@@ -1,0 +1,49 @@
+# Upload files
+backend/uploads/
+*/uploads/
+
+# Temporary files
+*.tmp
+*.temp
+*.swp
+*~
+# Environment
+.env
+.env.local
+.env.*.local
+
+# IDE
+.idea/
+*.iws
+*.iml
+*.ipr
+.vscode/
+
+# Database
+*.db
+
+# System
+.DS_Store
+Thumbs.db
+
+# Build
+target/
+*.class
+*.war
+
+# Logs
+*.log
+
+# Node (if any)
+node_modules/
+.gstack/
+.omc/
+.idea
+
+# Generated frontend assets and persistent runtime data
+**/dist/
+*.sqlite
+*.sqlite3
+*.db-wal
+*.db-shm
+backend/gallery-media/

@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.selfblog.mapper.BlogPostMapper">
+
+    <!-- 统计独立作者数 -->
+    <select id="countDistinctAuthorsSince">
+        SELECT COUNT(DISTINCT user_id) FROM blog_post WHERE create_time &gt;= #{since} AND is_deleted = 0
+    </select>
+
+    <!-- 浏览量+1 -->
+    <update id="incrementViewCount">
+        UPDATE blog_post SET view_count = CASE WHEN view_count &lt; 100000000 THEN view_count + 1 ELSE view_count END WHERE id = #{id} AND is_deleted = 0
+    </update>
+
+    <!-- 点赞数+1 -->
+    <update id="incrementLikeCount">
+        UPDATE blog_post SET like_count = CASE WHEN like_count &lt; 100000000 THEN like_count + 1 ELSE like_count END WHERE id = #{id} AND is_deleted = 0
+    </update>
+
+    <!-- 点赞数-1 -->
+    <update id="decrementLikeCount">
+        UPDATE blog_post SET like_count = like_count - 1 WHERE id = #{id} AND is_deleted = 0 AND like_count &gt; 0
+    </update>
+
+    <!-- 评论数+1 -->
+    <update id="incrementCommentCount">
+        UPDATE blog_post SET comment_count = CASE WHEN comment_count &lt; 100000000 THEN comment_count + 1 ELSE comment_count END WHERE id = #{id} AND is_deleted = 0
+    </update>
+
+    <!-- 评论数-N -->
+    <update id="decrementCommentCount">
+        UPDATE blog_post SET comment_count = comment_count - #{count} WHERE id = #{id} AND is_deleted = 0 AND comment_count &gt;= #{count}
+    </update>
+
+    <!-- 收藏数+1 -->
+    <update id="incrementCollectCount">
+        UPDATE blog_post SET collect_count = CASE WHEN collect_count &lt; 100000000 THEN collect_count + 1 ELSE collect_count END WHERE id = #{id} AND is_deleted = 0
+    </update>
+
+    <!-- 收藏数-1 -->
+    <update id="decrementCollectCount">
+        UPDATE blog_post SET collect_count = collect_count - 1 WHERE id = #{id} AND is_deleted = 0 AND collect_count &gt; 0
+    </update>
+
+    <!-- 分享数+1 -->
+    <update id="incrementShareCount">
+        UPDATE blog_post SET share_count = CASE WHEN share_count &lt; 100000000 THEN share_count + 1 ELSE share_count END WHERE id = #{id} AND is_deleted = 0
+    </update>
+
+    <!-- 分享数-1 -->
+    <update id="decrementShareCount">
+        UPDATE blog_post SET share_count = share_count - 1 WHERE id = #{id} AND is_deleted = 0 AND share_count &gt; 0
+    </update>
+
+    <!-- 统计每日新增文章数 -->
+    <select id="countPostsGroupByDate" resultType="java.util.Map">
+        SELECT DATE(create_time) as date, COUNT(*) as count FROM blog_post
+        WHERE create_time &gt;= #{since} AND is_deleted = 0
+        GROUP BY DATE(create_time) ORDER BY date
+    </select>
+
+    <!-- MySQL: 全文搜索（按时间排序） -->
+    <select id="fullTextSearch" resultType="java.lang.Long" databaseId="mysql">
+        SELECT id FROM blog_post
+        WHERE is_deleted = #{isDeleted} AND status = #{status}
+        AND MATCH(title, content) AGAINST(#{keyword} IN NATURAL LANGUAGE MODE)
+        ORDER BY create_time DESC LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <!-- SQLite: 全文搜索（按时间排序） -->
+    <select id="fullTextSearch" resultType="java.lang.Long" databaseId="sqlite">
+        SELECT id FROM blog_post
+        WHERE is_deleted = #{isDeleted} AND status = #{status}
+        AND (title LIKE '%' || #{keyword} || '%' OR content LIKE '%' || #{keyword} || '%')
+        ORDER BY create_time DESC LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <!-- MySQL: 全文搜索（按浏览量排序） -->
+    <select id="fullTextSearchByView" resultType="java.lang.Long" databaseId="mysql">
+        SELECT id FROM blog_post
+        WHERE is_deleted = #{isDeleted} AND status = #{status}
+        AND MATCH(title, content) AGAINST(#{keyword} IN NATURAL LANGUAGE MODE)
+        ORDER BY view_count DESC LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <!-- SQLite: 全文搜索（按浏览量排序） -->
+    <select id="fullTextSearchByView" resultType="java.lang.Long" databaseId="sqlite">
+        SELECT id FROM blog_post
+        WHERE is_deleted = #{isDeleted} AND status = #{status}
+        AND (title LIKE '%' || #{keyword} || '%' OR content LIKE '%' || #{keyword} || '%')
+        ORDER BY view_count DESC LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <!-- MySQL: 全文搜索（按点赞数排序） -->
+    <select id="fullTextSearchByLike" resultType="java.lang.Long" databaseId="mysql">
+        SELECT id FROM blog_post
+        WHERE is_deleted = #{isDeleted} AND status = #{status}
+        AND MATCH(title, content) AGAINST(#{keyword} IN NATURAL LANGUAGE MODE)
+        ORDER BY like_count DESC LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <!-- SQLite: 全文搜索（按点赞数排序） -->
+    <select id="fullTextSearchByLike" resultType="java.lang.Long" databaseId="sqlite">
+        SELECT id FROM blog_post
+        WHERE is_deleted = #{isDeleted} AND status = #{status}
+        AND (title LIKE '%' || #{keyword} || '%' OR content LIKE '%' || #{keyword} || '%')
+        ORDER BY like_count DESC LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <!-- MySQL: 全文搜索计数 -->
+    <select id="countFullTextSearch" resultType="java.lang.Long" databaseId="mysql">
+        SELECT COUNT(*) FROM blog_post
+        WHERE is_deleted = #{isDeleted} AND status = #{status}
+        AND MATCH(title, content) AGAINST(#{keyword} IN NATURAL LANGUAGE MODE)
+    </select>
+
+    <!-- SQLite: 全文搜索计数 -->
+    <select id="countFullTextSearch" resultType="java.lang.Long" databaseId="sqlite">
+        SELECT COUNT(*) FROM blog_post
+        WHERE is_deleted = #{isDeleted} AND status = #{status}
+        AND (title LIKE '%' || #{keyword} || '%' OR content LIKE '%' || #{keyword} || '%')
+    </select>
+
+</mapper>

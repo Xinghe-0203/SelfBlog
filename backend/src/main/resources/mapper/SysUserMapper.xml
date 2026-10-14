@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.selfblog.mapper.SysUserMapper">
+
+    <!-- MySQL: 原子性增加登录失败计数并检查是否需要锁定 -->
+    <update id="incrementLoginFailCount" databaseId="mysql">
+        UPDATE sys_user SET login_fail_count = LEAST(login_fail_count + 1, 2147483647),
+            lock_until = CASE WHEN login_fail_count + 1 &gt;= #{maxFailCount}
+            THEN TIMESTAMPADD('MINUTE', #{lockMinutes}, NOW()) ELSE lock_until END
+            WHERE id = #{userId} AND (lock_until IS NULL OR lock_until &lt;= NOW())
+    </update>
+
+    <!-- SQLite: 原子性增加登录失败计数并检查是否需要锁定 -->
+    <update id="incrementLoginFailCount" databaseId="sqlite">
+        UPDATE sys_user SET login_fail_count = MIN(login_fail_count + 1, 2147483647),
+            lock_until = CASE WHEN login_fail_count + 1 &gt;= #{maxFailCount}
+            THEN datetime('now', 'localtime', '+' || #{lockMinutes} || ' minutes') ELSE lock_until END
+            WHERE id = #{userId} AND (lock_until IS NULL OR lock_until &lt;= datetime('now', 'localtime'))
+    </update>
+
+    <!-- 默认（H2兼容）: 原子性增加登录失败计数并检查是否需要锁定 -->
+    <update id="incrementLoginFailCount">
+        UPDATE sys_user SET login_fail_count = LEAST(login_fail_count + 1, 2147483647),
+            lock_until = CASE WHEN login_fail_count + 1 &gt;= #{maxFailCount}
+            THEN DATEADD('MINUTE', #{lockMinutes}, CURRENT_TIMESTAMP) ELSE lock_until END
+            WHERE id = #{userId} AND (lock_until IS NULL OR lock_until &lt;= CURRENT_TIMESTAMP)
+    </update>
+
+    <!-- 原子性增加粉丝数 -->
+    <update id="incrementFollowerCount">
+        UPDATE sys_user SET follower_count = follower_count + 1 WHERE id = #{userId}
+    </update>
+
+    <!-- MySQL: 原子性减少粉丝数 -->
+    <update id="decrementFollowerCount" databaseId="mysql">
+        UPDATE sys_user SET follower_count = GREATEST(follower_count - 1, 0) WHERE id = #{userId}
+    </update>
+
+    <!-- SQLite: 原子性减少粉丝数 -->
+    <update id="decrementFollowerCount" databaseId="sqlite">
+        UPDATE sys_user SET follower_count = MAX(follower_count - 1, 0) WHERE id = #{userId}
+    </update>
+
+    <!-- 默认（H2兼容）: 原子性减少粉丝数 -->
+    <update id="decrementFollowerCount">
+        UPDATE sys_user SET follower_count = CASE WHEN follower_count - 1 &gt; 0 THEN follower_count - 1 ELSE 0 END WHERE id = #{userId}
+    </update>
+
+    <!-- 原子性增加关注数 -->
+    <update id="incrementFollowingCount">
+        UPDATE sys_user SET following_count = following_count + 1 WHERE id = #{userId}
+    </update>
+
+    <!-- MySQL: 原子性减少关注数 -->
+    <update id="decrementFollowingCount" databaseId="mysql">
+        UPDATE sys_user SET following_count = GREATEST(following_count - 1, 0) WHERE id = #{userId}
+    </update>
+
+    <!-- SQLite: 原子性减少关注数 -->
+    <update id="decrementFollowingCount" databaseId="sqlite">
+        UPDATE sys_user SET following_count = MAX(following_count - 1, 0) WHERE id = #{userId}
+    </update>
+
+    <!-- 默认（H2兼容）: 原子性减少关注数 -->
+    <update id="decrementFollowingCount">
+        UPDATE sys_user SET following_count = CASE WHEN following_count - 1 &gt; 0 THEN following_count - 1 ELSE 0 END WHERE id = #{userId}
+    </update>
+
+    <!-- 批量统计每日新增用户数 -->
+    <select id="countUsersGroupByDate" resultType="java.util.Map">
+        SELECT DATE(create_time) as date, COUNT(*) as count FROM sys_user
+        WHERE create_time &gt;= #{since} AND is_deleted = 0
+        GROUP BY DATE(create_time) ORDER BY date
+    </select>
+
+</mapper>

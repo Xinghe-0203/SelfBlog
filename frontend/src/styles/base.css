@@ -1,0 +1,112 @@
+/* ==================== Base Reset ==================== */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  font-size: 16px;
+  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+  color-scheme: light dark;
+}
+
+body {
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
+  background: var(--background-gradient);
+  background-attachment: fixed;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  transition: background var(--transition-slow), color var(--transition-slow);
+  min-height: 100vh;
+  overflow-x: hidden;
+  position: relative;
+}
+
+/* ==================== Scrollbar — Minimal ==================== */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--gray-300);
+  border-radius: var(--radius-full);
+  transition: background var(--transition);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--gray-400);
+}
+
+.dark-mode ::-webkit-scrollbar-thumb {
+  background: var(--gray-600);
+}
+
+.dark-mode ::-webkit-scrollbar-thumb:hover {
+  background: var(--gray-500);
+}
+
+/* ==================== Text Selection ==================== */
+::selection {
+  background: rgba(31, 108, 159, 0.15);
+  color: var(--text-primary);
+}
+
+.dark-mode ::selection {
+  background: rgba(31, 108, 159, 0.30);
+}
+
+/* ==================== Image Loading ==================== */
+img {
+  transition: opacity 0.3s ease;
+}
+
+img[loading="lazy"] {
+  opacity: 0;
+}
+
+img[loading="lazy"].loaded,
+img[loading="lazy"]:not([src=""]) {
+  opacity: 1;
+}
+
+/* ==================== Form Base ==================== */
+input,
+button,
+textarea,
+select {
+  font-family: inherit;
+  font-size: inherit;
+  line-height: inherit;
+}
+
+button {
+  cursor: pointer;
+  border: none;
+  background: none;
+}
+
+/* ==================== Responsive Base Font Size ==================== */
+@media (max-width: 640px) {
+  html {
+    font-size: 14px;
+  }
+}
+
+@media (min-width: 1600px) {
+  html {
+    font-size: 17px;
+  }
+}

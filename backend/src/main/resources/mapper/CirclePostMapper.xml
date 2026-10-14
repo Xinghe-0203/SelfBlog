@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.selfblog.mapper.CirclePostMapper">
+
+    <select id="countDistinctAuthorsSince">
+        SELECT COUNT(DISTINCT user_id) FROM blog_circle_post WHERE create_time &gt;= #{since} AND is_deleted = 0
+    </select>
+
+    <update id="incrementViewCount">
+        UPDATE blog_circle_post SET view_count = view_count + 1 WHERE id = #{id} AND is_deleted = 0
+    </update>
+
+    <update id="incrementLikeCount">
+        UPDATE blog_circle_post SET like_count = CASE WHEN like_count &lt; 100000000 THEN like_count + 1 ELSE like_count END WHERE id = #{id} AND is_deleted = 0
+    </update>
+
+    <update id="decrementLikeCount">
+        UPDATE blog_circle_post SET like_count = like_count - 1 WHERE id = #{id} AND is_deleted = 0 AND like_count &gt; 0
+    </update>
+
+    <update id="incrementCommentCount">
+        UPDATE blog_circle_post SET comment_count = comment_count + 1 WHERE id = #{id} AND is_deleted = 0
+    </update>
+
+    <update id="decrementCommentCount">
+        UPDATE blog_circle_post SET comment_count = comment_count - #{count} WHERE id = #{id} AND is_deleted = 0 AND comment_count &gt;= #{count}
+    </update>
+
+    <update id="incrementRepostCount">
+        UPDATE blog_circle_post SET repost_count = repost_count + 1 WHERE id = #{id} AND is_deleted = 0
+    </update>
+
+    <update id="decrementRepostCount">
+        UPDATE blog_circle_post SET repost_count = repost_count - 1 WHERE id = #{id} AND is_deleted = 0 AND repost_count &gt; 0
+    </update>
+
+    <!-- MySQL: 统计包含指定话题的动态数 -->
+    <select id="countByTopicId" resultType="java.lang.Long" databaseId="mysql">
+        SELECT COUNT(*) FROM blog_circle_post
+        WHERE JSON_CONTAINS(JSON_UNQUOTE(topic_ids), CAST(#{topicId} AS JSON))
+        AND status = 1 AND is_deleted = 0
+    </select>
+
+    <!-- SQLite: 统计包含指定话题的动态数（使用 json_each） -->
+    <select id="countByTopicId" resultType="java.lang.Long" databaseId="sqlite">
+        SELECT COUNT(*) FROM blog_circle_post, json_each(blog_circle_post.topic_ids)
+        WHERE CAST(json_each.value AS INTEGER) = #{topicId}
+        AND status = 1 AND is_deleted = 0
+    </select>
+
+    <!-- MySQL: 批量统计各话题关联的动态数 -->
+    <select id="countByTopicIdsRaw" resultType="java.util.Map" databaseId="mysql">
+        SELECT jt.topicId, COUNT(*) as cnt FROM blog_circle_post
+        CROSS JOIN JSON_TABLE(JSON_UNQUOTE(topic_ids), '$[*]' COLUMNS(topicId BIGINT PATH '$')) AS jt
+        WHERE jt.topicId IN
+        <foreach collection="topicIds" item="id" separator="," open="(" close=")">#{id}</foreach>
+        AND status = 1 AND is_deleted = 0 GROUP BY jt.topicId
+    </select>
+
+    <!-- SQLite: 批量统计各话题关联的动态数（使用 json_each） -->
+    <select id="countByTopicIdsRaw" resultType="java.util.Map" databaseId="sqlite">
+        SELECT CAST(je.value AS INTEGER) as topicId, COUNT(*) as cnt FROM blog_circle_post, json_each(blog_circle_post.topic_ids) AS je
+        WHERE CAST(je.value AS INTEGER) IN
+        <foreach collection="topicIds" item="id" separator="," open="(" close=")">#{id}</foreach>
+        AND status = 1 AND is_deleted = 0 GROUP BY je.value
+    </select>
+
+</mapper>

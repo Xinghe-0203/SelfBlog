@@ -1,0 +1,286 @@
+/* =============================================================================
+   动画系统 — Motion Choreography
+   =============================================================================
+   Three tiers of motion:
+     1. Scroll-reveal   — elements enter viewport with fade + translate
+     2. Interaction      — hover, press, focus feedback
+     3. Stagger          — sequential entrance for lists / grids
+
+   Easing follows the project's design-system tokens (--ease-out, etc.)
+   and uses cubic-bezier(0.16, 1, 0.3, 1) for the "snap-decelerate" feel
+   on scroll reveals specifically — slightly punchier than --ease-out.
+   ============================================================================= */
+
+/* ==================== 滚动进入动画 (Scroll Reveal) ==================== */
+.fade-in-up {
+  opacity: 0;
+  transform: translateY(12px);
+  transition: opacity 600ms cubic-bezier(0.16, 1, 0.3, 1),
+              transform 600ms cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: opacity, transform;
+}
+
+.fade-in-up.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.fade-in-left {
+  opacity: 0;
+  transform: translateX(-12px);
+  transition: opacity 600ms cubic-bezier(0.16, 1, 0.3, 1),
+              transform 600ms cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: opacity, transform;
+}
+
+.fade-in-left.visible {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.fade-in-right {
+  opacity: 0;
+  transform: translateX(12px);
+  transition: opacity 600ms cubic-bezier(0.16, 1, 0.3, 1),
+              transform 600ms cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: opacity, transform;
+}
+
+.fade-in-right.visible {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.fade-in-scale {
+  opacity: 0;
+  transform: scale(0.96);
+  transition: opacity 500ms cubic-bezier(0.16, 1, 0.3, 1),
+              transform 500ms cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: opacity, transform;
+}
+
+.fade-in-scale.visible {
+  opacity: 1;
+  transform: scale(1);
+}
+
+/* ==================== 交错延迟 (Stagger Delays) ==================== */
+.stagger-1 { transition-delay: 80ms; }
+.stagger-2 { transition-delay: 160ms; }
+.stagger-3 { transition-delay: 240ms; }
+.stagger-4 { transition-delay: 320ms; }
+.stagger-5 { transition-delay: 400ms; }
+.stagger-6 { transition-delay: 480ms; }
+
+/* ==================== 卡片悬停 (Card Hover) ==================== */
+.card-hover {
+  transition: box-shadow 200ms cubic-bezier(0.16, 1, 0.3, 1),
+              transform 200ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.card-hover:hover {
+  box-shadow: var(--shadow);
+  transform: translateY(-1px);
+}
+
+/* ==================== 按钮按压 (Button Press) ==================== */
+.btn-press:active {
+  transform: scale(0.98);
+  transition: transform 80ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* ==================== 页面过渡 (Page Transitions) ==================== */
+.page-enter-active,
+.page-leave-active {
+  transition: opacity 200ms ease, transform 200ms ease;
+}
+
+.page-enter-from {
+  opacity: 0;
+  transform: translateY(8px);
+}
+
+.page-leave-to {
+  opacity: 0;
+  transform: translateY(-8px);
+}
+
+/* ==================== 尊重减少动效偏好 ==================== */
+@media (prefers-reduced-motion: reduce) {
+  .fade-in-up,
+  .fade-in-left,
+  .fade-in-right,
+  .fade-in-scale {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+
+  .stagger-1,
+  .stagger-2,
+  .stagger-3,
+  .stagger-4,
+  .stagger-5,
+  .stagger-6 {
+    transition-delay: 0ms;
+  }
+
+  .card-hover:hover {
+    transform: none;
+  }
+
+  .btn-press:active {
+    transform: none;
+  }
+}
+
+/* ==================== 动画工具类 ==================== */
+
+/* 淡入 */
+.fade-in {
+  animation: fadeIn var(--duration-normal) var(--ease-out);
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* 从下方滑入 */
+.slide-up {
+  animation: slideUp var(--duration-normal) var(--ease-out);
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* 从上方滑入 */
+.slide-down {
+  animation: slideDown var(--duration-normal) var(--ease-out);
+}
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* 从左侧滑入 */
+.slide-left {
+  animation: slideLeft var(--duration-normal) var(--ease-out);
+}
+
+@keyframes slideLeft {
+  from { opacity: 0; transform: translateX(16px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+/* 从右侧滑入 */
+.slide-right {
+  animation: slideRight var(--duration-normal) var(--ease-out);
+}
+
+@keyframes slideRight {
+  from { opacity: 0; transform: translateX(-16px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+/* 缩放进入 */
+.scale-in {
+  animation: scaleIn var(--duration-normal) var(--ease-out);
+}
+
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.92); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+/* 弹性缩放 */
+.scale-bounce {
+  animation: scaleBounce var(--duration-slower) var(--ease-spring);
+}
+
+@keyframes scaleBounce {
+  from { opacity: 0; transform: scale(0.8); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+/* 悬浮动画 */
+.float {
+  animation: float 3s ease-in-out infinite;
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-8px); }
+}
+
+/* 脉冲动画 */
+.pulse {
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.5; }
+}
+
+/* 闪烁效果 — 骨架屏/加载态 */
+.shimmer {
+  background: linear-gradient(90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.4) 50%,
+    transparent 100%);
+  background-size: 200% 100%;
+  animation: shimmer 2s infinite;
+}
+
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+/* 旋转 */
+.spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* 摇晃提示 */
+.shake {
+  animation: shake 0.5s var(--ease-bounce);
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20%      { transform: translateX(-6px); }
+  40%      { transform: translateX(6px); }
+  60%      { transform: translateX(-4px); }
+  80%      { transform: translateX(4px); }
+}
+
+/* 渐显并上移 — 适合列表项逐个入场 */
+.stagger-in > * {
+  opacity: 0;
+  animation: staggerItem var(--duration-normal) var(--ease-out) forwards;
+}
+
+.stagger-in > *:nth-child(1)  { animation-delay: 0ms; }
+.stagger-in > *:nth-child(2)  { animation-delay: 50ms; }
+.stagger-in > *:nth-child(3)  { animation-delay: 100ms; }
+.stagger-in > *:nth-child(4)  { animation-delay: 150ms; }
+.stagger-in > *:nth-child(5)  { animation-delay: 200ms; }
+.stagger-in > *:nth-child(6)  { animation-delay: 250ms; }
+.stagger-in > *:nth-child(7)  { animation-delay: 300ms; }
+.stagger-in > *:nth-child(8)  { animation-delay: 350ms; }
+.stagger-in > *:nth-child(9)  { animation-delay: 400ms; }
+.stagger-in > *:nth-child(10) { animation-delay: 450ms; }
+
+@keyframes staggerItem {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}

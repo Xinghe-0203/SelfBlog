@@ -1,0 +1,70 @@
+/* Light color skins are data-driven from author settings. Dark-mode remains independent. */
+#selfblog[data-skin='forest']:not(.dark-mode) {
+  --bg-primary: #f6f8f1;
+  --bg-secondary: #edf2e5;
+  --bg-tertiary: #e5ecd9;
+  --surface-primary: #fffefa;
+  --surface-secondary: #f9faf5;
+  --border-light: #dce4d2;
+  --text-primary: #26372a;
+  --text-secondary: #586b5a;
+  --text-muted: #7f907e;
+  --accent: #2d7c54;
+  --accent-light: #e4f2e8;
+  --accent-dark: #1d6541;
+}
+
+#selfblog[data-skin='lavender']:not(.dark-mode) {
+  --bg-primary: #f8f6fc;
+  --bg-secondary: #f0edf8;
+  --bg-tertiary: #e8e2f4;
+  --surface-primary: #fff;
+  --surface-secondary: #fbfaff;
+  --border-light: #e4dff0;
+  --text-primary: #302b3d;
+  --text-secondary: #625b72;
+  --text-muted: #8c849c;
+  --accent: #7555b7;
+  --accent-light: #eee8fa;
+  --accent-dark: #5b3f98;
+}
+
+#selfblog[data-skin='sunset']:not(.dark-mode) {
+  --bg-primary: #fcf7f2;
+  --bg-secondary: #f6ede5;
+  --bg-tertiary: #efe2d6;
+  --surface-primary: #fffdfa;
+  --surface-secondary: #fff9f3;
+  --border-light: #eadbd0;
+  --text-primary: #3f3028;
+  --text-secondary: #735d50;
+  --text-muted: #9a8170;
+  --accent: #c45b3e;
+  --accent-light: #fbe9df;
+  --accent-dark: #a8442d;
+}
+
+#selfblog[data-skin='midnight'] {
+  --bg-primary: #101823;
+  --bg-secondary: #172332;
+  --bg-tertiary: #202f40;
+  --surface-primary: #182535;
+  --surface-secondary: #1d2c3c;
+  --border-light: #2d4053;
+  --text-primary: #ecf2f8;
+  --text-secondary: #b4c2d0;
+  --text-muted: #8094a9;
+  --accent: #69aef7;
+  --accent-light: #213a54;
+  --accent-dark: #8bc0fa;
+  --surface-solid: #182535;
+  --background-solid: #101823;
+  --glass-bg: #182535;
+  --glass-bg-light: #1d2c3c;
+  --glass-bg-heavy: #182535;
+  --border-solid: #2d4053;
+}
+
+#selfblog[data-skin='midnight'] .dark-mode {
+  color-scheme: dark;
+}

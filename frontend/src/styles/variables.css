@@ -1,0 +1,363 @@
+/* =============================================================================
+   SelfBlog Design System v6.0 — "清爽科技蓝"
+   =============================================================================
+
+   Aesthetic: Clean tech-blue with soft neutrals. School blog vibe —
+   fresh, youthful, professional but not flashy.
+
+   Palette source: User-defined 清爽科技蓝 scheme.
+   Accessibility targets: WCAG 2.1 AA contrast on all text/surface pairs.
+   ============================================================================= */
+
+/* ==================== CSS Variables — 清爽科技蓝 Theme ==================== */
+:root {
+  /* ---------------------------------------------------------------
+     Canvas / Background
+     --------------------------------------------------------------- */
+  --bg-primary:    #F8FAFC;         /* 页面背景 — 浅灰蓝，减少刺眼 */
+  --bg-secondary:  #F1F5F9;         /* 次级区域背景 */
+  --bg-tertiary:   #EDF2F7;
+
+  /* ---------------------------------------------------------------
+     Surfaces
+     --------------------------------------------------------------- */
+  --surface-primary:   #FFFFFF;     /* 卡片背景 — 纯白，与页面背景形成轻微对比 */
+  --surface-secondary: #FAFBFC;
+
+  /* ---------------------------------------------------------------
+     Borders / Dividers
+     --------------------------------------------------------------- */
+  --border-light:      #E5E6EB;     /* 浅灰分割线，不抢视线 */
+  --border-ultra-light: #F0F1F5;
+
+  /* ---------------------------------------------------------------
+     Text — 三级灰度梯度
+     --------------------------------------------------------------- */
+  --text-primary:   #1D2129;         /* 标题文字 — 深灰，比纯黑柔和 */
+  --text-secondary: #4E5969;         /* 正文文字 — 中灰 */
+  --text-muted:     #86909C;         /* 辅助文字 — 浅灰（时间、统计） */
+  --text-inverse:   #FFFFFF;
+
+  /* ---------------------------------------------------------------
+     Primary — 柔和蓝 #165DFF
+     --------------------------------------------------------------- */
+  --accent:       #165DFF;           /* 主色 — 沉稳耐看的蓝 */
+  --accent-light: #E8F3FF;           /* 浅蓝 — hover、标签选中、卡片高亮 */
+  --accent-dark:  #0E42D2;           /* 深蓝 — active/pressed */
+
+  /* ---------------------------------------------------------------
+     Secondary — 活力橙 #FF7D00（点赞、评论、热门标签点缀）
+     --------------------------------------------------------------- */
+  --secondary:       #FF7D00;
+  --secondary-light: #FFF7E8;
+  --secondary-dark:  #D96400;
+
+  /* ---------------------------------------------------------------
+     Semantic Colors
+     --------------------------------------------------------------- */
+  --success:       #00B42A;
+  --success-light: #E8FFEA;
+  --success-hover: #009A29;
+
+  --warning:       #FF7D00;
+  --warning-light: #FFF7E8;
+  --warning-hover: #D96400;
+
+  --error:         #F53F3F;
+  --error-light:   #FFECE8;
+  --error-hover:   #D9363E;
+
+  --info:          #165DFF;
+  --info-light:    #E8F3FF;
+  --info-hover:    #0E42D2;
+
+  /* ---------------------------------------------------------------
+     Neutral Gray Scale — 统一灰度梯度
+     --------------------------------------------------------------- */
+  --gray-50:  #F8FAFC;
+  --gray-100: #F1F5F9;
+  --gray-200: #E5E6EB;
+  --gray-300: #C9CDD4;
+  --gray-400: #86909C;
+  --gray-500: #4E5969;
+  --gray-600: #3D4550;
+  --gray-700: #2C333D;
+  --gray-800: #1D2129;
+  --gray-900: #111111;
+  --gray-950: #0A0A0A;
+
+  /* ---------------------------------------------------------------
+     Backward-Compatibility Aliases — Primary System
+     --------------------------------------------------------------- */
+  --primary:        var(--accent);
+  --primary-start:  var(--accent);
+  --primary-end:    var(--accent-dark);
+  --primary-hover:  var(--accent-dark);
+  --primary-active: var(--accent-dark);
+  --primary-light:  var(--accent-light);
+  --primary-subtle: rgba(22, 93, 255, 0.04);
+  --primary-glow:   rgba(22, 93, 255, 0.20);
+
+  /* Backward-Compatibility — Accent System */
+  --accent-hover:   var(--accent-dark);
+  --accent-active:  var(--accent-dark);
+  --accent-subtle:  rgba(22, 93, 255, 0.04);
+  --accent-glow:    rgba(22, 93, 255, 0.20);
+
+  /* Backward-Compatibility — Semantic Glow */
+  --success-glow: rgba(0, 180, 42, 0.15);
+  --warning-glow: rgba(255, 125, 0, 0.15);
+  --error-glow:   rgba(245, 63, 63, 0.15);
+  --info-glow:    rgba(22, 93, 255, 0.15);
+
+  /* Backward-Compatibility — Semantic Aliases */
+  --background:       var(--bg-primary);
+  --background-solid: #F8FAFC;
+  --surface:          #FFFFFF;
+  --surface-solid:    #FFFFFF;
+  --surface-raised:   #FFFFFF;
+  --border:           var(--border-ultra-light);
+  --border-solid:     var(--border-light);
+  --border-strong:    var(--gray-300);
+
+  /* ---------------------------------------------------------------
+     Backward-Compatibility — Glass System (solid surfaces)
+     --------------------------------------------------------------- */
+  --glass-bg:           #FFFFFF;
+  --glass-bg-light:     #FFFFFF;
+  --glass-bg-heavy:     #FFFFFF;
+  --glass-border:       var(--border-light);
+  --glass-border-frost: var(--border-light);
+  --glass-shadow:       var(--shadow-sm);
+  --glass-shadow-frost: var(--shadow-md);
+  --glass-blur:         none;
+  --glass-blur-heavy:   none;
+  --glass-hover:        #F8FAFC;
+  --glass-shine:        none;
+  --glass-frost-glow:   none;
+  --glass-border-wet:   var(--border-light);
+  --glass-shadow-wet:   var(--shadow-md);
+  --glass-wet-glow:     none;
+
+  /* ---------------------------------------------------------------
+     Decorative Colors — 校园活力点缀（紫色微调）
+     --------------------------------------------------------------- */
+  --blue:        var(--accent);
+  --blue-light:  var(--accent-light);
+  --green:       var(--success);
+  --green-light: var(--success-light);
+  --purple:      #6941C6;             /* 柔和紫 — 降低饱和度，更高级 */
+  --purple-light:#F4F0FF;             /* 浅紫背景 */
+  --purple-muted:#9B7ED1;             /* 柔和紫 — 辅助文字、标签 */
+  --pink:        #F772B2;
+  --pink-light:  #FFF0F6;
+  --red:         var(--error);
+  --red-light:   var(--error-light);
+  --orange:      var(--secondary);
+  --orange-light:var(--secondary-light);
+
+  /* ---------------------------------------------------------------
+     Typography System
+     --------------------------------------------------------------- */
+
+  /* Font Families */
+  --font-display: 'Lyon Text', 'Newsreader', 'Playfair Display', 'Instrument Serif', Georgia, serif;
+  --font-sans:    'SF Pro Display', 'Geist Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-serif:   'Lyon Text', 'Newsreader', 'Playfair Display', 'Instrument Serif', Georgia, serif;
+  --font-mono:    'Geist Mono', 'SF Mono', 'JetBrains Mono', monospace;
+
+  /* Font Sizes */
+  --text-xs:   0.75rem;     /* 12px */
+  --text-sm:   0.875rem;    /* 14px */
+  --text-base: 1rem;        /* 16px */
+  --text-lg:   1.125rem;    /* 18px */
+  --text-xl:   1.25rem;     /* 20px */
+  --text-2xl:  1.5rem;      /* 24px */
+  --text-3xl:  1.875rem;    /* 30px */
+  --text-4xl:  2.25rem;     /* 36px */
+  --text-5xl:  3rem;        /* 48px */
+
+  /* Line Heights */
+  --leading-none:    1;
+  --leading-tight:   1.25;
+  --leading-snug:    1.375;
+  --leading-normal:  1.6;
+  --leading-relaxed: 1.75;
+  --leading-loose:   2;
+
+  /* Font Weights */
+  --font-normal:    400;
+  --font-medium:    500;
+  --font-semibold:  600;
+  --font-bold:      700;
+  --font-extrabold: 800;
+
+  /* Letter Spacing */
+  --tracking-tight:  -0.025em;
+  --tracking-normal:  0;
+  --tracking-wide:    0.025em;
+  --tracking-wider:   0.05em;
+
+  /* ---------------------------------------------------------------
+     Spacing System — 8px Base Unit
+     --------------------------------------------------------------- */
+  --space-1:   4px;
+  --space-2:   8px;
+  --space-3:   12px;
+  --space-4:   16px;
+  --space-5:   20px;
+  --space-6:   24px;
+  --space-8:   32px;
+  --space-10:  40px;
+  --space-12:  48px;
+  --space-16:  64px;
+  --space-20:  80px;
+  --space-24:  96px;
+
+  /* Backward-Compatibility — Old spacing names */
+  --spacing-0:    0;
+  --spacing-0_5:  2px;
+  --spacing-1:    var(--space-1);
+  --spacing-1_5:  6px;
+  --spacing-2:    var(--space-2);
+  --spacing-2_5:  10px;
+  --spacing-3:    var(--space-3);
+  --spacing-3_5:  14px;
+  --spacing-4:    var(--space-4);
+  --spacing-5:    var(--space-5);
+  --spacing-6:    var(--space-6);
+  --spacing-7:    28px;
+  --spacing-8:    var(--space-8);
+  --spacing-9:    36px;
+  --spacing-10:   var(--space-10);
+  --spacing-12:   var(--space-12);
+  --spacing-14:   56px;
+  --spacing-16:   var(--space-16);
+  --spacing-20:   var(--space-20);
+  --spacing-24:   var(--space-24);
+
+  --spacing-xs:  var(--space-1);
+  --spacing-sm:  var(--space-2);
+  --spacing-md:  var(--space-4);
+  --spacing-lg:  var(--space-6);
+  --spacing-xl:  var(--space-8);
+  --spacing-2xl: var(--space-12);
+  --spacing-3xl: var(--space-16);
+  --spacing-4xl: var(--space-24);
+
+  /* ---------------------------------------------------------------
+     Border Radius — Restrained
+     --------------------------------------------------------------- */
+  --radius-none: 0;
+  --radius-xs:   4px;
+  --radius-sm:   4px;
+  --radius:      8px;
+  --radius-md:   8px;
+  --radius-lg:   12px;
+  --radius-xl:   16px;
+  --radius-2xl:  20px;
+  --radius-3xl:  24px;
+  --radius-full: 9999px;
+
+  /* ---------------------------------------------------------------
+     Shadows — 明显层次感，卡片悬浮效果
+     --------------------------------------------------------------- */
+  --shadow-xs:   0 1px 3px rgba(0, 0, 0, 0.06);
+  --shadow-sm:   0 2px 6px rgba(0, 0, 0, 0.08);
+  --shadow:      0 4px 12px rgba(0, 0, 0, 0.10);
+  --shadow-md:   0 6px 16px rgba(0, 0, 0, 0.12);
+  --shadow-lg:   0 8px 24px rgba(0, 0, 0, 0.14);
+  --shadow-xl:   0 12px 32px rgba(0, 0, 0, 0.16);
+  --shadow-2xl:  0 16px 48px rgba(0, 0, 0, 0.20);
+  --shadow-inner:inset 0 2px 4px rgba(0, 0, 0, 0.06);
+
+  --shadow-glow-primary: none;
+  --shadow-glow-accent:  none;
+  --shadow-glow-success: none;
+  --shadow-glow-error:   none;
+
+  /* ---------------------------------------------------------------
+     Motion System — Snappy Spring Easing
+     --------------------------------------------------------------- */
+
+  /* Durations */
+  --duration-instant: 50ms;
+  --duration-fast:    150ms;
+  --duration-normal:  200ms;
+  --duration-slow:    300ms;
+  --duration-slower:  400ms;
+
+  /* Easing Functions */
+  --ease-default:  cubic-bezier(0.16, 1, 0.3, 1);   /* Snappy ease-out */
+  --ease-in:       cubic-bezier(0.4, 0, 1, 1);
+  --ease-out:      cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out:   cubic-bezier(0.65, 0, 0.35, 1);
+  --ease-spring:   cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-bounce:   cubic-bezier(0.68, -0.55, 0.265, 1.55);
+  --ease-smooth:   cubic-bezier(0.25, 0.1, 0.25, 1);
+
+  /* Semantic Transitions */
+  --transition-fast:   150ms cubic-bezier(0.16, 1, 0.3, 1);
+  --transition:        200ms cubic-bezier(0.16, 1, 0.3, 1);
+  --transition-base:   200ms cubic-bezier(0.16, 1, 0.3, 1);
+  --transition-slow:   300ms cubic-bezier(0.16, 1, 0.3, 1);
+  --transition-spring: 400ms cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  /* ---------------------------------------------------------------
+     Container Widths
+     --------------------------------------------------------------- */
+  --container-xs: 480px;
+  --container-sm: 640px;
+  --container-md: 800px;
+  --container-lg: 1200px;
+  --container-xl: 1400px;
+
+  /* ---------------------------------------------------------------
+     Skeleton Loading
+     --------------------------------------------------------------- */
+  --skeleton-base:      #E5E6EB;
+  --skeleton-highlight: #F1F5F9;
+
+  /* ---------------------------------------------------------------
+     Navbar
+     --------------------------------------------------------------- */
+  --navbar-bg:     rgba(255, 255, 255, 0.95);
+  --navbar-height: 64px;
+
+  /* ---------------------------------------------------------------
+     Secondary / Accent colors (for likes, comments, hot tags)
+     --------------------------------------------------------------- */
+  --like-color:    var(--secondary);
+  --like-light:    var(--secondary-light);
+  --hot-tag-bg:    var(--secondary-light);
+  --hot-tag-text:  var(--secondary-dark);
+
+  /* ---------------------------------------------------------------
+     Z-Index Scale
+     --------------------------------------------------------------- */
+  --z-dropdown:        1000;
+  --z-sticky:          1020;
+  --z-fixed:           1030;
+  --z-overlay:         1040;
+  --z-modal-backdrop:  1050;
+  --z-modal:           1060;
+  --z-popover:         1070;
+  --z-tooltip:         1080;
+  --z-toast:           1090;
+  --z-preview:         1100;
+
+  /* ---------------------------------------------------------------
+     Background Gradient — 清爽蓝灰渐变
+     --------------------------------------------------------------- */
+  --background-gradient: linear-gradient(
+    160deg,
+    #F8FAFC 0%,
+    #F1F5F9 40%,
+    #EDF2F7 70%,
+    #F1F5F9 100%
+  );
+
+  /* Brand Gradient — Now monochrome blue */
+  --brand-gradient:    linear-gradient(135deg, var(--accent), var(--accent-dark));
+  --brand-gradient-h:  linear-gradient(90deg, var(--accent), var(--accent-dark));
+}

@@ -1,0 +1,162 @@
+/* ==================== Dark Mode — Warm Canvas Dark ==================== */
+.dark-mode {
+  /* Canvas / Background */
+  --bg-primary:    #191919;
+  --bg-secondary:  #202020;
+  --bg-tertiary:   #262626;
+
+  /* Surfaces */
+  --surface-primary:   #202020;
+  --surface-secondary: #262626;
+
+  /* Borders */
+  --border-light:      #333333;
+  --border-ultra-light: rgba(255, 255, 255, 0.06);
+
+  /* Text */
+  --text-primary:   #EBEBEB;
+  --text-secondary: #999999;
+  --text-muted:     #666666;
+  --text-inverse:   #111111;
+
+  /* Accent — Slightly brighter blue for dark backgrounds */
+  --accent:       #4BA3D4;
+  --accent-light: rgba(75, 163, 212, 0.12);
+  --accent-dark:  #6BB8E2;
+
+  /* Semantic Colors — Dark mode lighter tones */
+  --success:       #5CA862;
+  --success-light: rgba(92, 168, 98, 0.12);
+  --success-hover: #72BC78;
+
+  --warning:       #C89A3D;
+  --warning-light: rgba(200, 154, 61, 0.12);
+  --warning-hover: #D4AD58;
+
+  --error:         #D45B59;
+  --error-light:   rgba(212, 91, 89, 0.12);
+  --error-hover:   #E07270;
+
+  --info:          #4BA3D4;
+  --info-light:    rgba(75, 163, 212, 0.12);
+  --info-hover:    #6BB8E2;
+
+  /* Neutral Gray Scale — Inverted */
+  --gray-50:  #191919;
+  --gray-100: #202020;
+  --gray-200: #333333;
+  --gray-300: #444444;
+  --gray-400: #666666;
+  --gray-500: #888888;
+  --gray-600: #999999;
+  --gray-700: #BBBBBB;
+  --gray-800: #DDDDDD;
+  --gray-900: #EBEBEB;
+  --gray-950: #F5F5F5;
+
+  /* Backward-Compatibility — Primary System */
+  --primary:        var(--accent);
+  --primary-start:  var(--accent);
+  --primary-end:    var(--accent-dark);
+  --primary-hover:  var(--accent-dark);
+  --primary-active: #3A8FBE;
+  --primary-light:  var(--accent-light);
+  --primary-subtle: rgba(75, 163, 212, 0.06);
+  --primary-glow:   rgba(75, 163, 212, 0.20);
+
+  --accent-hover:   var(--accent-dark);
+  --accent-active:  #3A8FBE;
+  --accent-subtle:  rgba(75, 163, 212, 0.06);
+  --accent-glow:    rgba(75, 163, 212, 0.20);
+
+  --success-glow: rgba(92, 168, 98, 0.15);
+  --warning-glow: rgba(200, 154, 61, 0.15);
+  --error-glow:   rgba(212, 91, 89, 0.15);
+  --info-glow:    rgba(75, 163, 212, 0.15);
+
+  /* Backward-Compatibility — Semantic Aliases */
+  --background:       var(--bg-secondary);
+  --background-solid: #202020;
+  --surface:          #202020;
+  --surface-solid:    #202020;
+  --surface-raised:   #262626;
+  --border:           var(--border-ultra-light);
+  --border-solid:     var(--border-light);
+  --border-strong:    var(--gray-300);
+
+  /* Backward-Compatibility — Glass System (now solid in dark) */
+  --glass-bg:           #202020;
+  --glass-bg-light:     #262626;
+  --glass-bg-heavy:     #1A1A1A;
+  --glass-border:       var(--border-light);
+  --glass-border-frost: var(--border-light);
+  --glass-shadow:       var(--shadow-sm);
+  --glass-shadow-frost: var(--shadow-md);
+  --glass-blur:         none;
+  --glass-blur-heavy:   none;
+  --glass-hover:        #262626;
+  --glass-shine:        none;
+  --glass-frost-glow:   none;
+  --glass-border-wet:   var(--border-light);
+  --glass-shadow-wet:   var(--shadow-md);
+  --glass-wet-glow:     none;
+
+  /* Backward-Compatibility — Decorative Colors */
+  --blue:        #4BA3D4;
+  --blue-light:  rgba(75, 163, 212, 0.12);
+  --green:       #5CA862;
+  --green-light: rgba(92, 168, 98, 0.12);
+  --purple:      #9B8ABF;
+  --purple-light:rgba(155, 138, 191, 0.12);
+  --pink:        #C48898;
+  --pink-light:  rgba(196, 136, 152, 0.12);
+  --red:         #D45B59;
+  --red-light:   rgba(212, 91, 89, 0.12);
+  --orange:      #C89A3D;
+  --orange-light:rgba(200, 154, 61, 0.12);
+
+  /* Shadows — Dark mode deeper */
+  --shadow-xs:   0 1px 2px rgba(0, 0, 0, 0.20);
+  --shadow-sm:   0 1px 3px rgba(0, 0, 0, 0.24);
+  --shadow:      0 2px 8px rgba(0, 0, 0, 0.28);
+  --shadow-md:   0 4px 12px rgba(0, 0, 0, 0.32);
+  --shadow-lg:   0 8px 24px rgba(0, 0, 0, 0.40);
+  --shadow-xl:   0 12px 32px rgba(0, 0, 0, 0.50);
+  --shadow-2xl:  0 16px 40px rgba(0, 0, 0, 0.55);
+  --shadow-inner:inset 0 2px 4px rgba(0, 0, 0, 0.20);
+
+  --shadow-glow-primary: none;
+  --shadow-glow-accent:  none;
+  --shadow-glow-success: none;
+  --shadow-glow-error:   none;
+
+  /* Skeleton */
+  --skeleton-base:      #333333;
+  --skeleton-highlight: #262626;
+
+  /* Navbar */
+  --navbar-bg: rgba(25, 25, 25, 0.92);
+
+  /* Background Gradient */
+  --background-gradient: linear-gradient(
+    160deg,
+    #191919 0%,
+    #1E1E1E 40%,
+    #222222 70%,
+    #191919 100%
+  );
+
+  /* Brand Gradient */
+  --brand-gradient:    linear-gradient(135deg, var(--accent), var(--accent-dark));
+  --brand-gradient-h:  linear-gradient(90deg, var(--accent), var(--accent-dark));
+}
+
+/* ==================== Color Scheme ==================== */
+.dark-mode {
+  color-scheme: dark;
+}
+
+/* ==================== Theme Transition ==================== */
+body {
+  transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
+}

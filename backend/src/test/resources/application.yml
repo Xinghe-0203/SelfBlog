@@ -1,0 +1,114 @@
+# =============================================================================
+# 测试环境配置文件
+# =============================================================================
+
+spring:
+  application:
+    name: selfblog-forum-test
+
+  # 使用H2内存数据库进行测试
+  datasource:
+    driver-class-name: org.h2.Driver
+    url: jdbc:h2:mem:testdb;MODE=MySQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    username: sa
+    password:
+
+  # JPA/Hibernate配置（H2兼容模式）
+  jpa:
+    database-platform: org.hibernate.dialect.H2Dialect
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
+
+  # 缓存配置（测试时禁用）
+  cache:
+    type: none
+
+  # 邮件配置（测试使用 dummy 值，避免 JavaMailSender 创建失败）
+  mail:
+    host: localhost
+    port: 2525
+    username: test@test.com
+    password: test
+
+  # 数据库初始化（H2 内存库，启动时执行 schema.sql）
+  sql:
+    init:
+      mode: always
+
+# ==================== JWT 测试配置 ====================
+jwt:
+  secret: this_is_a_very_long_secret_key_for_testing_at_least_32_chars_long
+  expiration: 3600000          # 1小时（毫秒）
+  refresh-expiration: 604800000 # 7天（毫秒）
+
+# ==================== CORS 测试配置 ====================
+cors:
+  allowed-origins: http://localhost:8080,http://127.0.0.1:8080
+
+# ==================== MyBatis Plus 测试配置 ====================
+mybatis-plus:
+  configuration:
+    use-actual-param-name: false
+    log-impl: org.apache.ibatis.logging.nologging.NoLoggingImpl
+  global-config:
+    db-config:
+      id-type: auto
+      logic-delete-field: isDeleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+
+# ==================== 服务器测试配置 ====================
+server:
+  port: 0  # 随机端口
+  servlet:
+    context-path:  # 不设置 context-path 以避免和测试请求路径冲突
+
+app:
+  api-prefix: ""
+  single-author-mode: false
+ADMIN_USERNAME: test-admin
+ADMIN_PASSWORD: Test-Admin-Password-1234
+
+# ==================== 环境变量验证配置（测试时禁用）====================
+env:
+  validation:
+    enabled: false
+
+# ==================== 限流配置（测试时使用默认值）====================
+rate-limit:
+  login: 10
+  register: 5
+  send-code: 3
+  reset-password: 5
+  user-search: 20
+  media-upload: 10
+  circle-post: 10
+  user-general: 30
+  post-general: 10
+  comment: 20
+  like: 30
+  collect: 30
+  circle-general: 10
+  media-general: 10
+  share: 20
+  message: 20
+  auth: 20
+  tag: 30
+  topic: 30
+  follow: 20
+  trending: 20
+  notification: 30
+  report: 10
+  statistics: 20
+
+# ==================== 上传测试配置 ====================
+upload:
+  base-path: /tmp/test-uploads
+
+# ==================== Actuator 测试配置 ====================
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health

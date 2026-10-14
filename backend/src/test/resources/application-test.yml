@@ -1,0 +1,55 @@
+# 测试环境配置
+spring:
+  application:
+    name: selfblog-forum-test
+
+  # 数据源配置（使用H2内存数据库进行测试）
+  datasource:
+    driver-class-name: org.h2.Driver
+    url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;MODE=MySQL
+    username: sa
+    password:
+
+  # JPA配置
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
+    database-platform: org.hibernate.dialect.H2Dialect
+
+  # 缓存配置（测试时禁用）
+  cache:
+    type: simple
+
+# MyBatis Plus配置
+mybatis-plus:
+  mapper-locations: classpath*:/mapper/**/*.xml
+  type-aliases-package: com.selfblog.entity
+  configuration:
+    map-underscore-to-camel-case: true
+    use-actual-param-name: false
+    log-impl: org.apache.ibatis.logging.nologging.NoLoggingImpl
+  global-config:
+    db-config:
+      id-type: auto
+      logic-delete-field: isDeleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+
+# 服务器配置
+server:
+  port: 0  # 随机端口
+
+# JWT配置
+jwt:
+  secret: test-secret-key-for-unit-testing-only-do-not-use-in-production
+  expiration: 86400000
+  refresh-expiration: 604800000
+
+# 日志配置（测试时关闭SQL日志）
+logging:
+  level:
+    com.selfblog: WARN
+    org.springframework.security: WARN
+    org.springframework.web: WARN
+    org.mybatis: WARN

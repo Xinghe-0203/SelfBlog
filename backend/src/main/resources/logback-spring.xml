@@ -1,0 +1,327 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <!-- 定义日志文件路径 -->
+    <property name="LOG_PATH" value="logs"/>
+    <property name="LOG_FILE" value="${LOG_PATH}/application"/>
+
+    <!-- 日志格式 -->
+    <property name="CONSOLE_LOG_PATTERN"
+              value="%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] [%X{traceId:-}] [%X{userId:-}] %-5level %logger{36} - %msg%n"/>
+    <property name="FILE_LOG_PATTERN"
+              value="%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] [%X{traceId:-}] [%X{userId:-}] [%X{clientIp:-}] %-5level %logger{50} - %msg%n"/>
+    <property name="JSON_LOG_PATTERN"
+              value="%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] [%X{traceId:-}] [%X{userId:-}] [%X{clientIp:-}] %-5level %logger{50} - %msg%n"/>
+
+    <!-- ==================== 控制台 Appender ==================== -->
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>${CONSOLE_LOG_PATTERN}</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+    </appender>
+
+    <!-- ==================== 主日志文件 Appender（按日期和大小滚动）==================== -->
+    <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOG_FILE}.log</file>
+        <encoder>
+            <pattern>${FILE_LOG_PATTERN}</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <fileNamePattern>${LOG_PATH}/archive/application-%d{yyyy-MM-dd}.%i.log.gz</fileNamePattern>
+            <maxFileSize>100MB</maxFileSize>
+            <maxHistory>30</maxHistory>
+            <totalSizeCap>10GB</totalSizeCap>
+        </rollingPolicy>
+    </appender>
+
+    <!-- ==================== 错误日志 Appender ==================== -->
+    <appender name="ERROR" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOG_FILE}-error.log</file>
+        <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
+            <level>ERROR</level>
+        </filter>
+        <encoder>
+            <pattern>${FILE_LOG_PATTERN}</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <fileNamePattern>${LOG_PATH}/archive/application-error-%d{yyyy-MM-dd}.%i.log.gz</fileNamePattern>
+            <maxFileSize>50MB</maxFileSize>
+            <maxHistory>60</maxHistory>
+            <totalSizeCap>5GB</totalSizeCap>
+        </rollingPolicy>
+    </appender>
+
+    <!-- ==================== 请求日志 Appender（HTTP请求专用）==================== -->
+    <appender name="REQUEST" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOG_PATH}/request.log</file>
+        <encoder>
+            <pattern>${FILE_LOG_PATTERN}</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <fileNamePattern>${LOG_PATH}/archive/request-%d{yyyy-MM-dd}.%i.log.gz</fileNamePattern>
+            <maxFileSize>50MB</maxFileSize>
+            <maxHistory>15</maxHistory>
+            <totalSizeCap>2GB</totalSizeCap>
+        </rollingPolicy>
+    </appender>
+
+    <!-- ==================== 安全日志 Appender ==================== -->
+    <appender name="SECURITY" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOG_PATH}/security.log</file>
+        <encoder>
+            <pattern>${FILE_LOG_PATTERN}</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <fileNamePattern>${LOG_PATH}/archive/security-%d{yyyy-MM-dd}.%i.log.gz</fileNamePattern>
+            <maxFileSize>50MB</maxFileSize>
+            <maxHistory>30</maxHistory>
+            <totalSizeCap>2GB</totalSizeCap>
+        </rollingPolicy>
+    </appender>
+
+    <!-- ==================== 性能日志 Appender ==================== -->
+    <appender name="PERFORMANCE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOG_PATH}/performance.log</file>
+        <encoder>
+            <pattern>${FILE_LOG_PATTERN}</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <fileNamePattern>${LOG_PATH}/archive/performance-%d{yyyy-MM-dd}.%i.log.gz</fileNamePattern>
+            <maxFileSize>50MB</maxFileSize>
+            <maxHistory>15</maxHistory>
+            <totalSizeCap>2GB</totalSizeCap>
+        </rollingPolicy>
+    </appender>
+
+    <!-- ==================== SQL日志 Appender ==================== -->
+    <appender name="SQL_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOG_PATH}/sql.log</file>
+        <encoder>
+            <pattern>${FILE_LOG_PATTERN}</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <fileNamePattern>${LOG_PATH}/archive/sql-%d{yyyy-MM-dd}.%i.log.gz</fileNamePattern>
+            <maxFileSize>50MB</maxFileSize>
+            <maxHistory>7</maxHistory>
+            <totalSizeCap>1GB</totalSizeCap>
+        </rollingPolicy>
+    </appender>
+
+    <!-- ==================== 审计日志 Appender（用户操作记录）==================== -->
+    <appender name="AUDIT" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOG_PATH}/audit.log</file>
+        <encoder>
+            <pattern>${FILE_LOG_PATTERN}</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <fileNamePattern>${LOG_PATH}/archive/audit-%d{yyyy-MM-dd}.%i.log.gz</fileNamePattern>
+            <maxFileSize>50MB</maxFileSize>
+            <maxHistory>90</maxHistory>
+            <totalSizeCap>5GB</totalSizeCap>
+        </rollingPolicy>
+    </appender>
+
+    <!-- ==================== 异步 Appender（提高性能）==================== -->
+    <appender name="ASYNC_FILE" class="ch.qos.logback.classic.AsyncAppender">
+        <queueSize>512</queueSize>
+        <discardingThreshold>0</discardingThreshold>
+        <appender-ref ref="FILE"/>
+    </appender>
+
+    <appender name="ASYNC_ERROR" class="ch.qos.logback.classic.AsyncAppender">
+        <queueSize>256</queueSize>
+        <discardingThreshold>0</discardingThreshold>
+        <appender-ref ref="ERROR"/>
+    </appender>
+
+    <appender name="ASYNC_REQUEST" class="ch.qos.logback.classic.AsyncAppender">
+        <queueSize>256</queueSize>
+        <discardingThreshold>0</discardingThreshold>
+        <appender-ref ref="REQUEST"/>
+    </appender>
+
+    <appender name="ASYNC_SECURITY" class="ch.qos.logback.classic.AsyncAppender">
+        <queueSize>128</queueSize>
+        <discardingThreshold>0</discardingThreshold>
+        <appender-ref ref="SECURITY"/>
+    </appender>
+
+    <appender name="ASYNC_PERFORMANCE" class="ch.qos.logback.classic.AsyncAppender">
+        <queueSize>256</queueSize>
+        <discardingThreshold>0</discardingThreshold>
+        <appender-ref ref="PERFORMANCE"/>
+    </appender>
+
+    <appender name="ASYNC_SQL" class="ch.qos.logback.classic.AsyncAppender">
+        <queueSize>256</queueSize>
+        <discardingThreshold>0</discardingThreshold>
+        <appender-ref ref="SQL_FILE"/>
+    </appender>
+
+    <appender name="ASYNC_AUDIT" class="ch.qos.logback.classic.AsyncAppender">
+        <queueSize>256</queueSize>
+        <discardingThreshold>0</discardingThreshold>
+        <appender-ref ref="AUDIT"/>
+    </appender>
+
+    <!-- ==================== 日志过滤器 ==================== -->
+    <!-- 注：静态资源和健康检查已通过 HttpRequestLoggingInterceptor 的 excludePathPatterns 排除 -->
+
+    <!-- ==================== 开发环境配置 ==================== -->
+    <springProfile name="dev">
+        <root level="DEBUG">
+            <appender-ref ref="CONSOLE"/>
+        </root>
+        <!-- 项目日志 -->
+        <logger name="com.selfblog" level="DEBUG" additivity="false">
+            <appender-ref ref="CONSOLE"/>
+            <appender-ref ref="ASYNC_FILE"/>
+            <appender-ref ref="ASYNC_ERROR"/>
+        </logger>
+        <!-- 请求日志 -->
+        <logger name="com.selfblog.config.web.HttpRequestLoggingInterceptor" level="DEBUG" additivity="false">
+            <appender-ref ref="CONSOLE"/>
+            <appender-ref ref="ASYNC_REQUEST"/>
+        </logger>
+        <!-- 安全日志 -->
+        <logger name="com.selfblog.config.security.SecurityConfig" level="DEBUG" additivity="false">
+            <appender-ref ref="CONSOLE"/>
+            <appender-ref ref="ASYNC_SECURITY"/>
+        </logger>
+        <logger name="com.selfblog.config.security.JwtAuthenticationFilter" level="DEBUG" additivity="false">
+            <appender-ref ref="CONSOLE"/>
+            <appender-ref ref="ASYNC_SECURITY"/>
+        </logger>
+        <!-- 性能日志 -->
+        <logger name="com.selfblog.aspect.PerformanceMonitoringAspect" level="DEBUG" additivity="false">
+            <appender-ref ref="CONSOLE"/>
+            <appender-ref ref="ASYNC_PERFORMANCE"/>
+        </logger>
+        <!-- MyBatis SQL日志 -->
+        <logger name="com.selfblog.mapper" level="DEBUG" additivity="false">
+            <appender-ref ref="CONSOLE"/>
+            <appender-ref ref="ASYNC_SQL"/>
+        </logger>
+        <logger name="org.hibernate.SQL" level="DEBUG" additivity="false">
+            <appender-ref ref="CONSOLE"/>
+            <appender-ref ref="ASYNC_SQL"/>
+        </logger>
+        <!-- Spring Security日志 -->
+        <logger name="org.springframework.security" level="DEBUG" additivity="false">
+            <appender-ref ref="CONSOLE"/>
+        </logger>
+        <!-- 审计日志 -->
+        <logger name="com.selfblog.utils.LogUtils" level="DEBUG" additivity="false">
+            <appender-ref ref="CONSOLE"/>
+            <appender-ref ref="ASYNC_AUDIT"/>
+        </logger>
+    </springProfile>
+
+    <!-- ==================== 生产环境配置 ==================== -->
+    <springProfile name="prod">
+        <root level="INFO">
+            <appender-ref ref="CONSOLE"/>
+            <appender-ref ref="ASYNC_FILE"/>
+            <appender-ref ref="ASYNC_ERROR"/>
+        </root>
+        <!-- 项目日志 -->
+        <logger name="com.selfblog" level="INFO" additivity="false">
+            <appender-ref ref="CONSOLE"/>
+            <appender-ref ref="ASYNC_FILE"/>
+            <appender-ref ref="ASYNC_ERROR"/>
+        </logger>
+        <!-- 请求日志 -->
+        <logger name="com.selfblog.config.web.HttpRequestLoggingInterceptor" level="INFO" additivity="false">
+            <appender-ref ref="ASYNC_REQUEST"/>
+        </logger>
+        <!-- 安全日志 -->
+        <logger name="com.selfblog.config.security.SecurityConfig" level="INFO" additivity="false">
+            <appender-ref ref="ASYNC_SECURITY"/>
+        </logger>
+        <logger name="com.selfblog.config.security.JwtAuthenticationFilter" level="INFO" additivity="false">
+            <appender-ref ref="ASYNC_SECURITY"/>
+        </logger>
+        <!-- 性能日志 -->
+        <logger name="com.selfblog.aspect.PerformanceMonitoringAspect" level="INFO" additivity="false">
+            <appender-ref ref="ASYNC_PERFORMANCE"/>
+        </logger>
+        <!-- MyBatis SQL日志 -->
+        <logger name="com.selfblog.mapper" level="WARN" additivity="false">
+            <appender-ref ref="ASYNC_FILE"/>
+            <appender-ref ref="ASYNC_ERROR"/>
+        </logger>
+        <logger name="org.hibernate.SQL" level="WARN" additivity="false">
+            <appender-ref ref="ASYNC_FILE"/>
+            <appender-ref ref="ASYNC_ERROR"/>
+        </logger>
+        <!-- Spring框架日志 -->
+        <logger name="org.springframework" level="WARN" additivity="false">
+            <appender-ref ref="ASYNC_FILE"/>
+            <appender-ref ref="ASYNC_ERROR"/>
+        </logger>
+        <!-- Spring Security日志 -->
+        <logger name="org.springframework.security" level="WARN" additivity="false">
+            <appender-ref ref="ASYNC_SECURITY"/>
+            <appender-ref ref="ASYNC_ERROR"/>
+        </logger>
+        <!-- 审计日志 -->
+        <logger name="com.selfblog.utils.LogUtils" level="INFO" additivity="false">
+            <appender-ref ref="ASYNC_AUDIT"/>
+        </logger>
+        <!-- 限流日志 -->
+        <logger name="com.selfblog.config.web.RateLimitInterceptor" level="WARN" additivity="false">
+            <appender-ref ref="ASYNC_SECURITY"/>
+        </logger>
+    </springProfile>
+
+    <!-- ==================== 默认配置（未指定 profile 时）==================== -->
+    <springProfile name="default">
+        <root level="INFO">
+            <appender-ref ref="CONSOLE"/>
+            <appender-ref ref="ASYNC_FILE"/>
+            <appender-ref ref="ASYNC_ERROR"/>
+        </root>
+        <!-- 项目日志 -->
+        <logger name="com.selfblog" level="INFO" additivity="false">
+            <appender-ref ref="CONSOLE"/>
+            <appender-ref ref="ASYNC_FILE"/>
+            <appender-ref ref="ASYNC_ERROR"/>
+        </logger>
+        <!-- 请求日志 -->
+        <logger name="com.selfblog.config.web.HttpRequestLoggingInterceptor" level="INFO" additivity="false">
+            <appender-ref ref="CONSOLE"/>
+            <appender-ref ref="ASYNC_REQUEST"/>
+        </logger>
+        <!-- 安全日志 -->
+        <logger name="com.selfblog.config.security.SecurityConfig" level="INFO" additivity="false">
+            <appender-ref ref="CONSOLE"/>
+            <appender-ref ref="ASYNC_SECURITY"/>
+        </logger>
+        <logger name="com.selfblog.config.security.JwtAuthenticationFilter" level="INFO" additivity="false">
+            <appender-ref ref="CONSOLE"/>
+            <appender-ref ref="ASYNC_SECURITY"/>
+        </logger>
+        <!-- 性能日志 -->
+        <logger name="com.selfblog.aspect.PerformanceMonitoringAspect" level="INFO" additivity="false">
+            <appender-ref ref="CONSOLE"/>
+            <appender-ref ref="ASYNC_PERFORMANCE"/>
+        </logger>
+        <!-- 审计日志 -->
+        <logger name="com.selfblog.utils.LogUtils" level="INFO" additivity="false">
+            <appender-ref ref="CONSOLE"/>
+            <appender-ref ref="ASYNC_AUDIT"/>
+        </logger>
+        <!-- MyBatis SQL日志 -->
+        <logger name="com.selfblog.mapper" level="WARN" additivity="false">
+            <appender-ref ref="CONSOLE"/>
+            <appender-ref ref="ASYNC_SQL"/>
+        </logger>
+    </springProfile>
+</configuration>

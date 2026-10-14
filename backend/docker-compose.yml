@@ -1,0 +1,151 @@
+# ============================================
+# SelfBlog - Docker Compose 配置
+# 包含 MySQL 8.0 + Spring Boot 应用
+# ============================================
+
+services:
+  # ============================================
+  # MySQL 8.0 数据库服务
+  # ============================================
+  mysql:
+    image: mysql:8.0
+    container_name: selfblog-mysql
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      # 数据库配置（与 .env 文件对应）
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
+      MYSQL_DATABASE: ${DB_NAME:-campus_blog}
+      MYSQL_USER: ${DB_USERNAME:-campus_blog}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "127.0.0.1:3306:3306"
+    volumes:
+      # 持久化数据库数据
+      - mysql_data:/var/lib/mysql
+      # 初始化脚本（首次启动时自动执行）
+      - ./schema.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    networks:
+      - selfblog-network
+    healthcheck:
+      test: ["CMD", "sh", "-c", "MYSQL_PWD=$MYSQL_ROOT_PASSWORD mysqladmin ping -h localhost -u root"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    command:
+      # MySQL 8.0 特殊配置
+      --default-authentication-plugin=mysql_native_password
+      --character-set-server=utf8mb4
+      --collation-server=utf8mb4_unicode_ci
+      --skip-log-bin
+      --bind-address=0.0.0.0
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 256M
+          cpus: '0.25'
+    logging:
+      driver: json-file
+      options:
+        max-size: 50m
+        max-file: '3'
+
+  # ============================================
+  # Spring Boot 应用服务
+  # ============================================
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: selfblog-app
+    restart: unless-stopped
+    env_file:
+      - .env
+    depends_on:
+      # 确保 MySQL 就绪后再启动应用
+      mysql:
+        condition: service_healthy
+    environment:
+      # 数据库连接配置
+      DB_TYPE: mysql
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_NAME: ${DB_NAME:-campus_blog}
+      DB_USERNAME: ${DB_USERNAME:-campus_blog}
+      DB_PASSWORD: ${DB_PASSWORD}
+      # JWT 配置
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRATION: ${JWT_EXPIRATION:-86400000}
+      JWT_REFRESH_EXPIRATION: ${JWT_REFRESH_EXPIRATION:-604800000}
+      # 服务配置
+      SERVER_PORT: 8825
+      # CORS 配置（生产环境请修改为具体域名）
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:8825}
+      SPRING_PROFILES_ACTIVE: prod
+    ports:
+      - "127.0.0.1:8825:8825"
+    volumes:
+      # 持久化上传文件
+      - app_uploads:/app/uploads
+    networks:
+      - selfblog-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-standalone", "-qO-", "http://localhost:8825/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1.0'
+        reservations:
+          memory: 512M
+          cpus: '0.5'
+    logging:
+      driver: json-file
+      options:
+        max-size: 50m
+        max-file: '5'
+
+  # ============================================
+  # 可选：phpMyAdmin（数据库管理界面）
+  # 仅在需要时启用，访问 http://localhost:8080
+  # ============================================
+  # phpmyadmin:
+  #   image: phpmyadmin:latest
+  #   container_name: selfblog-phpmyadmin
+  #   restart: unless-stopped
+  #   depends_on:
+  #     - mysql
+  #   environment:
+  #     PMA_HOST: mysql
+  #     PMA_PORT: 3306
+  #   ports:
+  #     - "8080:80"
+  #   networks:
+  #     - selfblog-network
+
+# ============================================
+# 网络配置
+# ============================================
+networks:
+  selfblog-network:
+    driver: bridge
+
+# ============================================
+# 卷配置（数据持久化）
+# ============================================
+volumes:
+  # MySQL 数据卷
+  mysql_data:
+    driver: local
+  # 应用上传文件卷
+  app_uploads:
+    driver: local

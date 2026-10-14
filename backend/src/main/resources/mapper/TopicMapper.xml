@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.selfblog.mapper.TopicMapper">
+
+    <!-- 原子性增加动态数 -->
+    <update id="incrementPostCount">
+        UPDATE blog_topic SET post_count = post_count + 1, trending_score = trending_score + 1 WHERE id = #{topicId}
+    </update>
+
+    <!-- MySQL: 原子性减少动态数 -->
+    <update id="decrementPostCount" databaseId="mysql">
+        UPDATE blog_topic SET post_count = GREATEST(post_count - 1, 0), trending_score = GREATEST(trending_score - 1, 0) WHERE id = #{topicId}
+    </update>
+
+    <!-- SQLite: 原子性减少动态数 -->
+    <update id="decrementPostCount" databaseId="sqlite">
+        UPDATE blog_topic SET post_count = MAX(post_count - 1, 0), trending_score = MAX(trending_score - 1, 0) WHERE id = #{topicId}
+    </update>
+
+    <!-- 默认（H2兼容）: 原子性减少动态数 -->
+    <update id="decrementPostCount">
+        UPDATE blog_topic SET post_count = CASE WHEN post_count - 1 &gt; 0 THEN post_count - 1 ELSE 0 END, trending_score = CASE WHEN trending_score - 1 &gt; 0 THEN trending_score - 1 ELSE 0 END WHERE id = #{topicId}
+    </update>
+
+    <!-- 增加热度分数 -->
+    <update id="incrementTrendingScore">
+        UPDATE blog_topic SET trending_score = trending_score + #{score} WHERE id = #{topicId}
+    </update>
+
+    <!-- MySQL: 重新计算所有话题的热度分数 -->
+    <update id="recalculateAllTrendingScore" databaseId="mysql">
+        UPDATE blog_topic t SET t.trending_score =
+            COALESCE((SELECT COUNT(*) FROM blog_post p WHERE JSON_CONTAINS(p.topic_ids, CAST(t.id AS JSON)) AND p.is_deleted = 0 AND p.status = 1), 0) +
+            COALESCE((SELECT COUNT(*) FROM blog_circle_post cp WHERE JSON_CONTAINS(cp.topic_ids, CAST(t.id AS JSON)) AND cp.is_deleted = 0 AND cp.status = 1), 0)
+    </update>
+
+    <!-- SQLite: 重新计算所有话题的热度分数 -->
+    <update id="recalculateAllTrendingScore" databaseId="sqlite">
+        UPDATE blog_topic SET trending_score =
+            COALESCE((SELECT COUNT(*) FROM blog_post, json_each(blog_post.topic_ids) WHERE CAST(json_each.value AS INTEGER) = blog_topic.id AND blog_post.is_deleted = 0 AND blog_post.status = 1), 0) +
+            COALESCE((SELECT COUNT(*) FROM blog_circle_post, json_each(blog_circle_post.topic_ids) WHERE CAST(json_each.value AS INTEGER) = blog_topic.id AND blog_circle_post.is_deleted = 0 AND blog_circle_post.status = 1), 0)
+    </update>
+
+    <!-- MySQL: 重新计算所有话题的关联动态数（博客+圈子） -->
+    <update id="recalculateAllPostCount" databaseId="mysql">
+        UPDATE blog_topic t SET t.post_count =
+            COALESCE((SELECT COUNT(*) FROM blog_post p WHERE JSON_CONTAINS(p.topic_ids, CAST(t.id AS JSON)) AND p.is_deleted = 0 AND p.status = 1), 0) +
+            COALESCE((SELECT COUNT(*) FROM blog_circle_post cp WHERE JSON_CONTAINS(cp.topic_ids, CAST(t.id AS JSON)) AND cp.is_deleted = 0 AND cp.status = 1), 0)
+    </update>
+
+    <!-- SQLite: 重新计算所有话题的关联动态数（博客+圈子） -->
+    <update id="recalculateAllPostCount" databaseId="sqlite">
+        UPDATE blog_topic SET post_count =
+            COALESCE((SELECT COUNT(*) FROM blog_post, json_each(blog_post.topic_ids) WHERE CAST(json_each.value AS INTEGER) = blog_topic.id AND blog_post.is_deleted = 0 AND blog_post.status = 1), 0) +
+            COALESCE((SELECT COUNT(*) FROM blog_circle_post, json_each(blog_circle_post.topic_ids) WHERE CAST(json_each.value AS INTEGER) = blog_topic.id AND blog_circle_post.is_deleted = 0 AND blog_circle_post.status = 1), 0)
+    </update>
+
+</mapper>

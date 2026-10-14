@@ -1,0 +1,87 @@
+<template>
+  <footer class="site-footer">
+    <div class="footer-inner">
+      <div class="footer-brand">
+        <router-link to="/" class="footer-title">{{ siteStore.settings.siteTitle }}</router-link>
+        <p>{{ siteStore.settings.footerText }}</p>
+      </div>
+      <nav class="footer-links" aria-label="页脚导航">
+        <router-link to="/">首页</router-link>
+        <router-link to="/archives">归档</router-link>
+        <router-link to="/gallery">相册</router-link>
+        <router-link to="/about">关于</router-link>
+        <router-link to="/search">搜索</router-link>
+      </nav>
+      <small>© {{ currentYear }} {{ siteStore.settings.siteTitle }}</small>
+    </div>
+  </footer>
+</template>
+
+<script setup lang="ts">
+import { useSiteStore } from '@/stores/site'
+
+const currentYear = new Date().getFullYear()
+const siteStore = useSiteStore()
+</script>
+
+<style scoped>
+.site-footer {
+  margin-top: 72px;
+  border-top: 1px solid var(--border-solid);
+  background: var(--surface-primary);
+}
+
+.footer-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  max-width: 1040px;
+  margin: 0 auto;
+  padding: 26px 24px 32px;
+}
+
+.footer-title {
+  color: var(--text-primary);
+  font-family: var(--font-display);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.footer-brand p,
+.footer-inner small {
+  margin: 5px 0 0;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+}
+
+.footer-links {
+  display: flex;
+  gap: 18px;
+}
+
+.footer-links a {
+  color: var(--text-secondary);
+  font-size: 0.8125rem;
+  text-decoration: none;
+}
+
+.footer-links a:hover {
+  color: var(--primary);
+}
+
+@media (max-width: 680px) {
+  .footer-inner {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 18px;
+    padding: 24px 20px;
+  }
+  .footer-inner small {
+    margin-top: 0;
+  }
+  .footer-links {
+    flex-wrap: wrap;
+  }
+}
+</style>

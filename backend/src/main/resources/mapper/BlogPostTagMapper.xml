@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.selfblog.mapper.BlogPostTagMapper">
+
+    <!-- MySQL: 批量插入文章标签关联（忽略重复） -->
+    <insert id="batchInsertPostTags" databaseId="mysql">
+        INSERT IGNORE INTO blog_post_tag (post_id, tag_id) VALUES
+        <foreach collection="tagIds" item="tagId" separator=",">
+            (#{postId}, #{tagId})
+        </foreach>
+    </insert>
+
+    <!-- SQLite: 批量插入文章标签关联（忽略重复） -->
+    <insert id="batchInsertPostTags" databaseId="sqlite">
+        INSERT OR IGNORE INTO blog_post_tag (post_id, tag_id) VALUES
+        <foreach collection="tagIds" item="tagId" separator=",">
+            (#{postId}, #{tagId})
+        </foreach>
+    </insert>
+
+    <!-- 默认（H2兼容）: 批量插入文章标签关联 -->
+    <insert id="batchInsertPostTags">
+        INSERT INTO blog_post_tag (post_id, tag_id) VALUES
+        <foreach collection="tagIds" item="tagId" separator=",">
+            (#{postId}, #{tagId})
+        </foreach>
+    </insert>
+
+</mapper>

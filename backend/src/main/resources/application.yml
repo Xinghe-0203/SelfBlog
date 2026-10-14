@@ -1,0 +1,217 @@
+# =============================================================================
+# SelfBlog - 应用配置文件
+# =============================================================================
+# 说明：将 application.properties 重命名为 application.yml，
+#       YAML 格式更清晰易读，适合复杂配置。
+#
+# 【重要】敏感信息处理：
+#   - 数据库密码、JWT密钥等敏感配置应使用环境变量替代
+#   - 示例：password: ${DB_PASSWORD}
+#   - 生产环境请务必修改默认密码和密钥
+# =============================================================================
+
+# Spring 基础配置
+spring:
+  application:
+    name: selfblog  # 应用名称
+
+  # ==================== MVC 配置 ====================
+  mvc:
+    throw-exception-if-no-handler-found: true # 404时抛出异常，便于统一处理
+    log-request-details: true # 记录请求详情
+
+  # ==================== Caffeine 本地缓存配置 ====================
+  cache:
+    type: caffeine
+    caffeine:
+      spec: maximumSize=1000,expireAfterWrite=300s
+
+  # ==================== 数据源配置 ====================
+  # 注意：数据源由 DatabaseConfig.java 根据 DB_TYPE 环境变量动态配置
+  # MySQL: 使用 HikariCP 连接池，配置项见 DatabaseConfig
+  # SQLite: 使用 WAL 模式，单连接池
+
+  # ==================== Jackson 配置（JSON 序列化） ====================
+  jackson:
+    date-format: yyyy-MM-dd HH:mm:ss  # 日期格式
+    time-zone: GMT+8                    # 时区设置
+    default-property-inclusion: non_null # 只序列化非空字段
+    serialization:
+      write-dates-as-timestamps: false  # 禁用时间戳格式，使用date-format
+
+  # ==================== 文件上传配置 ====================
+  servlet:
+    multipart:
+      enabled: true
+      # 注意：Spring Boot 只支持字节格式，不接受 "50MB" 字符串
+      # 50MB = 52428800 字节，100MB = 104857600 字节
+      max-file-size: ${UPLOAD_MAX_FILE_SIZE:52428800}
+      max-request-size: ${UPLOAD_MAX_REQUEST_SIZE:104857600}
+
+  # ==================== 邮件配置 ====================
+  mail:
+    host: ${MAIL_HOST:smtp.example.com}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    protocol: smtp
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+          ssl:
+            enable: ${MAIL_SSL_ENABLED:true}
+          connectiontimeout: 5000
+          timeout: 5000
+          writetimeout: 5000
+
+# ==================== MyBatis Plus 配置 ====================
+mybatis-plus:
+  # Mapper XML 文件位置（如果使用 XML 写 SQL 的话）
+  mapper-locations: classpath*:/mapper/**/*.xml
+  
+  # 实体类包路径（用于自动扫描）
+  type-aliases-package: com.selfblog.entity
+  
+  configuration:
+    map-underscore-to-camel-case: true  # 数据库下划线自动转驼峰命名
+    use-actual-param-name: false         # 确保 @Param 注解优先于参数实际名称
+    # SQL日志配置：通过 MYBATIS_SQL_LOG 环境变量控制（0=关闭，1=开启）
+    log-impl: ${MYBATIS_SQL_LOG:org.apache.ibatis.logging.nologging.NoLoggingImpl}
+    
+  # MyBatis Plus 全局策略配置
+  global-config:
+    db-config:
+      id-type: auto                # 主键类型：自增
+      logic-delete-field: isDeleted # 逻辑删除字段名
+      logic-delete-value: 1       # 逻辑删除值
+      logic-not-delete-value: 0   # 逻辑未删除值
+
+# ==================== 服务器配置 ====================
+server:
+  port: ${SERVER_PORT:8825}  # 应用启动端口号（可通过环境变量配置）
+  compression:
+    enabled: true
+    mime-types: application/json,application/xml,text/html,text/css,text/javascript,application/javascript
+    min-response-size: 1024
+
+# ==================== Knife4j (Swagger) API 文档配置 ====================
+springdoc:
+  api-docs:
+    enabled: ${SWAGGER_ENABLED:true}               # 开启 API 文档
+    path: /v3/api-docs          # API 文档路径
+  swagger-ui:
+    enabled: ${SWAGGER_ENABLED:true}               # 开启 Swagger UI
+    path: /swagger-ui.html      # Swagger UI 访问路径
+    url: /api/v3/api-docs
+    config-url: /api/v3/api-docs/swagger-config
+
+# Knife4j 增强配置
+knife4j:
+  enable: true                   # 开启 Knife4j
+  setting:
+    language: zh_CN              # 中文界面
+
+# ==================== JWT 配置 ====================
+jwt:
+  # 【重要】请在 .env 文件中配置 JWT_SECRET（不能有默认值）
+  secret: ${JWT_SECRET}
+  expiration: ${JWT_EXPIRATION:86400000}           # 24小时（毫秒）
+  refresh-expiration: ${JWT_REFRESH_EXPIRATION:604800000}  # 7天（毫秒）
+
+# ==================== 上传配置 ====================
+upload:
+  base-path: uploads
+  image:
+    max-width: 1920
+    quality: 0.85
+  allowed-avatar-domains: ${AVATAR_ALLOWED_DOMAINS:localhost,127.0.0.1}
+
+# ==================== 头像域名白名单（同步映射） ====================
+avatar:
+  allowed-domains: ${AVATAR_ALLOWED_DOMAINS:localhost,127.0.0.1}
+
+# ==================== 邮件服务配置 ====================
+mail:
+  from: ${MAIL_FROM:${MAIL_USERNAME:noreply@campusblog.com}}  # 发件人地址，优先使用 MAIL_FROM，否则使用 MAIL_USERNAME
+  verification:
+    expire-minutes: 5        # 验证码有效期（分钟）
+    max-verify-attempts: 3   # 最大验证尝试次数
+    send-interval-seconds: 60  # 发送间隔限制（秒）
+
+# ==================== CORS 配置 ====================
+# 允许的跨域来源（通过环境变量 CORS_ALLOWED_ORIGINS 配置）
+# 多个来源用逗号分隔，生产环境应使用具体端口
+# 示例: http://localhost:8080,http://127.0.0.1:8080,https://selfblog.com
+cors:
+  allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:8825,http://127.0.0.1:3000}
+
+# The same executable serves the SPA at / and REST controllers below /api.
+app:
+  api-prefix: /api
+  single-author-mode: true
+
+# ==================== Actuator 运维监控配置 ====================
+management:
+  # Actuator 端点基础路径
+  base-path: /actuator
+
+  # 端点配置
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+      base-path: /actuator
+
+  endpoint:
+    # 健康检查端点配置
+    health:
+      show-details: when_authorized
+      probes:
+        enabled: true
+    # 信息端点配置
+    info:
+      enabled: true
+
+  # 健康检查详情配置
+  health:
+    db:
+      enabled: true
+    mail:
+      enabled: ${MAIL_HEALTH_ENABLED:false}  # 通过 .env 中 MAIL_HEALTH_ENABLED=true 开启
+    diskSpace:
+      enabled: true
+    ping:
+      enabled: true
+
+  # Info 端点基本信息（可通过环境变量覆盖）
+  info:
+    app:
+      name: ${spring.application.name}
+      version: ${project.version:0.0.1-SNAPSHOT}
+      description: 单人作者个人博客
+    java:
+      version: ${java.version}
+    spring:
+      version: ${spring.boot.version}
+
+# ==================== 日志配置 ====================
+logging:
+  file:
+    name: logs/application.log
+  logback:
+    rollingpolicy:
+      max-file-size: 100MB
+      max-history: 30
+      total-size-cap: 10GB
+  level:
+    # 项目日志级别
+    com.selfblog: INFO
+    # Spring Security日志
+    org.springframework.security: INFO
+    # Web请求日志
+    org.springframework.web: INFO
+    # 审计日志单独配置
+    com.selfblog.audit: INFO

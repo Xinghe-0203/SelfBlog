@@ -1,0 +1,74 @@
+# ==================== 生产环境配置 ====================
+# 激活方式：java -jar app.jar --spring.profiles.active=prod
+# 或设置环境变量：spring_profiles_active=prod
+
+spring:
+  jackson:
+    serialization:
+      indent-output: false  # 关闭 JSON 格式化，减小响应体积
+
+# ==================== API 文档（生产环境禁用） ====================
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+
+knife4j:
+  enable: false
+
+# ==================== Actuator 生产环境配置 ====================
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info  # 生产环境不暴露 metrics
+  endpoint:
+    health:
+      show-details: when_authorized  # 生产环境仅授权用户可见
+      probes:
+        enabled: true  # 启用存活探针和就绪探针
+  health:
+    db:
+      enabled: true
+    diskSpace:
+      enabled: true
+    ping:
+      enabled: true
+    livenessstate:
+      enabled: true
+    readinessstate:
+      enabled: true
+
+# ==================== 日志配置 ====================
+logging:
+  level:
+    # 项目日志
+    com.selfblog: INFO
+    # Spring 框架日志
+    org.springframework: WARN
+    # SQL 日志（生产环境关闭）
+    org.mybatis: WARN
+    # Hibernate 日志
+    org.hibernate: WARN
+    # HikariCP 日志
+    com.zaxxer.hikari: WARN
+  file:
+    name: logs/application.log  # 日志文件输出路径
+  pattern:
+    # 生产环境日志格式，包含更多上下文信息
+    file: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] [%X{traceId:-}] %-5level %logger{36} - %msg%n"
+
+# ==================== 服务器优化配置 ====================
+server:
+  # 错误处理
+  error:
+    include-message: never  # 不在错误响应中包含错误消息详情
+    include-stacktrace: never  # 不包含堆栈跟踪
+    include-exception: false  # 不包含异常类型
+  # Tomcat 生产优化
+  tomcat:
+    threads:
+      max: 200
+      min-spare: 10
+    connection-timeout: 60000

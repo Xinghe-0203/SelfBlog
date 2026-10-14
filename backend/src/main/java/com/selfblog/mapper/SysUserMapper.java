@@ -1,0 +1,49 @@
+package com.selfblog.mapper;
+
+import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.selfblog.entity.SysUser;
+import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
+
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * 用户表 Mapper 接口
+ * 【说明】继承 MyBatis Plus 的 BaseMapper，自动拥有 CRUD 方法
+ * 【数据库兼容】MySQL/SQLite - 自定义 SQL 已移至 SysUserMapper.xml
+ */
+@Mapper
+public interface SysUserMapper extends BaseMapper<SysUser> {
+
+    /**
+     * 原子性增加登录失败计数并检查是否需要锁定
+     */
+    int incrementLoginFailCount(@Param("userId") Long userId, @Param("maxFailCount") int maxFailCount, @Param("lockMinutes") int lockMinutes);
+
+    /**
+     * 原子性增加粉丝数
+     */
+    int incrementFollowerCount(@Param("userId") Long userId);
+
+    /**
+     * 原子性减少粉丝数
+     */
+    int decrementFollowerCount(@Param("userId") Long userId);
+
+    /**
+     * 原子性增加关注数
+     */
+    int incrementFollowingCount(@Param("userId") Long userId);
+
+    /**
+     * 原子性减少关注数
+     */
+    int decrementFollowingCount(@Param("userId") Long userId);
+
+    /**
+     * 批量统计每日新增用户数（避免 N+1 查询）
+     */
+    List<Map<String, Object>> countUsersGroupByDate(@Param("since") LocalDateTime since);
+}
