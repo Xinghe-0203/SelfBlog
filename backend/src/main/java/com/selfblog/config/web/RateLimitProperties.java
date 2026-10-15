@@ -147,6 +147,12 @@ public class RateLimitProperties {
     private int galleryUpload = 20;
 
     /**
+     * 站点品牌资产上传限流（次/分钟）。
+     * 允许单文件 20MB，比相册上传更重，所以给得比 galleryUpload 宽松一点。
+     */
+    private int siteAssetUpload = 30;
+
+    /**
      * 获取所有限流配置的Map形式，便于动态查找
      */
     public Map<String, Integer> getAllLimits() {
@@ -180,6 +186,7 @@ public class RateLimitProperties {
         limits.put("/api/guest-comments/", guestComment);
         limits.put("/api/gallery/", gallery);
         limits.put("/api/admin/albums/", galleryUpload);
+        limits.put("/api/admin/site-assets", siteAssetUpload);
         return limits;
     }
 }

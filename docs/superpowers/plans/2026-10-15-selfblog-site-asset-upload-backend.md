@@ -1264,7 +1264,7 @@ git commit -m "feat: expose the admin site-asset upload endpoint"
 - Consumes: 无
 - Produces: 配置项 `siteAssetUpload`（默认 30 次/分钟），映射到前缀 `/api/admin/site-assets`
 
-- [ ] **Step 1: 新增字段**
+- [x] **Step 1: 新增字段**
 
 在 `RateLimitProperties.java` 中 `private int galleryUpload = 20;`（约第 147 行）之后插入：
 
@@ -1276,7 +1276,7 @@ git commit -m "feat: expose the admin site-asset upload endpoint"
     private int siteAssetUpload = 30;
 ```
 
-- [ ] **Step 2: 注册到映射表**
+- [x] **Step 2: 注册到映射表**
 
 在 `getAllLimits()` 里 `limits.put("/api/admin/albums/", galleryUpload);`（约第 182 行）之后插入：
 
@@ -1284,15 +1284,15 @@ git commit -m "feat: expose the admin site-asset upload endpoint"
         limits.put("/api/admin/site-assets", siteAssetUpload);
 ```
 
-- [ ] **Step 3: 验证**
+- [x] **Step 3: 验证**
 
 ```powershell
 & $mvn test -Dskip.npm=true -Dskip.installnodenpm=true
 ```
 
-Expected: 全量 386 + 本计划新增用例，0 失败。限流表在 `@SpringBootTest` 启动时就会被构造，配置写错会导致上下文起不来，因此全量测试本身就是有效的回归验证。
+Expected: 全量 456，0 失败。限流表在 `@SpringBootTest` 启动时就会被构造，配置写错会导致上下文起不来，因此全量测试本身就是有效的回归验证。
 
-- [ ] **Step 4: 提交**
+- [x] **Step 4: 提交**
 
 ```bash
 git add backend/src/main/java/com/selfblog/config/web/RateLimitProperties.java
@@ -1571,3 +1571,7 @@ git commit -m "docs: log the backend site-asset upload channel"
 ### Task 4（2026-10-15）
 
 - 实现与原计划一致，无偏差。`AdminSiteAssetControllerTest` **5/5 通过**；管理员成功、普通用户 403、参数缺失和服务校验异常均由 MVC slice 验证。
+
+### Task 5（2026-10-15）
+
+- 实现与原计划一致，无偏差。`RateLimitProperties` 新增 `/api/admin/site-assets` → 30 次/分钟；独立复跑全量后端测试：**456/456 通过**。
