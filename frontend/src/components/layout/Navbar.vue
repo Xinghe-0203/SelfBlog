@@ -62,10 +62,18 @@
             />
             <button type="submit">搜索</button>
           </form>
-          <router-link to="/" @click="mobileOpen = false">首页</router-link>
-          <router-link to="/archives" @click="mobileOpen = false">归档</router-link>
-          <router-link to="/gallery" @click="mobileOpen = false">相册</router-link>
-          <router-link to="/about" @click="mobileOpen = false">关于</router-link>
+          <router-link to="/" exact-active-class="active" @click="mobileOpen = false">
+            首页
+          </router-link>
+          <router-link to="/archives" active-class="active" @click="mobileOpen = false">
+            归档
+          </router-link>
+          <router-link to="/gallery" active-class="active" @click="mobileOpen = false">
+            相册
+          </router-link>
+          <router-link to="/about" active-class="active" @click="mobileOpen = false">
+            关于
+          </router-link>
         </div>
       </Transition>
     </nav>
@@ -218,7 +226,8 @@ const search = () => {
   color: var(--text-primary);
 }
 
-.nav-links a.active {
+.nav-links a.active,
+.mobile-panel a.active {
   background: var(--primary-light);
   color: var(--primary);
 }
@@ -312,9 +321,12 @@ const search = () => {
 }
 
 .mobile-search button {
+  /* 输入框 width:100% 会挤扁按钮，导致"搜索"两个字竖着折行。 */
+  flex: 0 0 auto;
+  white-space: nowrap;
   border: 0;
   border-radius: var(--radius-full);
-  padding: 0 14px;
+  padding: 0 18px;
   background: var(--primary);
   color: white;
   font-weight: 600;
