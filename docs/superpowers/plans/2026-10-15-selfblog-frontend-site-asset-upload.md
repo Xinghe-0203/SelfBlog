@@ -809,3 +809,13 @@ git commit -m "docs: describe the frontend site asset upload controls"
 - 全量验证：`npm run lint:check`、`npm run type-check`、`npm run test:run`（**167/167**）、`npm run build` 全部通过。
 - 端到端（真实后端 + Chrome）：管理员登录 → 设置页上传四种资源 → 上传后 favicon 即时换新 → 保存成功 → 刷新后四个字段全部持久化 → 公开页顶栏 Logo 与 favicon 生效，无控制台错误。
 - 验证后已删除数据库中本次写入的四个设置行与 `backend/uploads/site-assets` 下的测试文件（经比对主库 WAL 时间戳确认测试前这些行与文件均不存在），本地环境已还原。
+
+### 审查修复（2026-10-15，`6f1950f`）
+
+第一轮实现后做了只读代码审查，两处重要项与若干小项已修复：
+
+- **上传在途锁**：`SiteAssetField` 的 URL 输入在 `uploading` 期间禁用，避免慢上传的响应覆盖用户刚输入的内容；另补"在途忽略二次选择"的用例。
+- **上传与手填语义分离**：新增 `uploaded` 事件，设置页只在真实上传结果上同步 `siteStore`（Logo/favicon 立即生效）；手填 URL 仍只写表单、保存时随其余设置落库，避免逐字输入污染全局 store。
+- **陈旧状态清理**：手动编辑会同时清掉 `error` 与旧 `duration`；`formatDuration` 对 <1 秒的值返回空串。
+- **补齐测试**：新增 8 个用例（在途去重、上传锁、音乐 20MB 档、大小写扩展名、空响应、原始文件名展示、手工编辑清理、四键路由 + 手填不同步），前端全量 **175/175**。
+- 未采纳的一条 Minor：`Content-Type: multipart/form-data` 头保留 —— 与 `media.ts` / `gallery.ts` 的既有上传调用保持一致，axios 会自行覆盖 boundary。

@@ -15,7 +15,7 @@
 
 ### 说明
 
-- 上传成功即写入表单并同步 `siteStore`（顶栏 Logo、favicon 立即换新），点「保存设置」才通过 `PUT /api/admin/site-settings` 落库
+- 上传成功即写入表单并同步 `siteStore`（顶栏 Logo、favicon 立即换新），点「保存设置」才通过 `PUT /api/admin/site-settings` 落库；手填 URL 只写表单、保存时一并生效
 - 音乐字段预览显示文件名与时长；图片字段显示方形缩略图；远端 CDN 手填 URL 的能力保留
 - 前端预检与后端校验规则一致，但服务端仍是权威（扩展名白名单 + 魔数 + 体积）
 
