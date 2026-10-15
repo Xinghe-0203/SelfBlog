@@ -134,7 +134,7 @@ The site runs in single-author mode: registration is disabled and password authe
 | Token blacklist | Added on logout, prevents replay |
 | Login lock | 5 failures → 15 min lock (atomic update) |
 | XSS | HtmlSanitizer (Jsoup) for server-side purification |
-| Rate limiting | 23 endpoints via `RateLimitInterceptor` |
+| Rate limiting | Path-prefix limits via `RateLimitInterceptor`; site-asset uploads: 30 requests/min |
 | IP protection | Format validation against IP spoofing |
 | Validation | Spring Validation (`@Valid`, `@NotBlank`) |
 | CORS | Configurable whitelist, `*` forbidden in production |
@@ -209,6 +209,6 @@ Multi-stage build: JDK 21 (build) → JRE 21 Alpine (runtime). Runs as non-root 
 | Collect | 4 | Report | 4 |
 | Tag | 5 | Share | 3 |
 | Media | 4 | Statistics | 4 |
-| Trending | 3 | Admin | 15+ |
+| Trending | 3 | Admin | 16+ |
 
 Total: **120+ endpoints**. Authenticated endpoints require `Authorization: Bearer <access_token>`.

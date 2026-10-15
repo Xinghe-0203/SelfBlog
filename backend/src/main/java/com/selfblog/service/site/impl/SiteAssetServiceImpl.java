@@ -173,8 +173,9 @@ public class SiteAssetServiceImpl implements SiteAssetService {
     }
 
     /**
-     * 净化 SVG。渲染点全是图片上下文，脚本在那里不会执行，所以这是纵深防御：
-     * 万一将来有人把 logo 直接 innerHTML 进页面，至少文件里已经没有可执行的壳。
+     * 净化 SVG。{@code /uploads/**} 资源 URL 是公开的，也可能被直接作为顶层文档打开；
+     * 那种场景下 SVG 脚本可能以本站源执行，因此不能只依赖当前 {@code <img>} / favicon 等图片上下文的限制。
+     * 先净化上传内容是必要的安全边界，图片上下文对脚本的额外禁用则是纵深防御。
      *
      * 解析器对垃圾输入不会抛异常（已实测），因此用"有没有 svg 根元素"来拒绝非 SVG。
      */

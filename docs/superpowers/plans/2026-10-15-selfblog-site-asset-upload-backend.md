@@ -60,7 +60,7 @@
 - Consumes: 无
 - Produces: `SiteAssetKind`（枚举，值 `LOGO` / `FAVICON` / `AVATAR` / `MUSIC`）、内嵌 `SiteAssetKind.Category`（`IMAGE` / `AUDIO`）、`getWireName(): String`、`getCategory(): Category`、`getExtensions(): Set<String>`、`getMaxBytes(): long`、`getMaxMegabytes(): long`、`isAudio(): boolean`、`describeExtensions(): String`、静态 `fromWireName(String): SiteAssetKind`（不认识返回 `null`）、静态 `extensionOf(String): String`
 
-- [ ] **Step 1: 写枚举与测试**
+- [x] **Step 1: 写枚举与测试**
 
 创建 `backend/src/main/java/com/selfblog/common/enums/SiteAssetKind.java`：
 
@@ -281,7 +281,7 @@ class SiteAssetKindTest {
 }
 ```
 
-- [ ] **Step 2: 跑测试确认通过**
+- [x] **Step 2: 跑测试确认通过**
 
 ```powershell
 & $mvn test -Dtest=SiteAssetKindTest -Dskip.npm=true -Dskip.installnodenpm=true
@@ -291,7 +291,7 @@ Expected: `Tests run: 25, Failures: 0, Errors: 0`（9 个 `@Test` + `@ValueSourc
 
 > 注：`@ParameterizedTest` 在本仓库是**首次使用**，`junit-jupiter-params` 由 `spring-boot-starter-test` 传递带入，无需改 `pom.xml`。若报找不到注解，不要再加依赖，改成把参数写进 `@Test` 里逐个断言即可。
 
-- [ ] **Step 3: 提交**
+- [x] **Step 3: 提交**
 
 ```bash
 git add backend/src/main/java/com/selfblog/common/enums/SiteAssetKind.java backend/src/test/java/com/selfblog/common/enums/SiteAssetKindTest.java
@@ -310,7 +310,7 @@ git commit -m "feat: add SiteAssetKind enum for brand asset upload limits"
 - Consumes: `SiteAssetKind`（Task 1）
 - Produces: `SiteAssetVO`（Lombok `@Data`，字段 `url` / `kind` / `size` / `originalName`，另带 `@Schema`）、`SiteAssetService#store(MultipartFile file, String kind): SiteAssetVO`
 
-- [ ] **Step 1: 写 VO**
+- [x] **Step 1: 写 VO**
 
 创建 `backend/src/main/java/com/selfblog/vo/site/SiteAssetVO.java`：
 
@@ -341,7 +341,7 @@ public class SiteAssetVO {
 }
 ```
 
-- [ ] **Step 2: 写接口**
+- [x] **Step 2: 写接口**
 
 创建 `backend/src/main/java/com/selfblog/service/site/SiteAssetService.java`：
 
@@ -367,7 +367,7 @@ public interface SiteAssetService {
 }
 ```
 
-- [ ] **Step 3: 编译确认**
+- [x] **Step 3: 编译确认**
 
 ```powershell
 & $mvn -q compile -Dskip.npm=true -Dskip.installnodenpm=true
@@ -375,7 +375,7 @@ public interface SiteAssetService {
 
 Expected: 无输出即成功。
 
-- [ ] **Step 4: 提交**
+- [x] **Step 4: 提交**
 
 ```bash
 git add backend/src/main/java/com/selfblog/vo/site/SiteAssetVO.java backend/src/main/java/com/selfblog/service/site/SiteAssetService.java
@@ -392,7 +392,7 @@ git commit -m "feat: add SiteAssetVO and SiteAssetService contract"
 2. **体积上限**：按 `SiteAssetKind` 分档，图片 2MB、音乐 20MB（都在 `spring.servlet.multipart.max-file-size=50MB` 之下）。
 3. **魔数嗅探**：扩展名是客户端给的，把 `evil.html` 改名成 `logo.png` 就能绕过第 1 条。必须比对真实文件头。
 
-SVG 额外做净化。**必须明确它的定位**：所有渲染点都是图片上下文（`<img src>`、`<link rel="icon">`、`<audio src>`），SVG 里的脚本在那里本就不会执行，所以净化是纵深防御而非唯一防线。另外**必须用 `selectFirst("svg") == null` 来拒绝非 SVG**，不能靠捕获异常 —— 已实测 Jsoup 的 XML 解析器对垃圾输入（`not xml at all <<<>>>`）不抛异常，只是解析不出 `svg` 根元素。
+SVG 额外做净化。**这不是可选的纵深防御**：`/uploads/**` 是公开地址，用户可以直接打开 SVG URL 作为顶层文档，而该场景脚本可能以本站源执行。即使当前 `<img src>` / `<link rel="icon">` 等图片上下文会额外禁用 SVG 脚本，也不能只依赖这一点。必须在落盘前净化危险元素、事件属性与脚本 URL。另外**必须用 `selectFirst("svg") == null` 来拒绝非 SVG**，不能靠捕获异常 —— 已实测 Jsoup 的 XML 解析器对垃圾输入（`not xml at all <<<>>>`）不抛异常，只是解析不出 `svg` 根元素。
 
 **Files:**
 - Create: `backend/src/main/java/com/selfblog/service/site/impl/SiteAssetServiceImpl.java`
@@ -580,8 +580,9 @@ public class SiteAssetServiceImpl implements SiteAssetService {
     }
 
     /**
-     * 净化 SVG。渲染点全是图片上下文，脚本在那里不会执行，所以这是纵深防御：
-     * 万一将来有人把 logo 直接 innerHTML 进页面，至少文件里已经没有可执行的壳。
+     * 净化 SVG。/uploads 资源 URL 是公开的，也可能被直接作为顶层文档打开；
+     * 那种场景下 SVG 脚本可能以本站源执行，因此不能只依赖当前 <img> / favicon 等图片上下文的限制。
+     * 先净化上传内容是必要的安全边界，图片上下文对脚本的额外禁用则是纵深防御。
      *
      * 解析器对垃圾输入不会抛异常（已实测），因此用"有没有 svg 根元素"来拒绝非 SVG。
      */
@@ -1500,23 +1501,23 @@ git commit -m "feat: register faviconUrl and siteLogoUrl as site settings"
 
 ### Task 7: 全量校验与文档
 
-- [ ] **Step 1: 全量测试**
+- [x] **Step 1: 全量测试**
 
 ```powershell
 & $mvn test -Dskip.npm=true -Dskip.installnodenpm=true
 ```
 
-Expected: `Tests run: 386 + 新增`，`Failures: 0, Errors: 0`，`BUILD SUCCESS`。
+Expected: `Tests run: 463`，`Failures: 0, Errors: 0, Skipped: 0`，`BUILD SUCCESS`。
 
-- [ ] **Step 2: 确认没有多余产物**
+- [x] **Step 2: 确认没有多余产物**
 
 ```powershell
 git status --porcelain
 ```
 
-Expected: 只有本计划预期的 Java 文件改动；**不应出现 `backend/uploads/site-assets`** 或任何 `.png` / `.mp3` 之类被误提交的文件。
+Expected: 只有 Task 7 预期的文档与 Javadoc 修订；**不应出现 `backend/uploads/site-assets`** 或任何 `.png` / `.mp3` 之类被误提交的文件。
 
-- [ ] **Step 3: 更新 `CHANGELOG.md`**
+- [x] **Step 3: 更新 `CHANGELOG.md`**
 
 按仓库既有格式（中文，`新增` / `说明` / `影响文件` 分节）在文件顶部新增一节 `## 未发布 — 资源上传通道（后端）(2026-10-15)`，内容需包含：
 
@@ -1524,20 +1525,20 @@ Expected: 只有本计划预期的 Java 文件改动；**不应出现 `backend/u
 - **说明**：
   - **为什么不复用 `MediaService`** —— 那条通道用 thumbnailator 把所有图片重新编码成 `.jpg`，`.ico`、`.svg`、音频都过不去；favicon 需要 `.ico`、logo 需要 `.svg`。
   - **为什么不用建表** —— `site_setting` 是 `setting_key` / `setting_value` 键值表，新增设置项只是多一行数据，`schema.sql`、`schema-sqlite.sql`、`src/test/resources/schema.sql` 三处都不需要改。
-  - **SVG 净化的定位是纵深防御** —— 所有渲染点都是图片上下文（`<img src>`、`<link rel="icon">`、`<audio src>`），脚本在那里不会执行；净化是为了防止将来有人把 logo 直接注入 HTML。
+  - **SVG 净化是必要的安全边界** —— `/uploads/**` 是公开地址，SVG 可被直接作为顶层文档打开；当前图片上下文虽会额外禁用脚本，但不能依赖它作为唯一防线。净化会移除脚本 / 危险元素、事件属性与脚本 URL，且按本地元素名处理带 XML namespace 前缀的写法。
   - **`.ico` 同时接受 ICO 与 PNG 两种文件头** —— 不少工具导出的 `favicon.ico` 实际是 PNG。
   - **前端仍需下一批次接入** —— 本次只到接口与设置项为止，后台「站点设置」页还没有上传入口。
 - **影响文件**：把本计划文件清单里的 11 个文件逐条列出并写明改动类型。
 
-- [ ] **Step 4: 检查 `backend/README.md` 是否需要更新**
+- [x] **Step 4: 检查 `backend/README.md` 是否需要更新**
 
 ```powershell
 Select-String -Path backend\README.md -Pattern 'site-settings|media/upload|接口|API' | Select-Object -First 15
 ```
 
-如果 README 里维护了管理端接口清单，把 `POST /admin/site-assets` 加进去；如果它没有这类清单，**不要**为了本计划硬造一节，跳过并在汇报里说明。
+README 没有逐条管理端接口清单，因此没有硬造新章节；更新了已有汇总中的 Admin 下限（15+ → 16+）和限流说明（注明资源上传 30 次/分钟）。
 
-- [ ] **Step 5: 提交**
+- [x] **Step 5: 提交**
 
 ```bash
 git add CHANGELOG.md backend/README.md
@@ -1560,12 +1561,21 @@ git commit -m "docs: log the backend site-asset upload channel"
 
 ## 执行修订
 
+### Task 1（2026-10-15）
+
+- `SiteAssetKindTest` **25/25 通过**；`junit-jupiter-params` 已由现有 `spring-boot-starter-test` 提供，无需改依赖。
+
+### Task 2（2026-10-15）
+
+- `SiteAssetVO` 与 `SiteAssetService` 编译通过（`mvn -q compile`，退出码 0），无额外测试或依赖。
+
 ### Task 3（2026-10-15）
 
 - 实际测试数为 **40**：按原计划 39 个用例外，代码审查发现 SVG 中带命名空间前缀的 `<x:script>` 能绕过按 CSS 标签名删除的逻辑，新增 `store_StripsNamespacePrefixedScriptFromSvg` 回归用例。该测试先失败、修改后通过。
 - Jsoup 1.18.3 的 `Element` 没有 `removeAttribute(String)`；实现改用其真实 API `removeAttr(String)`。原计划示例代码中的该调用无法编译。
 - AAC 测试夹具的字面量 `0x80` 超出 Java `byte` 的正值范围，需写成 `(byte) 0x80`；否则测试源码无法编译。
 - SVG 危险元素现在按元素名的本地部分匹配，因此无前缀和命名空间前缀形式都会移除；事件属性也按本地属性名判断。解析仍使用 Jsoup XML parser，保留 `linearGradient` / `viewBox` 大小写。
+- `/uploads/**` 资源可被直接导航为顶层文档，SVG 脚本可能以本站源执行；因此净化是必要安全边界，而不只是图片上下文之外的纵深防御。
 - 验证：`SiteAssetServiceImplTest` **40/40 通过**；检查确认测试没有创建 `backend/uploads/site-assets`。
 
 ### Task 4（2026-10-15）
@@ -1579,3 +1589,9 @@ git commit -m "docs: log the backend site-asset upload channel"
 ### Task 6（2026-10-15）
 
 - 实现与原计划一致，无偏差。`SiteSettingsServiceImplTest` 先验证未实现时的失败，再确认 **7/7 通过**；每个测试前清空 `siteSettingsCache`，避免事务回滚后缓存残留。
+
+### Task 7（2026-10-15）
+
+- 完整后端测试 **463/463 通过**（0 failures / errors / skipped，`BUILD SUCCESS`）。
+- `backend/README.md` 无逐条管理端 API 清单；保留其汇总表结构，只将 Admin 下限由 15+ 提到 16+，并将过时的限流接口数字替换为路径前缀说明与新上传限额。
+- `CHANGELOG.md` 新增后端上传批次条目；此前“后端设置键尚未收录”的说明改为明确标注“第一批完成时的状态”，避免与后续条目冲突。

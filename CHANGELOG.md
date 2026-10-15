@@ -4,6 +4,40 @@
 
 ---
 
+## 未发布 — 资源上传通道（后端）(2026-10-15)
+
+### 新增
+
+- **管理员站点资源上传** `POST /api/admin/site-assets`：仅管理员可用，multipart 参数为 `file` 与 `kind`（`logo` / `favicon` / `avatar` / `music`）；成功后返回随机公开地址 `/uploads/site-assets/<kind>/<uuid>.<ext>`
+- 上传校验包含扩展名白名单与文件魔数；logo、favicon、avatar 每个文件最多 2 MB，music 最多 20 MB；接口限流为每分钟 30 次
+- **SVG 安全净化**：移除危险元素（含 XML 命名空间前缀形式）、事件属性和脚本 URL
+- 站点设置新增并默认提供 `faviconUrl`、`siteLogoUrl`；`site_setting` 是键值表，因此无需改表或数据库迁移
+
+### 说明
+
+- 上传通道不复用 `MediaService`：它会把所有图片重新编码为 `.jpg`，不适用于 `.ico`、`.svg` 或音频。`.ico` 同时接受 ICO 与 PNG 文件头，因为部分 favicon 导出工具会把 PNG 字节写入 `.ico` 文件
+- `/uploads/**` 是公开地址，上传的 SVG 可被直接作为顶层文档打开，脚本可能以本站源执行；因此 SVG 净化是必要的安全边界，不能只依赖图片上下文的限制
+- 后端接口与设置支持已完成；后台 `Settings.vue` 上传控件及前端 API 接入留待下一批
+
+### 影响文件
+
+| 文件 | 改动类型 |
+|------|----------|
+| `backend/src/main/java/com/selfblog/common/enums/SiteAssetKind.java` | 新增：资产种类、扩展名白名单与分档大小上限 |
+| `backend/src/test/java/com/selfblog/common/enums/SiteAssetKindTest.java` | 新增：资产种类、扩展名与大小规则测试 |
+| `backend/src/main/java/com/selfblog/vo/site/SiteAssetVO.java` | 新增：上传结果与资源元信息 |
+| `backend/src/main/java/com/selfblog/service/site/SiteAssetService.java` | 新增：站点资源上传服务接口 |
+| `backend/src/main/java/com/selfblog/service/site/impl/SiteAssetServiceImpl.java` | 新增：校验、SVG 净化及随机路径落盘 |
+| `backend/src/test/java/com/selfblog/service/site/impl/SiteAssetServiceImplTest.java` | 新增：上传校验、大小限制与 SVG 净化测试 |
+| `backend/src/main/java/com/selfblog/controller/admin/AdminSiteAssetController.java` | 新增：管理员资源上传接口 |
+| `backend/src/test/java/com/selfblog/controller/AdminSiteAssetControllerTest.java` | 新增：接口、权限及错误响应测试 |
+| `backend/src/main/java/com/selfblog/config/web/RateLimitProperties.java` | 修改：新增资源上传每分钟 30 次限流配置 |
+| `backend/src/main/java/com/selfblog/service/site/impl/SiteSettingsServiceImpl.java` | 修改：允许并默认提供 `faviconUrl`、`siteLogoUrl` |
+| `backend/src/test/java/com/selfblog/service/site/impl/SiteSettingsServiceImplTest.java` | 新增：品牌设置默认值与 URL 校验测试 |
+| `backend/README.md` | 修改：更新管理员 API 数量及限流说明 |
+
+---
+
 ## 未发布 — 视觉重设计（一）：设计底座与公开页导航 (2026-10-15)
 
 站点视觉重设计的第一批落地：先把圆角 token、图标系统、滚动状态与品牌资产这些**共享底座**做好，再让公开页顶栏成为第一个消费者。后端上传通道、文章页阅读体验、后台胶囊化在后续批次。
@@ -33,7 +67,7 @@
 
 - **布局高度守恒**是本次的硬约束：`.app-main { padding-top: 80px }`（`App.vue`）以及文章页的 `scroll-margin-top: 105px`、`.article-aside { top: 105px }` 都是按顶栏高度写死的锚点。因此滚动收缩**只改视觉高度**（`.nav-shell` 的 `min-height` 58→48），顶栏占据的布局高度始终不变，正文位置不跳动
 - **jsdom 测不到的东西靠浏览器验**：胶囊圆角、毛玻璃、收缩位移都无法在单测里断言。已用 Playwright 实测计算样式与截图确认（`getComputedStyle` 取到 `border-radius: 24px`、`backdrop-filter: blur(20px) saturate(1.4)`、移动端 `opacity: 0` 且 `top: -62px`），上面两个移动端 Bug 就是这样发现的
-- `faviconUrl` / `siteLogoUrl` 目前**只是前端消费端**：后端 `SiteSettingsServiceImpl` 的 `ALLOWED_KEYS` 与 `defaults()` 尚未收录这两个键，所以后台还存不进这两个值；在收录之前 `applySettings()` 收到的数据里没有它们，前端会保持默认空串并回落静态图标。后端收录与上传接口属于下一批次
+- **第一批完成时的状态**：`faviconUrl` / `siteLogoUrl` 当时只是前端消费端；后端 `SiteSettingsServiceImpl` 的 `ALLOWED_KEYS` 与 `defaults()` 尚未收录这两个键，所以后台还存不进这两个值；后端收录与上传接口属于后续批次（现已由上方后端批次完成）
 - 圆角 token 只改了 scale 本身，**全站逐处裸圆角替换与后台侧边栏胶囊化留到后续批次**，避免一次提交同时动几十个文件而无法审查
 
 ### 影响文件
