@@ -2,42 +2,52 @@
   <div class="admin-layout">
     <aside class="sidebar" :class="{ 'sidebar-open': mobileOpen }">
       <div class="sidebar-brand">
-        <span class="brand-mark" aria-hidden="true">✳</span>
+        <span class="brand-mark" aria-hidden="true">
+          <img
+            v-if="siteStore.settings.siteLogoUrl"
+            class="brand-mark--image"
+            :src="siteStore.settings.siteLogoUrl"
+            alt=""
+          />
+          <Icon v-else name="logo" :size="17" />
+        </span>
         <div>
           <strong>{{ siteStore.settings.siteTitle }}</strong
           ><small>作者工作台</small>
         </div>
         <button class="close-menu" type="button" aria-label="关闭菜单" @click="mobileOpen = false">
-          ×
+          <Icon name="close" :size="18" />
         </button>
       </div>
 
       <nav class="sidebar-nav" aria-label="后台导航">
         <router-link :to="`${siteStore.adminRoot}/dashboard`" exact-active-class="active" @click="closeOnMobile">
-          <span class="nav-icon" aria-hidden="true">⌂</span>概览
+          <span class="nav-icon" aria-hidden="true"><Icon name="gauge" :size="17" /></span>概览
         </router-link>
         <router-link :to="`${siteStore.adminRoot}/posts`" active-class="active" @click="closeOnMobile">
-          <span class="nav-icon" aria-hidden="true">▤</span>文章管理
+          <span class="nav-icon" aria-hidden="true"><Icon name="file-text" :size="17" /></span>文章管理
         </router-link>
         <router-link :to="`${siteStore.adminRoot}/tags`" active-class="active" @click="closeOnMobile">
-          <span class="nav-icon" aria-hidden="true">⌑</span>标签管理
+          <span class="nav-icon" aria-hidden="true"><Icon name="tag" :size="17" /></span>标签管理
         </router-link>
         <router-link :to="`${siteStore.adminRoot}/visitors`" active-class="active" @click="closeOnMobile">
-          <span class="nav-icon" aria-hidden="true">◷</span>访客记录
+          <span class="nav-icon" aria-hidden="true"><Icon name="users" :size="17" /></span>访客记录
         </router-link>
         <router-link :to="`${siteStore.adminRoot}/comments`" active-class="active" @click="closeOnMobile">
-          <span class="nav-icon" aria-hidden="true">▱</span>评论管理
+          <span class="nav-icon" aria-hidden="true"><Icon name="message" :size="17" /></span>评论管理
         </router-link>
         <router-link :to="`${siteStore.adminRoot}/albums`" active-class="active" @click="closeOnMobile">
-          <span class="nav-icon" aria-hidden="true">▧</span>相册管理
+          <span class="nav-icon" aria-hidden="true"><Icon name="image" :size="17" /></span>相册管理
         </router-link>
         <router-link :to="`${siteStore.adminRoot}/settings`" active-class="active" @click="closeOnMobile">
-          <span class="nav-icon" aria-hidden="true">⚙</span>网站设置
+          <span class="nav-icon" aria-hidden="true"><Icon name="settings" :size="17" /></span>网站设置
         </router-link>
       </nav>
 
       <div class="sidebar-footer">
-        <router-link to="/" @click="closeOnMobile">← 返回博客</router-link>
+        <router-link to="/" @click="closeOnMobile">
+          <span class="nav-icon" aria-hidden="true"><Icon name="home" :size="15" /></span>返回博客
+        </router-link>
       </div>
     </aside>
 
@@ -57,10 +67,10 @@
           aria-label="打开导航菜单"
           @click="mobileOpen = true"
         >
-          ☰
+          <Icon name="menu" :size="18" />
         </button>
         <span>{{ userStore.nickname || userStore.username || '作者管理' }}</span>
-        <router-link to="/" class="public-link">打开博客 ↗</router-link>
+        <router-link to="/" class="public-link">打开博客 <Icon name="external" :size="13" /></router-link>
         <button class="logout-button" type="button" @click="logout">退出登录</button>
       </header>
       <div class="main-content">
@@ -75,6 +85,7 @@ import { ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useSiteStore } from '@/stores/site'
 import { useUserStore } from '@/stores/user'
+import Icon from '@/components/common/Icon.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -121,10 +132,16 @@ watch(() => route.path, closeOnMobile)
   place-items: center;
   width: 33px;
   height: 33px;
-  border-radius: 10px;
+  overflow: hidden;
+  border-radius: var(--radius);
   background: var(--primary);
   color: white;
   font-size: 1.1rem;
+}
+.brand-mark--image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 .sidebar-brand div {
   display: flex;
@@ -166,7 +183,7 @@ watch(() => route.path, closeOnMobile)
   gap: 11px;
   min-height: 43px;
   padding: 0 12px;
-  border-radius: 8px;
+  border-radius: var(--radius-full);
   color: var(--text-secondary);
   font-size: 0.86rem;
   text-decoration: none;
@@ -185,6 +202,8 @@ watch(() => route.path, closeOnMobile)
   font-weight: 600;
 }
 .nav-icon {
+  display: grid;
+  place-items: center;
   width: 20px;
   color: currentColor;
   font-size: 1.1rem;
@@ -214,6 +233,9 @@ watch(() => route.path, closeOnMobile)
   font-size: 0.82rem;
 }
 .public-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   margin-left: auto;
   color: var(--primary);
   font-weight: 600;
@@ -222,7 +244,7 @@ watch(() => route.path, closeOnMobile)
 .logout-button {
   padding: 7px 10px;
   border: 1px solid var(--border-solid);
-  border-radius: 7px;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--text-secondary);
   font-size: 0.75rem;

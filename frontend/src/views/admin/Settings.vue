@@ -10,7 +10,7 @@
         <label>作者名称<input v-model.trim="form.authorName" maxlength="80" required /></label>
         <label>作者介绍<textarea v-model.trim="form.authorBio" rows="3" maxlength="1000"></textarea></label>
         <SiteAssetField :model-value="form.authorAvatar" kind="avatar" label="作者头像" hint="支持上传或手填外链地址。" @update:model-value="setAsset('authorAvatar', $event)" @uploaded="applyUploadedAsset('authorAvatar', $event)" />
-        <SiteAssetField :model-value="form.siteLogoUrl" kind="logo" label="站点 Logo" hint="站点品牌图标；留空使用内置图标。" @update:model-value="setAsset('siteLogoUrl', $event)" @uploaded="applyUploadedAsset('siteLogoUrl', $event)" />
+        <SiteAssetField :model-value="form.siteLogoUrl" kind="logo" label="站点 Logo" hint="公开页顶栏与后台侧边栏的品牌图标；留空使用内置图标。" @update:model-value="setAsset('siteLogoUrl', $event)" @uploaded="applyUploadedAsset('siteLogoUrl', $event)" />
         <SiteAssetField :model-value="form.faviconUrl" kind="favicon" label="网站图标" hint="浏览器标签页图标；留空使用默认图标。" @update:model-value="setAsset('faviconUrl', $event)" @uploaded="applyUploadedAsset('faviconUrl', $event)" />
         <label>页脚文字<input v-model.trim="form.footerText" maxlength="1000" /></label>
       </section>
