@@ -8,6 +8,7 @@ import { publicInteractionApi, type AnonymousLike, type GuestComment } from '@/a
 import { formatDate, getSafeImageUrl } from '@/utils'
 import { useUserStore } from '@/stores/user'
 import { useSiteStore } from '@/stores/site'
+import { applySeoMeta, applyArticleJsonLd, setSeoSiteTitle } from '@/composables/useSeoMeta'
 import { toast } from '@/utils/toast'
 import type { Post } from '@/types'
 
@@ -21,6 +22,11 @@ const route = useRoute()
 const userStore = useUserStore()
 const siteStore = useSiteStore()
 const post = ref<Post | null>(null)
+/** 上一篇 / 下一篇，缺失的方向为 null */
+const adjacent = ref<{ prev: { id: number; title: string } | null; next: { id: number; title: string } | null }>({
+  prev: null,
+  next: null
+})
 const loading = ref(true)
 const error = ref('')
 const readingProgress = ref(0)
@@ -65,11 +71,45 @@ const fetchPost = async () => {
       return
     }
     post.value = response.data
+    // 分享到微信/微博/Twitter 时，抓取器读的是这几条静态 meta，
+    // 不更新就永远是首页标题和封面。
+    const detail = response.data
+    // 摘要优先用后端返回的 summary；缺失时从正文剥掉 Markdown 标记生成纯文本
+    const description =
+      detail.summary ||
+      detail.content
+        ?.replace(/!\[[^\]]*\]\([^)]*\)/g, '')
+        .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
+        .replace(/[#*`>_~-]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .slice(0, 140) ||
+      ''
+    setSeoSiteTitle(siteStore.settings.siteTitle)
+    applySeoMeta({
+      title: detail.title,
+      description,
+      image: detail.coverUrl || detail.coverImage,
+      url: `/post/${detail.id}`,
+      type: 'article',
+      publishedTime: detail.createTime,
+      author: detail.nickname || detail.authorName,
+      tags: (detail.tags || []).map((tag) => tag.name)
+    })
+    applyArticleJsonLd({
+      title: detail.title,
+      description,
+      image: detail.coverUrl || detail.coverImage,
+      url: `/post/${detail.id}`,
+      publishedTime: detail.createTime,
+      author: detail.nickname || detail.authorName
+    })
     comments.value = []
     commentsTotal.value = 0
     commentPage.value = 1
     likeInfo.value = { liked: false, likeCount: response.data.likeCount || 0 }
     void loadLikeStatus()
+    void loadAdjacent()
     if (siteStore.isCommentsEnabled) void loadComments()
   } catch (err: unknown) {
     const status = (err as { response?: { status?: number } }).response?.status
@@ -78,6 +118,20 @@ const fetchPost = async () => {
     else error.value = '文章暂时无法加载，请稍后重试。'
   } finally {
     loading.value = false
+  }
+}
+
+/**
+ * 相邻文章只是阅读辅助，取不到时不该影响正文展示，因此失败静默处理。
+ */
+async function loadAdjacent() {
+  const id = post.value?.id
+  if (!id) return
+  try {
+    const response = await postApi.getAdjacentPosts(id)
+    adjacent.value = response.data || { prev: null, next: null }
+  } catch {
+    adjacent.value = { prev: null, next: null }
   }
 }
 
@@ -249,6 +303,17 @@ onUnmounted(() => window.removeEventListener('scroll', updateReadingProgress))
 
         <div ref="contentRef" class="markdown-body" v-html="renderedContent"></div>
 
+        <nav v-if="adjacent.prev || adjacent.next" class="post-adjacent" aria-label="相邻文章">
+          <router-link v-if="adjacent.prev" class="adjacent-link" :to="`/post/${adjacent.prev.id}`">
+            <span class="adjacent-label">← 上一篇</span>
+            <span class="adjacent-title">{{ adjacent.prev.title }}</span>
+          </router-link>
+          <router-link v-if="adjacent.next" class="adjacent-link adjacent-link--next" :to="`/post/${adjacent.next.id}`">
+            <span class="adjacent-label">下一篇 →</span>
+            <span class="adjacent-title">{{ adjacent.next.title }}</span>
+          </router-link>
+        </nav>
+
         <section class="reader-interactions" :aria-label="`《${post.title}》的互动`">
           <button class="like-action" :class="{ active: likeInfo.liked }" type="button" :disabled="liking" @click="toggleAnonymousLike">
             <span aria-hidden="true">{{ likeInfo.liked ? '♥' : '♡' }}</span>
@@ -361,8 +426,47 @@ onUnmounted(() => window.removeEventListener('scroll', updateReadingProgress))
 }
 .reader-interactions { display: flex; align-items: center; gap: 14px; margin: 25px 0 30px; padding: 16px 0; border-top: 1px solid var(--border-solid); border-bottom: 1px solid var(--border-solid); }
 .like-action { display: inline-flex; align-items: center; gap: 7px; padding: 9px 13px; border: 1px solid var(--border-solid); border-radius: 999px; background: var(--surface-primary); color: var(--text-secondary); font: inherit; font-size: .82rem; cursor: pointer; }
-.like-action span { color: #dc4762; font-size: 1.1rem; }.like-action.active { border-color: #f0bdc9; background: #fff0f3; color: #c82f50; }.like-action:disabled { opacity: .6; cursor: wait; }.like-action strong { font-size: .76rem; }
+.like-action span { color: var(--like-accent); font-size: 1.1rem; }.like-action.active { border-color: var(--like-accent-border); background: var(--like-accent-soft); color: var(--like-accent-strong); }.like-action:disabled { opacity: .6; cursor: wait; }.like-action strong { font-size: .76rem; }
 .interaction-note { color: var(--text-muted); font-size: .72rem; }
+
+/* 上一篇 / 下一篇：博客阅读器的标准出口，避免读完只能在浏览器里按后退 */
+.post-adjacent {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+  margin: 30px 0 8px;
+}
+.adjacent-link {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 14px 16px;
+  border: 1px solid var(--border-solid);
+  border-radius: 10px;
+  background: var(--surface-primary);
+  text-decoration: none;
+  transition: border-color var(--duration-fast) var(--ease-default), transform var(--duration-fast) var(--ease-default);
+}
+.adjacent-link:hover {
+  border-color: var(--accent);
+  transform: translateY(-1px);
+}
+.adjacent-link--next { text-align: right; }
+.adjacent-label { color: var(--text-muted); font-size: .7rem; letter-spacing: .04em; }
+.adjacent-title {
+  color: var(--text-primary);
+  font-size: .88rem;
+  font-weight: 600;
+  line-height: 1.45;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+@media (max-width: 640px) {
+  .adjacent-link--next { text-align: left; }
+}
 .comments-section { margin: 46px 0 30px; }
 .comments-heading { margin-bottom: 18px; }.comments-heading .eyebrow { margin: 0 0 6px; color: var(--primary); font-size: .67rem; font-weight: 700; letter-spacing: .15em; }.comments-heading h2 { margin: 0; font: 700 1.5rem var(--font-display); }.comments-heading h2 span { margin-left: 5px; color: var(--text-muted); font: 500 .85rem var(--font-sans); }
 .comment-form { display: grid; gap: 12px; padding: 17px; border: 1px solid var(--border-solid); border-radius: 12px; background: var(--surface-primary); }.comment-form label { display: grid; gap: 6px; color: var(--text-secondary); font-size: .75rem; }.comment-form input, .comment-form textarea { width: 100%; padding: 10px 12px; border: 1px solid var(--border-solid); border-radius: 8px; background: var(--bg-primary); color: var(--text-primary); font: inherit; font-size: .85rem; }.comment-form textarea { resize: vertical; }.comment-form-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; }.comment-form-footer small { color: var(--text-muted); font-size: .7rem; }.comment-form-footer button { padding: 9px 13px; border: 0; border-radius: 8px; background: var(--primary); color: white; font-size: .76rem; font-weight: 700; cursor: pointer; }.comment-form-footer button:disabled { opacity: .55; }
@@ -466,8 +570,11 @@ onUnmounted(() => window.removeEventListener('scroll', updateReadingProgress))
   margin: 1.5em 0;
   padding: 17px;
   border-radius: 9px;
-  background: var(--gray-900);
-  color: var(--gray-100);
+  /* 用 --code-bg 而非 --gray-900：深色模式下灰度会反转，
+     --gray-900 会变成 #EBEBEB，让代码块成为全页最亮的元素。 */
+  background: var(--code-bg);
+  color: var(--code-text);
+  border: 1px solid var(--code-border);
   font-size: 0.82rem;
   line-height: 1.65;
 }

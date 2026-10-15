@@ -65,6 +65,12 @@
   --border-solid: #2d4053;
 }
 
+/* midnight 皮肤本身就是深色，原生控件/滚动条应始终按深色渲染。
+   App.vue 把 .dark-mode 加在 #selfblog 自身（而非其后代），
+   原来的 `#selfblog[data-skin='midnight'] .dark-mode` 是后代选择器，
+   永远匹配不到，导致 color-scheme 从未生效。 */
+#selfblog[data-skin='midnight'],
+#selfblog[data-skin='midnight'].dark-mode,
 #selfblog[data-skin='midnight'] .dark-mode {
   color-scheme: dark;
 }

@@ -44,6 +44,17 @@ export const postApi = {
   },
 
   /**
+   * 获取相邻文章（上一篇 / 下一篇），任一方向没有文章时对应值为 null
+   */
+  getAdjacentPosts(
+    id: number | string
+  ): Promise<
+    ApiResponse<{ prev: { id: number; title: string } | null; next: { id: number; title: string } | null }>
+  > {
+    return api.get(`/post/${id}/adjacent`)
+  },
+
+  /**
    * 获取文章列表
    */
   getPostList(params: PostListParams): Promise<PaginatedResponse<Post>> {

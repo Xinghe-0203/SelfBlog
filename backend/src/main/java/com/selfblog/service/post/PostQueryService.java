@@ -7,6 +7,7 @@ import com.selfblog.dto.post.PostAdvancedSearchRequest;
 import com.selfblog.dto.post.PostQueryRequest;
 import com.selfblog.dto.post.SaveDraftRequest;
 import com.selfblog.entity.BlogPost;
+import com.selfblog.vo.post.AdjacentPostVO;
 import com.selfblog.vo.post.PostDetailResponse;
 import com.selfblog.vo.post.PostListResponse;
 
@@ -77,4 +78,14 @@ public interface PostQueryService extends IService<BlogPost> {
      * 根据文章ID获取标签列表
      */
     List<PostDetailResponse.TagVO> getTagsByPostId(Long postId);
+
+    /**
+     * 获取相邻文章，用于文章详情页底部的上一篇/下一篇导航。
+     *
+     * <p>按发布时间（createTime）排序，只返回已发布文章；同一时间戳用 id 兜底排序。
+     *
+     * @param postId 当前文章ID
+     * @return 固定包含 "prev"（更早一篇）与 "next"（更新一篇）两个键，不存在时值为 null
+     */
+    Map<String, AdjacentPostVO> getAdjacentPosts(Long postId);
 }

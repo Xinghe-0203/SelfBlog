@@ -166,6 +166,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/site/public", "/site/public").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/visitor/track", "/visitor/track").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/post/{id}", "/post/{id}").permitAll()
+                        // 文章详情页底部的上一篇/下一篇，访客也要能拿
+                        .requestMatchers(HttpMethod.GET, "/api/post/{id}/adjacent", "/post/{id}/adjacent").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/post/list", "/post/list").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/post/search/**", "/post/search/**").permitAll()
                         .requestMatchers(HttpMethod.PUT, "/api/post/{id}/view", "/post/{id}/view").permitAll()
@@ -180,7 +182,11 @@ public class SecurityConfig {
                 // Outside /api the production app only exposes the bundled SPA and public uploads.
                 // Disable this broad history fallback in tests, where controller paths are unprefixed.
                 if (apiPrefix != null && !apiPrefix.isBlank()) {
-                    authorize.requestMatchers("/", "/index.html", "/assets/**", "/favicon.ico", "/robots.txt",
+                    // /feed.xml、/atom.xml、/sitemap.xml 带扩展名，不会被下面的 SPA 回退
+                    // （[^\.]* 只匹配不含点号的路径）命中，必须单独放行，否则会落到
+                    // 末尾「仅 ROLE_admin」的兜底规则返回 401，订阅器与爬虫都取不到。
+                    authorize.requestMatchers("/", "/index.html", "/assets/**", "/favicon.ico",
+                            "/robots.txt", "/feed.xml", "/atom.xml", "/sitemap.xml",
                             "/{path:^(?!api$|assets$|uploads$|actuator$|v3$|swagger-ui$|doc\\.html$)[^\\.]*$}",
                             "/{path:^(?!api$|assets$|uploads$|actuator$|v3$|swagger-ui$|doc\\.html$)[^\\.]*$}/**").permitAll();
                 }

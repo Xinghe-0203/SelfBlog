@@ -7,7 +7,7 @@ import org.springframework.boot.env.EnvironmentPostProcessor;
 import org.springframework.core.env.ConfigurableEnvironment;
 
 import java.io.IOException;
-import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -58,8 +58,10 @@ public class DotenvConfig implements EnvironmentPostProcessor {
 
         try {
             Properties properties = new Properties();
-            try (InputStream is = Files.newInputStream(envPath)) {
-                properties.load(is);
+            // 必须按 UTF-8 读取：Properties.load(InputStream) 会按 ISO-8859-1 解码，
+            // 导致 .env 中的中文值（如 ADMIN_NICKNAME=站长）变成乱码。
+            try (var reader = Files.newBufferedReader(envPath, StandardCharsets.UTF_8)) {
+                properties.load(reader);
             }
 
             int loadedCount = 0;

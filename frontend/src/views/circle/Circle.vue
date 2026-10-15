@@ -647,7 +647,7 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 4px 16px rgba(13, 148, 136, 0.35);
+  box-shadow: 0 4px 16px rgba(22, 93, 255, 0.35);
   transition: all var(--transition);
   z-index: var(--z-fixed);
 }
@@ -655,7 +655,7 @@ onBeforeUnmount(() => {
 .fab-create:hover {
   background: var(--primary-hover);
   transform: scale(1.08);
-  box-shadow: 0 6px 24px rgba(13, 148, 136, 0.45);
+  box-shadow: 0 6px 24px rgba(22, 93, 255, 0.45);
 }
 
 .fab-create:active {

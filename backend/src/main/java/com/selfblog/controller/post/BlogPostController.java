@@ -9,6 +9,7 @@ import com.selfblog.dto.post.PostQueryRequest;
 import com.selfblog.dto.post.SaveDraftRequest;
 import com.selfblog.service.post.BlogPostService;
 import com.selfblog.utils.SecurityUtils;
+import com.selfblog.vo.post.AdjacentPostVO;
 import com.selfblog.vo.post.PostDetailResponse;
 import com.selfblog.vo.post.PostListResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -24,6 +25,7 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * 文章管理控制器
@@ -113,6 +115,15 @@ public class BlogPostController {
         }
         PostDetailResponse detail = blogPostService.getPostDetail(id);
         return Result.success(detail);
+    }
+
+    /**
+     * 获取相邻文章（上一篇 / 下一篇）
+     */
+    @Operation(summary = "获取相邻文章")
+    @GetMapping("/{id}/adjacent")
+    public Result<Map<String, AdjacentPostVO>> getAdjacentPosts(@PathVariable Long id) {
+        return Result.success(blogPostService.getAdjacentPosts(id));
     }
 
     /**

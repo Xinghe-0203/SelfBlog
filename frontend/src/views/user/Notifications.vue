@@ -361,7 +361,7 @@ onUnmounted(() => {
 }
 
 .notif-item.unread {
-  background: rgba(13, 148, 136, 0.03);
+  background: rgba(22, 93, 255, 0.03);
 }
 
 /* Unread dot */

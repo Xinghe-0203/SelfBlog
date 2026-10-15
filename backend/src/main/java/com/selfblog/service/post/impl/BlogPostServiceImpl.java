@@ -23,6 +23,7 @@ import com.selfblog.service.post.PostInteractionService;
 import com.selfblog.service.post.PostQueryService;
 import com.selfblog.service.social.NotificationService;
 import com.selfblog.utils.HtmlSanitizer;
+import com.selfblog.vo.post.AdjacentPostVO;
 import com.selfblog.vo.post.PostDetailResponse;
 import com.selfblog.vo.post.PostListResponse;
 import lombok.extern.slf4j.Slf4j;
@@ -33,6 +34,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -498,6 +500,12 @@ public class BlogPostServiceImpl extends ServiceImpl<BlogPostMapper, BlogPost> i
     @Transactional(readOnly = true)
     public PostDetailResponse getPostDetail(Long postId) {
         return postQueryService.getPostDetail(postId);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Map<String, AdjacentPostVO> getAdjacentPosts(Long postId) {
+        return postQueryService.getAdjacentPosts(postId);
     }
 
     @Override

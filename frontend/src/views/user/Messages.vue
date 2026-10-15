@@ -461,7 +461,7 @@ onUnmounted(() => {
 }
 
 .conv-item.active {
-  background: rgba(13, 148, 136, 0.06);
+  background: rgba(22, 93, 255, 0.06);
   border-left: 2px solid var(--primary);
 }
 

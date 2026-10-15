@@ -8,6 +8,7 @@ import authRoutes from './modules/auth'
 import homeRoutes from './modules/home'
 import postRoutes from './modules/post'
 import discoverRoutes from './modules/discover'
+import userRoutes from './modules/user'
 import { createAdminRoutes } from './modules/admin'
 
 export { lazyLoad } from './helpers'
@@ -17,6 +18,9 @@ const routes: RouteRecordRaw[] = [
   ...authRoutes,
   ...postRoutes,
   ...discoverRoutes,
+  // userRoutes 此前已定义但从未注册，导致 /profile、/drafts、/collections、
+  // /messages、/notifications、/my-reports 等十多个页面全部落到 404。
+  ...userRoutes,
   {
     path: '/:pathMatch(.*)*',
     name: 'NotFound',

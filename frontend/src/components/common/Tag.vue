@@ -172,13 +172,13 @@ const handleClick = (e: MouseEvent) => {
 
 /* ==================== PRIMARY — Teal pastel ==================== */
 .tag--primary {
-  background: rgba(13, 148, 136, 0.08);
-  color: #0F766E;
-  border: 1px solid rgba(13, 148, 136, 0.15);
+  background: rgba(22, 93, 255, 0.08);
+  color: #0E42D2;
+  border: 1px solid rgba(22, 93, 255, 0.15);
 }
 
 .tag--closable.tag--primary:hover {
-  background: rgba(13, 148, 136, 0.14);
+  background: rgba(22, 93, 255, 0.14);
 }
 
 /* ==================== ACCENT — Coral pastel ==================== */
@@ -194,13 +194,13 @@ const handleClick = (e: MouseEvent) => {
 
 /* ==================== SUCCESS — Emerald pastel ==================== */
 .tag--success {
-  background: rgba(5, 150, 105, 0.08);
-  color: #047857;
-  border: 1px solid rgba(5, 150, 105, 0.15);
+  background: rgba(0, 180, 42, 0.08);
+  color: #009A29;
+  border: 1px solid rgba(0, 180, 42, 0.15);
 }
 
 .tag--closable.tag--success:hover {
-  background: rgba(5, 150, 105, 0.14);
+  background: rgba(0, 180, 42, 0.14);
 }
 
 /* ==================== WARNING — Amber pastel ==================== */

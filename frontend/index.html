@@ -3,12 +3,41 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SelfBlog</title>
+
+  <!-- 默认值；运行时由 siteStore 用后台“网站设置”覆盖 -->
+  <title>个人博客</title>
+  <meta name="description" content="记录技术、生活与一路上的新发现。">
+  <meta name="author" content="站长">
+
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
-  <!-- 字体预加载 — Plus Jakarta Sans (正文) + Fraunces (标题) -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..900;1,9..144,300..900&family=Plus+Jakarta+Sans:ital,wght@0,300..800;1,300..800&display=swap" rel="stylesheet">
+  <link rel="canonical" href="/">
+
+  <!-- 主题色：让移动端浏览器地址栏跟随站点主题 -->
+  <meta name="theme-color" content="#165DFF" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#191919" media="(prefers-color-scheme: dark)">
+  <meta name="color-scheme" content="light dark">
+
+  <!-- 订阅源自动发现：阅读器（Feedly / Inoreader / NetNewsWire 等）靠这三行找到订阅地址 -->
+  <link rel="alternate" type="application/rss+xml" title="RSS 订阅" href="/feed.xml">
+  <link rel="alternate" type="application/atom+xml" title="Atom 订阅" href="/atom.xml">
+  <link rel="sitemap" type="application/xml" href="/sitemap.xml">
+
+  <!-- 分享到社交平台时的预览卡片 -->
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="个人博客">
+  <meta property="og:title" content="个人博客">
+  <meta property="og:description" content="记录技术、生活与一路上的新发现。">
+  <meta property="og:locale" content="zh_CN">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="个人博客">
+  <meta name="twitter:description" content="记录技术、生活与一路上的新发现。">
+
+  <!--
+    这里原先从 fonts.googleapis.com 加载 Fraunces + Plus Jakarta Sans，
+    但整套 CSS 的 --font-display/--font-sans 从未引用这两个字体族，
+    等于每次访问都白下载几百 KB 外部字体（且在国内网络下经常超时阻塞渲染）。
+    已移除，字体改为在 variables.css 中用系统字体栈 + 中文回退。
+  -->
 </head>
 <body>
   <div id="app"></div>

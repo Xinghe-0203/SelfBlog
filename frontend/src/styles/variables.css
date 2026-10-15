@@ -25,6 +25,26 @@
   --surface-secondary: #FAFBFC;
 
   /* ---------------------------------------------------------------
+     Contrast Surface — 高对比实心表面（主按钮 / 反色块）
+     注意：不要用 --gray-900 当“深色背景”。深色模式下灰度梯度会整体反转，
+     --gray-900 会变成 #EBEBEB，导致按钮/代码块在深色页面上变成刺眼的亮块。
+     这两个 token 由各自主题显式定义，语义稳定。
+     --------------------------------------------------------------- */
+  --contrast-bg:        #111111;
+  --contrast-bg-hover:  #333333;
+  --contrast-bg-active: #0A0A0A;
+  --contrast-fg:        #FFFFFF;
+
+  /* ---------------------------------------------------------------
+     Code Surface — 代码块
+     浅色模式下为深色块（反转观感）；深色模式下同样保持深色，
+     避免整页最亮的元素是一段代码。
+     --------------------------------------------------------------- */
+  --code-bg:     #1D2129;
+  --code-text:   #E5E6EB;
+  --code-border: #2C333D;
+
+  /* ---------------------------------------------------------------
      Borders / Dividers
      --------------------------------------------------------------- */
   --border-light:      #E5E6EB;     /* 浅灰分割线，不抢视线 */
@@ -160,11 +180,19 @@
      Typography System
      --------------------------------------------------------------- */
 
-  /* Font Families */
-  --font-display: 'Lyon Text', 'Newsreader', 'Playfair Display', 'Instrument Serif', Georgia, serif;
-  --font-sans:    'SF Pro Display', 'Geist Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  --font-serif:   'Lyon Text', 'Newsreader', 'Playfair Display', 'Instrument Serif', Georgia, serif;
-  --font-mono:    'Geist Mono', 'SF Mono', 'JetBrains Mono', monospace;
+  /* Font Families
+     全部使用系统字体栈：不请求任何外部字体，避免国内网络下 Google Fonts
+     超时阻塞渲染。中文必须显式回退（苹方/微软雅黑/思源黑体），
+     否则中文会落到浏览器默认字体，与西文混排时字重和字距都不一致。 */
+  --font-display: 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia,
+                  'Songti SC', 'Source Han Serif SC', 'Noto Serif CJK SC', 'SimSun', serif;
+  --font-sans:    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+                  'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei',
+                  'Source Han Sans SC', 'Noto Sans CJK SC', Helvetica, Arial, sans-serif;
+  --font-serif:   'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia,
+                  'Songti SC', 'Source Han Serif SC', 'Noto Serif CJK SC', 'SimSun', serif;
+  --font-mono:    ui-monospace, SFMono-Regular, Menlo, Consolas,
+                  'JetBrains Mono', 'Sarasa Mono SC', 'Courier New', monospace;
 
   /* Font Sizes */
   --text-xs:   0.75rem;     /* 12px */
@@ -331,6 +359,13 @@
   --like-light:    var(--secondary-light);
   --hot-tag-bg:    var(--secondary-light);
   --hot-tag-text:  var(--secondary-dark);
+
+  /* 点赞按钮的心形强调色。不要把这些值直接写死在组件里：
+     浅色下的 #fff0f3 之类浅底在深色模式下会变成刺眼的亮块。 */
+  --like-accent:        #DC4762;
+  --like-accent-strong: #C82F50;
+  --like-accent-soft:   #FFF0F3;
+  --like-accent-border: #F0BDC9;
 
   /* ---------------------------------------------------------------
      Z-Index Scale

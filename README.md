@@ -75,7 +75,7 @@
 | **Java 21** | 后端业务逻辑、API 接口、安全认证 |
 | **TypeScript** | 前端组件、状态管理、类型安全 |
 | **SQL** | 数据库建表、索引、查询 |
-| **CSS** | 前端样式（Rainy Glassmorphism 设计系统） |
+| **CSS** | 前端样式（设计系统 v6.0「清爽科技蓝」，CSS 变量 + 深色模式 + 皮肤） |
 | **XML** | MyBatis Mapper 映射、Logback 日志配置 |
 
 ---
@@ -143,7 +143,7 @@ SelfBlog/
 │       ├── stores/                 # Pinia 状态管理（3 个 Store）
 │       ├── router/                 # 路由配置（模块化）
 │       ├── composables/            # 组合式函数
-│       ├── styles/                 # 全局样式（Rainy Glassmorphism）
+│       ├── styles/                 # 全局样式（清爽科技蓝设计系统）
 │       ├── types/                  # TypeScript 类型定义
 │       └── utils/                  # 工具函数
 │
@@ -283,6 +283,19 @@ Controller（控制器）→ Service（服务）→ Mapper（数据访问）→ 
 **http://localhost:8825/doc.html**（`prod` profile 下关闭）
 
 公开 API 提供已发布文章、标签、搜索、访客统计采集、匿名点赞、访客评论和相册访问。文章写入、站点配置、访客/评论/相册管理等接口要求作者管理员身份；注册关闭。
+
+### 站点订阅与收录
+
+以下地址在**根路径**（不带 `/api` 前缀），供阅读器与搜索引擎抓取：
+
+| 地址 | 说明 |
+|------|------|
+| `/feed.xml` | RSS 2.0 订阅源，已发布文章按时间倒序 |
+| `/atom.xml` | Atom 1.0 订阅源 |
+| `/sitemap.xml` | 站点地图：首页、归档、关于、相册、搜索、全部文章与标签 |
+| `/robots.txt` | 动态生成，`Sitemap` 指令为绝对地址并 `Disallow: /admin`、`/api/` |
+
+部署在反向代理之后时，用环境变量 `SITE_BASE_URL`（如 `https://blog.example.com`）指定对外域名，否则订阅源与站点地图里的链接会使用请求头推导出的地址。
 
 ---
 

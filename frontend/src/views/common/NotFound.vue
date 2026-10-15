@@ -139,7 +139,7 @@ const doSearch = () => {
 .shape-3 {
   width: 40px;
   height: 40px;
-  background: linear-gradient(135deg, var(--success), #059669);
+  background: linear-gradient(135deg, var(--success), #00B42A);
   bottom: 0;
   left: 25%;
   animation: float3 7s ease-in-out infinite;

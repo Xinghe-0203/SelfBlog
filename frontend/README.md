@@ -151,7 +151,10 @@ appStore.toggleSidebar() // Sidebar toggle
 
 ## Design System
 
-Rainy Glassmorphism UI with glass effects, water drops, ripple animations, and light sweeps.
+Clean tech-blue ("清爽科技蓝") design system: CSS-variable tokens for color, spacing,
+radius and shadows, a first-class dark mode, and five selectable light/dark skins.
+Surfaces are solid by default — the legacy glass tokens (`--glass-*`) are kept for
+compatibility but resolve to solid colors with `--glass-blur: none`.
 
 ### CSS Variables
 

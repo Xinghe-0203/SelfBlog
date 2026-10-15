@@ -194,7 +194,7 @@ const handleKeydown = (e: KeyboardEvent) => {
 }
 
 .input-wrap--focused .input-label {
-  color: var(--primary, #0D9488);
+  color: var(--primary, #165DFF);
 }
 
 .input-wrap--error .input-label {
@@ -263,10 +263,10 @@ const handleKeydown = (e: KeyboardEvent) => {
 }
 
 .input-field:focus {
-  border-color: var(--primary, #0D9488);
+  border-color: var(--primary, #165DFF);
   box-shadow:
-    0 0 0 3px rgba(13, 148, 136, 0.08),
-    0 0 0 1px rgba(13, 148, 136, 0.12);
+    0 0 0 3px rgba(22, 93, 255, 0.08),
+    0 0 0 1px rgba(22, 93, 255, 0.12);
 }
 
 /* ==================== Error state ==================== */
@@ -282,13 +282,13 @@ const handleKeydown = (e: KeyboardEvent) => {
 
 /* ==================== Success state ==================== */
 .input-wrap--success .input-field {
-  border-color: var(--success, #059669);
+  border-color: var(--success, #00B42A);
 }
 
 .input-wrap--success .input-field:focus {
   box-shadow:
-    0 0 0 3px rgba(5, 150, 105, 0.08),
-    0 0 0 1px rgba(5, 150, 105, 0.12);
+    0 0 0 3px rgba(0, 180, 42, 0.08),
+    0 0 0 1px rgba(0, 180, 42, 0.12);
 }
 
 /* ==================== Disabled / Readonly ==================== */
@@ -348,7 +348,7 @@ const handleKeydown = (e: KeyboardEvent) => {
 }
 
 .input-message--success {
-  color: var(--success, #059669);
+  color: var(--success, #00B42A);
 }
 
 .input-message--hint {

@@ -17,6 +17,7 @@ import com.selfblog.mapper.*;
 import com.selfblog.service.post.BlogTagService;
 import com.selfblog.service.post.PostQueryService;
 import com.selfblog.service.content.TopicService;
+import com.selfblog.vo.post.AdjacentPostVO;
 import com.selfblog.vo.post.PostDetailResponse;
 import com.selfblog.vo.post.PostListResponse;
 import lombok.extern.slf4j.Slf4j;
@@ -26,6 +27,7 @@ import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -717,5 +719,57 @@ public class PostQueryServiceImpl extends ServiceImpl<BlogPostMapper, BlogPost> 
         request.setCoverImage(draft.getCoverImage());
 
         return request;
+    }
+
+    @Override
+    public Map<String, AdjacentPostVO> getAdjacentPosts(Long postId) {
+        BlogPost current = getById(postId);
+        if (current == null || current.getCreateTime() == null) {
+            return Collections.emptyMap();
+        }
+
+        LocalDateTime created = current.getCreateTime();
+        Map<String, AdjacentPostVO> result = new HashMap<>(4);
+        // 阅读顺序按发布时间：prev = 更早的一篇，next = 更新的一篇
+        result.put("prev", findAdjacent(created, current.getId(), false));
+        result.put("next", findAdjacent(created, current.getId(), true));
+        return result;
+    }
+
+    /**
+     * 取相邻的一篇已发布文章。
+     *
+     * @param newer true 取更新的一篇（时间更晚，取其中最早的），false 取更早的一篇（取其中最晚的）
+     */
+    private AdjacentPostVO findAdjacent(LocalDateTime created, Long currentId, boolean newer) {
+        LambdaQueryWrapper<BlogPost> wrapper = new LambdaQueryWrapper<BlogPost>()
+                .eq(BlogPost::getStatus, PostStatus.PUBLISHED.getValue())
+                .ne(BlogPost::getId, currentId);
+
+        // 发布时间相同时用 id 兜底，避免漏掉文章或重复指回自己
+        if (newer) {
+            wrapper.and(w -> w.gt(BlogPost::getCreateTime, created)
+                            .or(inner -> inner.eq(BlogPost::getCreateTime, created)
+                                            .gt(BlogPost::getId, currentId)))
+                    .orderByAsc(BlogPost::getCreateTime)
+                    .orderByAsc(BlogPost::getId);
+        } else {
+            wrapper.and(w -> w.lt(BlogPost::getCreateTime, created)
+                            .or(inner -> inner.eq(BlogPost::getCreateTime, created)
+                                            .lt(BlogPost::getId, currentId)))
+                    .orderByDesc(BlogPost::getCreateTime)
+                    .orderByDesc(BlogPost::getId);
+        }
+
+        // 分页取第一条（不查总数），避免依赖 MySQL 专有的 LIMIT 写法
+        Page<BlogPost> page = page(new Page<>(1, 1, false), wrapper);
+        if (page.getRecords().isEmpty()) {
+            return null;
+        }
+        BlogPost adjacent = page.getRecords().get(0);
+        AdjacentPostVO vo = new AdjacentPostVO();
+        vo.setId(adjacent.getId());
+        vo.setTitle(adjacent.getTitle());
+        return vo;
     }
 }

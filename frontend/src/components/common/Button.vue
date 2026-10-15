@@ -124,7 +124,7 @@ const handleClick = (e: MouseEvent) => {
 }
 
 .btn:focus-visible {
-  outline: 2px solid var(--primary, #0D9488);
+  outline: 2px solid var(--primary, #165DFF);
   outline-offset: 2px;
 }
 
@@ -211,11 +211,14 @@ const handleClick = (e: MouseEvent) => {
   height: 1em;
 }
 
-/* ==================== PRIMARY — Near-black island ==================== */
+/* ==================== PRIMARY — High-contrast solid island ==================== */
 .btn--primary {
-  background: #111111;
-  color: #FFFFFF;
-  border-color: #111111;
+  /* 用 --contrast-* 而不是硬编码 #111111：
+     浅色模式为近黑实心，深色模式自动反转为浅底深字，
+     否则纯黑按钮在 #191919 画布上几乎看不出边界。 */
+  background: var(--contrast-bg);
+  color: var(--contrast-fg);
+  border-color: var(--contrast-bg);
   box-shadow:
     0 1px 2px rgba(0, 0, 0, 0.20),
     0 4px 8px rgba(0, 0, 0, 0.08),
@@ -223,8 +226,8 @@ const handleClick = (e: MouseEvent) => {
 }
 
 .btn--primary:hover:not(:disabled) {
-  background: #333333;
-  border-color: #333333;
+  background: var(--contrast-bg-hover);
+  border-color: var(--contrast-bg-hover);
   box-shadow:
     0 2px 4px rgba(0, 0, 0, 0.20),
     0 8px 16px rgba(0, 0, 0, 0.10),
@@ -233,8 +236,8 @@ const handleClick = (e: MouseEvent) => {
 }
 
 .btn--primary:active:not(:disabled) {
-  background: #0A0A0A;
-  border-color: #0A0A0A;
+  background: var(--contrast-bg-active);
+  border-color: var(--contrast-bg-active);
   box-shadow:
     0 1px 2px rgba(0, 0, 0, 0.30),
     inset 0 1px 3px rgba(0, 0, 0, 0.15);
@@ -256,12 +259,12 @@ const handleClick = (e: MouseEvent) => {
 
 .btn--secondary:hover:not(:disabled) {
   background: var(--glass-hover, rgba(255, 255, 255, 0.92));
-  border-color: var(--primary, #0D9488);
-  color: var(--primary, #0D9488);
+  border-color: var(--primary, #165DFF);
+  color: var(--primary, #165DFF);
   box-shadow:
     0 2px 6px rgba(0, 0, 0, 0.06),
     0 8px 20px rgba(0, 0, 0, 0.04),
-    0 0 0 1px rgba(13, 148, 136, 0.08),
+    0 0 0 1px rgba(22, 93, 255, 0.08),
     inset 0 1px 0 rgba(255, 255, 255, 0.8);
   transform: translateY(-1px);
 }
@@ -280,28 +283,28 @@ const handleClick = (e: MouseEvent) => {
 }
 
 .btn--ghost:hover:not(:disabled) {
-  background: var(--primary-light, rgba(13, 148, 136, 0.08));
-  color: var(--primary, #0D9488);
+  background: var(--primary-light, rgba(22, 93, 255, 0.08));
+  color: var(--primary, #165DFF);
 }
 
 .btn--ghost:active:not(:disabled) {
-  background: rgba(13, 148, 136, 0.14);
+  background: rgba(22, 93, 255, 0.14);
   transform: scale(0.98);
 }
 
 /* ==================== OUTLINE — Border only, fill on hover ==================== */
 .btn--outline {
   background: transparent;
-  color: var(--primary, #0D9488);
-  border-color: var(--primary, #0D9488);
+  color: var(--primary, #165DFF);
+  border-color: var(--primary, #165DFF);
 }
 
 .btn--outline:hover:not(:disabled) {
-  background: var(--primary, #0D9488);
+  background: var(--primary, #165DFF);
   color: #FFFFFF;
   box-shadow:
-    0 2px 6px rgba(13, 148, 136, 0.20),
-    0 8px 20px rgba(13, 148, 136, 0.10);
+    0 2px 6px rgba(22, 93, 255, 0.20),
+    0 8px 20px rgba(22, 93, 255, 0.10);
   transform: translateY(-1px);
 }
 
@@ -337,20 +340,20 @@ const handleClick = (e: MouseEvent) => {
 
 /* ==================== SUCCESS ==================== */
 .btn--success {
-  background: var(--success, #059669);
+  background: var(--success, #00B42A);
   color: #FFFFFF;
-  border-color: var(--success, #059669);
+  border-color: var(--success, #00B42A);
   box-shadow:
-    0 1px 2px rgba(5, 150, 105, 0.15),
-    0 4px 8px rgba(5, 150, 105, 0.08);
+    0 1px 2px rgba(0, 180, 42, 0.15),
+    0 4px 8px rgba(0, 180, 42, 0.08);
 }
 
 .btn--success:hover:not(:disabled) {
-  background: var(--success-hover, #047857);
-  border-color: var(--success-hover, #047857);
+  background: var(--success-hover, #009A29);
+  border-color: var(--success-hover, #009A29);
   box-shadow:
-    0 2px 6px rgba(5, 150, 105, 0.20),
-    0 8px 20px rgba(5, 150, 105, 0.12);
+    0 2px 6px rgba(0, 180, 42, 0.20),
+    0 8px 20px rgba(0, 180, 42, 0.12);
   transform: translateY(-1px);
 }
 

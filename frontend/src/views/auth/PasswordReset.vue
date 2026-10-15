@@ -462,7 +462,7 @@ const handleSubmit = async () => {
 }
 
 .step.completed {
-  background: linear-gradient(135deg, var(--success), #059669);
+  background: linear-gradient(135deg, var(--success), #00B42A);
   border-color: var(--success);
   color: white;
   box-shadow: 0 4px 12px var(--success-glow);
@@ -647,7 +647,7 @@ const handleSubmit = async () => {
   width: 80px;
   height: 80px;
   margin: 0 auto var(--spacing-md);
-  background: linear-gradient(135deg, var(--success), #059669);
+  background: linear-gradient(135deg, var(--success), #00B42A);
   border-radius: 50%;
   display: flex;
   align-items: center;

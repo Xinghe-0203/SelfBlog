@@ -951,7 +951,7 @@ watch(showCreateTopicModal, (val) => {
 
 .submit-btn:hover:not(:disabled) {
   background: var(--primary-hover);
-  box-shadow: 0 2px 8px rgba(13, 148, 136, 0.3);
+  box-shadow: 0 2px 8px rgba(22, 93, 255, 0.3);
 }
 
 .submit-btn:disabled {

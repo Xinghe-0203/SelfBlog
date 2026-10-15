@@ -9,6 +9,18 @@
   --surface-primary:   #202020;
   --surface-secondary: #262626;
 
+  /* Contrast Surface — 深色模式下反转为浅底深字，
+     既保持足够对比，又不会像纯黑按钮那样与背景糊在一起。 */
+  --contrast-bg:        #EBEBEB;
+  --contrast-bg-hover:  #FFFFFF;
+  --contrast-bg-active: #D6D6D6;
+  --contrast-fg:        #111111;
+
+  /* Code Surface — 深色模式下代码块保持深色，避免成为全页最亮元素 */
+  --code-bg:     #161616;
+  --code-text:   #E5E6EB;
+  --code-border: #333333;
+
   /* Borders */
   --border-light:      #333333;
   --border-ultra-light: rgba(255, 255, 255, 0.06);
@@ -114,6 +126,12 @@
   --red-light:   rgba(212, 91, 89, 0.12);
   --orange:      #C89A3D;
   --orange-light:rgba(200, 154, 61, 0.12);
+
+  /* 点赞强调色 — 深色下提亮并改为半透明底，避免浅粉底变成亮块 */
+  --like-accent:        #FF7A90;
+  --like-accent-strong: #FF96A8;
+  --like-accent-soft:   rgba(255, 122, 144, 0.14);
+  --like-accent-border: rgba(255, 122, 144, 0.38);
 
   /* Shadows — Dark mode deeper */
   --shadow-xs:   0 1px 2px rgba(0, 0, 0, 0.20);

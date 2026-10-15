@@ -64,15 +64,30 @@ src/
 
 ## v2.0 新特性
 
-- Rainy glassmorphism UI 设计
+- 清爽科技蓝 (Clean Tech Blue) UI 设计，CSS 变量驱动的设计系统 v6.0
 - Circle 功能增强
 - 性能优化 (懒加载、虚拟滚动)
 
 ## 设计系统
 
-- CSS 变量定义在 `main.css`
-- 毛玻璃效果类: `.glass`, `.glass-card`
+- 入口 `src/styles/main.css`，按顺序 `@import` 12 个模块；设计 token 在 `variables.css`，深色模式覆盖在 `dark-mode.css`，皮肤在 `skins.css`
+- 深色模式通过 `.dark-mode` 类生效（`stores/theme.ts` 加在 `<html>`，`App.vue` 同时绑在 `#selfblog` 上）
+- 皮肤通过 `#selfblog[data-skin='...']` 生效：`ocean`(默认)/`forest`/`lavender`/`sunset`/`midnight`
 - 动画工具类: `.fade-in`, `.slide-up`, `.pulse`
+
+### Token 使用约定（重要）
+
+- **不要用 `--gray-900` / `--gray-100` 当「深色表面」**：深色模式会整体反转灰度梯度（`--gray-900` 由 `#111111` 变成 `#EBEBEB`），会让按钮、代码块在深色页面上变成刺眼的亮块
+- 需要「永远深色」或「高对比实心」时使用语义 token：
+  - `--code-bg` / `--code-text` / `--code-border` — 代码块，两种主题下都保持深色
+  - `--contrast-bg` / `--contrast-bg-hover` / `--contrast-bg-active` / `--contrast-fg` — 高对比实心按钮（浅色模式近黑，深色模式自动反转为浅底深字）
+- 组件只引用语义 token，不直接写十六进制色值
+
+## 路由约定
+
+- 本站为单人作者博客，访客只读：`authRoutes` 只有一条 `/login` 重定向，指向服务端下发的作者后台入口 `siteStore.adminRoot`（默认 `/admin`）。组件中访客需登录时统一 `router.push('/login')`，不要再指向硬编码路径
+- `requiresAuth` / `requiresAdmin` 由 `guards.ts` 统一跳转到 `adminRoot` 并带 `redirect` 查询参数
+- 举报页路由为 `/report/:type(post|comment|user)/:id(\d+)`
 
 ## 开发规范
 

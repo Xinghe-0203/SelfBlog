@@ -22,8 +22,9 @@
             <circle cx="40" cy="36" r="4" fill="white" opacity="0.9" />
             <defs>
               <linearGradient id="logo-grad" x1="0" y1="0" x2="56" y2="56">
-                <stop stop-color="#0D9488" />
-                <stop offset="1" stop-color="#14B8A6" />
+                <!-- 跟随主题主色，避免与导航栏蓝色 Logo 不一致（原先硬编码为青色 #0D9488） -->
+                <stop stop-color="var(--accent)" />
+                <stop offset="1" stop-color="var(--accent-dark)" />
               </linearGradient>
             </defs>
           </svg>
@@ -548,8 +549,8 @@ const handleLogin = async () => {
   font-size: var(--text-base);
   font-weight: var(--font-semibold);
   font-family: var(--font-sans);
-  background: var(--gray-900);
-  color: var(--text-inverse);
+  background: var(--contrast-bg);
+  color: var(--contrast-fg);
   border: none;
   border-radius: var(--radius);
   cursor: pointer;
@@ -560,7 +561,7 @@ const handleLogin = async () => {
 }
 
 .btn-primary:hover:not(:disabled) {
-  background: var(--gray-800);
+  background: var(--contrast-bg-hover);
 }
 
 .btn-primary:active:not(:disabled) {

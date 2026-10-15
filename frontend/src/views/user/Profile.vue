@@ -683,7 +683,7 @@ onMounted(() => {
   position: fixed;
   inset: 0;
   background:
-    radial-gradient(circle at 15% 25%, rgba(13, 148, 136, 0.03) 0%, transparent 45%),
+    radial-gradient(circle at 15% 25%, rgba(22, 93, 255, 0.03) 0%, transparent 45%),
     radial-gradient(circle at 85% 75%, rgba(249, 115, 22, 0.02) 0%, transparent 45%);
   pointer-events: none;
   z-index: 0;
@@ -1224,8 +1224,8 @@ a.stat-cell[href] {
 }
 
 .views-pill {
-  background: rgba(13, 148, 136, 0.06);
-  border-color: rgba(13, 148, 136, 0.12);
+  background: rgba(22, 93, 255, 0.06);
+  border-color: rgba(22, 93, 255, 0.12);
   color: var(--primary);
 }
 

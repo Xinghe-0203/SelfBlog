@@ -60,6 +60,14 @@ const userRoutes: RouteRecordRaw[] = [
     meta: { title: '我的举报', requiresAuth: true }
   },
   {
+    // CircleDetail 等页面会跳转 `/report/{post|comment|user}/{id}`，
+    // 此前缺少该路由导致“举报”按钮落到 404 页。
+    path: '/report/:type(post|comment|user)/:id(\\d+)',
+    name: 'Report',
+    component: lazyLoad(() => import('@/views/common/Report.vue')),
+    meta: { title: '举报内容', requiresAuth: true }
+  },
+  {
     path: '/notifications',
     name: 'Notifications',
     component: lazyLoad(() => import('@/views/user/Notifications.vue')),

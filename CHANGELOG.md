@@ -4,6 +4,93 @@
 
 ---
 
+## 未发布 — SEO、订阅源与字体 (2026-10-15)
+
+参考同类开源个人博客项目（`linhaojun857/aurora`、`weiwosuoai/WeBlog`、`iszhouhua/blog` 等）后补齐的能力。
+这些项目普遍具备「被订阅、被搜索、被分享」的基础设施，而本项目在此之前完全没有。
+
+### 新增
+
+- **RSS 2.0 订阅源** `GET /feed.xml`：输出已发布文章（`status=1`，按发布时间倒序，最多 100 篇），含标题、链接、摘要、分类与 `pubDate`
+- **Atom 1.0 订阅源** `GET /atom.xml`：同一数据源的现代格式，时间戳按 RFC 3339 截断到秒
+- **`GET /sitemap.xml`**：收录首页、归档、关于、相册、搜索、全部文章与全部标签
+- **动态 `GET /robots.txt`**：`Sitemap` 指令必须是绝对地址，静态文件在构建时并不知道站点域名，因此改为运行时生成；同时 `Disallow: /admin` 与 `/api/`
+- **`index.html` 补齐站点级 SEO/分享标签**：`description`、`canonical`、`theme-color`（浅色/深色两套）、Open Graph、Twitter Card，以及订阅源自动发现 `rel="alternate"`
+- **文章页运行时更新分享卡片**：新增 `composables/useSeoMeta.ts`，进入文章详情时把 `og:title`/`og:description`/`og:image`/`article:published_time`/`article:tag` 换成该文章自己的值——单页应用所有路由共用一份 `index.html`，不这样做分享出去永远是首页标题
+- **文章页 JSON-LD 结构化数据**：注入 `BlogPosting`（标题、摘要、封面、发布时间、作者、站点），让搜索结果有机会展示富摘要；用 `textContent` 写入，标题含 `</script>` 也不会破坏页面
+- **上一篇 / 下一篇导航**：`GET /api/post/{id}/adjacent` 返回相邻的已发布文章（按发布时间，时间相同用 id 兜底），文章底部渲染为两张卡片。此前读完一篇文章没有任何出口，只能按浏览器后退
+- 站点基地址支持 `SITE_BASE_URL` 覆盖（反向代理后 `request` 里的 host 可能不是对外域名），未配置时按 `X-Forwarded-*` 或请求推导
+
+### Bug 修复
+
+- **`/robots.txt` 返回 500**：`SecurityConfig` 已放行该路径，但项目里根本没有这个资源，爬虫访问只会看到一台坏掉的站点
+- **`/feed.xml`、`/sitemap.xml` 返回 401**：`SpaController` 的 SPA 回退正则用 `[^\.]*` 只匹配**不含点号**的路径，带扩展名的地址不会被回退命中，直接落到末尾「仅 `ROLE_admin`」的兜底规则。已在 `SecurityConfig` 显式放行这三个地址
+- **每次访问都白下载数百 KB 外部字体**：`index.html` 从 `fonts.googleapis.com` 加载 Fraunces + Plus Jakarta Sans，但 `variables.css` 的 `--font-display`/`--font-sans` 从未引用这两个字体族（引用的是 `Lyon Text`/`Newsreader`/`SF Pro Display` 等从未加载的字体）。已移除这三条 `link`，字体改用系统字体栈
+- **字体栈没有中文回退**：`--font-sans` 只有 `-apple-system`/`Segoe UI` 等西文字体，中文会落到浏览器默认字体，与西文混排时字重字距不一致；`--font-display` 引用的衬线体全部不存在，实际退化为 Georgia。已补 `PingFang SC`/`Hiragino Sans GB`/`Microsoft YaHei`/`Source Han Sans SC`/`Noto Sans CJK SC` 等中文回退
+
+### 说明
+
+`SeoController` 使用 `@Controller` + `@ResponseBody` 而非 `@RestController`：项目通过 `WebMvcConfig#configurePathMatch` 给所有 `@RestController` 自动加 `/api` 前缀，用后者会让订阅地址变成 `/api/feed.xml`，而订阅器与爬虫只会去根路径找。
+
+### 影响文件
+
+| 文件 | 改动类型 |
+|------|----------|
+| `backend/.../controller/site/SeoController.java` | 新增：RSS / Atom / sitemap / robots |
+| `backend/.../config/security/SecurityConfig.java` | 放行 `/feed.xml`、`/atom.xml`、`/sitemap.xml` 与 `/api/post/{id}/adjacent` |
+| `backend/.../service/post/PostQueryService.java`（+Impl） | 新增 `getAdjacentPosts`：相邻文章的查询逻辑 |
+| `backend/.../service/post/BlogPostService.java`（+Impl） | 按既有 facade 约定委托 `getAdjacentPosts` |
+| `backend/.../controller/post/BlogPostController.java` | 新增 `GET /{id}/adjacent` |
+| `backend/.../vo/post/AdjacentPostVO.java` | 新增：相邻文章 VO |
+| `frontend/index.html` | 新增 SEO/OG/Twitter/订阅发现标签；移除无效的 Google Fonts |
+| `frontend/src/composables/useSeoMeta.ts` | 新增：运行时维护页面级 meta 与 JSON-LD |
+| `frontend/src/views/post/PostDetail.vue` | 文章加载后更新分享卡片、注入 JSON-LD、渲染上一篇/下一篇 |
+| `frontend/src/api/post.ts` | 新增 `getAdjacentPosts` |
+| `frontend/src/styles/variables.css` / `dark-mode.css` | 字体栈改为系统字体 + 中文回退；新增 `--like-accent*` 语义 token |
+
+---
+
+## 未发布 — 样式系统与路由修复 (2026-10-15)
+
+### Bug 修复
+
+- **十多个用户页面全部 404**: `router/index.ts` 只注册了 `homeRoutes`/`authRoutes`/`postRoutes`/`discoverRoutes`，**从未导入并展开 `userRoutes`**，导致 `router/modules/user.ts` 中定义的全部路由成为死代码：`/profile`、`/profile-edit`、`/user/:id`、`/password-change`、`/drafts`、`/collections`、`/following`、`/followers`、`/my-reports`、`/notifications`、`/messages` 均落到「页面不存在」。补上导入与展开（`vue-tsc` 不会报未使用模块，因此此前未被发现）
+- **访客点赞/收藏/关注跳转到 404**: `LikeButton`/`CollectButton`/`FollowButton`/`Circle`/`CircleDetail` 等组件在访客操作时 `router.push('/login')`，但 `authRoutes` 是空数组，`/login` 没有对应路由。新增 `/login` 重定向到服务端下发的作者后台入口（`siteStore.adminRoot`），与 `guards.ts` 中 `requiresAuth` 的跳转约定一致
+- **举报按钮跳转到 404**: `CircleDetail.vue` 跳转 `/report/post/{id}`，但缺少该路由，`views/common/Report.vue` 虽已实现却无法访问。新增 `/report/:type(post|comment|user)/:id(\d+)` 路由
+- **`.env` 中文值乱码**: `DotenvConfig` 使用 `Properties.load(InputStream)` 按 ISO-8859-1 解码，导致 `.env.example` 中自带的 `ADMIN_NICKNAME=站长` 被读成 `ç«é¿`。改为按 UTF-8 读取
+- **深色模式下代码块变成全页最亮元素**: `PostDetail.vue` 的 `.markdown-body :deep(pre)` 用 `--gray-900` 作深色背景，但深色模式会整体反转灰度梯度（`--gray-900` 变为 `#EBEBEB`），代码块因此变成刺眼的浅色块。改用不随主题反转的 `--code-bg`/`--code-text`
+- **主按钮在深色模式下失去边界**: `Button.vue` 的 `.btn--primary` 硬编码 `#111111`，在 `#191919` 画布上几乎看不出按钮边界。改用语义化的 `--contrast-bg`/`--contrast-fg`，深色模式自动反转为浅底深字
+- **`--gray-900` 被当作深色表面使用导致按钮意外反转**: `Login.vue`/`Register.vue` 的 `.btn-primary` 用 `--gray-900` + `--gray-800` 作背景，深色模式下变成浅色按钮。改用 `--contrast-*` 语义 token
+- **登录/注册页 Logo 与导航栏不一致**: 两个页面的内联 SVG Logo 渐变硬编码为青色 `#0D9488`→`#14B8A6`，而全站主色是蓝色 `#165DFF`。改为引用 `var(--accent)`/`var(--accent-dark)`，同时让皮肤切换生效
+- **`midnight` 皮肤的 `color-scheme` 从未生效**: `skins.css` 用后代选择器 `#selfblog[data-skin='midnight'] .dark-mode`，但 `App.vue` 把 `.dark-mode` 加在 `#selfblog` 自身，选择器永远匹配不到。补充同元素与后代两种形式
+
+### 样式系统
+
+- **清理遗留青色主题残留**: `Button.vue`、`Input.vue`、`Tag.vue`、`QuickComposer.vue`、`Circle.vue`、`Messages.vue`、`Notifications.vue`、`Profile.vue`、`PasswordReset.vue`、`NotFound.vue` 中残留的旧青色/绿色调色板（`#0D9488`/`#059669`/`#047857`/`#0F766E`/`#14B8A6` 及对应 `rgba()`）统一迁移到当前「清爽科技蓝」调色板
+- **新增语义化设计 token**（`variables.css` + `dark-mode.css`）:
+  - `--contrast-bg` / `--contrast-bg-hover` / `--contrast-bg-active` / `--contrast-fg` — 高对比实心表面，两个主题各自显式定义，语义稳定
+  - `--code-bg` / `--code-text` / `--code-border` — 代码块专用表面，深色模式下仍保持深色
+  - 补充注释说明「不要用 `--gray-900` 当深色背景」，因为深色模式会反转灰度梯度
+
+### 影响文件
+
+| 文件 | 改动类型 |
+|------|----------|
+| `backend/src/main/java/com/selfblog/config/DotenvConfig.java` | `.env` 改按 UTF-8 读取 |
+| `frontend/src/router/modules/auth.ts` | 新增 `/login` 重定向路由 |
+| `frontend/src/router/modules/user.ts` | 新增 `/report/:type/:id` 路由 |
+| `frontend/src/styles/variables.css` | 新增 `--contrast-*` 与 `--code-*` token |
+| `frontend/src/styles/dark-mode.css` | 深色模式下的 `--contrast-*` 与 `--code-*` 定义 |
+| `frontend/src/styles/skins.css` | 修复 `midnight` 的 `color-scheme` 选择器 |
+| `frontend/src/components/common/Button.vue` | 主按钮 token 化 + 清理青色残留 |
+| `frontend/src/components/common/Input.vue` | 清理青色残留 |
+| `frontend/src/components/common/Tag.vue` | 清理青色残留 |
+| `frontend/src/views/post/PostDetail.vue` | 代码块改用 `--code-*` |
+| `frontend/src/views/auth/Login.vue` | Logo 渐变与主按钮 token 化 |
+| `frontend/src/views/auth/Register.vue` | Logo 渐变与主按钮 token 化 |
+
+---
+
 ## v2.0.25 (2026-10-14)
 
 ### 个人博客与一体化部署

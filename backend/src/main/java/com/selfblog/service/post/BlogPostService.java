@@ -8,10 +8,12 @@ import com.selfblog.dto.post.PostCreateRequest;
 import com.selfblog.dto.post.PostQueryRequest;
 import com.selfblog.dto.post.SaveDraftRequest;
 import com.selfblog.entity.BlogPost;
+import com.selfblog.vo.post.AdjacentPostVO;
 import com.selfblog.vo.post.PostDetailResponse;
 import com.selfblog.vo.post.PostListResponse;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * 文章服务接口
@@ -71,6 +73,13 @@ public interface BlogPostService extends IService<BlogPost> {
      * @return 文章详情
      */
     PostDetailResponse getPostDetail(Long postId);
+
+    /**
+     * 获取相邻文章（上一篇 / 下一篇），委托给 PostQueryService
+     * @param postId 当前文章ID
+     * @return 含 "prev" / "next" 两个键，不存在时为 null
+     */
+    Map<String, AdjacentPostVO> getAdjacentPosts(Long postId);
 
     /**
      * 分页查询文章列表
