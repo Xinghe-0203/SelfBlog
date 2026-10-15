@@ -10,6 +10,9 @@
 html {
   font-size: 16px;
   scroll-behavior: smooth;
+  /* 顶栏是 fixed 浮动胶囊，原生锚点跳转需要给它让位，
+     否则 #hash 跳转后标题会被压在导航下面。 */
+  scroll-padding-top: 96px;
   -webkit-text-size-adjust: 100%;
   color-scheme: light dark;
 }
