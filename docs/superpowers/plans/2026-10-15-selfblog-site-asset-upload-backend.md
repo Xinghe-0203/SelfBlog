@@ -402,7 +402,7 @@ SVG 额外做净化。**必须明确它的定位**：所有渲染点都是图片
 - Consumes: `SiteAssetKind`（Task 1）、`SiteAssetVO` / `SiteAssetService`（Task 2）
 - Produces: `SiteAssetServiceImpl`（`@Service`，实现 `SiteAssetService#store`）
 
-- [ ] **Step 1: 写实现**
+- [x] **Step 1: 写实现**
 
 创建 `backend/src/main/java/com/selfblog/service/site/impl/SiteAssetServiceImpl.java`：
 
@@ -643,7 +643,7 @@ public class SiteAssetServiceImpl implements SiteAssetService {
 }
 ```
 
-- [ ] **Step 2: 写测试**
+- [x] **Step 2: 写测试**
 
 创建 `backend/src/test/java/com/selfblog/service/site/impl/SiteAssetServiceImplTest.java`：
 
@@ -1032,15 +1032,15 @@ class SiteAssetServiceImplTest {
 }
 ```
 
-- [ ] **Step 3: 跑测试**
+- [x] **Step 3: 跑测试**
 
 ```powershell
 & $mvn test -Dtest=SiteAssetServiceImplTest -Dskip.npm=true -Dskip.installnodenpm=true
 ```
 
-Expected: `Tests run: 39, Failures: 0, Errors: 0`（28 个 `@Test` + `@ValueSource` 展开 3 + 5 + 3 = 11）。
+Expected: `Tests run: 40, Failures: 0, Errors: 0`（包含新增的命名空间前缀 SVG 脚本回归用例）。
 
-- [ ] **Step 4: 确认测试没有污染真实上传目录**
+- [x] **Step 4: 确认测试没有污染真实上传目录**
 
 ```powershell
 Get-ChildItem -Recurse uploads -ErrorAction SilentlyContinue | Select-Object -First 5 -ExpandProperty FullName
@@ -1048,7 +1048,7 @@ Get-ChildItem -Recurse uploads -ErrorAction SilentlyContinue | Select-Object -Fi
 
 Expected: 无输出（或只有改动前就存在的内容）。测试全部写在 `@TempDir` 里，`backend/uploads` 不应出现 `site-assets`。
 
-- [ ] **Step 5: 提交**
+- [x] **Step 5: 提交**
 
 ```bash
 git add backend/src/main/java/com/selfblog/service/site/impl/SiteAssetServiceImpl.java backend/src/test/java/com/selfblog/service/site/impl/SiteAssetServiceImplTest.java
@@ -1557,3 +1557,13 @@ git commit -m "docs: log the backend site-asset upload channel"
 **手动验证（可选，需要真实起服务）**：`mvn spring-boot:run` 依赖 `.env` 里的 `JWT_SECRET` 与 `ADMIN_PASSWORD`，且会带上前端构建。若要做端到端验证，用 `multipart` 发一个 `kind=favicon` 的 PNG，确认返回的 URL 能 `GET` 到 200。注意 AGENTS.md 记录的约定：copy `.env.example` → `.env`，值不要加引号。
 
 **下一批次（前端）**：`frontend/src/api/site.ts` 增加 `uploadSiteAsset()`，新增 `SiteAssetField.vue`（保留手动填 URL 的能力 + 上传按钮 + 预览），并在 `frontend/src/views/admin/Settings.vue` 接入四个字段。
+
+## 执行修订
+
+### Task 3（2026-10-15）
+
+- 实际测试数为 **40**：按原计划 39 个用例外，代码审查发现 SVG 中带命名空间前缀的 `<x:script>` 能绕过按 CSS 标签名删除的逻辑，新增 `store_StripsNamespacePrefixedScriptFromSvg` 回归用例。该测试先失败、修改后通过。
+- Jsoup 1.18.3 的 `Element` 没有 `removeAttribute(String)`；实现改用其真实 API `removeAttr(String)`。原计划示例代码中的该调用无法编译。
+- AAC 测试夹具的字面量 `0x80` 超出 Java `byte` 的正值范围，需写成 `(byte) 0x80`；否则测试源码无法编译。
+- SVG 危险元素现在按元素名的本地部分匹配，因此无前缀和命名空间前缀形式都会移除；事件属性也按本地属性名判断。解析仍使用 Jsoup XML parser，保留 `linearGradient` / `viewBox` 大小写。
+- 验证：`SiteAssetServiceImplTest` **40/40 通过**；检查确认测试没有创建 `backend/uploads/site-assets`。
