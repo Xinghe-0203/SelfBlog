@@ -112,7 +112,7 @@ export function useScrollState(threshold = 16) {
 
 - 图标注册表 `icons.ts` 导出 `Record<string, string>`（`name → SVG path/片段`，统一 `viewBox="0 0 24 24"`，`fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"`，与 `Navbar.vue:186-195` 现有 svg 样式一致）
 - `<Icon name="search" :size="17" />`，`currentColor` 驱动 → 深色模式自动适配，无需两套
-- 首批约 18 个：`search, sun, moon, menu, close, home, archive, image, info, settings, gauge, file-text, tag, users, message, music, play, pause, arrow-up, external`
+- 首批 21 个：`logo, search, sun, moon, menu, close, home, archive, image, info, settings, gauge, file-text, tag, users, message, music, play, pause, arrow-up, external`（`logo` 是 brandMark 的兜底图标）
 
 替换现有文字符号图标：`Navbar.vue`（search/theme/menu）、`AdminLayout.vue:17-36`（`⌂ ▤ ⌑ ◷ ▱ ▧ ⚙`）、`MusicPlayer.vue:5`（`Ⅱ ▶`）、`BackToTop.vue`、`Footer.vue`、`components/common/*` 中的装饰符号。
 
@@ -236,7 +236,7 @@ Settings.vue ◀── { url }
 
 | 文件 | 职责 |
 | --- | --- |
-| `frontend/src/composables/useScrollState.ts` | 滚动状态（scrolled/direction/y），rAF 节流 |
+| `frontend/src/composables/useScrollState.ts` | 滚动状态（scrolled/direction），rAF 节流 |
 | `frontend/src/composables/useMarkdownEnhance.ts` | 正文 DOM 后处理：代码头部/复制/折叠、标题锚点、图片灯箱收集 |
 | `frontend/src/components/common/Icon.vue` | 图标渲染组件 |
 | `frontend/src/components/common/icons.ts` | 内置 SVG 注册表 |
@@ -280,7 +280,7 @@ Settings.vue ◀── { url }
 | 非 admin 调用 | 401/403，由既有安全链路给出 |
 | SVG 净化后为空或解析失败 | `BusinessException(400, "图标文件无法解析")` |
 | 落盘 IO 失败 | `BusinessException(500, "文件保存失败")`，清理已写入的临时文件 |
-| 前端前端预检失败 | 字段下方行内错误，不发请求 |
+| 前端预检失败（格式/大小不合规） | 字段下方行内错误，不发请求 |
 | 上传成功但设置保存失败 | 上传的 URL 已写入表单，用户重试保存即可；不影响已保存的旧值 |
 | `faviconUrl` 为空 | 移除自定义 link，回落静态兜底 |
 | 上传的 URL 404（文件被外部删除） | 浏览器自然破图；不做前端探测（避免额外请求） |
