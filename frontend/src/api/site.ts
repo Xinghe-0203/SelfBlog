@@ -2,6 +2,7 @@ import api from './index'
 import type { ApiResponse } from '@/types'
 import type { SiteSettings } from '@/stores/site'
 import { getVisitorId } from '@/utils/visitor'
+import type { AxiosProgressEvent } from 'axios'
 
 export interface VisitorSummary {
   totalVisitors: number
@@ -31,6 +32,15 @@ export interface PageResult<T> {
   pages: number
 }
 
+export type SiteAssetKind = 'logo' | 'favicon' | 'avatar' | 'music'
+
+export interface SiteAssetUpload {
+  url: string
+  kind: SiteAssetKind
+  size: number
+  originalName: string
+}
+
 export const siteApi = {
   getPublicSettings(): Promise<ApiResponse<SiteSettings>> {
     return api.get('/site/public')
@@ -40,6 +50,24 @@ export const siteApi = {
   },
   updateSettings(data: Partial<SiteSettings>): Promise<ApiResponse<SiteSettings>> {
     return api.put('/admin/site-settings', data)
+  },
+  /**
+   * 上传站点品牌资源（头像 / logo / favicon / 音乐）。
+   * 与 /media/upload 不同：这条通道原样落盘，不会把图片重编码成 jpg。
+   */
+  uploadSiteAsset(
+    kind: SiteAssetKind,
+    file: File,
+    onProgress?: (event: AxiosProgressEvent) => void
+  ): Promise<ApiResponse<SiteAssetUpload>> {
+    const formData = new FormData()
+    formData.append('file', file)
+    formData.append('kind', kind)
+    return api.post('/admin/site-assets', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 120000,
+      onUploadProgress: onProgress
+    })
   },
   trackVisitor(path: string, referrer = ''): Promise<ApiResponse> {
     return api.post('/visitor/track', { visitorId: getVisitorId(), path, referrer })
