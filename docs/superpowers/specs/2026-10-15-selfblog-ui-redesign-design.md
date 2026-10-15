@@ -138,10 +138,11 @@ export function useScrollState(threshold = 16) {
 
 `kind ∈ { logo, favicon, avatar, music }`，各自规则：
 
-| kind | MIME 白名单 | 大小上限 | 落盘位置 |
+| kind | 扩展名白名单 | 大小上限 | 落盘位置 |
 | --- | --- | --- | --- |
-| `logo` / `favicon` / `avatar` | `image/png`, `image/jpeg`, `image/webp`, `image/svg+xml`, `image/x-icon`, `image/vnd.microsoft.icon` | 2 MB | `uploads/site-assets/<kind>/<uuid>.<ext>` |
-| `music` | `audio/mpeg`, `audio/mp3`, `audio/ogg`, `audio/wav`, `audio/x-m4a`, `audio/aac` | 20 MB | `uploads/site-assets/music/<uuid>.<ext>` |
+| `logo` / `avatar` | `.png`, `.jpg`, `.jpeg`, `.webp`, `.svg` | 2 MB | `uploads/site-assets/<kind>/<uuid>.<ext>` |
+| `favicon` | `.png`, `.ico`, `.svg` | 2 MB | `uploads/site-assets/favicon/<uuid>.<ext>` |
+| `music` | `.mp3`, `.ogg`, `.wav`, `.m4a`, `.aac` | 20 MB | `uploads/site-assets/music/<uuid>.<ext>` |
 
 **原样字节落盘，不过 Thumbnailator** —— 这正是新通道存在的全部理由。
 
@@ -149,14 +150,14 @@ export function useScrollState(threshold = 16) {
 
 1. **扩展名白名单**（防止 `.php`/`.html` 等）
 2. **magic number 嗅探**，不信客户端 `Content-Type`：
-   - 图片：PNG `89 50 4E 47`、JPEG `FF D8 FF`、WEBP `RIFF....WEBP`、ICO `00 00 01 00`、SVG `3C 3F 78 6D 6C` 或 `3C 73 76 67`
-   - 音频：ID3 `49 44 33`、MPEG 帧同步 `FF FB/F3/F2`、Ogg `4F 67 67 53`、WAV `52 49 46 46`+`57 41 56 45`、MP4 `66 74 79 70`
+   - 图片：PNG `89 50 4E 47`、JPEG `FF D8 FF`、WEBP `RIFF....WEBP`、ICO `00 00 01 00`（favicon `.ico` 同时接受 PNG 文件头）、SVG XML 中的 `<svg`
+   - 音频：MP3/AAC 的 ID3 或 MPEG/ADTS 帧同步、Ogg `4F 67 67 53`、WAV `52 49 46 46`+`57 41 56 45`、M4A `ftyp` box
    - 嗅探与扩展名不一致 → 400
 3. **大小上限**
 
-**SVG 双层防护**：主要安全性来自渲染位置——logo/favicon 只通过 `<img src>` 和 `<link rel="icon">` 加载，浏览器按图像上下文处理，SVG 内 script 不执行。但仍用 Jsoup 做白名单净化剥掉 `script`/`foreignObject`/`on*`/`<a>`/`<use>`，防止 URL 未来被复用到内联或 `<object>` 上下文。
+**SVG 净化是必要的安全边界**：`/uploads/**` 是公开地址，用户可以直接打开上传的 SVG 作为顶层文档，在那里脚本可能以本站源执行。不能只依赖 `<img src>` / `<link rel="icon">` 等图片上下文对脚本的额外限制。上传前使用 Jsoup XML parser 保留 SVG 大小写；删除 `script` / `foreignObject` / `iframe` / `embed` / `object`（按本地名匹配，也覆盖 XML namespace 前缀）、事件属性，以及包含 `javascript:` 或 `data:text/html` 的属性值。保留常见 SVG 结构（例如 `<use href="#symbol">`），避免破坏由本地 symbol 组成的品牌图形。
 
-返回 `{ "url": "/uploads/site-assets/favicon/<uuid>.svg", "kind": "favicon" }`。
+返回 `{ "url": "/uploads/site-assets/favicon/<uuid>.svg", "kind": "favicon", "size": 1234, "originalName": "favicon.svg" }`。
 
 **上传产物不做删除**：`updateSettings` 只改 KV 值，旧文件留在磁盘。理由：按 URL 反推文件路径删除有目录穿越面，且站点资源体积极小。这是有意取舍，写入 spec 备案。
 
@@ -172,13 +173,24 @@ export function useScrollState(threshold = 16) {
 
 #### 前端
 
-新文件 `src/api/siteAsset.ts`：
+在现有 `src/api/site.ts` 的 `siteApi` 中增加站点资源上传方法（不新增 API 模块）：
 
 ```ts
-upload(kind: SiteAssetKind, file: File, onProgress?): Promise<ApiResponse<SiteAssetUpload>>
+type SiteAssetKind = 'logo' | 'favicon' | 'avatar' | 'music'
+interface SiteAssetUpload {
+  url: string
+  kind: SiteAssetKind
+  size: number
+  originalName: string
+}
+uploadSiteAsset(
+  kind: SiteAssetKind,
+  file: File,
+  onProgress?: (event: AxiosProgressEvent) => void
+): Promise<ApiResponse<SiteAssetUpload>>
 ```
 
-（沿用 `src/api/` 的 Axios 封装；拦截器返回的是业务 envelope，`response.data` 才是 payload。）
+（沿用 `src/api/` 的 Axios 封装；拦截器返回的是业务 envelope，`response.data` 才是 payload。）上传结果字段为 `url`、`kind`、`size`、`originalName`。
 
 `src/stores/site.ts`：
 
@@ -186,7 +198,7 @@ upload(kind: SiteAssetKind, file: File, onProgress?): Promise<ApiResponse<SiteAs
 - `applySettings()` 增补 favicon 运行时注入：`faviconUrl` 变化时，移除 `document.head` 中全部 `link[rel~="icon"]` / `link[rel="apple-touch-icon"]` / `link[rel="shortcut icon"]`，按扩展名推导 `type`（`svg→image/svg+xml`、`ico→image/x-icon`、其余 `image/png`）重建节点。`faviconUrl` 为空时移除自定义节点，回落到 `index.html:12` 的静态兜底。
 - 注意：`main.ts:41-46` 是先 `loadPublicSettings()` 再 `app.use(router)`，favicon 注入发生在首次路由前，无闪烁。
 
-`src/views/admin/Settings.vue` 四个上传组件（头像 / 站点 Logo / 网站图标 / 背景音乐）：
+新增通用组件 `src/components/admin/SiteAssetField.vue`，并在 `src/views/admin/Settings.vue` 接入四个字段（头像 / 站点 Logo / 网站图标 / 背景音乐）：
 
 - 每个字段 = 上传按钮 + 即时预览 + 原 URL 输入框（保留远端 CDN 手填能力）
 - `accept` 属性按 kind 限定；前端预检大小，超限直接拒绝，不走网络
@@ -200,7 +212,7 @@ upload(kind: SiteAssetKind, file: File, onProgress?): Promise<ApiResponse<SiteAs
 Settings.vue ──POST /api/admin/site-assets──▶ AdminSiteAssetController
                                                  └─ SiteAssetService: 校验三连 → 写 uploads/site-assets/<kind>/<uuid>.<ext>
                                                  └─ 返回 /uploads/... 相对路径
-Settings.vue ◀── { url }
+Settings.vue ◀── { url, kind, size, originalName }
    └─ form.faviconUrl / siteLogoUrl / authorAvatar / musicUrl = url
    └─ siteStore.applySettings()          ← 乐观更新，导航栏 logo + favicon 立即生效
    └─ 用户点击「保存设置」→ PUT /api/admin/site-settings
@@ -241,7 +253,7 @@ Settings.vue ◀── { url }
 | `frontend/src/components/common/Icon.vue` | 图标渲染组件 |
 | `frontend/src/components/common/icons.ts` | 内置 SVG 注册表 |
 | `frontend/src/components/post/MobileTocSheet.vue` | 移动端目录抽屉 |
-| `frontend/src/api/siteAsset.ts` | 站点资源上传 API |
+| `frontend/src/components/admin/SiteAssetField.vue` | 通用站点资源上传字段、预览与手动 URL 输入 |
 | `backend/.../controller/admin/AdminSiteAssetController.java` | 上传接口 |
 | `backend/.../service/site/SiteAssetService.java` | 上传服务接口 |
 | `backend/.../service/site/impl/SiteAssetServiceImpl.java` | 校验 + magic 嗅探 + SVG 净化 + 落盘 |
@@ -256,6 +268,7 @@ Settings.vue ◀── { url }
 | `frontend/src/components/layout/Navbar.vue` | 滚动三态、图标、胶囊选中、品牌 logo 用 `siteLogoUrl` |
 | `frontend/src/components/layout/MusicPlayer.vue` | 图标 + 大 R 角重设计 |
 | `frontend/src/components/common/BackToTop.vue` | 换 Icon 组件 + radius token |
+| `frontend/src/api/site.ts` | 增加站点资源上传 API |
 | `frontend/src/views/admin/AdminLayout.vue` | 侧边栏图标 + 胶囊选中 |
 | `frontend/src/views/admin/Settings.vue` | 四个上传字段 + 预览 |
 | `frontend/src/stores/site.ts` | 两个新键 + favicon 运行时注入 |
@@ -274,13 +287,15 @@ Settings.vue ◀── { url }
 | 场景 | 行为 |
 | --- | --- |
 | `kind` 不在白名单 | `BusinessException(400, "不支持的资源类型")` |
-| MIME / 扩展名不匹配 | `BusinessException(400, "<类型>仅支持 … 格式")` |
-| magic number 与扩展名不一致 | `BusinessException(400, "文件内容与格式不符")` |
-| 超过大小上限 | `BusinessException(400, "文件大小不能超过 N MB")` |
-| 非 admin 调用 | 401/403，由既有安全链路给出 |
-| SVG 净化后为空或解析失败 | `BusinessException(400, "图标文件无法解析")` |
-| 落盘 IO 失败 | `BusinessException(500, "文件保存失败")`，清理已写入的临时文件 |
-| 前端预检失败（格式/大小不合规） | 字段下方行内错误，不发请求 |
+| `kind` 不支持 | `BusinessException(400, "不支持的资源类型")` |
+| 文件为空 | `BusinessException(400, "请选择要上传的文件")` |
+| 扩展名不在当前 kind 白名单 | `BusinessException(400, "仅支持 … 格式")`；服务端不以客户端 MIME 为准 |
+| magic number 与扩展名不一致 | `BusinessException(400, "文件内容与扩展名不匹配，请上传真实文件")` |
+| 超过大小上限 | `BusinessException(400, "文件大小不能超过 NMB")` |
+| 非 admin 调用 | 既有安全链路拒绝；MVC 测试中普通用户为 403 |
+| SVG 不含 `<svg>` 元素 | `BusinessException(400, "SVG 文件缺少 <svg> 根元素")` |
+| 落盘 IO 失败 | `BusinessException(500, "文件保存失败: …")` |
+| 前端预检失败（扩展名/大小不合规） | 字段下方行内错误，不发请求；`accept` 仅作文件选择提示，服务端仍独立校验 |
 | 上传成功但设置保存失败 | 上传的 URL 已写入表单，用户重试保存即可；不影响已保存的旧值 |
 | `faviconUrl` 为空 | 移除自定义 link，回落静态兜底 |
 | 上传的 URL 404（文件被外部删除） | 浏览器自然破图；不做前端探测（避免额外请求） |
@@ -291,21 +306,19 @@ Settings.vue ◀── { url }
 
 ### 后端
 
-`AdminSiteAssetControllerTest` 覆盖：
+后端分层测试覆盖：
 
-- 四种 kind 各一次成功上传，返回 `/uploads/site-assets/<kind>/...`
-- 每种 kind 一个非法 MIME → 400
-- magic number 与扩展名不符 → 400
-- 超限 → 400
-- SVG 内含 `<script>` / `onload=` → 净化后落盘文件不含这些片段
-- 非 admin → 401/403
-- `SiteSettingsServiceImpl` 侧：`faviconUrl` / `siteLogoUrl` 写入合法、`javascript:` 之类的非法值被 `validateValue` 拒绝
+- `SiteAssetKindTest`：kind、各自扩展名和大小规则；`SiteAssetServiceImplTest`：白名单、图片/音乐大小上限、magic number、写入随机 URL、SVG 净化（包括 namespace 前缀脚本）与普通 SVG 大小写保留。
+- `AdminSiteAssetControllerTest`：管理员成功、kind 转发、服务业务错误、缺少参数、普通用户 403。
+- `SiteSettingsServiceImplTest`：`faviconUrl` / `siteLogoUrl` 默认值、可保存 URL 与 `javascript:` 等非法值拒绝；每个测试前清空站点设置缓存。
 
 配合完整回归：`mvn test`（H2 + test schema，`DB_TYPE` 保持不填）。
 
 ### 前端
 
 新增单测：`useScrollState.test.ts`（阈值/方向/rAF）、`site.test.ts`（favicon link 增删与 type 推导）、`useMarkdownEnhance.test.ts`（代码头部注入、长文折叠、锚点）。
+
+站点资源上传批次还应覆盖：`site.ts` 上传方法的 FormData 字段与进度回调；`SiteAssetField.test.ts` 的扩展名/大小预检、手动 URL 编辑、预览、上传成功和行内错误；Settings 集成中四个字段到对应设置键的绑定，以及上传后即时应用、保存后持久化。
 
 既有测试必须保持通过。全量校验：
 
@@ -330,7 +343,7 @@ cd frontend && npm run lint:check && npm run type-check && npm run test:run && n
 1. **圆角扫描面大**，`views/**` 有 20+ 文件。风险是深色模式下大面积视觉回归。缓解：先只改 token（阶段 A），全站目视确认后再做逐文件替换；每完成一个 view 单独看一次。
 2. **`.app-main { padding-top: 80px }` 写死**。本设计用"视觉收缩、布局高度守恒"绕开，但这是 brittle 的——若将来导航栏真的要变占位高度，`PostDetail` 的 `105px` 常量必须同步。已在 §3.2 记为硬约束。
 3. **上传产物不删除**，磁盘只增不减。站点资源体积极小（图标 KB 级、音乐 MB 级），换一次主题攒几个文件可忽略，换取的是零目录穿越面。
-4. **SVG 安全性依赖渲染位置**。当前所有渲染点都是图像上下文（`<img>` / `<link rel=icon>`），script 不执行；Jsoup 净化是第二层。若未来把上传的 SVG 内联进页面，必须重新评估。
+4. **SVG 可被直接作为顶层文档打开**。因 `/uploads/**` 公开，SVG 净化是必要安全边界；当前 `<img>` / `<link rel=icon>` 图像上下文的脚本限制只是额外防护，不能取代服务端净化。
 5. **单 JAR 模式需要重新构建**：`pom.xml:202` 把 `frontend/dist` 打进 JAR 的 `static`，前端改动不跑到 `target` 里就不生效。
 6. **本 spec 未覆盖 Docker 路径**（见 §9）。
 
@@ -343,7 +356,8 @@ cd frontend && npm run lint:check && npm run type-check && npm run test:run && n
 | A | token scale + `Icon.vue` + 两个 composable | 单测绿，页面无回归 |
 | B | `Navbar.vue` 滚动三态 + 图标 + 胶囊 | 公开页滚动态目视 |
 | C | `AdminLayout.vue` 侧边栏 | 后台目视 |
-| D | 后端上传通道 + `Settings.vue` 四个字段 | `AdminSiteAssetControllerTest` + 上传四类文件 |
+| D1 | 后端上传通道（已完成） | 分层后端测试 + 全量 Maven 回归 |
+| D2 | `Settings.vue` 四个资源字段与上传控件 | API/组件测试 + 管理员页手动上传并保存四种 kind |
 | E | `PostDetail.vue` 阅读体验 | 文章页目视 + 单测 |
 | F | 全站圆角 token 替换 + 动效 + 深色模式收尾 | 全站目视 + `npm run build` |
 
