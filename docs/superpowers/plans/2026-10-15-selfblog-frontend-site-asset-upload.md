@@ -819,3 +819,7 @@ git commit -m "docs: describe the frontend site asset upload controls"
 - **陈旧状态清理**：手动编辑会同时清掉 `error` 与旧 `duration`；`formatDuration` 对 <1 秒的值返回空串。
 - **补齐测试**：新增 8 个用例（在途去重、上传锁、音乐 20MB 档、大小写扩展名、空响应、原始文件名展示、手工编辑清理、四键路由 + 手填不同步），前端全量 **175/175**。
 - 未采纳的一条 Minor：`Content-Type: multipart/form-data` 头保留 —— 与 `media.ts` / `gallery.ts` 的既有上传调用保持一致，axios 会自行覆盖 boundary。
+
+### 复核补充（2026-10-15）
+
+- 审查会话复核确认两个 Important 均已真实修复、`uploaded` 事件切分无重复写入；两个残留 Minor 一并处理：四字段的手填路由全部纳入集成测试（此前只覆盖 favicon）；禁用态 URL 输入框补 `opacity` + `cursor` 视觉反馈。

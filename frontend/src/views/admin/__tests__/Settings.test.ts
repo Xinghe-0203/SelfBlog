@@ -107,14 +107,18 @@ describe('Settings brand asset fields', () => {
   it('keeps manual url edits out of the global store until save', async () => {
     const wrapper = await mountSettings()
     const store = useSiteStore()
+    const manual = [
+      { kind: 'avatar', key: 'authorAvatar', url: '/uploads/site-assets/avatar/manual.png' },
+      { kind: 'logo', key: 'siteLogoUrl', url: '/uploads/site-assets/logo/manual.svg' },
+      { kind: 'favicon', key: 'faviconUrl', url: '/uploads/site-assets/favicon/manual.ico' },
+      { kind: 'music', key: 'musicUrl', url: '/uploads/site-assets/music/manual.mp3' }
+    ] as const
 
-    requireField(wrapper, 'favicon').vm.$emit(
-      'update:modelValue',
-      '/uploads/site-assets/favicon/manual.ico'
-    )
-    await nextTick()
-
-    expect(store.settings.faviconUrl).toBe('')
+    for (const item of manual) {
+      requireField(wrapper, item.kind).vm.$emit('update:modelValue', item.url)
+      await nextTick()
+      expect(store.settings[item.key]).toBe('')
+    }
     expect(document.head.querySelector('link[data-runtime]')).toBeNull()
 
     updateSettings.mockResolvedValue({ code: 200, message: 'OK', data: { ...store.settings } })
@@ -122,6 +126,8 @@ describe('Settings brand asset fields', () => {
     await flushPromises()
 
     const payload = updateSettings.mock.calls[0]?.[0] as Record<string, string>
-    expect(payload.faviconUrl).toBe('/uploads/site-assets/favicon/manual.ico')
+    for (const item of manual) {
+      expect(payload[item.key]).toBe(item.url)
+    }
   })
 })

@@ -189,6 +189,7 @@ async function handleFileChange(event: Event): Promise<void> {
 .asset-thumb-empty { color: var(--text-muted); font-size: .68rem; }
 .asset-controls { display: flex; flex: 1; min-width: 0; flex-direction: column; gap: 8px; }
 .asset-input { width: 100%; padding: 10px 11px; border: 1px solid var(--border-solid); border-radius: var(--radius-sm); background: var(--bg-primary); color: var(--text-primary); font: inherit; font-size: .84rem; }
+.asset-input:disabled { opacity: .6; cursor: wait; }
 .asset-upload-button { align-self: flex-start; padding: 8px 13px; border: 0; border-radius: var(--radius-sm); background: var(--primary); color: white; font-size: .78rem; font-weight: 700; cursor: pointer; }
 .asset-upload-button:disabled { opacity: .6; cursor: wait; }
 .asset-file-input { display: none; }
