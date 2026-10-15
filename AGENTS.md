@@ -36,22 +36,25 @@ Java source root: `backend/src/main/java/com/selfblog/`.
 
 ## Frontend: run and verify
 
-Commands below run from `frontend/`. Use Node 22 (>=22.13) or Node 24+: `.npmrc` enables `engine-strict`, and locked jsdom/Vitest dependencies reject the README's Node 18 minimum.
+Commands below run from `frontend/`. `.npmrc` sets `engine-strict=true`, and the locked tree requires Node `^22.22.2 || ^24.15.0 || >=26.0.0` (from `abbrev@5.0.0`, reached via `@vue/test-utils` → `js-beautify` → `nopt`). Anything below that — including Node 24.0–24.14 — hard-fails `npm ci`/`npm install` with `EBADENGINE`; `npm ci --engine-strict=false` bypasses the gate for local work.
 
 ```sh
 npm ci
 npm run dev
 npm run lint:check
-npm run format:check
+npm run format:check   # NOT a passing gate: already fails on ~96 files at baseline
 npm run type-check
 npm run test:run
 npm run test:run -- src/utils/__tests__/crypto.test.ts
 npm run build
 ```
 
-- `lint` auto-fixes all `src`; `format` rewrites files. Use the `*:check` scripts for non-mutating verification. `build` runs `vue-tsc --noEmit` before Vite; `type-check` is the focused check.
+- `lint` auto-fixes all `src`; `format` rewrites files. Use the `*:check` scripts for non-mutating verification **except `format:check`**, which already fails on ~96 files at baseline (`core.autocrlf=true` writes CRLF into the working tree while `.prettierrc` sets `endOfLine: "lf"`, plus pre-existing drift) — treat a non-zero exit as noise, not as your bug. To check only what you touched, run `npx prettier --check --end-of-line auto <files>`; never run the repo-wide `format` script, which rewrites ~96 unrelated files. `build` runs `vue-tsc --noEmit` before Vite; `type-check` is the focused check.
+- `tsconfig.json` enables `strict` **and `noUncheckedIndexedAccess`**: indexed access yields `T | undefined`, so `arr[0].foo` fails `type-check`. Use `arr[0]?.foo`, or drop the index (e.g. `url.replace(/[?#].*$/, '')` instead of `url.split('?')[0]`). `type-check` is a required gate, not advisory.
 - `npm test` starts watch mode; `test:run` exits. Vitest configuration lives in `vite.config.ts`, uses jsdom, and loads `src/test/setup.ts` (router/matchMedia mocks). Coverage/UI scripts exist, but `@vitest/coverage-v8` and `@vitest/ui` are not installed in the manifest/lockfile.
+- jsdom testing conventions: jsdom has no real `requestAnimationFrame`, so stub it with a queue you flush explicitly — a synchronous rAF stub cannot observe per-frame coalescing, and `Object.defineProperty(window, 'scrollY', …)` is required before dispatching `scroll`. Any test mounting a component that registers global listeners must call `enableAutoUnmount(afterEach)` from `@vue/test-utils`, because `src/test/setup.ts` does not. Prefer a real `createMemoryHistory()` router over `stubs: { RouterLink: true }`: the stub renders `<router-link-stub>` and drops slot content unless `renderStubDefaultSlot` is on, and it cannot express real active-route behavior.
 - Dev runs on port 3000. `VITE_API_TARGET` controls `/api` proxying and `/uploads` → `/api/uploads` rewriting. Axios hardcodes `/api` in `src/api/index.ts`; the advertised `VITE_API_BASE_URL` is not consumed there. Production proxying is configured separately in `vercel.json`/the reverse proxy.
+- The SPA renders from `src/stores/site.ts` defaults with no backend running (public API calls just log 500s), so `npm run dev` alone is enough to verify layout/CSS in a browser. Playwright is installed globally (`npm root -g`); launch it with `chromium.launch({ channel: 'chrome' })` — the `ms-playwright` browser cache predates the global Playwright version and `chromium.launch()` alone fails with "Executable doesn't exist".
 
 ## Frontend: integration traps
 

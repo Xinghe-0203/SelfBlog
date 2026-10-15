@@ -4,6 +4,59 @@
 
 ---
 
+## 未发布 — 视觉重设计（一）：设计底座与公开页导航 (2026-10-15)
+
+站点视觉重设计的第一批落地：先把圆角 token、图标系统、滚动状态与品牌资产这些**共享底座**做好，再让公开页顶栏成为第一个消费者。后端上传通道、文章页阅读体验、后台胶囊化在后续批次。
+
+### 新增
+
+- **内置 SVG 图标系统** `components/common/icons.ts` + `components/common/Icon.vue`：21 个 24×24 描边图标（`logo`/`search`/`sun`/`moon`/`menu`/`close`/`home`/`archive`/`image`/`info`/`settings`/`gauge`/`file-text`/`tag`/`users`/`message`/`music`/`play`/`pause`/`arrow-up`/`external`）。全部靠 `stroke="currentColor"` 取色，深浅两套主题自动适配。**不引入任何图标库依赖**，`dependencies` 保持 7 项不变
+- **`composables/useScrollState.ts`**：rAF 节流的滚动状态，返回 `{ scrolled, direction }`。滚动是高频事件，直接读 `scrollY` 会让长页面掉帧，因此同一帧内最多处理一次
+- **顶栏滚动三态**：静止 → 圆角胶囊实底；下滚过阈值 → 高度收紧、转半透明 + 毛玻璃（`backdrop-filter: blur(20px) saturate(1.4)`）、阴影加深；小屏下滚 → 顶栏收走、上滚立刻归位（桌面端不隐藏，避免鼠标用户找不到导航）
+- **导航选中态胶囊化**：选中项为 `--radius-full` 的浅色胶囊，未选中只在 hover 出浅底。移动端面板此前完全没有选中指示，一并补上
+- **可上传的品牌商标**：`siteLogoUrl` 有值时顶栏渲染 `<img>`，为空时回落内置 `Icon name="logo"`——即"设置里可自由上传图片"的前端半边
+- **`faviconUrl` 运行时注入**：`stores/site.ts` 新增 `mimeForIcon()` 与 `applyFavicon()`，按扩展名推导 MIME（`.svg`→`image/svg+xml`、`.ico`→`image/x-icon`、其余 `image/png`）并同步到 `<head>`。注入节点带 `data-runtime` 标记以便幂等清理，**`index.html` 的静态 `/favicon.svg` 永不移除**，所以"清空设置"会自然回落到默认图标
+- **`html { scroll-padding-top: 96px }`**：顶栏是 `fixed` 浮动胶囊，原生锚点跳转需要给它让位，否则 `#hash` 跳转后标题会被压在导航下面
+
+### 变更
+
+- **圆角整体上移一档**（`--radius-xs` 4→6、`sm` 4→8、`radius`/`md` 8→12、`lg` 12→16、`xl` 16→20、`2xl` 20→24、`3xl` 24→32）。`--radius-full` 保持 `9999px`：胶囊选中态与圆形头像共用它，同一个值同时覆盖"小方块变圆"和"胶囊"，不再新增 `--radius-pill` 之类的冗余 token
+- 搜索框改为全圆角胶囊，主题切换/汉堡按钮改为正圆，品牌角标由硬编码 `9px` 改用 `--radius-sm`
+- 顶栏模板重写。`Navbar.vue` 里 `.write-link`/`.admin-link`/`.login-link`/`.logout-link` 四组样式是**死代码**——模板从未渲染过对应元素（登录/注册入口早先已移除），随本次重写一并删除
+
+### Bug 修复
+
+- **移动端搜索按钮文字竖排折行**：`.mobile-search` 里输入框 `width: 100%` 且未设 `flex`，把"搜索"按钮挤到只剩一个字宽，两个字上下排成两行。已给按钮 `flex: 0 0 auto` + `white-space: nowrap`
+- **移动端导航没有任何选中指示**：桌面端有 `.nav-links a.active`，移动端面板的链接连 `active-class` 都没配
+
+### 说明
+
+- **布局高度守恒**是本次的硬约束：`.app-main { padding-top: 80px }`（`App.vue`）以及文章页的 `scroll-margin-top: 105px`、`.article-aside { top: 105px }` 都是按顶栏高度写死的锚点。因此滚动收缩**只改视觉高度**（`.nav-shell` 的 `min-height` 58→48），顶栏占据的布局高度始终不变，正文位置不跳动
+- **jsdom 测不到的东西靠浏览器验**：胶囊圆角、毛玻璃、收缩位移都无法在单测里断言。已用 Playwright 实测计算样式与截图确认（`getComputedStyle` 取到 `border-radius: 24px`、`backdrop-filter: blur(20px) saturate(1.4)`、移动端 `opacity: 0` 且 `top: -62px`），上面两个移动端 Bug 就是这样发现的
+- `faviconUrl` / `siteLogoUrl` 目前**只是前端消费端**：后端 `SiteSettingsServiceImpl` 的 `ALLOWED_KEYS` 与 `defaults()` 尚未收录这两个键，所以后台还存不进这两个值；在收录之前 `applySettings()` 收到的数据里没有它们，前端会保持默认空串并回落静态图标。后端收录与上传接口属于下一批次
+- 圆角 token 只改了 scale 本身，**全站逐处裸圆角替换与后台侧边栏胶囊化留到后续批次**，避免一次提交同时动几十个文件而无法审查
+
+### 影响文件
+
+| 文件 | 改动类型 |
+|------|----------|
+| `frontend/src/styles/variables.css` | 圆角 scale 整体上移一档 |
+| `frontend/src/styles/base.css` | 新增 `scroll-padding-top: 96px` |
+| `frontend/src/components/common/icons.ts` | 新增：21 个描边图标注册表 |
+| `frontend/src/components/common/Icon.vue` | 新增：图标渲染组件（`name` / `size`） |
+| `frontend/src/components/common/__tests__/icons.test.ts` | 新增：注册表结构与安全性断言（65 例） |
+| `frontend/src/composables/useScrollState.ts` | 新增：rAF 节流的滚动状态 |
+| `frontend/src/composables/__tests__/useScrollState.test.ts` | 新增：7 例，含每帧合并与卸载后静默 |
+| `frontend/src/stores/site.ts` | 新增 `faviconUrl`/`siteLogoUrl` 键、`mimeForIcon()`、`applyFavicon()` |
+| `frontend/src/stores/__tests__/site.test.ts` | 新增：11 例，含幂等注入与静态兜底不被移除 |
+| `frontend/src/components/layout/Navbar.vue` | 重写：滚动三态、图标、胶囊选中、可上传 logo；修移动端两个问题 |
+| `frontend/src/components/layout/__tests__/Navbar.test.ts` | 新增：10 例，用真实 memory router 断言 active class |
+| `AGENTS.md` | 修正 Node 引擎范围、`format:check` 基线失败、`noUncheckedIndexedAccess`、jsdom 测试约定 |
+| `docs/superpowers/specs/2026-10-15-selfblog-ui-redesign-design.md` | 新增：本次重设计的完整设计稿 |
+| `docs/superpowers/plans/2026-10-15-selfblog-ui-foundation-and-navbar.md` | 新增：第一批次的实施计划与执行修订 |
+
+---
+
 ## 未发布 — SEO、订阅源与字体 (2026-10-15)
 
 参考同类开源个人博客项目（`linhaojun857/aurora`、`weiwosuoai/WeBlog`、`iszhouhua/blog` 等）后补齐的能力。
