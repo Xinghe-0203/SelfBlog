@@ -4,6 +4,34 @@
 
 ---
 
+## 未发布 — 站点资源上传控件（前端）(2026-10-15)
+
+承接「资源上传通道（后端）」：后台「网站设置」页新增四个品牌资源字段，支持上传与预览。
+
+### 新增
+
+- **`SiteAssetField.vue` 通用资源字段**：预览 + 手动 URL 输入 + 上传按钮；按 kind 限定 `accept` 与体积上限（图片 2MB、音乐 20MB），预检失败不发请求，错误行内展示
+- **上传 API** `siteApi.uploadSiteAsset()`：multipart 提交到 `POST /api/admin/site-assets`，带上传进度回调
+
+### 说明
+
+- 上传成功即写入表单并同步 `siteStore`（顶栏 Logo、favicon 立即换新），点「保存设置」才通过 `PUT /api/admin/site-settings` 落库
+- 音乐字段预览显示文件名与时长；图片字段显示方形缩略图；远端 CDN 手填 URL 的能力保留
+- 前端预检与后端校验规则一致，但服务端仍是权威（扩展名白名单 + 魔数 + 体积）
+
+### 影响文件
+
+| 文件 | 改动类型 |
+|------|----------|
+| `frontend/src/api/site.ts` | 新增 `SiteAssetKind` / `SiteAssetUpload` 类型与 `uploadSiteAsset()` |
+| `frontend/src/components/admin/SiteAssetField.vue` | 新增：站点资源上传字段组件 |
+| `frontend/src/views/admin/Settings.vue` | 四个字段接入 + 乐观更新 |
+| `frontend/src/api/__tests__/site.test.ts` | 新增：上传 API 单测 |
+| `frontend/src/components/admin/__tests__/SiteAssetField.test.ts` | 新增：字段组件单测 |
+| `frontend/src/views/admin/__tests__/Settings.test.ts` | 新增：设置页集成测试 |
+
+---
+
 ## 未发布 — 资源上传通道（后端）(2026-10-15)
 
 ### 新增

@@ -39,7 +39,7 @@
   - `export interface SiteAssetUpload { url: string; kind: SiteAssetKind; size: number; originalName: string }`
   - `siteApi.uploadSiteAsset(kind: SiteAssetKind, file: File, onProgress?: (event: AxiosProgressEvent) => void): Promise<ApiResponse<SiteAssetUpload>>`
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 新建 `frontend/src/api/__tests__/site.test.ts`：
 
@@ -94,7 +94,7 @@ describe('siteApi.uploadSiteAsset', () => {
 })
 ```
 
-- [ ] **Step 2: 跑测试确认失败**
+- [x] **Step 2: 跑测试确认失败**
 
 ```powershell
 npm run test:run -- src/api/__tests__/site.test.ts
@@ -102,7 +102,7 @@ npm run test:run -- src/api/__tests__/site.test.ts
 
 Expected: 失败（`siteApi.uploadSiteAsset is not a function`）。
 
-- [ ] **Step 3: 实现**
+- [x] **Step 3: 实现**
 
 `frontend/src/api/site.ts` 顶部补 `import type { AxiosProgressEvent } from 'axios'`，并新增类型：
 
@@ -140,7 +140,7 @@ export interface SiteAssetUpload {
   },
 ```
 
-- [ ] **Step 4: 测试与类型检查**
+- [x] **Step 4: 测试与类型检查**
 
 ```powershell
 npm run test:run -- src/api/__tests__/site.test.ts
@@ -149,7 +149,7 @@ npm run type-check
 
 Expected: 1 test passed；`vue-tsc` 无错误。
 
-- [ ] **Step 5: 提交**
+- [x] **Step 5: 提交**
 
 ```bash
 git add frontend/src/api/site.ts frontend/src/api/__tests__/site.test.ts
@@ -170,7 +170,7 @@ git commit -m "feat: add the site asset upload API"
   - props：`modelValue: string`、`kind: SiteAssetKind`、`label: string`、`hint?: string`
   - emits：`update:modelValue: [value: string]`
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 新建 `frontend/src/components/admin/__tests__/SiteAssetField.test.ts`：
 
@@ -312,7 +312,7 @@ describe('SiteAssetField', () => {
 })
 ```
 
-- [ ] **Step 2: 跑测试确认失败**
+- [x] **Step 2: 跑测试确认失败**
 
 ```powershell
 npm run test:run -- src/components/admin/__tests__/SiteAssetField.test.ts
@@ -320,7 +320,7 @@ npm run test:run -- src/components/admin/__tests__/SiteAssetField.test.ts
 
 Expected: 失败（模块不存在）。
 
-- [ ] **Step 3: 写组件**
+- [x] **Step 3: 写组件**
 
 新建 `frontend/src/components/admin/SiteAssetField.vue`：
 
@@ -516,7 +516,7 @@ async function handleFileChange(event: Event): Promise<void> {
 </style>
 ```
 
-- [ ] **Step 4: 跑测试与类型检查**
+- [x] **Step 4: 跑测试与类型检查**
 
 ```powershell
 npm run test:run -- src/components/admin/__tests__/SiteAssetField.test.ts
@@ -525,7 +525,7 @@ npm run type-check
 
 Expected: 8 tests passed；`vue-tsc` 无错误。
 
-- [ ] **Step 5: 提交**
+- [x] **Step 5: 提交**
 
 ```bash
 git add frontend/src/components/admin/SiteAssetField.vue frontend/src/components/admin/__tests__/SiteAssetField.test.ts
@@ -544,7 +544,7 @@ git commit -m "feat: add the site asset upload field component"
 - Consumes: `SiteAssetField`（Task 2）、`useSiteStore().applySettings()`、`siteApi.getSettings()/updateSettings()`
 - Produces: 设置页四个资源字段的绑定与乐观更新行为
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 新建 `frontend/src/views/admin/__tests__/Settings.test.ts`：
 
@@ -643,7 +643,7 @@ describe('Settings brand asset fields', () => {
 })
 ```
 
-- [ ] **Step 2: 跑测试确认失败**
+- [x] **Step 2: 跑测试确认失败**
 
 ```powershell
 npm run test:run -- src/views/admin/__tests__/Settings.test.ts
@@ -651,7 +651,7 @@ npm run test:run -- src/views/admin/__tests__/Settings.test.ts
 
 Expected: 失败（页面里还没有 `SiteAssetField`）。
 
-- [ ] **Step 3: 改 `Settings.vue`**
+- [x] **Step 3: 改 `Settings.vue`**
 
 模板部分：
 
@@ -699,7 +699,7 @@ function applyAsset(key: AssetSettingKey, url: string): void {
 }
 ```
 
-- [ ] **Step 4: 跑测试与类型检查**
+- [x] **Step 4: 跑测试与类型检查**
 
 ```powershell
 npm run test:run -- src/views/admin/__tests__/Settings.test.ts
@@ -708,7 +708,7 @@ npm run type-check
 
 Expected: 2 tests passed；`vue-tsc` 无错误。
 
-- [ ] **Step 5: 提交**
+- [x] **Step 5: 提交**
 
 ```bash
 git add frontend/src/views/admin/Settings.vue frontend/src/views/admin/__tests__/Settings.test.ts
@@ -719,7 +719,7 @@ git commit -m "feat: wire brand asset uploads into site settings"
 
 ### Task 4: 全量校验与文档
 
-- [ ] **Step 1: 全量校验**
+- [x] **Step 1: 全量校验**
 
 ```powershell
 npm run lint:check
@@ -730,7 +730,7 @@ npm run build
 
 Expected: 全绿；`build` 会先跑 `vue-tsc` 再打包。
 
-- [ ] **Step 2: 更新 `CHANGELOG.md`**
+- [x] **Step 2: 更新 `CHANGELOG.md`**
 
 在文件顶部新增一节（沿用既有中文分节）：
 
@@ -761,11 +761,11 @@ Expected: 全绿；`build` 会先跑 `vue-tsc` 再打包。
 | `frontend/src/views/admin/__tests__/Settings.test.ts` | 新增：设置页集成测试 |
 ```
 
-- [ ] **Step 3: 检查 `frontend/README.md`**
+- [x] **Step 3: 检查 `frontend/README.md`**
 
 看「Project Structure」里 `components/` 与 `views/admin` 的清单是否提到设置页资源字段；若有对应描述就补一行，没有就不硬造。
 
-- [ ] **Step 4: （可选）浏览器端到端验证**
+- [x] **Step 4: （可选）浏览器端到端验证**
 
 仓库有 `backend/.env` 与 SQLite 库，可真实起服务验证：
 
@@ -779,7 +779,7 @@ npm run dev
 
 登录后台 → 网站设置 → 上传 PNG 头像、SVG logo、ICO favicon、MP3 音乐 → 验证即时预览、顶栏 logo 与 favicon 立即换新 → 保存后刷新仍在。
 
-- [ ] **Step 5: 提交**
+- [x] **Step 5: 提交**
 
 ```bash
 git add CHANGELOG.md frontend/README.md
@@ -795,3 +795,17 @@ git commit -m "docs: describe the frontend site asset upload controls"
 - 前端 `lint:check` / `type-check` / `test:run` / `build` 全绿
 
 **下一批（E）**：文章页阅读体验——代码复制/折叠、标题锚点、移动端目录抽屉、图片灯箱、字数统计与「最后更新」。计划另起。
+
+---
+
+## 执行修订
+
+### 实施记录（2026-10-15）
+
+- Task 1–3 由主会话按 TDD 直接实施（子代理渠道限流），每个任务独立提交：`f7d9c69`（上传 API）、`a9df493`（字段组件）、`b643963`（设置页接入）。
+- Task 2 实现偏离一处：音乐预览的"文件名 + 时长"改用 `audioMeta` computed 拼装，避免模板里跨行插值；行为与测试目标不变。
+- Task 2 测试偏离一处：`tsconfig` 的 lib 不含 ES2022，`Array.prototype.at` 过不了 `vue-tsc`，改为取 emit 数组最后一条索引。
+- Task 3 的 `applyAsset` 用 `Partial<SiteSettings>` patch + `Object.assign` 写表单，规避联合键直接赋值在类型系统里的歧义。
+- 全量验证：`npm run lint:check`、`npm run type-check`、`npm run test:run`（**167/167**）、`npm run build` 全部通过。
+- 端到端（真实后端 + Chrome）：管理员登录 → 设置页上传四种资源 → 上传后 favicon 即时换新 → 保存成功 → 刷新后四个字段全部持久化 → 公开页顶栏 Logo 与 favicon 生效，无控制台错误。
+- 验证后已删除数据库中本次写入的四个设置行与 `backend/uploads/site-assets` 下的测试文件（经比对主库 WAL 时间戳确认测试前这些行与文件均不存在），本地环境已还原。

@@ -63,10 +63,12 @@ src/
 │   │   ├── PostCard.vue
 │   │   ├── Skeleton.vue
 │   │   └── Toast.vue
-│   └── layout/         # 3 layout components
-│       ├── Footer.vue
-│       ├── Navbar.vue
-│       └── PageTransition.vue
+│   ├── layout/         # 3 layout components
+│   │   ├── Footer.vue
+│   │   ├── Navbar.vue
+│   │   └── PageTransition.vue
+│   └── admin/          # Site settings brand-asset field
+│       └── SiteAssetField.vue
 ├── composables/
 │   └── useConfirm.ts   # Promise-based confirm dialog
 ├── router/
