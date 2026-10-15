@@ -14,9 +14,18 @@
 - **布局高度守恒**：`.app-main { padding-top: 80px }`（`src/App.vue:111`）**不得修改**。导航栏滚动收缩只改视觉（高度、模糊、底色、阴影），不得改变它占据的布局高度，否则 `src/views/post/PostDetail.vue:540` 的 `scroll-margin-top:105px` 与 `:641` 的 `.article-side{top:105px}` 锚点全部失效。
 - **胶囊选中态统一用 `var(--radius-full)`**，不新增 `--radius-pill` / `--radius-nav`。
 - **只替换 `border-radius: <裸值>`**，不动 `50%`（圆形头像）与 `999px`（已是胶囊语义）。
+- **`noUncheckedIndexedAccess: true`**（`frontend/tsconfig.json:23`）：数组下标取值是 `string | undefined`，`arr[0].foo` 会直接编译失败。写索引访问必须用 `arr[0]?.foo` 或改写掉索引（例如用 `replace` 剥 query 而不是 `split('?')[0]`）。`type-check` 是必过闸门。
 - **命令一律在 `frontend/` 下执行**。
 - 每个任务结束必须 `npm run lint:check && npm run type-check` 通过再提交。
 - 提交信息用英文 conventional commit 前缀。
+
+## 执行修订（2026-10-15，实施时发现，以此为准）
+
+计划写完后实际跑通时发现三处问题，Task 1–4 按修订后的版本落地，已在提交里：
+
+1. **`npm run format:check` 在本仓库基线就是失败的**，与本次改动无关。原因有二：`.prettierrc` 写了 `endOfLine: "lf"` 而 `core.autocrlf=true` 让工作区全是 CRLF；即使加 `--end-of-line auto` 归一，仍有 96 个文件不符合 prettier。**因此本计划不再把 `format:check` 当闸门**，改用 `npx prettier --check --end-of-line auto <改动过的文件>` 只校验自己碰过的文件。
+2. **`useScrollState` 的测试与实现原本互相矛盾**：用同步 `requestAnimationFrame` 替身测不出"每帧合并"，导致 20 次 scroll 换来 20 次调度。正确做法是把 rAF 回调攒进队列由用例显式 flush 一帧（真实浏览器里 rAF 本来就是异步的），实现侧保持 `update()` 开头解锁 `ticking`。另外测试文件必须加 `enableAutoUnmount(afterEach)`，否则 window 上的 scroll 监听会在用例间叠加。**以 `frontend/src/composables/useScrollState.ts` 及其测试的已提交版本为准。**
+3. **`direction` 在未过阈值时不记 `down`**：此时顶栏不会隐藏，方向保持中性的 `up` 初始态更稳。
 
 ---
 
@@ -74,8 +83,11 @@
 
 - [ ] **Step 2: 验证格式化与 lint**
 
-Run: `npm run format:check && npm run lint:check`
-Expected: 两条都通过（无输出 / 无 error）
+Run: `npm run lint:check`
+Expected: 0 error（存量 warning 不计）
+
+Run: `npx prettier --check --end-of-line auto src/styles/variables.css`
+Expected: 该文件仍报 warn —— 这是**存量**漂移（全仓库 96 个文件都不符合 prettier），不是本次改动引入的。本次编辑必须与文件现有风格一致（对齐的冒号、`—` 破折号），不要去 reformat 整个文件。
 
 - [ ] **Step 3: 目视确认没有灾难性回归**
 
@@ -752,24 +764,40 @@ git commit -m "feat: add faviconUrl/siteLogoUrl settings keys with runtime favic
 创建 `frontend/src/components/layout/__tests__/Navbar.test.ts`：
 
 ```ts
-import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { ref, nextTick } from 'vue'
-import { mount } from '@vue/test-utils'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { nextTick } from 'vue'
+import { mount, enableAutoUnmount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
-
-const scrolled = ref(false)
-const direction = ref<'up' | 'down'>('up')
 
 vi.mock('vue-router', () => ({
   useRouter: () => ({ push: vi.fn() })
 }))
 
-vi.mock('@/composables/useScrollState', () => ({
-  useScrollState: () => ({ scrolled, direction })
-}))
-
 import Navbar from '../Navbar.vue'
 import { useSiteStore } from '@/stores/site'
+
+/**
+ * 这里**不要** mock `@/composables/useScrollState`。
+ * vi.mock 的工厂会被提升到 import 之前执行，在工厂里引用测试模块顶层用 ref()
+ * 建的变量会直接撞 TDZ 报 "Cannot access 'scrolled' before initialization"。
+ * 改用真实 composable + 真实 scroll 事件，顺带把"composable 的输出确实接到了
+ * class 上"这层集成也一起测了。
+ */
+let frameQueue: FrameRequestCallback[] = []
+
+function flushFrame(): void {
+  const pending = frameQueue
+  frameQueue = []
+  for (const cb of pending) cb(0)
+}
+
+/** 写 scrollY → 派发 scroll → 跑完一帧 → 等 Vue 刷新。 */
+async function scrollTo(y: number): Promise<void> {
+  Object.defineProperty(window, 'scrollY', { writable: true, configurable: true, value: y })
+  window.dispatchEvent(new Event('scroll'))
+  flushFrame()
+  await nextTick()
+}
 
 /** 组件和测试必须共用同一个 pinia 实例，否则改 store 组件看不到。 */
 let pinia: ReturnType<typeof createPinia>
@@ -783,12 +811,23 @@ function mountNavbar() {
   })
 }
 
+/** window 上的 scroll 监听是全局的，不卸载会在用例之间叠加。 */
+enableAutoUnmount(afterEach)
+
 describe('Navbar', () => {
   beforeEach(() => {
-    scrolled.value = false
-    direction.value = 'up'
+    frameQueue = []
+    vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
+      frameQueue.push(cb)
+      return frameQueue.length
+    })
+    Object.defineProperty(window, 'scrollY', { writable: true, configurable: true, value: 0 })
     pinia = createPinia()
     setActivePinia(pinia)
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
   })
 
   it('falls back to the built-in logo icon when no logo is uploaded', () => {
@@ -818,35 +857,33 @@ describe('Navbar', () => {
     }
   })
 
-  it('marks the wrapper as scrolled once past the threshold', async () => {
+  it('toggles the scrolled state past the threshold', async () => {
     const wrapper = mountNavbar()
     expect(wrapper.find('.site-nav-wrap').classes()).not.toContain('is-scrolled')
 
-    scrolled.value = true
-    await nextTick()
+    await scrollTo(400)
     expect(wrapper.find('.site-nav-wrap').classes()).toContain('is-scrolled')
+
+    await scrollTo(0)
+    expect(wrapper.find('.site-nav-wrap').classes()).not.toContain('is-scrolled')
   })
 
   // 这里只断言状态 class；实际隐藏效果由 CSS 的 @media (max-width: 760px) 决定，
   // jsdom 不跑媒体查询，所以视觉效果只能目视验证。
-  it('flags the nav as hidden while scrolling down', async () => {
+  it('marks the nav as hidden while scrolling down, and reveals it on the way up', async () => {
     const wrapper = mountNavbar()
-    expect(wrapper.find('.site-nav-wrap').classes()).not.toContain('is-hidden')
 
-    scrolled.value = true
-    direction.value = 'down'
-    await nextTick()
+    await scrollTo(400)
     expect(wrapper.find('.site-nav-wrap').classes()).toContain('is-hidden')
 
-    direction.value = 'up'
-    await nextTick()
+    await scrollTo(200)
     expect(wrapper.find('.site-nav-wrap').classes()).not.toContain('is-hidden')
   })
 
   it('never hides the nav before the page is scrolled', async () => {
     const wrapper = mountNavbar()
-    direction.value = 'down'
-    await nextTick()
+    // 未过阈值：scrolled 为 false，方向不该把它带进隐藏态。
+    await scrollTo(8)
     expect(wrapper.find('.site-nav-wrap').classes()).not.toContain('is-hidden')
   })
 
@@ -1324,8 +1361,11 @@ html {
 
 - [ ] **Step 2: 全量校验**
 
-Run: `npm run lint:check && npm run format:check && npm run type-check && npm run test:run`
-Expected: 四条全过；测试数量比改动前多出本计划新增的用例，且无既有用例失败
+Run: `npm run lint:check && npm run type-check && npm run test:run`
+Expected: 三条全过；测试数量比改动前多出本计划新增的用例，且无既有用例失败
+
+Run: `npx prettier --check --end-of-line auto <本计划新增/修改过的每个文件>`
+Expected: 全部通过。**不要跑 `npm run format:check`** —— 它在本仓库基线就失败（96 个文件），跟本计划无关。
 
 - [ ] **Step 3: 生产构建验证**
 
