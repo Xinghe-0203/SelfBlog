@@ -9,7 +9,9 @@
         <label>网站简介<textarea v-model.trim="form.siteDescription" rows="3" maxlength="1000"></textarea></label>
         <label>作者名称<input v-model.trim="form.authorName" maxlength="80" required /></label>
         <label>作者介绍<textarea v-model.trim="form.authorBio" rows="3" maxlength="1000"></textarea></label>
-        <label>头像地址<input v-model.trim="form.authorAvatar" placeholder="https://… 或 /uploads/…" /></label>
+        <SiteAssetField :model-value="form.authorAvatar" kind="avatar" label="作者头像" hint="支持上传或手填外链地址。" @update:model-value="applyAsset('authorAvatar', $event)" />
+        <SiteAssetField :model-value="form.siteLogoUrl" kind="logo" label="站点 Logo" hint="公开页顶栏与后台侧边栏的品牌图标；留空使用内置图标。" @update:model-value="applyAsset('siteLogoUrl', $event)" />
+        <SiteAssetField :model-value="form.faviconUrl" kind="favicon" label="网站图标" hint="浏览器标签页图标；留空使用默认图标。" @update:model-value="applyAsset('faviconUrl', $event)" />
         <label>页脚文字<input v-model.trim="form.footerText" maxlength="1000" /></label>
       </section>
 
@@ -22,7 +24,7 @@
         <label class="toggle-row"><span><strong>开放文章评论</strong><small>关闭后访客无法查看或提交评论，已有评论仍保留。</small></span><input v-model="form.commentsEnabled" type="checkbox" true-value="true" false-value="false" /></label>
         <label class="toggle-row"><span><strong>启用背景音乐</strong><small>浏览器通常会阻止有声音的自动播放；访客可手动点击播放。</small></span><input v-model="form.musicEnabled" type="checkbox" true-value="true" false-value="false" /></label>
         <label>音乐名称<input v-model.trim="form.musicTitle" maxlength="80" /></label>
-        <label>音乐文件 URL<input v-model.trim="form.musicUrl" placeholder="https://… 或 /uploads/music.mp3" /><small>音频请使用可公开访问的 MP3/OGG 地址。</small></label>
+        <SiteAssetField :model-value="form.musicUrl" kind="music" label="背景音乐文件" hint="支持 MP3/OGG/WAV/M4A/AAC，最大 20MB；留空则播放器不出现。" @update:model-value="applyAsset('musicUrl', $event)" />
       </section>
 
       <section class="settings-panel"><div class="panel-heading"><span>04</span><div><h2>视觉主题</h2><p>即时切换网站的整体色调。</p></div></div>
@@ -40,12 +42,25 @@
 import { onMounted, reactive, ref } from 'vue'
 import { useSiteStore, type SiteSettings } from '@/stores/site'
 import { siteApi } from '@/api/site'
+import SiteAssetField from '@/components/admin/SiteAssetField.vue'
 
 const siteStore = useSiteStore()
 const form = reactive<SiteSettings>({ ...siteStore.settings })
 const saving = ref(false)
 const saved = ref(false)
 const error = ref('')
+
+type AssetSettingKey = 'authorAvatar' | 'siteLogoUrl' | 'faviconUrl' | 'musicUrl'
+
+/**
+ * 上传成功先写表单 + 同步 store（导航栏 Logo、favicon 立即换新），
+ * 真正落库要等「保存设置」——与 spec 的乐观更新约定一致。
+ */
+function applyAsset(key: AssetSettingKey, url: string): void {
+  const patch: Partial<SiteSettings> = { [key]: url.trim() }
+  Object.assign(form, patch)
+  siteStore.applySettings(patch)
+}
 
 async function load() {
   try {
