@@ -30,6 +30,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   'update:modelValue': [value: string]
+  uploaded: [value: string]
 }>()
 
 const fileInput = ref<HTMLInputElement | null>(null)
@@ -65,7 +66,7 @@ function fileName(url: string): string {
 }
 
 function formatDuration(seconds: number): string {
-  if (!Number.isFinite(seconds) || seconds <= 0) return ''
+  if (!Number.isFinite(seconds) || seconds < 1) return ''
   const total = Math.round(seconds)
   const minutes = Math.floor(total / 60)
   const rest = total % 60
@@ -73,7 +74,10 @@ function formatDuration(seconds: number): string {
 }
 
 function handleInput(event: Event): void {
+  // 手动改 URL：清掉上一次上传/预览留下的状态，避免旧文件名、时长或错误残留在新值下面。
   uploadedName.value = ''
+  duration.value = ''
+  error.value = ''
   emit('update:modelValue', (event.target as HTMLInputElement).value)
 }
 
@@ -112,6 +116,8 @@ async function handleFileChange(event: Event): Promise<void> {
     uploadedName.value = response.data.originalName || file.name
     duration.value = ''
     emit('update:modelValue', response.data.url)
+    // 与手动编辑区分：只有真实上传结果才让设置页同步到全局 store（Logo / favicon 立即换新）。
+    emit('uploaded', response.data.url)
   } catch (err) {
     error.value = (err as Error & { userMessage?: string }).userMessage || '上传失败，请稍后重试。'
   } finally {
@@ -146,6 +152,7 @@ async function handleFileChange(event: Event): Promise<void> {
           class="asset-input"
           type="text"
           :value="modelValue"
+          :disabled="uploading"
           placeholder="/uploads/site-assets/… 或 https://…"
           :aria-label="`${label}地址`"
           @input="handleInput"

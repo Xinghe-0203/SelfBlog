@@ -35,6 +35,18 @@ async function selectFile(wrapper: ReturnType<typeof mountField>, file: File) {
   await input.trigger('change')
 }
 
+/** 让 mock 返回一个只有测试显式释放才 resolve 的 promise，用于测"上传在途"。 */
+function makePendingUpload() {
+  const control: { release?: () => void } = {}
+  uploadSiteAsset.mockImplementation(
+    () =>
+      new Promise((resolve) => {
+        control.release = () => resolve(UPLOAD_RESPONSE)
+      })
+  )
+  return control
+}
+
 describe('SiteAssetField', () => {
   beforeEach(() => {
     uploadSiteAsset.mockReset()
@@ -83,6 +95,7 @@ describe('SiteAssetField', () => {
     expect(wrapper.emitted('update:modelValue')).toEqual([
       ['/uploads/site-assets/logo/mock.png']
     ])
+    expect(wrapper.emitted('uploaded')).toEqual([['/uploads/site-assets/logo/mock.png']])
   })
 
   it('shows the API message inline when the upload fails', async () => {
@@ -129,5 +142,99 @@ describe('SiteAssetField', () => {
     const meta = wrapper.find('.asset-audio-meta').text()
     expect(meta).toContain('song.mp3')
     expect(meta).toContain('3:24')
+  })
+
+  it('ignores a second selection while an upload is in flight', async () => {
+    const control = makePendingUpload()
+    const wrapper = mountField()
+    const file = new File(['png'], 'logo.png', { type: 'image/png' })
+
+    await selectFile(wrapper, file)
+    await selectFile(wrapper, file)
+
+    expect(uploadSiteAsset).toHaveBeenCalledTimes(1)
+    control.release?.()
+    await flushPromises()
+    expect(wrapper.emitted('update:modelValue')).toHaveLength(1)
+  })
+
+  it('locks the url input while an upload is in flight', async () => {
+    const control = makePendingUpload()
+    const wrapper = mountField()
+
+    await selectFile(wrapper, new File(['png'], 'logo.png'))
+    expect(wrapper.find('.asset-input').attributes('disabled')).toBeDefined()
+
+    control.release?.()
+    await flushPromises()
+    expect(wrapper.find('.asset-input').attributes('disabled')).toBeUndefined()
+  })
+
+  it('rejects music over the 20MB cap without a request', async () => {
+    const wrapper = mountField({ kind: 'music' })
+    const oversized = new File([new Uint8Array(20 * 1024 * 1024 + 1)], 'big.mp3')
+    await selectFile(wrapper, oversized)
+
+    expect(wrapper.find('.asset-error').text()).toContain('20MB')
+    expect(uploadSiteAsset).not.toHaveBeenCalled()
+  })
+
+  it('accepts uppercase extensions', async () => {
+    uploadSiteAsset.mockResolvedValue(UPLOAD_RESPONSE)
+    const wrapper = mountField()
+
+    await selectFile(wrapper, new File(['x'], 'LOGO.PNG'))
+    await flushPromises()
+
+    expect(uploadSiteAsset).toHaveBeenCalledTimes(1)
+  })
+
+  it('shows a generic error when the response has no url', async () => {
+    uploadSiteAsset.mockResolvedValue({ code: 200, message: 'OK', data: {} })
+    const wrapper = mountField()
+
+    await selectFile(wrapper, new File(['x'], 'logo.png'))
+    await flushPromises()
+
+    expect(wrapper.find('.asset-error').text()).toContain('上传失败')
+    expect(wrapper.emitted('uploaded')).toBeUndefined()
+  })
+
+  it('shows the uploaded original name in the music preview', async () => {
+    uploadSiteAsset.mockResolvedValue({
+      code: 200,
+      message: 'OK',
+      data: {
+        url: '/uploads/site-assets/music/new.mp3',
+        kind: 'music',
+        size: 5,
+        originalName: '我的歌.mp3'
+      }
+    })
+    const wrapper = mountField({ kind: 'music' })
+
+    await selectFile(wrapper, new File(['id3'], 'song.mp3'))
+    await flushPromises()
+    await wrapper.setProps({ modelValue: '/uploads/site-assets/music/new.mp3' })
+
+    expect(wrapper.find('.asset-audio-meta').text()).toContain('我的歌.mp3')
+  })
+
+  it('clears stale messages and duration when the url is edited by hand', async () => {
+    const wrapper = mountField({
+      kind: 'music',
+      modelValue: '/uploads/site-assets/music/song.mp3'
+    })
+    const audio = wrapper.find('.asset-audio-player')
+    Object.defineProperty(audio.element, 'duration', { value: 204, configurable: true })
+    await audio.trigger('loadedmetadata')
+    expect(wrapper.find('.asset-audio-meta').text()).toContain('3:24')
+
+    await selectFile(wrapper, new File(['x'], 'bad.gif'))
+    expect(wrapper.find('.asset-error').exists()).toBe(true)
+
+    await wrapper.find('.asset-input').setValue('https://cdn.example.com/other.mp3')
+    expect(wrapper.find('.asset-error').exists()).toBe(false)
+    expect(wrapper.find('.asset-audio-meta').text()).not.toContain('3:24')
   })
 })

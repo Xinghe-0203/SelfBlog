@@ -51,38 +51,77 @@ describe('Settings brand asset fields', () => {
     getSettings.mockResolvedValue({
       code: 200,
       message: 'OK',
-      data: { ...useSiteStore().settings, authorAvatar: '/uploads/site-assets/avatar/me.png' }
+      data: {
+        ...useSiteStore().settings,
+        authorAvatar: '/uploads/site-assets/avatar/me.png',
+        siteLogoUrl: '/uploads/site-assets/logo/me.svg',
+        faviconUrl: '/uploads/site-assets/favicon/me.ico',
+        musicUrl: '/uploads/site-assets/music/me.mp3'
+      }
     })
     const wrapper = await mountSettings()
 
-    const kinds = wrapper.findAllComponents(SiteAssetField).map((field) => field.props('kind'))
-    expect(kinds).toEqual(expect.arrayContaining(['avatar', 'logo', 'favicon', 'music']))
-    expect(requireField(wrapper, 'avatar').props('modelValue')).toBe(
-      '/uploads/site-assets/avatar/me.png'
-    )
+    const loaded = {
+      avatar: '/uploads/site-assets/avatar/me.png',
+      logo: '/uploads/site-assets/logo/me.svg',
+      favicon: '/uploads/site-assets/favicon/me.ico',
+      music: '/uploads/site-assets/music/me.mp3'
+    } as const
+    for (const [kind, url] of Object.entries(loaded)) {
+      expect(requireField(wrapper, kind).props('modelValue')).toBe(url)
+    }
     expect(wrapper.text()).toContain('站点 Logo')
     expect(wrapper.text()).toContain('网站图标')
   })
 
-  it('applies an uploaded url optimistically, then persists it on save', async () => {
+  it('routes every uploaded url to its own store key and to the save payload', async () => {
     const wrapper = await mountSettings()
-    const favicon = requireField(wrapper, 'favicon')
-
-    favicon.vm.$emit('update:modelValue', '/uploads/site-assets/favicon/new.ico')
-    await nextTick()
-
-    // 乐观更新：store 立刻换新，favicon link 也立刻注入
     const store = useSiteStore()
-    expect(store.settings.faviconUrl).toBe('/uploads/site-assets/favicon/new.ico')
-    const injected = document.head.querySelector<HTMLLinkElement>('link[data-runtime]')
-    expect(injected?.getAttribute('href')).toBe('/uploads/site-assets/favicon/new.ico')
+    const uploads = [
+      { kind: 'avatar', key: 'authorAvatar', url: '/uploads/site-assets/avatar/sample.png' },
+      { kind: 'logo', key: 'siteLogoUrl', url: '/uploads/site-assets/logo/sample.svg' },
+      { kind: 'favicon', key: 'faviconUrl', url: '/uploads/site-assets/favicon/sample.ico' },
+      { kind: 'music', key: 'musicUrl', url: '/uploads/site-assets/music/sample.mp3' }
+    ] as const
+
+    for (const upload of uploads) {
+      requireField(wrapper, upload.kind).vm.$emit('uploaded', upload.url)
+      await nextTick()
+      expect(store.settings[upload.key]).toBe(upload.url)
+      if (upload.kind === 'favicon') {
+        const injected = document.head.querySelector<HTMLLinkElement>('link[data-runtime]')
+        expect(injected?.getAttribute('href')).toBe(upload.url)
+      }
+    }
 
     updateSettings.mockResolvedValue({ code: 200, message: 'OK', data: { ...store.settings } })
     await wrapper.find('form').trigger('submit')
     await flushPromises()
 
-    expect(updateSettings).toHaveBeenCalledWith(
-      expect.objectContaining({ faviconUrl: '/uploads/site-assets/favicon/new.ico' })
+    const payload = updateSettings.mock.calls[0]?.[0] as Record<string, string>
+    for (const upload of uploads) {
+      expect(payload[upload.key]).toBe(upload.url)
+    }
+  })
+
+  it('keeps manual url edits out of the global store until save', async () => {
+    const wrapper = await mountSettings()
+    const store = useSiteStore()
+
+    requireField(wrapper, 'favicon').vm.$emit(
+      'update:modelValue',
+      '/uploads/site-assets/favicon/manual.ico'
     )
+    await nextTick()
+
+    expect(store.settings.faviconUrl).toBe('')
+    expect(document.head.querySelector('link[data-runtime]')).toBeNull()
+
+    updateSettings.mockResolvedValue({ code: 200, message: 'OK', data: { ...store.settings } })
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+
+    const payload = updateSettings.mock.calls[0]?.[0] as Record<string, string>
+    expect(payload.faviconUrl).toBe('/uploads/site-assets/favicon/manual.ico')
   })
 })
