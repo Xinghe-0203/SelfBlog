@@ -7,7 +7,18 @@
 
 ## Backend: run and verify
 
-Requires JDK 21 and installed Maven; there is no Maven wrapper. Commands below run from `backend/`.
+Requires JDK 21; there is no Maven wrapper in the repo, and on this machine `mvn` is **not on `PATH`** (`MAVEN_HOME` points at an empty `D:\Javawebexe`, and `JAVA_HOME` points at a JDK 25 the project does not target). Commands below run from `backend/`. Verified working invocation:
+
+```powershell
+$env:JAVA_HOME = 'C:\Program Files\Java\jdk-21'
+$mvn = 'C:\Users\Zora\.m2\wrapper\dists\apache-maven-3.9.12\59fe215c0ad6947fea90184bf7add084544567b927287592651fda3782e0e798\bin\mvn.cmd'
+& $mvn test -Dskip.npm=true -Dskip.installnodenpm=true
+```
+
+- **Always pass `-Dskip.npm=true -Dskip.installnodenpm=true` for backend test runs.** `pom.xml` wires `frontend-maven-plugin`, which otherwise runs `npm ci` + `npm run build` in `../frontend` on every build (bound to `initialize`/`generate-resources`). With the skips a single test class finishes in ~8s; without them the whole frontend is rebuilt first.
+- **Consequence: a plain `mvn test` mutates frontend build output.** Never run it while frontend files are mid-edit.
+- Baseline as of 2026-10-15: `mvn test` = **386 tests, 0 failures, BUILD SUCCESS**. Never leave the suite below that.
+- The plugin provisions its own Node **v24.15.0** at `backend/target/frontend/node/` (`node.exe`, `npm.cmd`, `npx.cmd`, npm 11.12.1). This is the Node that satisfies `engine-strict`; see the frontend section.
 
 ```sh
 mvn spring-boot:run
@@ -22,6 +33,7 @@ mvn clean package -DskipTests
 - MySQL requires `DB_TYPE=mysql`, all `DB_HOST/DB_PORT/DB_NAME/DB_USERNAME/DB_PASSWORD` values, and startup validation requires a password of at least 8 characters. Use `schema.sql` only for a new empty database; migrate an existing database with `backend/migration-selfblog.sql`. Docker Compose explicitly sets `DB_TYPE=mysql`.
 - Tests use H2 via `src/test/resources/application.yml`, optional `application-test.yml`, and test `schema.sql`; test request paths omit `/api`. Keep `DB_TYPE` unset for H2: a runtime database selection activates `DatabaseConfig` and replaces the test datasource, even with the `test` profile.
 - Runtime API controllers are prefixed with `/api` by MVC; the SPA is served at `/`, Knife4j is `/doc.html`, and Actuator health is `/actuator/health` (API docs disabled under `prod`). Tests clear the MVC API prefix and use unprefixed request paths.
+- **Testing an admin controller with `@WebMvcTest` needs `@MockBean JwtUtils` plus an authenticated user** (both verified empirically). The slice pulls in `SecurityConfig`, whose `jwtAuthenticationFilter` requires `JwtUtils` — without the mock the context fails with `NoSuchBeanDefinitionException`. Method-level `@PreAuthorize` *is* enforced in the slice: role `admin` → 200, any other user → 403, anonymous → 403. The working recipe is `@MockBean JwtUtils` + a per-test `@WithMockUser(roles = "admin")`; do **not** reach for `@AutoConfigureMockMvc(addFilters = false)`, which was measured to return 401 rather than bypassing authorization.
 
 ## Backend: change boundaries
 
@@ -37,6 +49,9 @@ Java source root: `backend/src/main/java/com/selfblog/`.
 ## Frontend: run and verify
 
 Commands below run from `frontend/`. `.npmrc` sets `engine-strict=true`, and the locked tree requires Node `^22.22.2 || ^24.15.0 || >=26.0.0` (from `abbrev@5.0.0`, reached via `@vue/test-utils` → `js-beautify` → `nopt`). Anything below that — including Node 24.0–24.14 — hard-fails `npm ci`/`npm install` with `EBADENGINE`; `npm ci --engine-strict=false` bypasses the gate for local work.
+
+- **A satisfying Node already exists in the repo tree.** The backend's `frontend-maven-plugin` provisions Node **v24.15.0** + npm **11.12.1** at `backend/target/frontend/node/` (`node.exe`, `npm.cmd`, `npx.cmd`). Prefix `PATH` with that directory to run any npm script under a Node that clears `engine-strict` — e.g. `$env:PATH = "C:\…\backend\target\frontend\node;$env:PATH"; npm install --dry-run` reports `up to date` with **no** `EBADENGINE`, while the machine's own Node 24.14.0 fails the gate. Prefer this over `--engine-strict=false`.
+- `node_modules` in this checkout was originally installed on Linux, so Windows lacked the `.bin/*.cmd` shims and win32 native packages; that has since been repaired in place (`@rollup/rollup-win32-x64-msvc`, `@esbuild/win32-x64`), and `package.json`/`package-lock.json` were left untouched. `npm run` scripts work.
 
 ```sh
 npm ci
