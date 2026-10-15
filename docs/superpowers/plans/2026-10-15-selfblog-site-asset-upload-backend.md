@@ -1315,7 +1315,7 @@ git commit -m "feat: rate limit the site-asset upload endpoint"
 - Consumes: `SiteSettingsService#updateSettings(Map)` / `getSettings()`（既有）
 - Produces: 设置项 `faviconUrl`、`siteLogoUrl`（默认空串，值必须是空串、`http(s)://…` 或 `/uploads/…`）
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 创建 `backend/src/test/java/com/selfblog/service/site/impl/SiteSettingsServiceImplTest.java`：
 
@@ -1434,7 +1434,7 @@ class SiteSettingsServiceImplTest {
 }
 ```
 
-- [ ] **Step 2: 跑测试，确认失败**
+- [x] **Step 2: 跑测试，确认失败**
 
 ```powershell
 & $mvn test -Dtest=SiteSettingsServiceImplTest -Dskip.npm=true -Dskip.installnodenpm=true
@@ -1442,7 +1442,7 @@ class SiteSettingsServiceImplTest {
 
 Expected: FAIL。`brandAssetKeys_ArePresentInDefaults` 因缺少 `faviconUrl` 失败；`updateSettings_AcceptsUploadedPaths` 因 `"包含不支持的设置项"` 抛异常失败。
 
-- [ ] **Step 3: 收录两个键**
+- [x] **Step 3: 收录两个键**
 
 在 `SiteSettingsServiceImpl.java` 的 `ALLOWED_KEYS`（第 22–26 行）末尾追加两个键，改成：
 
@@ -1455,7 +1455,7 @@ Expected: FAIL。`brandAssetKeys_ArePresentInDefaults` 因缺少 `faviconUrl` �
     );
 ```
 
-- [ ] **Step 4: 补默认值**
+- [x] **Step 4: 补默认值**
 
 在 `defaults()` 中，把 `values.put("authorAvatar", "");`（第 104 行）之后改成：
 
@@ -1465,7 +1465,7 @@ Expected: FAIL。`brandAssetKeys_ArePresentInDefaults` 因缺少 `faviconUrl` �
         values.put("siteLogoUrl", "");
 ```
 
-- [ ] **Step 5: 补校验规则**
+- [x] **Step 5: 补校验规则**
 
 把 `validateValue` 里的 URL 分支（第 145–149 行）从
 
@@ -1481,7 +1481,7 @@ Expected: FAIL。`brandAssetKeys_ArePresentInDefaults` 因缺少 `faviconUrl` �
 
 分支体内逻辑不变。
 
-- [ ] **Step 6: 跑测试确认通过**
+- [x] **Step 6: 跑测试确认通过**
 
 ```powershell
 & $mvn test -Dtest=SiteSettingsServiceImplTest -Dskip.npm=true -Dskip.installnodenpm=true
@@ -1489,7 +1489,7 @@ Expected: FAIL。`brandAssetKeys_ArePresentInDefaults` 因缺少 `faviconUrl` �
 
 Expected: `Tests run: 7, Failures: 0, Errors: 0`
 
-- [ ] **Step 7: 提交**
+- [x] **Step 7: 提交**
 
 ```bash
 git add backend/src/main/java/com/selfblog/service/site/impl/SiteSettingsServiceImpl.java backend/src/test/java/com/selfblog/service/site/impl/SiteSettingsServiceImplTest.java
@@ -1575,3 +1575,7 @@ git commit -m "docs: log the backend site-asset upload channel"
 ### Task 5（2026-10-15）
 
 - 实现与原计划一致，无偏差。`RateLimitProperties` 新增 `/api/admin/site-assets` → 30 次/分钟；独立复跑全量后端测试：**456/456 通过**。
+
+### Task 6（2026-10-15）
+
+- 实现与原计划一致，无偏差。`SiteSettingsServiceImplTest` 先验证未实现时的失败，再确认 **7/7 通过**；每个测试前清空 `siteSettingsCache`，避免事务回滚后缓存残留。

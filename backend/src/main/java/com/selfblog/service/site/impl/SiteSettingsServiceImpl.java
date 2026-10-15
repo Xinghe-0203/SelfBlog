@@ -22,7 +22,8 @@ public class SiteSettingsServiceImpl implements SiteSettingsService {
     private static final Set<String> ALLOWED_KEYS = Set.of(
             "siteTitle", "siteDescription", "authorName", "authorBio", "authorAvatar",
             "adminPath", "commentsEnabled", "visitorTrackingEnabled", "musicEnabled",
-            "musicUrl", "musicTitle", "themeSkin", "themePrimaryColor", "footerText"
+            "musicUrl", "musicTitle", "themeSkin", "themePrimaryColor", "footerText",
+            "faviconUrl", "siteLogoUrl"
     );
     private static final Set<String> RESERVED_PATHS = Set.of(
             "api", "assets", "uploads", "post", "archives", "about", "search", "gallery",
@@ -102,6 +103,8 @@ public class SiteSettingsServiceImpl implements SiteSettingsService {
         values.put("authorName", "站长");
         values.put("authorBio", "欢迎来到我的个人博客。");
         values.put("authorAvatar", "");
+        values.put("faviconUrl", "");
+        values.put("siteLogoUrl", "");
         values.put("adminPath", normalizeAdminPath(configuredAdminPath));
         values.put("commentsEnabled", "true");
         values.put("visitorTrackingEnabled", "true");
@@ -142,7 +145,7 @@ public class SiteSettingsServiceImpl implements SiteSettingsService {
             case "themePrimaryColor" -> {
                 if (!value.matches("#[0-9a-fA-F]{6}")) throw new BusinessException(400, "主题色需使用 #RRGGBB 格式");
             }
-            case "musicUrl", "authorAvatar" -> {
+            case "musicUrl", "authorAvatar", "faviconUrl", "siteLogoUrl" -> {
                 if (!value.isBlank() && !(value.startsWith("https://") || value.startsWith("http://") || value.startsWith("/uploads/"))) {
                     throw new BusinessException(400, "请填写 http(s) 地址或站内 /uploads/ 文件路径");
                 }
