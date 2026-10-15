@@ -274,17 +274,20 @@
   --spacing-4xl: var(--space-24);
 
   /* ---------------------------------------------------------------
-     Border Radius — Restrained
-     --------------------------------------------------------------- */
+     Border Radius — Generous
+     ---------------------------------------------------------------
+     整体上移一档，让卡片/输入框/按钮呈现明显的大 R 角。
+     --radius-full 保持 9999px：胶囊选中态和圆形头像共用它，
+     同一个值同时覆盖"小方块变圆"和"胶囊"，不必再开新 token。 */
   --radius-none: 0;
-  --radius-xs:   4px;
-  --radius-sm:   4px;
-  --radius:      8px;
-  --radius-md:   8px;
-  --radius-lg:   12px;
-  --radius-xl:   16px;
-  --radius-2xl:  20px;
-  --radius-3xl:  24px;
+  --radius-xs:   6px;
+  --radius-sm:   8px;
+  --radius:      12px;
+  --radius-md:   12px;
+  --radius-lg:   16px;
+  --radius-xl:   20px;
+  --radius-2xl:  24px;
+  --radius-3xl:  32px;
   --radius-full: 9999px;
 
   /* ---------------------------------------------------------------
