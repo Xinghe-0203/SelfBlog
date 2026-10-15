@@ -1,10 +1,19 @@
 <template>
-  <header class="site-nav-wrap">
+  <header class="site-nav-wrap" :class="{ 'is-scrolled': scrolled, 'is-hidden': hidden }">
     <nav class="site-nav" aria-label="主导航">
       <div class="nav-shell">
         <router-link to="/" class="brand" :aria-label="`${siteStore.settings.siteTitle} 首页`">
-          <span class="brand-mark" aria-hidden="true">✳</span>
-          <span>{{ siteStore.settings.siteTitle }}</span>
+          <img
+            v-if="siteStore.settings.siteLogoUrl"
+            class="brand-mark brand-mark--image"
+            :src="siteStore.settings.siteLogoUrl"
+            alt=""
+            aria-hidden="true"
+          />
+          <span v-else class="brand-mark" aria-hidden="true">
+            <Icon name="logo" :size="16" />
+          </span>
+          <span class="brand-name">{{ siteStore.settings.siteTitle }}</span>
         </router-link>
 
         <div class="nav-links" aria-label="博客导航">
@@ -15,10 +24,7 @@
         </div>
 
         <form class="nav-search" role="search" @submit.prevent="search">
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <circle cx="11" cy="11" r="7" />
-            <path d="m16 16 4 4" />
-          </svg>
+          <Icon name="search" :size="17" />
           <input v-model="searchQuery" type="search" placeholder="搜索文章" aria-label="搜索文章" />
           <kbd>↵</kbd>
         </form>
@@ -30,15 +36,7 @@
             :aria-label="themeStore.isDarkMode ? '切换亮色模式' : '切换暗色模式'"
             @click="themeStore.toggleTheme"
           >
-            <svg v-if="!themeStore.isDarkMode" viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M20.5 15.5A8.5 8.5 0 0 1 8.5 3.5 8.5 8.5 0 1 0 20.5 15.5Z" />
-            </svg>
-            <svg v-else viewBox="0 0 24 24" aria-hidden="true">
-              <circle cx="12" cy="12" r="4" />
-              <path
-                d="M12 2v2m0 16v2M4.93 4.93l1.42 1.42m11.3 11.3 1.42 1.42M2 12h2m16 0h2M4.93 19.07l1.42-1.42m11.3-11.3 1.42-1.42"
-              />
-            </svg>
+            <Icon :name="themeStore.isDarkMode ? 'sun' : 'moon'" :size="17" />
           </button>
 
           <button
@@ -48,7 +46,7 @@
             aria-label="切换导航菜单"
             @click="mobileOpen = !mobileOpen"
           >
-            <span></span><span></span>
+            <Icon :name="mobileOpen ? 'close' : 'menu'" :size="18" />
           </button>
         </div>
       </div>
@@ -75,16 +73,26 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useThemeStore } from '@/stores/theme'
 import { useSiteStore } from '@/stores/site'
+import { useScrollState } from '@/composables/useScrollState'
+import Icon from '@/components/common/Icon.vue'
 
 const router = useRouter()
 const themeStore = useThemeStore()
 const siteStore = useSiteStore()
+const { scrolled, direction } = useScrollState(16)
+
 const searchQuery = ref('')
 const mobileOpen = ref(false)
+
+/**
+ * 小屏下滚时把顶栏收走，上滚立刻归位。
+ * 未滚过阈值前不隐藏 —— 否则首屏滑一下就找不到导航了。
+ */
+const hidden = computed(() => scrolled.value && direction.value === 'down')
 
 const search = () => {
   const query = searchQuery.value.trim()
@@ -93,7 +101,6 @@ const search = () => {
   searchQuery.value = ''
   router.push({ path: '/search', query: { q: query } })
 }
-
 </script>
 
 <style scoped>
@@ -104,6 +111,18 @@ const search = () => {
   left: 0;
   right: 0;
   padding: 0 20px;
+  transition:
+    transform var(--transition-slow),
+    opacity var(--transition-slow);
+}
+
+/* 小屏下滚收起、上滚归位。桌面端不隐藏，避免鼠标用户找不到导航。 */
+@media (max-width: 760px) {
+  .site-nav-wrap.is-hidden {
+    transform: translateY(-140%);
+    opacity: 0;
+    pointer-events: none;
+  }
 }
 
 .site-nav {
@@ -111,9 +130,23 @@ const search = () => {
   max-width: 1120px;
   margin: 0 auto;
   border: 1px solid var(--border-solid);
-  border-radius: 16px;
+  border-radius: var(--radius-2xl);
   background: var(--surface-primary);
   box-shadow: 0 8px 30px rgba(24, 31, 40, 0.07);
+  transition:
+    background var(--transition-slow),
+    box-shadow var(--transition-slow),
+    backdrop-filter var(--transition-slow),
+    border-color var(--transition-slow);
+}
+
+/* 滚过后转成毛玻璃实心条：高度向下收，顶边不动，内容零位移。 */
+.is-scrolled .site-nav {
+  border-color: transparent;
+  background: var(--navbar-bg);
+  backdrop-filter: blur(20px) saturate(1.4);
+  -webkit-backdrop-filter: blur(20px) saturate(1.4);
+  box-shadow: 0 10px 34px rgba(24, 31, 40, 0.12);
 }
 
 .nav-shell {
@@ -122,6 +155,11 @@ const search = () => {
   align-items: center;
   gap: 28px;
   padding: 0 18px;
+  transition: min-height var(--transition-slow);
+}
+
+.is-scrolled .nav-shell {
+  min-height: 48px;
 }
 
 .brand {
@@ -141,31 +179,47 @@ const search = () => {
   place-items: center;
   width: 27px;
   height: 27px;
-  border-radius: 9px;
+  border-radius: var(--radius-sm);
   color: white;
   background: var(--primary);
   font-size: 1rem;
+  flex: 0 0 auto;
+}
+
+.brand-mark--image {
+  display: block;
+  object-fit: cover;
+  background: transparent;
 }
 
 .nav-links {
   display: flex;
   align-items: center;
-  gap: 22px;
+  gap: 4px;
 }
 
+/* 胶囊选中态：选中带浅底，未选中只有 hover 才出底，避免导航变成一排实心色块。 */
 .nav-links a,
-.mobile-panel a,
-.mobile-panel > button {
+.mobile-panel a {
+  padding: 7px 14px;
+  border-radius: var(--radius-full);
   color: var(--text-secondary);
   font-size: 0.875rem;
   font-weight: 500;
   text-decoration: none;
-  transition: color 160ms ease;
+  transition:
+    background var(--transition-fast),
+    color var(--transition-fast);
 }
 
 .nav-links a:hover,
-.nav-links a.active,
 .mobile-panel a:hover {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+.nav-links a.active {
+  background: var(--primary-light);
   color: var(--primary);
 }
 
@@ -175,23 +229,11 @@ const search = () => {
   gap: 9px;
   width: min(260px, 24vw);
   margin-left: auto;
-  padding: 8px 10px;
+  padding: 8px 12px;
   border: 1px solid var(--border-solid);
-  border-radius: 9px;
+  border-radius: var(--radius-full);
   background: var(--bg-primary);
   color: var(--text-muted);
-}
-
-.nav-search svg,
-.icon-button svg {
-  width: 17px;
-  height: 17px;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1.8;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  flex: 0 0 auto;
 }
 
 .nav-search input,
@@ -221,7 +263,7 @@ const search = () => {
 .nav-actions {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
   min-width: max-content;
 }
 
@@ -233,10 +275,13 @@ const search = () => {
   height: 34px;
   padding: 0;
   border: 0;
-  border-radius: 9px;
+  border-radius: var(--radius-full);
   background: transparent;
   color: var(--text-secondary);
   cursor: pointer;
+  transition:
+    background var(--transition-fast),
+    color var(--transition-fast);
 }
 
 .icon-button:hover,
@@ -245,46 +290,8 @@ const search = () => {
   color: var(--primary);
 }
 
-.write-link,
-.admin-link,
-.login-link,
-.logout-link {
-  color: var(--text-secondary);
-  font-size: 0.8125rem;
-  font-weight: 600;
-  text-decoration: none;
-}
-
-.write-link,
-.login-link {
-  color: var(--primary);
-}
-
-.write-link:hover,
-.admin-link:hover,
-.login-link:hover,
-.logout-link:hover {
-  color: var(--primary-hover);
-}
-
-.logout-link {
-  padding: 0;
-  border: 0;
-  background: none;
-  cursor: pointer;
-  font-family: inherit;
-}
-
 .menu-toggle {
   display: none;
-  align-content: center;
-  gap: 5px;
-}
-
-.menu-toggle span {
-  width: 17px;
-  height: 1.5px;
-  background: currentColor;
 }
 
 .mobile-panel {
@@ -299,15 +306,15 @@ const search = () => {
 }
 
 .mobile-search input {
-  padding: 9px 10px;
+  padding: 9px 12px;
   border: 1px solid var(--border-solid);
-  border-radius: 8px;
+  border-radius: var(--radius);
 }
 
 .mobile-search button {
   border: 0;
-  border-radius: 8px;
-  padding: 0 12px;
+  border-radius: var(--radius-full);
+  padding: 0 14px;
   background: var(--primary);
   color: white;
   font-weight: 600;
@@ -337,13 +344,10 @@ const search = () => {
     padding: 0 12px;
   }
   .nav-links,
-  .nav-search,
-  .admin-link,
-  .logout-link {
+  .nav-search {
     display: none;
   }
   .nav-actions {
-    gap: 6px;
     margin-left: auto;
   }
   .menu-toggle {
@@ -352,20 +356,24 @@ const search = () => {
   .mobile-panel {
     display: flex;
     flex-direction: column;
-    gap: 15px;
-    padding: 14px 16px 17px;
+    gap: 6px;
+    padding: 10px 12px 14px;
     border-top: 1px solid var(--border-solid);
   }
-  .mobile-panel > a,
-  .mobile-panel > button {
-    padding: 2px 0;
+  .mobile-panel > a {
     text-align: left;
   }
-  .mobile-panel > button {
-    border: 0;
-    background: transparent;
-    cursor: pointer;
-    font-family: inherit;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .site-nav-wrap,
+  .site-nav,
+  .nav-shell {
+    transition: none;
+  }
+  .site-nav-wrap.is-hidden {
+    transform: none;
+    opacity: 0;
   }
 }
 
@@ -373,8 +381,10 @@ const search = () => {
   .brand {
     font-size: 0.96rem;
   }
-  .write-link {
-    font-size: 0.75rem;
+  .brand-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 }
 </style>
