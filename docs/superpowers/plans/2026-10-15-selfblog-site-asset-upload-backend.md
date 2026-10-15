@@ -1067,7 +1067,7 @@ git commit -m "feat: validate and store uploaded site assets"
 - Consumes: `SiteAssetService`（Task 2/3）、`SiteAssetVO`（Task 2）
 - Produces: `POST /api/admin/site-assets`（multipart：`file`、`kind`）→ `Result<SiteAssetVO>`
 
-- [ ] **Step 1: 写控制器**
+- [x] **Step 1: 写控制器**
 
 创建 `backend/src/main/java/com/selfblog/controller/admin/AdminSiteAssetController.java`：
 
@@ -1111,7 +1111,7 @@ public class AdminSiteAssetController {
 }
 ```
 
-- [ ] **Step 2: 写测试**
+- [x] **Step 2: 写测试**
 
 创建 `backend/src/test/java/com/selfblog/controller/AdminSiteAssetControllerTest.java`：
 
@@ -1234,7 +1234,7 @@ class AdminSiteAssetControllerTest {
 }
 ```
 
-- [ ] **Step 3: 跑测试**
+- [x] **Step 3: 跑测试**
 
 ```powershell
 & $mvn test -Dtest=AdminSiteAssetControllerTest -Dskip.npm=true -Dskip.installnodenpm=true
@@ -1242,7 +1242,7 @@ class AdminSiteAssetControllerTest {
 
 Expected: `Tests run: 5, Failures: 0, Errors: 0`
 
-- [ ] **Step 4: 提交**
+- [x] **Step 4: 提交**
 
 ```bash
 git add backend/src/main/java/com/selfblog/controller/admin/AdminSiteAssetController.java backend/src/test/java/com/selfblog/controller/AdminSiteAssetControllerTest.java
@@ -1567,3 +1567,7 @@ git commit -m "docs: log the backend site-asset upload channel"
 - AAC 测试夹具的字面量 `0x80` 超出 Java `byte` 的正值范围，需写成 `(byte) 0x80`；否则测试源码无法编译。
 - SVG 危险元素现在按元素名的本地部分匹配，因此无前缀和命名空间前缀形式都会移除；事件属性也按本地属性名判断。解析仍使用 Jsoup XML parser，保留 `linearGradient` / `viewBox` 大小写。
 - 验证：`SiteAssetServiceImplTest` **40/40 通过**；检查确认测试没有创建 `backend/uploads/site-assets`。
+
+### Task 4（2026-10-15）
+
+- 实现与原计划一致，无偏差。`AdminSiteAssetControllerTest` **5/5 通过**；管理员成功、普通用户 403、参数缺失和服务校验异常均由 MVC slice 验证。
