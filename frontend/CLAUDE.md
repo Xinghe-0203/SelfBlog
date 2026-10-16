@@ -13,7 +13,7 @@ npm run build          # 构建生产版本（先 vue-tsc --noEmit，再 Vite）
 npm run preview        # 预览生产版本
 npm run lint:check     # 只读 ESLint 检查（npm run lint 会改写文件）
 npm run type-check     # vue-tsc --noEmit（必过闸门）
-npm run test:run       # Vitest 单次运行（当前 41 文件 / 392 tests；原始基线 210）
+npm run test:run       # Vitest 单次运行（当前 41 文件 / 393 tests；原始基线 210）
 npm run test:deployment # node:test：Vercel 代理生成器 + Docker/Compose 源契约（27 项）
 ```
 

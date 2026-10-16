@@ -2,7 +2,7 @@
 
 日期：2026-10-16
 
-状态：已实施并通过本批验证（见[验证记录](../../reviews/2026-10-16-seo-deployment-verification.md)）。前端 392 / 后端 540 项测试、部署契约 27 项、真实单 JAR+SQLite 联调 8/8 通过；Docker 守护进程与真实 Vercel 部署仍未验证。
+状态：已实施并通过本批验证（见[验证记录](../../reviews/2026-10-16-seo-deployment-verification.md)）。前端 393 / 后端 545 项测试、部署契约 27 项、真实单 JAR+SQLite 联调 9/9 通过；Docker 守护进程与真实 Vercel 部署仍未验证。
 
 ## 1. 目标与约束
 

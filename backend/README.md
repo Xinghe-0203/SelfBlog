@@ -192,7 +192,7 @@ Covering high-frequency queries: user post lists, category filtering, hot/latest
 ## Testing
 
 ```bash
-mvn test "-Dskip.npm=true" "-Dskip.installnodenpm=true"                 # 538 tests, ~1 min
+mvn test "-Dskip.npm=true" "-Dskip.installnodenpm=true"                 # 545 tests, ~1 min
 mvn test "-Dtest=AuthControllerTest" "-Dskip.npm=true" "-Dskip.installnodenpm=true"
 ```
 
@@ -258,6 +258,13 @@ delegates to `ReadingPageService` + `ReadingHtmlRenderer`:
 `X-Forwarded-*` headers cannot change canonical URLs, feeds or sitemap links. Leave it empty
 only for local development, where the direct request origin is used.
 
+The author can also set the same origin in the admin UI (**网站设置 → 站点资料 → 网站域名**,
+stored as the `siteBaseUrl` setting). Priority: admin setting → `SITE_BASE_URL` env → direct
+request origin. Saving takes effect on the next request (the settings cache is evicted);
+clearing falls back to the env value. Invalid stored values are logged and ignored instead of
+breaking the site. The public settings response includes `siteBaseUrl` because the canonical
+domain is public by definition.
+
 Discovery endpoints (root path, no `/api` prefix):
 
 | Endpoint | Content |
@@ -284,7 +291,7 @@ this repository only *proxies* to the JAR (no second static frontend), see
 **Scope note:** returning crawlable HTML establishes the technical conditions for indexing;
 it does not prove that search engines have indexed the site, and no ranking is promised.
 
-The final full suite with this feature passes **538 tests / 0 failures / 0 errors / 0 skipped**.
+The final full suite with this feature passes **545 tests / 0 failures / 0 errors / 0 skipped**.
 See [the verification record](../docs/reviews/2026-10-16-seo-deployment-verification.md) for the
 live evidence and its limits (real MySQL, Docker and a real Vercel deployment are not covered
 by the automated run).

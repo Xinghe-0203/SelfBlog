@@ -123,6 +123,13 @@ server {
 
 **生产环境请显式设置 `SITE_BASE_URL`**（例如 `SITE_BASE_URL=https://blog.example.com`）。它现在是 canonical、分享图、RSS/Atom、sitemap 与 robots 的正式对外 origin：设置后，伪造的 `Host`/`X-Forwarded-*` 头不会再把地址改成内网或攻击者域名。未设置时按直连请求推导，仅适合本地开发。
 
+自 2026-10-16 起，作者也可以在**后台「网站设置 → 站点资料 → 网站域名」**里填写同一个 origin：
+
+- **后台设置为准**：填了就用它（保存后下一次请求立即生效）；留空则回落到 `.env` 的 `SITE_BASE_URL`，再回落到当前访问地址。
+- 只能填站点地址（可带端口），不能带路径、查询串或账号密码；非法输入会被后台拒绝并给出提示。
+- 即使数据库里被直接改坏，服务端也只记录警告并回落，不会让整站 500。
+- 采用 Vercel 时注意：Vercel 项目**构建期**仍使用它自己的 `SITE_BASE_URL` 环境变量做路由校验；运行期的 canonical/订阅/地图地址以本设置的优先级为准，建议两处保持一致。
+
 反代需要**原样转发所有路径**到一个 JAR：页面 HTML、`/assets/**`、`/api/**`、`/uploads/**`、`/feed.xml`、`/sitemap*.xml`、`/robots.txt`。不要把 `/uploads` 改写成 `/api/uploads`，也不要让静态服务器自己回退 SPA。
 
 ## 7. 抓取与 SEO 行为（本批新增）
