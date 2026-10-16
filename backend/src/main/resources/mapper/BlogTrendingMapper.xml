@@ -2,12 +2,17 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.selfblog.mapper.BlogTrendingMapper">
 
-    <!-- 根据文章ID和日期查询趋势记录 -->
+    <!--
+      趋势数据同样有“唯一键 (post_id, date) + 逻辑删除”的组合：
+      查询必须自己带 is_deleted = 0；每日 upsert 必须把 is_deleted 复位为 0，
+      否则被逻辑删除过的那一天会永远更新但永远查不到。
+    -->
     <select id="selectByPostIdAndDate" resultType="com.selfblog.entity.BlogTrending">
         SELECT * FROM blog_trending
         WHERE post_id = #{postId}
           AND date &gt;= #{dateStart}
           AND date &lt; #{dateEnd}
+          AND is_deleted = 0
     </select>
 
     <!-- 批量根据文章ID和日期查询趋势记录（优化N+1问题） -->
@@ -19,6 +24,7 @@
         </foreach>
           AND date &gt;= #{dateStart}
           AND date &lt; #{dateEnd}
+          AND is_deleted = 0
     </select>
 
     <!-- 获取热门文章列表（按热度评分降序，每个文章只返回最近日期的记录，避免重复） -->
@@ -27,39 +33,40 @@
         INNER JOIN (
             SELECT post_id, MAX(date) as max_date
             FROM blog_trending
-            WHERE date &gt;= #{dateStart} AND date &lt; #{dateEnd}
+            WHERE date &gt;= #{dateStart} AND date &lt; #{dateEnd} AND is_deleted = 0
             GROUP BY post_id
         ) latest ON bt.post_id = latest.post_id AND bt.date = latest.max_date
-        WHERE bt.date &gt;= #{dateStart} AND bt.date &lt; #{dateEnd}
+        WHERE bt.date &gt;= #{dateStart} AND bt.date &lt; #{dateEnd} AND bt.is_deleted = 0
         ORDER BY bt.score DESC
     </select>
 
-    <!-- MySQL: 插入或更新趋势记录（ON DUPLICATE KEY UPDATE） -->
+    <!-- MySQL: 插入或更新趋势记录（ON DUPLICATE KEY UPDATE）；命中唯一键时复位删除标记 -->
     <insert id="upsert" parameterType="com.selfblog.entity.BlogTrending" databaseId="mysql">
-        INSERT INTO blog_trending (post_id, score, view_count, like_count, comment_count, date, create_time, update_time)
+        INSERT INTO blog_trending (post_id, score, view_count, like_count, comment_count, date, create_time, update_time, is_deleted)
         VALUES (#{trending.postId}, #{trending.score}, #{trending.viewCount}, #{trending.likeCount},
-                #{trending.commentCount}, #{trending.statDate}, NOW(), NOW())
+                #{trending.commentCount}, #{trending.statDate}, NOW(), NOW(), 0)
         ON DUPLICATE KEY UPDATE
             score = #{trending.score},
             view_count = #{trending.viewCount},
             like_count = #{trending.likeCount},
             comment_count = #{trending.commentCount},
+            is_deleted = 0,
             update_time = NOW()
     </insert>
 
-    <!-- SQLite: 插入或更新趋势记录（INSERT OR REPLACE） -->
+    <!-- SQLite: INSERT OR REPLACE 会整行重建，is_deleted 自然回到默认 0 -->
     <insert id="upsert" parameterType="com.selfblog.entity.BlogTrending" databaseId="sqlite">
         INSERT OR REPLACE INTO blog_trending (post_id, score, view_count, like_count, comment_count, date, create_time, update_time)
         VALUES (#{trending.postId}, #{trending.score}, #{trending.viewCount}, #{trending.likeCount},
                 #{trending.commentCount}, #{trending.statDate}, datetime('now','localtime'), datetime('now','localtime'))
     </insert>
 
-    <!-- 默认（H2兼容）: 插入或更新趋势记录 -->
+    <!-- 默认（H2兼容）: MERGE by (post_id, date)，显式带上 is_deleted = 0 -->
     <insert id="upsert" parameterType="com.selfblog.entity.BlogTrending">
-        MERGE INTO blog_trending (post_id, score, view_count, like_count, comment_count, date, create_time, update_time)
+        MERGE INTO blog_trending (post_id, score, view_count, like_count, comment_count, date, create_time, update_time, is_deleted)
         KEY(post_id, date)
         VALUES (#{trending.postId}, #{trending.score}, #{trending.viewCount}, #{trending.likeCount},
-                #{trending.commentCount}, #{trending.statDate}, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                #{trending.commentCount}, #{trending.statDate}, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0)
     </insert>
 
     <!-- 获取所有文章的最新趋势数据（优化：使用 JOIN 替代相关子查询） -->
@@ -68,8 +75,10 @@
         INNER JOIN (
             SELECT post_id, MAX(date) as max_date
             FROM blog_trending
+            WHERE is_deleted = 0
             GROUP BY post_id
         ) latest ON bt.post_id = latest.post_id AND bt.date = latest.max_date
+        WHERE bt.is_deleted = 0
     </select>
 
 </mapper>

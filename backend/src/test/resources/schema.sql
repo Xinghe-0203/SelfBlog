@@ -84,7 +84,9 @@ CREATE TABLE IF NOT EXISTS blog_tag (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(50) NOT NULL,
     post_count INT DEFAULT 0,
-    is_deleted INT DEFAULT 0
+    is_deleted INT DEFAULT 0,
+    -- 与 MySQL/SQLite 一致：标签名唯一，删除后重建依赖恢复而不是新插一行
+    UNIQUE(name)
 );
 
 -- ============================================================================
@@ -108,7 +110,9 @@ CREATE TABLE IF NOT EXISTS blog_like (
     user_id BIGINT NOT NULL,
     post_id BIGINT NOT NULL,
     create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    is_deleted INT DEFAULT 0
+    is_deleted INT DEFAULT 0,
+    -- 与 MySQL/SQLite 一致：同一用户对同一文章只有一行，取消后重新点赞依赖恢复标记
+    UNIQUE(user_id, post_id)
 );
 
 -- ============================================================================
@@ -119,7 +123,9 @@ CREATE TABLE IF NOT EXISTS blog_collect (
     user_id BIGINT NOT NULL,
     post_id BIGINT NOT NULL,
     create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    is_deleted INT DEFAULT 0
+    is_deleted INT DEFAULT 0,
+    -- 与 MySQL/SQLite 一致
+    UNIQUE(user_id, post_id)
 );
 
 -- ============================================================================
@@ -142,7 +148,9 @@ CREATE TABLE IF NOT EXISTS blog_follow (
     follower_id BIGINT NOT NULL,
     following_id BIGINT NOT NULL,
     create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    is_deleted INT DEFAULT 0
+    is_deleted INT DEFAULT 0,
+    -- 与 MySQL/SQLite 一致
+    UNIQUE(follower_id, following_id)
 );
 
 -- ============================================================================
@@ -175,7 +183,9 @@ CREATE TABLE IF NOT EXISTS blog_trending (
     date DATE,
     create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    is_deleted INT DEFAULT 0
+    is_deleted INT DEFAULT 0,
+    -- 与 MySQL/SQLite 一致：每篇文章每天只有一行，upsert 依赖该唯一键
+    UNIQUE(post_id, date)
 );
 
 -- ============================================================================
@@ -205,7 +215,9 @@ CREATE TABLE IF NOT EXISTS blog_draft_tag (
     draft_id BIGINT NOT NULL,
     tag_id BIGINT NOT NULL,
     create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    is_deleted INT DEFAULT 0
+    is_deleted INT DEFAULT 0,
+    -- 与 MySQL/SQLite 一致
+    UNIQUE(draft_id, tag_id)
 );
 
 -- ============================================================================

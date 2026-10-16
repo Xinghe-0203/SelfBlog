@@ -12,7 +12,7 @@ import com.selfblog.mapper.SiteSettingMapper;
 import com.selfblog.service.site.PageService;
 import com.selfblog.service.site.SiteSettingsService;
 import com.selfblog.service.site.page.PageCatalog;
-import org.springframework.dao.DuplicateKeyException;
+import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -202,7 +202,11 @@ public class PageServiceImpl implements PageService {
                         .set(SiteSetting::getSettingValue, next));
                 if (changed != 1) throw conflict();
             }
-        } catch (DuplicateKeyException e) { throw new BusinessException(409, "地址已被占用或页面已更新，请重新加载后重试"); }
+        } catch (DataAccessException e) {
+            // 唯一地址/版本冲突：不同数据库翻译出的异常类型不同（SQLite 是
+            // UncategorizedSQLException），统一按父类捕获后返回 409。
+            throw new BusinessException(409, "地址已被占用或页面已更新，请重新加载后重试");
+        }
     }
     private String encode(Object value) {
         try {

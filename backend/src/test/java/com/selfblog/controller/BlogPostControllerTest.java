@@ -113,6 +113,26 @@ class BlogPostControllerTest {
     }
 
     @Test
+    @DisplayName("createPost_OverlongCategoryOrCover_Returns400InsteadOfDatabaseFailure")
+    void createPost_OverlongCategoryOrCover_Returns400InsteadOfDatabaseFailure() throws Exception {
+        // blog_post.category 是 VARCHAR(50)、cover_url 是 VARCHAR(500)：
+        // DTO 必须在这里挡住，否则 MySQL/H2 会以数据库错误返回 500（SQLite 甚至静默存下）。
+        setUpSecurityContext(1L, false);
+        String longCategory = "x".repeat(51);
+        String longCover = "https://cdn.example.com/" + "a".repeat(500) + ".jpg";
+
+        mockMvc.perform(post("/post")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"标题\",\"content\":\"正文\",\"category\":\"" + longCategory + "\"}"))
+                .andExpect(status().isBadRequest());
+
+        mockMvc.perform(post("/post")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"标题\",\"content\":\"正文\",\"coverImage\":\"" + longCover + "\"}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     @DisplayName("updatePost_Success_Returns200")
     void updatePost_Success_Returns200() throws Exception {
         // Given

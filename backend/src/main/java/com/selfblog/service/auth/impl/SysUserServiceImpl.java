@@ -22,7 +22,7 @@ import com.selfblog.vo.user.UserRegisterResponse;
 import com.selfblog.vo.user.UserVO;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.dao.DuplicateKeyException;
+import org.springframework.dao.DataAccessException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -104,8 +104,9 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
 
         try {
             this.save(user);
-        } catch (DuplicateKeyException e) {
-            // 并发注册时捕获数据库唯一约束异常
+        } catch (DataAccessException e) {
+            // 并发注册：约束错误在不同数据库翻译成不同异常（SQLite 为 UncategorizedSQLException），
+            // 统一按父类转换为可读失败。（注册入口本身已关闭，这里只保证不再暴露 500。）
             throw new BusinessException(400, "注册失败，请稍后重试");
         }
 
@@ -141,7 +142,7 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
 
         try {
             this.save(user);
-        } catch (DuplicateKeyException e) {
+        } catch (DataAccessException e) {
             throw new BusinessException(400, "注册失败，请稍后重试");
         }
 

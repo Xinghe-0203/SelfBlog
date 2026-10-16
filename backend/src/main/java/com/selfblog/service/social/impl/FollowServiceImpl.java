@@ -20,7 +20,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.dao.DuplicateKeyException;
+import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
@@ -119,8 +119,9 @@ public class FollowServiceImpl extends ServiceImpl<BlogFollowMapper, BlogFollow>
                             eventPublisher.publishEvent(new FollowCreatedEvent(currentUserId, targetUserId));
                         }
                     });
-                } catch (DuplicateKeyException e) {
+                } catch (DataAccessException e) {
                     // 并发冲突：记录已存在，使用绕过 @TableLogic 的查询确认实际状态
+                    // 捕获父类 DataAccessException：SQLite 的约束错误是 UncategorizedSQLException。
                     BlogFollow concurrentFollow = blogFollowMapper.selectRawByFollowerAndFollowing(currentUserId, targetUserId);
                     if (concurrentFollow != null) {
                         if (concurrentFollow.getIsDeleted() != null && concurrentFollow.getIsDeleted() == 1) {

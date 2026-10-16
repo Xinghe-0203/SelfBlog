@@ -14,7 +14,7 @@ import com.selfblog.utils.UserConverter;
 import com.selfblog.vo.circle.CircleCommentVO;
 import com.selfblog.vo.circle.CircleLikeResultVO;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.dao.DuplicateKeyException;
+import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -98,7 +98,7 @@ public class CircleInteractionServiceImpl implements CircleInteractionService {
                             postId
                     );
                 }
-            } catch (DuplicateKeyException e) {
+            } catch (DataAccessException e) {
                 CircleLike concurrentLike = circleLikeMapper.selectOne(wrapper);
                 if (concurrentLike != null) {
                     circleLikeMapper.logicalDeleteById(concurrentLike.getId());
@@ -109,7 +109,7 @@ public class CircleInteractionServiceImpl implements CircleInteractionService {
                         circleLikeMapper.insert(newLike);
                         circlePostMapper.incrementLikeCount(postId);
                         result.setAction("like");
-                    } catch (DuplicateKeyException e2) {
+                    } catch (DataAccessException e2) {
                         // 二次并发冲突：重新查询确认实际状态并执行对应操作
                         CircleLike finalLike = circleLikeMapper.selectOne(wrapper);
                         if (finalLike != null) {

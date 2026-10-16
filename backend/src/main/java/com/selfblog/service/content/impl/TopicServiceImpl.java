@@ -9,7 +9,7 @@ import com.selfblog.mapper.TopicMapper;
 import com.selfblog.service.content.TopicService;
 import com.selfblog.utils.HtmlSanitizer;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.dao.DuplicateKeyException;
+import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -123,8 +123,10 @@ public class TopicServiceImpl extends ServiceImpl<TopicMapper, Topic> implements
         try {
             this.save(topic);
             return topic.getId();
-        } catch (DuplicateKeyException e) {
-            // 并发创建时处理唯一约束冲突
+        } catch (DataAccessException e) {
+            // 并发创建时处理唯一约束冲突：不同数据库把约束错误翻译成不同异常类型
+            // （H2/MySQL → DuplicateKeyException，SQLite → UncategorizedSQLException），
+            // 统一捕获父类；找不到同名记录时保留原始异常而不是掩盖。
             LambdaQueryWrapper<Topic> retryWrapper = new LambdaQueryWrapper<>();
             retryWrapper.eq(Topic::getName, sanitizedName);
             Topic existing = this.getOne(retryWrapper);

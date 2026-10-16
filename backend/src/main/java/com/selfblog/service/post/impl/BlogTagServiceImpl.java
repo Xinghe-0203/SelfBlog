@@ -9,7 +9,7 @@ import com.selfblog.service.post.BlogTagService;
 import com.selfblog.utils.HtmlSanitizer;
 import com.selfblog.utils.SecurityUtils;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.dao.DuplicateKeyException;
+import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -54,8 +54,14 @@ public class BlogTagServiceImpl extends ServiceImpl<BlogTagMapper, BlogTag> impl
         tag.setName(trimmedName);
         try {
             this.save(tag);
-        } catch (DuplicateKeyException e) {
-            BlogTag existing = this.getOne(wrapper);
+        } catch (DataAccessException e) {
+            // 名称唯一 + 逻辑删除：冲突行可能是被删除的同名标签，需要恢复而不是返回 null。
+            // 捕获父类 DataAccessException：H2/MySQL 是 DuplicateKeyException，
+            // SQLite 的约束错误是 UncategorizedSQLException，只有父类可移植。
+            BlogTag existing = restoreOrFind(trimmedName);
+            if (existing == null) {
+                throw e;
+            }
             return existing;
         }
         return tag;
@@ -81,11 +87,31 @@ public class BlogTagServiceImpl extends ServiceImpl<BlogTagMapper, BlogTag> impl
         tag.setName(sanitizedName);
         try {
             this.save(tag);
-        } catch (DuplicateKeyException e) {
-            existing = this.getOne(wrapper);
-            return existing.getId();
+        } catch (DataAccessException e) {
+            // 与 createTag 相同：同名行可能只是被逻辑删除，恢复后返回其 id。
+            BlogTag restored = restoreOrFind(sanitizedName);
+            if (restored == null) {
+                throw e;
+            }
+            return restored.getId();
         }
         return tag.getId();
+    }
+
+    /**
+     * 名称冲突时找回同名标签：先恢复被逻辑删除的行，再退回到正常查询。
+     * 返回值可能为 null（极端并发下记录已被物理删除），由调用方决定如何报错。
+     */
+    private BlogTag restoreOrFind(String name) {
+        BlogTag raw = baseMapper.selectRawByName(name);
+        if (raw == null) {
+            return null;
+        }
+        if (raw.getIsDeleted() != null && raw.getIsDeleted() == 1) {
+            baseMapper.restoreById(raw.getId());
+            raw.setIsDeleted(0);
+        }
+        return raw;
     }
 
     @Override

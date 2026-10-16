@@ -33,6 +33,7 @@ public class PostCreateRequest {
     private String content;
 
     @Schema(description = "文章分类")
+    @Size(max = 50, message = "文章分类不能超过50字符")
     private String category;
 
     @Schema(description = "标签ID列表")
@@ -45,5 +46,6 @@ public class PostCreateRequest {
     private List<Long> topicIds;
 
     @Schema(description = "封面图片URL")
+    @Size(max = 500, message = "封面图片地址不能超过500字符")
     private String coverImage;
 }
