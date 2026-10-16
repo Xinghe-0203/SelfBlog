@@ -42,7 +42,12 @@ const next = (): void => {
   if (props.images && currentIndex.value < props.images.length - 1) currentIndex.value++
 }
 
-const handleKeydown = (e: KeyboardEvent): void => {
+/**
+ * 用函数声明而不是 const 箭头函数：上面的 watch(..., { immediate: true })
+ * 在 setup 阶段就会执行一次并引用它，const 会撞 TDZ —— 初始 show=true 时
+ * keydown 监听根本挂不上，Escape / 方向键全部失效。
+ */
+function handleKeydown(e: KeyboardEvent): void {
   if (e.key === 'Escape') emit('close')
   if (e.key === 'ArrowLeft') prev()
   if (e.key === 'ArrowRight') next()
