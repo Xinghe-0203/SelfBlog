@@ -4,6 +4,20 @@
 
 ---
 
+## 未发布 — 修复单 JAR 模式下静态 favicon 的 401 (2026-10-16)
+
+### 修复
+
+- `index.html` 的默认图标兜底是 `/favicon.svg`，但 `SecurityConfig` 的静态资源放行名单只写了 `/favicon.ico`；在单 JAR（Spring 直接提供前端静态资源）模式下，浏览器请求默认 favicon 会落到 admin 兜底规则返回 401。已把 `/favicon.svg` 加入放行名单，并用打包后的 JAR 实测 `GET /favicon.svg → 200`
+
+### 影响文件
+
+| 文件 | 改动类型 |
+|------|----------|
+| `backend/src/main/java/com/selfblog/config/security/SecurityConfig.java` | 静态资源放行名单新增 `/favicon.svg` |
+
+---
+
 ## 未发布 — 视觉重设计（四）：全站圆角收尾 (2026-10-16)
 
 批次一上调了圆角 token，但页面里仍有大量裸圆角值不跟随；本批把它们全部换成 token，让「大 R 角」真正覆盖全站。
