@@ -2,13 +2,23 @@
   <div class="admin-tags">
     <div class="admin-container">
       <header class="page-heading">
-        <div><h1>标签管理</h1><p>为文章建立标签，方便读者按主题查找。</p></div>
+        <div>
+          <h1>标签管理</h1>
+          <p>为文章建立标签，方便读者按主题查找。</p>
+        </div>
       </header>
 
       <form class="create-form" @submit.prevent="createTag">
         <h2 class="form-title">新建标签</h2>
         <div class="form-row">
-          <input v-model="newTagName" type="text" class="form-input" aria-label="标签名称" placeholder="输入标签名称" maxlength="40" />
+          <input
+            v-model="newTagName"
+            type="text"
+            class="form-input"
+            aria-label="标签名称"
+            placeholder="输入标签名称（最多20字）"
+            maxlength="20"
+          />
           <button class="btn btn-primary" type="submit" :disabled="!newTagName.trim() || creating">
             {{ creating ? '创建中…' : '创建' }}
           </button>
@@ -18,7 +28,12 @@
       <div v-if="loading" class="table-container">
         <table class="data-table">
           <thead>
-            <tr><th>ID</th><th>名称</th><th>文章数</th><th>操作</th></tr>
+            <tr>
+              <th>ID</th>
+              <th>名称</th>
+              <th>文章数</th>
+              <th>操作</th>
+            </tr>
           </thead>
           <tbody>
             <tr v-for="i in 5" :key="i">
@@ -40,20 +55,31 @@
       <div v-else class="table-container">
         <table class="data-table">
           <thead>
-            <tr><th>ID</th><th>名称</th><th>文章数</th><th>操作</th></tr>
+            <tr>
+              <th>ID</th>
+              <th>名称</th>
+              <th>文章数</th>
+              <th>操作</th>
+            </tr>
           </thead>
           <tbody>
             <tr v-if="tags.length === 0">
-              <td colspan="4" class="empty-cell"><div class="empty-content"><Icon name="tag" :size="22" /><span>暂无标签</span></div></td>
+              <td colspan="4" class="empty-cell">
+                <div class="empty-content"><Icon name="tag" :size="22" /><span>暂无标签</span></div>
+              </td>
             </tr>
             <tr v-for="tag in tags" :key="tag.id">
               <td class="id-cell">{{ tag.id }}</td>
               <td class="tag-name">{{ tag.name }}</td>
-              <td><span class="count-badge">{{ tag.postCount || 0 }}</span></td>
+              <td>
+                <span class="count-badge">{{ tag.postCount || 0 }}</span>
+              </td>
               <td>
                 <div class="actions">
                   <button class="btn btn-ghost" type="button" @click="startEdit(tag)">编辑</button>
-                  <button class="btn btn-ghost danger" type="button" @click="deleteTag(tag)"><Icon name="trash" :size="14" />删除</button>
+                  <button class="btn btn-ghost danger" type="button" @click="deleteTag(tag)">
+                    <Icon name="trash" :size="14" />删除
+                  </button>
                 </div>
               </td>
             </tr>
@@ -62,20 +88,42 @@
       </div>
 
       <nav v-if="totalPages > 1" class="pagination" aria-label="标签分页">
-        <button type="button" :disabled="currentPage <= 1" @click="changePage(currentPage - 1)"><Icon name="chevron-left" :size="16" />上一页</button>
+        <button type="button" :disabled="currentPage <= 1" @click="changePage(currentPage - 1)">
+          <Icon name="chevron-left" :size="16" />上一页
+        </button>
         <span class="page-info">第 {{ currentPage }} / {{ totalPages }} 页</span>
-        <button type="button" :disabled="currentPage >= totalPages" @click="changePage(currentPage + 1)">下一页<Icon name="chevron-right" :size="16" /></button>
+        <button
+          type="button"
+          :disabled="currentPage >= totalPages"
+          @click="changePage(currentPage + 1)"
+        >
+          下一页<Icon name="chevron-right" :size="16" />
+        </button>
       </nav>
     </div>
 
     <Modal :show="editDialog" title="编辑标签" @close="editDialog = false">
       <div class="edit-form">
         <label class="edit-label" for="tag-edit-name">标签名称</label>
-        <input id="tag-edit-name" v-model="editName" type="text" class="form-input" maxlength="40" placeholder="输入标签名称" />
+        <input
+          id="tag-edit-name"
+          v-model="editName"
+          type="text"
+          class="form-input"
+          maxlength="20"
+          placeholder="输入标签名称（最多20字）"
+        />
       </div>
       <template #footer>
         <button class="btn btn-secondary" type="button" @click="editDialog = false">取消</button>
-        <button class="btn btn-primary" type="button" :disabled="!editName.trim()" @click="submitEdit">保存</button>
+        <button
+          class="btn btn-primary"
+          type="button"
+          :disabled="!editName.trim()"
+          @click="submitEdit"
+        >
+          保存
+        </button>
       </template>
     </Modal>
     <ConfirmDialog />
@@ -125,6 +173,10 @@ const fetchTags = async () => {
 const createTag = async () => {
   const name = newTagName.value.trim()
   if (!name) return
+  if (name.length > 20) {
+    toast.warning('标签名称不能超过20个字符')
+    return
+  }
   creating.value = true
   try {
     await adminApi.createTag({ name })
@@ -133,7 +185,7 @@ const createTag = async () => {
     fetchTags()
   } catch (err: any) {
     logger.error('Failed to create tag', { error: err.message })
-    toast.error('创建失败')
+    toast.error(err.userMessage || '创建失败，请重试')
   } finally {
     creating.value = false
   }
@@ -147,6 +199,10 @@ const startEdit = (tag: any) => {
 
 const submitEdit = async () => {
   if (!editName.value.trim() || !editingTag.value) return
+  if (editName.value.trim().length > 20) {
+    toast.warning('标签名称不能超过20个字符')
+    return
+  }
   try {
     await adminApi.updateTag(editingTag.value.id, { name: editName.value.trim() })
     toast.success('标签更新成功')
@@ -154,7 +210,7 @@ const submitEdit = async () => {
     editingTag.value.name = editName.value.trim()
   } catch (err: any) {
     logger.error('Failed to update tag', { error: err.message })
-    toast.error('更新失败')
+    toast.error(err.userMessage || '更新失败，请重试')
   }
 }
 
@@ -163,7 +219,7 @@ const deleteTag = async (tag: any) => {
   if (!ok) return
   try {
     await adminApi.deleteTag(tag.id)
-    tags.value = tags.value.filter(t => t.id !== tag.id)
+    tags.value = tags.value.filter((t) => t.id !== tag.id)
     toast.success('删除成功')
   } catch (err: any) {
     logger.error('Failed to delete tag', { error: err.message })
@@ -387,15 +443,28 @@ onMounted(() => {
 .sk-line {
   height: 14px;
   border-radius: var(--radius-xs);
-  background: linear-gradient(90deg, var(--skeleton-base) 25%, var(--skeleton-highlight) 50%, var(--skeleton-base) 75%);
+  background: linear-gradient(
+    90deg,
+    var(--skeleton-base) 25%,
+    var(--skeleton-highlight) 50%,
+    var(--skeleton-base) 75%
+  );
   background-size: 200% 100%;
   animation: shimmer 1.5s infinite;
 }
 
-.sk-line.w-30 { width: 30%; }
-.sk-line.w-40 { width: 40%; }
-.sk-line.w-50 { width: 50%; }
-.sk-line.w-60 { width: 60%; }
+.sk-line.w-30 {
+  width: 30%;
+}
+.sk-line.w-40 {
+  width: 40%;
+}
+.sk-line.w-50 {
+  width: 50%;
+}
+.sk-line.w-60 {
+  width: 60%;
+}
 
 .edit-form {
   padding: 4px 0;

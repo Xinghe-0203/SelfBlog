@@ -1,5 +1,7 @@
 # Compact Glass Foundation and Navigation Music Implementation Plan
 
+**Delivery note (2026-10-16):** Original batch delivered in `de04f00`; subsequent matched-prototype corrections and verification are tracked in [the follow-up plan](2026-10-16-navigation-fidelity-correction.md) and [audit report](../../reviews/2026-10-16-navigation-fidelity-and-fullstack-audit.md). Original unchecked step-level boxes were not maintained during execution; do not treat them as a current delivery status or retroactively mark unrecorded evidence complete.
+
 > **For agentic workers:** Execute inline in this session, task by task, using the loaded TDD and file-planning workflows. Delegation is optional, not required. Steps use checkbox syntax for tracking.
 
 **Goal:** Ship the approved smaller-radius design foundation, reference-style navigation and one reliable shared audio player.

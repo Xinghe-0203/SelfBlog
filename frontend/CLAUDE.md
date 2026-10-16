@@ -13,7 +13,7 @@ npm run build          # 构建生产版本（先 vue-tsc --noEmit，再 Vite）
 npm run preview        # 预览生产版本
 npm run lint:check     # 只读 ESLint 检查（npm run lint 会改写文件）
 npm run type-check     # vue-tsc --noEmit（必过闸门）
-npm run test:run       # Vitest 单次运行（基线 17 文件 / 210 tests）
+npm run test:run       # Vitest 单次运行（当前 31 文件 / 345 tests；原始基线 210）
 ```
 
 > 本机直接把 `npm run <script>` 跑在系统 PATH 上会失败（PATH 里有一条不配对的引号，
@@ -25,20 +25,22 @@ npm run test:run       # Vitest 单次运行（基线 17 文件 / 210 tests）
 
 - Vue 3.5.44 (Composition API)
 - Vite 6.4.4
-- Vue Router 4.3.0
-- Pinia 2.1.7
-- Axios 1.7.4
-- Marked 12.0.1 (Markdown)
-- DOMPurify 3.0.9 (XSS 防护)
-- TypeScript 6.0 + Vitest 4.1.8（单元测试，jsdom + @vue/test-utils）
+- Vue Router 4.6.4
+- Pinia 2.3.1
+- Axios 1.20.0
+- Marked 12.0.2 (Markdown)
+- DOMPurify 3.4.17 (XSS 防护)
+- TypeScript 6.0.3 + Vitest 4.1.11（单元测试，jsdom + @vue/test-utils）
+
+以上按 package-lock.json 锁定版本核对，不把 package.json 范围下界当作实际版本。
 
 ## 项目结构
 
 ```
 src/
 ├── api/            # API 接口 (20 个模块)
-├── components/     # 组件 (24 个)
-│   ├── common/     # 通用组件 (12 个)
+├── components/     # Vue 组件
+│   ├── common/     # 通用组件
 │   │   ├── BackToTop.vue     # 返回顶部
 │   │   ├── Button.vue        # 通用按钮
 │   │   ├── Card.vue          # 通用卡片
@@ -57,10 +59,10 @@ src/
 │   │   ├── CreatePostModal.vue   # 创建帖子弹窗
 │   │   └── QuickComposer.vue     # 快速发布器
 │   ├── home/       # 首页组件 (HomeFilters, HomeSidebar, PostCardList)
-│   ├── layout/     # 布局组件 (3 个: Footer, MusicPlayer, Navbar)
-│   ├── post/       # 文章组件 (MobileTocSheet)
+│   ├── layout/     # Footer / Navbar / NavbarMusicControl / headless MusicPlayer
+│   ├── post/       # ArticleList / MobileTocSheet
 │   └── admin/      # 后台组件 (SiteAssetField)
-├── composables/    # 组合式函数 (useConfirm / useScrollState / useMarkdownEnhance / useSeoMeta / usePagination / useScrollReveal)
+├── composables/    # useDialog / useConfirm / useScrollState / useMarkdownEnhance / useSeoMeta / usePagination / useScrollReveal
 ├── router/         # 路由配置
 ├── stores/         # Pinia 状态管理 (site / theme / user / music)
 ├── styles/         # 样式文件（入口 main.css）
@@ -100,7 +102,10 @@ src/
 - `MusicPlayer` 是唯一音频宿主，常驻 App；共享动作在 `stores/music.ts`，NavbarMusicControl 只消费状态。不可恢复自动播放或把音频移进面板
 - 文章行统一走 `components/post/ArticleList.vue`（首页/搜索/标签复用）；新增列表页面不要另写一套行标记
 - 后台页面沿用 `AdminLayout` 的「标题 + 说明 + 内容区」层级；列表/表格用容器横向滚动，不要靠隐藏列或缩字号适配
-- 后台抽屉的焦点、Esc 与滚动锁由 `AdminLayout` 内的 `useDialog` 负责；不要再用各自的 `bodyOverflowCount` 或固定 z-index 遮罩
+- 后台抽屉只在手机打开时由 `AdminLayout` 内的 `useDialog` 管理焦点、Esc 与滚动锁；关闭时 inert，进入桌面释放模态状态。不要再用各自的 `bodyOverflowCount` 或固定 z-index 遮罩
+- 导航链接紧接搜索框，弹性空白放在右侧工具前；选中态 34px 胶囊与 44px 点击区域分开，不把原型触达尺寸直接照搬
+- 编辑器保存状态依据成功提交的完整内容快照；摘要/标签也计入未保存状态，旧请求不得把请求期间的新改动标成已保存。离开守卫测试必须通过 RouterView 挂载
+- 标签新建/编辑上限 20 字，以后端现有校验为准；不要只改输入框上限而不校验程序提交
 
 ## 路由约定
 

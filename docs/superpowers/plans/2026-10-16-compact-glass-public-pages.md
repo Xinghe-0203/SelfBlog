@@ -1,5 +1,7 @@
 # Compact Glass Public Reading Pages Implementation Plan
 
+**Delivery note (2026-10-16):** Original batch delivered in `c550963`; actual regression and live-service coverage are recorded in [the audit report](../../reviews/2026-10-16-navigation-fidelity-and-fullstack-audit.md). Original unchecked step-level boxes were not maintained during execution; they are historical planning steps, not a current completion checklist.
+
 > **For agentic workers:** Execute inline task by task after the foundation/music plan. Use TDD for behavior and browser checks for CSS-only work.
 
 **Goal:** Bring every active public reading route to the approved B-space/A-list design without losing reading or gallery features.

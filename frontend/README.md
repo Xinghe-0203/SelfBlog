@@ -10,13 +10,15 @@ Vue 3 frontend for a single-author personal blog. Public pages focus on reading,
 |-----------|---------|---------|
 | Vue | 3.5.44 | UI framework (Composition API) |
 | Vite | 6.4.4 | Build tool |
-| Vue Router | 4.3.0 | Routing |
-| Pinia | 2.1.7 | State management |
-| Axios | 1.7.4 | HTTP client |
-| Marked | 12.0.1 | Markdown rendering |
-| DOMPurify | 3.0.9 | XSS protection |
+| Vue Router | 4.6.4 | Routing |
+| Pinia | 2.3.1 | State management |
+| Axios | 1.20.0 | HTTP client |
+| Marked | 12.0.2 | Markdown rendering |
+| DOMPurify | 3.4.17 | XSS protection |
 | TypeScript | 6.0 | Type safety |
-| Vitest | 4.1.8 | Unit tests (jsdom + @vue/test-utils) |
+| Vitest | 4.1.11 | Unit tests (jsdom + @vue/test-utils) |
+
+Versions above reflect `package-lock.json`, not the lower bounds of manifest ranges.
 
 ## Quick Start
 
@@ -41,7 +43,7 @@ src/
 │   ├── common/         # Reusable UI: Button, Card, Input, Icon, Modal, Toast, ImagePreview, BackToTop, …
 │   ├── layout/         # Navbar, Footer, headless MusicPlayer, NavbarMusicControl
 │   ├── home/           # PostCardList, HomeSidebar
-│   ├── post/           # MobileTocSheet (article reading extras)
+│   ├── post/           # ArticleList + MobileTocSheet (shared rows and reading extras)
 │   ├── circle/         # Campus circle widgets
 │   └── admin/          # SiteAssetField (brand asset uploads)
 ├── composables/        # useDialog, useConfirm, useScrollState, useMarkdownEnhance, useSeoMeta, usePagination, useScrollReveal
@@ -141,6 +143,28 @@ glass uses `--functional-glass-*` with a solid fallback.
 ### Verification (whole-site redesign, 2026-10-16)
 
 Vitest: **30 files / 328 tests**. Type-check passes; ESLint has no errors (existing warnings only); Vite production build passes. Chrome checked 320/390/768/820/960/1024/1440px, 44px navigation actions, stable heights, Escape/focus, dark mode, reduced motion, overlay layers and real generated-WAV playback/public continuity/admin pause/source replacement. Batches 2–3 were additionally checked at 1440/1024/820/768/390px across eight public routes plus login → seven author screens, the 390px admin drawer, table scrolling and the editor. API data was browser-fixtured; no backend or existing user data was changed.
+
+### Follow-up correction (2026-10-16)
+
+Matched-data Chrome comparison identified and corrected navigation/music drift:
+links follow search, the active fill is a 34px capsule within a 44px click target,
+and the idle music entry uses static bars plus "听一会儿". Music sliders keep real
+values and system-color rails/thumbs in forced-colors mode. Saved brand/theme and
+music availability still control presentation.
+
+The mobile sidebar is inert while closed; desktop resizing releases its modal
+focus/scroll ownership. Editor dirty state compares complete submitted-content
+snapshots (including summary/tags), so success does not cause a false leave warning
+and in-flight edits/failed requests remain protected. Draft saves cannot overlap
+publication. Tag creation/editing follows the backend's 20-character limit.
+
+Current gates: **31 files / 345 tests**, type-check, ESLint **0 errors / 255 warnings**,
+production build. The separate real Spring Boot/SQLite audit (temporary data/uploads,
+no API fixtures) now passes **17/17** assertions, including the previously failing
+publication warning and tag limit, plus resumed-draft identity and canceled-confirmation
+focus regressions from independent review. See the
+[full report](../docs/reviews/2026-10-16-navigation-fidelity-and-fullstack-audit.md)
+for tested workflows and untested deployment environments.
 
 ### Page layout notes
 

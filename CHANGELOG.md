@@ -4,6 +4,32 @@
 
 ---
 
+## 未发布 — 导航原型还原与前后端联调修正 (2026-10-16)
+
+### 说明
+
+- 导航按批准原型恢复链接紧接搜索、右侧工具前留白、浅蓝胶囊选中态、静止声条＋「听一会儿」及音乐面板布局；保留 44px 触达、真实音频状态、作者品牌与主题配置。1440px 下第一个链接从 x=885 修正为 x=472（原型 x=471）。
+- 修复后台抽屉切换桌面后的焦点/滚动锁残留、关闭侧栏仍可聚焦屏幕外链接及缺失的 aria-controls 目标。
+- 修复发布/手动保存成功后误报未保存；改为完整提交快照，保护请求期间的新改动与失败请求，避免自动保存与发布竞争。真实路由挂载新增相应回归。
+- 标签新建/编辑与后端既有 20 字限制对齐，保留具体失败原因；后端校验不变。
+- 独立复核追加并修复：恢复后续草稿时保留原文章 ID、取消发布确认后焦点回到发布按钮；均先复现失败再验证修复。
+- 前端 31 文件 / 345 测试、类型检查、Lint（0 错误 / 255 警告）与构建通过；后端 463 测试通过。真实 SQLite 联调初查 13/15，修正并扩展复核场景后为 **17/17**，见[复查报告](docs/reviews/2026-10-16-navigation-fidelity-and-fullstack-audit.md)。
+- 原有数据库、上传目录和运行服务未被写入；临时联调实例已关闭。MySQL、Docker、SMTP 与外部媒体未在本次真实联调中验证。
+
+### 影响文件
+
+| 文件 | 改动类型 |
+| --- | --- |
+| `frontend/src/components/layout/Navbar.vue`、`NavbarMusicControl.vue`、`components/common/icons.ts` | 导航/音乐原型还原与高对比轨道降级 |
+| `frontend/src/views/admin/AdminLayout.vue`、`TagsManagement.vue` | 抽屉生命周期及标签校验 |
+| `frontend/src/views/post/PostEdit.vue` | 提交快照、未保存保护及异步写入互斥 |
+| 对应 `__tests__/*.test.ts` | 新增和强化真实路由、交互与边界回归 |
+| `docs/reviews/2026-10-16-navigation-fidelity-and-fullstack-audit.md` | 新增：差异证据、缺陷复现、真实验证范围与限制 |
+| `README.md`、`frontend/README.md`、`backend/README.md` | 更新：修复结论、锁定版本、验证范围及限制 |
+| `frontend/CLAUDE.md`、`AGENTS.md`、设计规格与计划 | 更新：约束、实际依赖版本、代理描述与交付记录 |
+
+---
+
 ## 未发布 — 清透空间重设计（三）：作者工作台 (2026-10-16)
 
 ### 说明

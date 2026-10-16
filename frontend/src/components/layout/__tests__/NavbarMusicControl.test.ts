@@ -5,7 +5,10 @@ import NavbarMusicControl from '../NavbarMusicControl.vue'
 import { useMusicStore } from '@/stores/music'
 
 enableAutoUnmount(afterEach)
-beforeEach(() => { localStorage.clear(); setActivePinia(createPinia()) })
+beforeEach(() => {
+  localStorage.clear()
+  setActivePinia(createPinia())
+})
 
 function setup(open = true) {
   const music = useMusicStore()
@@ -15,8 +18,19 @@ function setup(open = true) {
 }
 
 describe('navigation music control', () => {
+  it('keeps the approved idle sound bars and listening label without implying playback', () => {
+    const { wrapper, music } = setup(false)
+    expect(wrapper.get('.music-trigger').text()).toBe('听一会儿')
+    expect(wrapper.findAll('.music-bars i')).toHaveLength(3)
+    expect(music.playing).toBe(false)
+    expect(wrapper.get('.music-trigger').classes()).not.toContain('is-playing')
+  })
   it('does not appear without configured music', () => {
-    expect(mount(NavbarMusicControl, { props: { open: false } }).find('button').exists()).toBe(false)
+    expect(
+      mount(NavbarMusicControl, { props: { open: false } })
+        .find('button')
+        .exists()
+    ).toBe(false)
   })
 
   it('requests a panel without playing or creating another audio', async () => {

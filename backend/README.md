@@ -175,17 +175,18 @@ Covering high-frequency queries: user post lists, category filtering, hot/latest
 
 | Cache | Content | TTL |
 |-------|---------|-----|
-| `hotTagsCache` | Hot tags | 30 min |
-| `categoryCache` | Categories | 1 hour |
-| `userCache` | User info | 30 min |
-| `trendingCache` | Trending stats | 10 min |
-| `statsCache` | System stats | 5 min |
+| `hotTagsCache` | Hot tags | 10 min |
+| `categoryCache` | Categories | 30 min |
+| `userCache` | User info | 10 min |
+| `trendingCache` | Trending stats | 5 min |
+| `statsCache` | System stats | 15 min |
+| `statusCache` | Interaction status | 2 min |
 | `siteSettingsCache` | Site settings | 10 min |
 | `visitorSummaryCache` | Visitor dashboard summary | 30 sec |
 
 - `@Cacheable` on 12+ query methods
 - `@CacheEvict` on 15+ write methods
-- Expected 15-300x query performance improvement
+- TTLs follow `CaffeineCacheConfig.java`; actual performance gains require workload-specific measurement.
 
 ## Testing
 
@@ -195,6 +196,24 @@ mvn test "-Dtest=AuthControllerTest" "-Dskip.npm=true" "-Dskip.installnodenpm=tr
 ```
 
 Always pass the two skip flags for test-only runs: without them the `frontend-maven-plugin` runs `npm ci` + `npm run build` in `../frontend` first and mutates the frontend build output. Tests use an in-memory H2 database on a random port, with no impact on production data.
+
+### Real-service follow-up verification (2026-10-16)
+
+The full backend suite was rerun: **463 tests, 0 failures, 0 errors, 0 skipped**.
+An additional current-source instance used a fresh temporary SQLite database and
+separate upload directories. Real HTTP/browser checks exercised administrator login,
+direct publication and public queries, guest likes/comments and moderation, protected
+album images/unlock tokens, music upload/download, settings persistence and feeds.
+The existing local service and its data were not modified.
+
+The combined audit initially passed **13/15 workflow assertions**, exposing a frontend
+unsaved-changes warning after successful publication and tag inputs allowing 40
+characters against the server's existing 20-character rule. After frontend fixes,
+the audit plus two additional editor review scenarios passes **17/17**. The backend rule was verified to reject a 21-character
+value with HTTP 400; no backend API/schema/validation change was needed.
+See the [audit report](../docs/reviews/2026-10-16-navigation-fidelity-and-fullstack-audit.md)
+for exact scope. This does **not** validate a real MySQL deployment, Docker build,
+SMTP delivery or external media providers.
 
 ## Docker
 

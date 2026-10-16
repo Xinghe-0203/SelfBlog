@@ -53,13 +53,15 @@
 | **TypeScript** | 6.x | 编程语言 |
 | **Vue** | 3.5.44 | UI 框架（Composition API） |
 | **Vite** | 6.4.4 | 构建工具 |
-| **Vue Router** | 4.3.0 | 前端路由 |
-| **Pinia** | 2.1.7 | 状态管理 |
-| **Axios** | 1.7.4 | HTTP 客户端 |
-| **Marked** | 12.0.1 | Markdown 渲染 |
-| **DOMPurify** | 3.0.9 | XSS 防护 |
-| **Vitest** | 4.1.8 | 单元测试 |
+| **Vue Router** | 4.6.4 | 前端路由 |
+| **Pinia** | 2.3.1 | 状态管理 |
+| **Axios** | 1.20.0 | HTTP 客户端 |
+| **Marked** | 12.0.2 | Markdown 渲染 |
+| **DOMPurify** | 3.4.17 | XSS 防护 |
+| **Vitest** | 4.1.11 | 单元测试 |
 | **npm** | 11.x | 包管理工具（构建时自动安装） |
+
+前端版本表按当前 `frontend/package-lock.json` 的锁定版本核对；`package.json` 中的 `^` 范围下界不等于实际安装版本。
 
 ### 数据库
 
@@ -113,6 +115,8 @@
 
 全站布局重做按[已确认设计](docs/superpowers/specs/2026-10-16-selfblog-ios-glass-redesign-design.md)分三批实施：设计底座/导航/音乐、公开阅读路径、作者工作台均已完成，实现记录见 [CHANGELOG.md](CHANGELOG.md)。
 
+**后续修正（2026-10-16）**：导航已按批准原型恢复链接分组、浅蓝胶囊选中态、声条＋「听一会儿」及音乐面板布局；修复后台抽屉、发布误报、恢复草稿重复创建、取消确认焦点丢失及标签长度问题。真实 SQLite 联调初查为 13/15，修正并增加复核场景后为 **17/17**；前端 **345** / 后端 **463** 项测试通过，类型、Lint（0 错误）及构建通过。范围、证据及未覆盖环境见[导航与前后端复查报告](docs/reviews/2026-10-16-navigation-fidelity-and-fullstack-audit.md)。
+
 ---
 
 ## 项目结构
@@ -154,7 +158,7 @@ SelfBlog/
 │   └── src/
 │       ├── api/                    # API 模块（20 个）
 │       ├── views/                  # 页面组件（45 个）
-│       ├── components/             # 通用组件（24 个）
+│       ├── components/             # 通用组件、导航、文章行与后台控件
 │       ├── stores/                 # Pinia：site / theme / user / music
 │       ├── router/                 # 路由配置（模块化）
 │       ├── composables/            # 组合式函数

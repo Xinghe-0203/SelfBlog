@@ -1,5 +1,7 @@
 # Compact Glass Author Workspace Implementation Plan
 
+**Delivery note (2026-10-16):** Original batch delivered in `e791586`; follow-up drawer/editor/tag defects and their fixes are tracked in [the correction plan](2026-10-16-navigation-fidelity-correction.md) and [audit report](../../reviews/2026-10-16-navigation-fidelity-and-fullstack-audit.md). Original unchecked step-level boxes were not maintained during execution; do not blanket-check them as if each historical verification was recorded.
+
 > **For agentic workers:** Execute inline after the foundation and public-page plans. Read each complete source before modifying it; test behavior before implementation.
 
 **Goal:** Carry the approved design through every active author workflow, not just the sidebar.

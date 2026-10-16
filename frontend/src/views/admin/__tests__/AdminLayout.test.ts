@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { nextTick } from 'vue'
 import { enableAutoUnmount, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
@@ -32,11 +32,41 @@ function mountLayout() {
 
 describe('AdminLayout', () => {
   beforeEach(async () => {
+    vi.stubGlobal('innerWidth', 390)
     pinia = createPinia()
     setActivePinia(pinia)
     router = createRouter({ history: createMemoryHistory(), routes })
     await router.push('/admin/dashboard')
     await router.isReady()
+  })
+
+  afterEach(() => vi.unstubAllGlobals())
+
+  it('keeps a closed mobile sidebar out of keyboard navigation and names the controls target', async () => {
+    const wrapper = mountLayout()
+    expect(wrapper.get('.sidebar').attributes('inert')).toBeDefined()
+    expect(wrapper.get('.sidebar').attributes('id')).toBe(
+      wrapper.get('.menu-button').attributes('aria-controls')
+    )
+    await wrapper.get('.menu-button').trigger('click')
+    expect(wrapper.get('.sidebar').attributes('inert')).toBeUndefined()
+    expect(wrapper.get('.sidebar').attributes('aria-modal')).toBe('true')
+  })
+
+  it('releases modal focus and scroll ownership when resizing to desktop', async () => {
+    const wrapper = mountLayout()
+    await wrapper.get('.menu-button').trigger('click')
+    expect(document.body.style.overflow).toBe('hidden')
+    vi.stubGlobal('innerWidth', 1440)
+    window.dispatchEvent(new Event('resize'))
+    await nextTick()
+    expect(wrapper.get('.menu-button').attributes('aria-expanded')).toBe('false')
+    expect(document.body.style.overflow).toBe('')
+    expect(wrapper.get('.sidebar').attributes('inert')).toBeUndefined()
+    expect(wrapper.get('.sidebar').attributes('aria-modal')).toBeUndefined()
+    const logout = wrapper.get<HTMLButtonElement>('.logout-button').element
+    logout.focus()
+    expect(document.activeElement).toBe(logout)
   })
 
   it('falls back to the built-in logo icon when no logo is uploaded', () => {

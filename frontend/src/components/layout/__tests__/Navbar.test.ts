@@ -4,6 +4,7 @@ import { mount, enableAutoUnmount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { createRouter, createMemoryHistory } from 'vue-router'
 import Navbar from '../Navbar.vue'
+import Icon from '@/components/common/Icon.vue'
 import { useSiteStore } from '@/stores/site'
 import { useMusicStore } from '@/stores/music'
 
@@ -79,6 +80,7 @@ describe('Navbar', () => {
     const wrapper = mountNavbar()
     expect(wrapper.find('img.brand-mark--image').exists()).toBe(false)
     expect(wrapper.find('.brand-mark .icon').exists()).toBe(true)
+    expect(wrapper.findComponent(Icon).props('name')).toBe('sparkle')
   })
 
   it('renders the uploaded logo instead of the built-in icon', async () => {
