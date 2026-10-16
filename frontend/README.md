@@ -203,7 +203,7 @@ for tested workflows and untested deployment environments.
   contracts with `node:test` (27 assertions). Running the Vite build still produces `dist/`
   for the JAR; nothing about normal development or deployment changed.
 
-Gates for this batch: **41 files / 393 tests**, strict type-check, ESLint **0 errors /
+Gates for this batch: **41 files / 394 tests**, strict type-check, ESLint **0 errors /
 256 warnings**, touched-file format check and production build pass; `npm run test:deployment`
 passes 27/27. Real-service SQLite/Chrome evidence (JS-disabled reading, sitemap completeness,
 local proxy transport) is recorded in

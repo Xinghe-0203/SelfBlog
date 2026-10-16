@@ -116,7 +116,7 @@
 - `robots.txt` 按实际后台路径生成；`SITE_BASE_URL` 统一 canonical/订阅/地图的对外地址
 - 支持 Docker（MySQL 或 SQLite 二选一）与 **Vercel 统一反向代理**；不在 Vercel 单独部署第二份前端
 - 这些是“可被抓取”的技术条件，**不代表搜索引擎已经收录**；部署细节见[部署指南](backend/DEPLOY.md)
-- 本批验证：前端393 / 后端545项测试，部署契约27项；[SEO/部署验证记录](docs/reviews/2026-10-16-seo-deployment-verification.md)
+- 本批验证：前端394 / 后端548项测试，部署契约27项；[SEO/部署验证记录](docs/reviews/2026-10-16-seo-deployment-verification.md)
 - 站点正式域名可在后台「网站设置」修改（后台设置的优先级高于 `.env` 的 `SITE_BASE_URL`，留空自动回落）
 
 ### 界面与导航音乐

@@ -192,7 +192,7 @@ Covering high-frequency queries: user post lists, category filtering, hot/latest
 ## Testing
 
 ```bash
-mvn test "-Dskip.npm=true" "-Dskip.installnodenpm=true"                 # 545 tests, ~1 min
+mvn test "-Dskip.npm=true" "-Dskip.installnodenpm=true"                 # 548 tests, ~1 min
 mvn test "-Dtest=AuthControllerTest" "-Dskip.npm=true" "-Dskip.installnodenpm=true"
 ```
 
@@ -291,7 +291,7 @@ this repository only *proxies* to the JAR (no second static frontend), see
 **Scope note:** returning crawlable HTML establishes the technical conditions for indexing;
 it does not prove that search engines have indexed the site, and no ranking is promised.
 
-The final full suite with this feature passes **545 tests / 0 failures / 0 errors / 0 skipped**.
+The final full suite with this feature passes **548 tests / 0 failures / 0 errors / 0 skipped**.
 See [the verification record](../docs/reviews/2026-10-16-seo-deployment-verification.md) for the
 live evidence and its limits (real MySQL, Docker and a real Vercel deployment are not covered
 by the automated run).

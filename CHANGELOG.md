@@ -4,6 +4,31 @@
 
 ---
 
+## 未发布 — 文章发布/编辑的标签与媒体修复 (2026-10-17)
+
+### 说明（均为“先复现、再修复”）
+
+- **修复：编辑文章后标签全部消失，且再也加不回来。** 真实环境（SQLite/MySQL）的 `blog_post_tag` 有 `UNIQUE(post_id, tag_id)`；编辑文章会先逻辑删除旧关联（`is_deleted=1`），随后 `INSERT IGNORE` 被旧行占据的唯一键静默拦下，标签永久失效。现改为按数据库方言 upsert 并把 `is_deleted` 复位为 0（MySQL `ON DUPLICATE KEY UPDATE`、SQLite `ON CONFLICT … DO UPDATE`、H2 `MERGE … KEY`）。H2 测试库此前缺少该唯一键，导致单测看不到问题，已补齐以与生产一致。
+- **修复：`BlogPostMedia.selectByPostId` 未过滤软删除**，编辑文章替换配图后，编辑器与公开接口会继续返回已移除的旧图。查询补 `is_deleted = 0`，并补上此前缺失的 H2 兜底批量插入语句。
+- **修复：同时提交 `tagIds` 与 `tagNames` 时新标签被静默丢弃。** 编辑器会同时发送两个字段（已有标签带 id、新输入只有名字），后端旧逻辑“tagIds 非空就忽略 tagNames”。现按并集解析（名字走 getOrCreate 后与 id 去重合并），混用场景不再丢标签。
+- **修复：写作页标签输入上限 50 字，与后端 20 字限制不一致**（此前只修过后台标签管理页）。输入框改为 20 字，仍以后端校验为准。
+- 新增回归：`PostTagLifecycleTest`（编辑保留/移除/恢复/混用）、`BlogPostMediaMapperTest`（替换媒体不返回软删行）、`PostEdit.test.ts`（输入上限与发布载荷契约）；真实单 JAR 联调新增“编辑后标签保留、可恢复”检查。
+- 全量验证：前端 41 文件/394 测试、类型检查与 Lint 通过；后端 548 测试通过；真实 JAR + SQLite 联调 10/10、上一批浏览器回归 32/32（新增“编辑器标签输入上限”检查）。
+
+### 影响文件
+
+| 文件 | 改动类型 |
+| --- | --- |
+| `backend/src/main/resources/mapper/BlogPostTagMapper.xml` | 关联写入由 INSERT IGNORE 改为方言 upsert 并复位 `is_deleted` |
+| `backend/src/main/resources/mapper/BlogPostMediaMapper.xml` | 查询补软删条件；补 H2 兜底批量插入 |
+| `backend/.../service/post/impl/BlogPostServiceImpl.java` | `resolveTagIds` 改为 tagIds/tagNames 并集 |
+| `backend/src/test/resources/schema.sql` | H2 的 `blog_post_tag` 补 `UNIQUE(post_id, tag_id)`，与生产一致 |
+| `backend/src/test/.../PostTagLifecycleTest.java`、`mapper/BlogPostMediaMapperTest.java` | 新增回归 |
+| `frontend/src/views/post/PostEdit.vue` | 标签输入上限对齐后端 20 字 |
+| `frontend/src/views/post/__tests__/PostEdit.test.ts` | 新增输入上限与载荷契约断言 |
+
+---
+
 ## 未发布 — 可抓取正文与统一部署 (2026-10-16)
 
 ### 说明
