@@ -1,302 +1,120 @@
-<template>
-  <div class="admin-layout">
-    <aside class="sidebar" :class="{ 'sidebar-open': mobileOpen }">
-      <div class="sidebar-brand">
-        <span class="brand-mark" aria-hidden="true">
-          <img
-            v-if="siteStore.settings.siteLogoUrl"
-            class="brand-mark--image"
-            :src="siteStore.settings.siteLogoUrl"
-            alt=""
-          />
-          <Icon v-else name="logo" :size="17" />
-        </span>
-        <div>
-          <strong>{{ siteStore.settings.siteTitle }}</strong
-          ><small>作者工作台</small>
-        </div>
-        <button class="close-menu" type="button" aria-label="关闭菜单" @click="mobileOpen = false">
-          <Icon name="close" :size="18" />
-        </button>
-      </div>
-
-      <nav class="sidebar-nav" aria-label="后台导航">
-        <router-link :to="`${siteStore.adminRoot}/dashboard`" exact-active-class="active" @click="closeOnMobile">
-          <span class="nav-icon" aria-hidden="true"><Icon name="gauge" :size="17" /></span>概览
-        </router-link>
-        <router-link :to="`${siteStore.adminRoot}/posts`" active-class="active" @click="closeOnMobile">
-          <span class="nav-icon" aria-hidden="true"><Icon name="file-text" :size="17" /></span>文章管理
-        </router-link>
-        <router-link :to="`${siteStore.adminRoot}/tags`" active-class="active" @click="closeOnMobile">
-          <span class="nav-icon" aria-hidden="true"><Icon name="tag" :size="17" /></span>标签管理
-        </router-link>
-        <router-link :to="`${siteStore.adminRoot}/visitors`" active-class="active" @click="closeOnMobile">
-          <span class="nav-icon" aria-hidden="true"><Icon name="users" :size="17" /></span>访客记录
-        </router-link>
-        <router-link :to="`${siteStore.adminRoot}/comments`" active-class="active" @click="closeOnMobile">
-          <span class="nav-icon" aria-hidden="true"><Icon name="message" :size="17" /></span>评论管理
-        </router-link>
-        <router-link :to="`${siteStore.adminRoot}/albums`" active-class="active" @click="closeOnMobile">
-          <span class="nav-icon" aria-hidden="true"><Icon name="image" :size="17" /></span>相册管理
-        </router-link>
-        <router-link :to="`${siteStore.adminRoot}/settings`" active-class="active" @click="closeOnMobile">
-          <span class="nav-icon" aria-hidden="true"><Icon name="settings" :size="17" /></span>网站设置
-        </router-link>
-      </nav>
-
-      <div class="sidebar-footer">
-        <router-link to="/" @click="closeOnMobile">
-          <span class="nav-icon" aria-hidden="true"><Icon name="home" :size="15" /></span>返回博客
-        </router-link>
-      </div>
-    </aside>
-
-    <button
-      v-if="mobileOpen"
-      class="sidebar-overlay"
-      type="button"
-      aria-label="关闭导航菜单"
-      @click="mobileOpen = false"
-    ></button>
-
-    <div class="workspace">
-      <header class="workspace-header">
-        <button
-          class="menu-button"
-          type="button"
-          aria-label="打开导航菜单"
-          @click="mobileOpen = true"
-        >
-          <Icon name="menu" :size="18" />
-        </button>
-        <span>{{ userStore.nickname || userStore.username || '作者管理' }}</span>
-        <router-link to="/" class="public-link">打开博客 <Icon name="external" :size="13" /></router-link>
-        <button class="logout-button" type="button" @click="logout">退出登录</button>
-      </header>
-      <div class="main-content">
-        <router-view />
-      </div>
-    </div>
-  </div>
-</template>
-
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useSiteStore } from '@/stores/site'
 import { useUserStore } from '@/stores/user'
+import { useThemeStore } from '@/stores/theme'
+import { useDialog } from '@/composables/useDialog'
 import Icon from '@/components/common/Icon.vue'
+import type { IconName } from '@/components/common/icons'
 
 const route = useRoute()
 const router = useRouter()
 const siteStore = useSiteStore()
 const userStore = useUserStore()
+const themeStore = useThemeStore()
 const mobileOpen = ref(false)
-const closeOnMobile = () => {
-  mobileOpen.value = false
-}
-async function logout() {
+// The drawer traps focus and Escape only while it is open over the workspace.
+const drawer = ref<HTMLElement | null>(null)
+const { layer } = useDialog(mobileOpen, drawer, () => { mobileOpen.value = false })
+
+const authorName = computed(() => userStore.nickname || userStore.username || '作者管理')
+const navLinks: Array<{ segment: string; label: string; icon: IconName }> = [
+  { segment: 'dashboard', label: '概览', icon: 'gauge' },
+  { segment: 'posts', label: '文章管理', icon: 'file-text' },
+  { segment: 'tags', label: '标签管理', icon: 'tag' },
+  { segment: 'visitors', label: '访客记录', icon: 'users' },
+  { segment: 'comments', label: '评论管理', icon: 'message' },
+  { segment: 'albums', label: '相册管理', icon: 'image' },
+  { segment: 'settings', label: '网站设置', icon: 'settings' }
+]
+const closeOnMobile = (): void => { mobileOpen.value = false }
+
+async function logout(): Promise<void> {
   await userStore.logout()
   await router.replace(siteStore.adminRoot)
 }
 watch(() => route.path, closeOnMobile)
 </script>
 
+<template>
+  <div class="admin-layout">
+    <Transition name="drawer-scrim">
+      <button v-if="mobileOpen" class="sidebar-overlay" type="button" aria-label="关闭导航菜单" :style="{ zIndex: 60 + layer }" @click="closeOnMobile"></button>
+    </Transition>
+
+    <aside ref="drawer" class="sidebar functional-glass" :class="{ 'sidebar-open': mobileOpen }" :style="{ zIndex: 70 + layer }">
+      <div class="sidebar-brand">
+        <span class="brand-mark" aria-hidden="true"><img v-if="siteStore.settings.siteLogoUrl" class="brand-mark--image" :src="siteStore.settings.siteLogoUrl" alt="" /><Icon v-else name="logo" :size="17" /></span>
+        <div><strong>{{ siteStore.settings.siteTitle }}</strong><small>作者工作台</small></div>
+        <button class="close-menu" type="button" aria-label="关闭菜单" @click="closeOnMobile"><Icon name="close" :size="18" /></button>
+      </div>
+
+      <nav class="sidebar-nav" aria-label="后台导航">
+        <router-link v-for="link in navLinks" :key="link.segment" :to="`${siteStore.adminRoot}/${link.segment}`" active-class="active" @click="closeOnMobile">
+          <Icon :name="link.icon" :size="17" />{{ link.label }}
+        </router-link>
+      </nav>
+
+      <div class="sidebar-footer">
+        <button class="admin-theme-toggle" type="button" @click="themeStore.toggleTheme">
+          <Icon :name="themeStore.isDarkMode ? 'sun' : 'moon'" :size="16" />{{ themeStore.isDarkMode ? '切换亮色模式' : '切换暗色模式' }}
+        </button>
+        <router-link to="/" @click="closeOnMobile"><Icon name="home" :size="16" />返回博客</router-link>
+      </div>
+    </aside>
+
+    <div class="workspace">
+      <header class="workspace-header">
+        <button class="menu-button" type="button" aria-label="打开导航菜单" aria-controls="admin-sidebar" :aria-expanded="mobileOpen" @click="mobileOpen = true"><Icon name="menu" :size="18" /></button>
+        <span class="workspace-author">{{ authorName }}</span>
+        <router-link to="/" class="public-link">打开博客<Icon name="external" :size="13" /></router-link>
+        <button class="logout-button" type="button" @click="logout">退出登录</button>
+      </header>
+      <div class="main-content"><router-view /></div>
+    </div>
+  </div>
+</template>
+
 <style scoped>
-.admin-layout {
-  min-height: 100vh;
-  background: var(--bg-primary);
-  color: var(--text-primary);
-}
-.sidebar {
-  position: fixed;
-  z-index: 100;
-  inset: 0 auto 0 0;
-  display: flex;
-  flex-direction: column;
-  width: 244px;
-  padding: 22px 15px 16px;
-  border-right: 1px solid var(--border-solid);
-  background: var(--surface-primary);
-}
-.sidebar-brand {
-  display: flex;
-  align-items: center;
-  gap: 11px;
-  min-height: 52px;
-  padding: 0 10px 20px;
-  border-bottom: 1px solid var(--border-solid);
-}
-.brand-mark {
-  display: grid;
-  place-items: center;
-  width: 33px;
-  height: 33px;
-  overflow: hidden;
-  border-radius: var(--radius);
-  background: var(--primary);
-  color: white;
-  font-size: 1.1rem;
-}
-.brand-mark--image {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-.sidebar-brand div {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-.sidebar-brand strong {
-  overflow: hidden;
-  color: var(--text-primary);
-  font-family: var(--font-display);
-  font-size: 0.92rem;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.sidebar-brand small {
-  color: var(--text-muted);
-  font-size: 0.7rem;
-}
-.close-menu {
-  display: none;
-  margin-left: auto;
-  border: 0;
-  background: none;
-  color: var(--text-muted);
-  cursor: pointer;
-  font-size: 1.5rem;
-}
-.sidebar-nav {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  padding-top: 22px;
-}
-.sidebar-nav a,
-.sidebar-footer a {
-  display: flex;
-  align-items: center;
-  gap: 11px;
-  min-height: 43px;
-  padding: 0 12px;
-  border-radius: var(--radius-full);
-  color: var(--text-secondary);
-  font-size: 0.86rem;
-  text-decoration: none;
-  transition:
-    color 150ms ease,
-    background 150ms ease;
-}
-.sidebar-nav a:hover,
-.sidebar-footer a:hover {
-  background: var(--bg-secondary);
-  color: var(--primary);
-}
-.sidebar-nav a.active {
-  background: var(--primary-light);
-  color: var(--primary);
-  font-weight: 600;
-}
-.nav-icon {
-  display: grid;
-  place-items: center;
-  width: 20px;
-  color: currentColor;
-  font-size: 1.1rem;
-  text-align: center;
-}
-.sidebar-footer {
-  margin-top: auto;
-  padding-top: 15px;
-  border-top: 1px solid var(--border-solid);
-}
-.workspace {
-  min-height: 100vh;
-  margin-left: 244px;
-}
-.workspace-header {
-  position: sticky;
-  z-index: 20;
-  top: 0;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  height: 60px;
-  padding: 0 30px;
-  border-bottom: 1px solid var(--border-solid);
-  background: var(--surface-primary);
-  color: var(--text-secondary);
-  font-size: 0.82rem;
-}
-.public-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  margin-left: auto;
-  color: var(--primary);
-  font-weight: 600;
-  text-decoration: none;
-}
-.logout-button {
-  padding: 7px 10px;
-  border: 1px solid var(--border-solid);
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: var(--text-secondary);
-  font-size: 0.75rem;
-  cursor: pointer;
-}
+.admin-layout { min-height: 100vh; background: var(--bg-primary); color: var(--text-primary); }
+.sidebar { position: fixed; inset: 0 auto 0 0; display: flex; flex-direction: column; width: 236px; padding: 18px 14px 14px; border-right: 1px solid var(--border-light); border-radius: 0; }
+.sidebar::after { border-radius: 0; }
+.sidebar-brand { display: flex; align-items: center; gap: 11px; min-height: 48px; padding: 0 8px 16px; border-bottom: 1px solid var(--border-light); }
+.brand-mark { display: grid; flex: 0 0 32px; place-items: center; width: 32px; height: 32px; overflow: hidden; border-radius: var(--radius); background: var(--accent-light); color: var(--accent); }
+.brand-mark--image { width: 100%; height: 100%; object-fit: cover; background: transparent; }
+.sidebar-brand div { display: grid; gap: 3px; min-width: 0; }
+.sidebar-brand strong { overflow: hidden; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+.sidebar-brand small { color: var(--text-muted); font-size: 11px; }
+.close-menu { display: none; flex: 0 0 44px; place-items: center; width: 44px; height: 44px; margin-left: auto; margin-right: -8px; border-radius: var(--radius); color: var(--text-secondary); }
+.close-menu:hover { background: var(--bg-secondary); }
+.sidebar-nav { display: flex; flex-direction: column; gap: 3px; padding-top: 14px; }
+.sidebar-nav a, .sidebar-footer a, .admin-theme-toggle { display: flex; align-items: center; gap: 10px; min-height: 44px; padding-inline: 11px; border-radius: var(--radius); color: var(--text-secondary); font-size: 13px; text-align: left; }
+.sidebar-nav a:hover, .sidebar-footer a:hover, .admin-theme-toggle:hover { background: var(--bg-secondary); color: var(--text-primary); }
+.sidebar-nav a.active { background: var(--accent-light); color: var(--accent); font-weight: 600; }
+.sidebar-footer { display: grid; gap: 3px; margin-top: auto; padding-top: 12px; border-top: 1px solid var(--border-light); }
+.workspace { min-height: 100vh; margin-left: 236px; }
+.workspace-header { position: sticky; top: 0; z-index: 20; display: flex; align-items: center; gap: 12px; min-height: 56px; padding-inline: 24px; border-bottom: 1px solid var(--border-light); background: var(--functional-glass-bg); backdrop-filter: blur(12px) saturate(1.1); -webkit-backdrop-filter: blur(12px) saturate(1.1); color: var(--text-secondary); font-size: 13px; }
+.workspace-author { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.public-link { display: inline-flex; align-items: center; gap: 5px; min-height: 44px; margin-left: auto; color: var(--accent); font-weight: 600; }
+.logout-button { min-height: 44px; padding-inline: 12px; border: 1px solid var(--border-light); border-radius: var(--radius); color: var(--text-secondary); font-size: 12px; }
 .logout-button:hover { color: var(--error); border-color: var(--error); }
-.menu-button {
-  display: none;
-  border: 0;
-  background: none;
-  color: var(--text-primary);
-  cursor: pointer;
-  font-size: 1.2rem;
+.menu-button { display: none; place-items: center; width: 44px; height: 44px; margin-left: -10px; border-radius: var(--radius); color: var(--text-primary); }
+.menu-button:hover { background: var(--bg-secondary); }
+.main-content { max-width: 1220px; margin-inline: auto; padding: 26px 24px 48px; }
+.sidebar-overlay { position: fixed; inset: 0; border: 0; background: var(--scrim); }
+.drawer-scrim-enter-active, .drawer-scrim-leave-active { transition: opacity 180ms ease; }
+.drawer-scrim-enter-from, .drawer-scrim-leave-to { opacity: 0; }
+@media (max-width: 860px) {
+  .sidebar { transform: translateX(-105%); transition: transform 200ms var(--ease-out); box-shadow: var(--shadow-xl); }
+  .sidebar.sidebar-open { transform: translateX(0); }
+  .close-menu, .menu-button { display: grid; }
+  .workspace { margin-left: 0; }
+  .workspace-header { padding-inline: 16px; }
+  .main-content { padding: 20px 16px 40px; }
 }
-.main-content {
-  max-width: 1220px;
-  margin: 0 auto;
-  padding: 34px 30px;
-}
-.sidebar-overlay {
-  display: none;
-}
-@media (max-width: 760px) {
-  .sidebar {
-    transform: translateX(-105%);
-    transition: transform 180ms ease;
-    box-shadow: var(--shadow-lg);
-  }
-  .sidebar.sidebar-open {
-    transform: translateX(0);
-  }
-  .close-menu,
-  .menu-button {
-    display: block;
-  }
-  .sidebar-overlay {
-    position: fixed;
-    z-index: 90;
-    inset: 0;
-    display: block;
-    border: 0;
-    background: rgba(12, 20, 25, 0.4);
-  }
-  .workspace {
-    margin-left: 0;
-  }
-  .workspace-header {
-    height: 54px;
-    padding: 0 17px;
-  }
-  .main-content {
-    padding: 23px 17px;
-  }
+@media (prefers-reduced-motion: reduce) {
+  .sidebar { transition: none; }
+  .drawer-scrim-enter-from, .drawer-scrim-leave-to { opacity: 1; }
 }
 </style>

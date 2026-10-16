@@ -2,10 +2,17 @@
 import { onMounted, ref } from 'vue'
 import { siteApi, type VisitorSummary } from '@/api/site'
 import { useSiteStore } from '@/stores/site'
+import Icon from '@/components/common/Icon.vue'
+import type { IconName } from '@/components/common/icons'
 
 const siteStore = useSiteStore()
 const stats = ref<VisitorSummary | null>(null)
 const statsError = ref(false)
+const workspaceLinks: Array<{ segment: string; label: string; description: string; action: string; icon: IconName }> = [
+  { segment: 'posts', label: '文章管理', description: '查看、编辑和整理已发布的文章。', action: '管理文章', icon: 'file-text' },
+  { segment: 'visitors', label: '访客记录', description: '了解访问量、访客趋势和大家正在阅读的页面。', action: '查看访客', icon: 'users' },
+  { segment: 'settings', label: '网站设置', description: '调整网站资料、评论开关、皮肤、相册和背景音乐。', action: '配置网站', icon: 'settings' }
+]
 
 onMounted(async () => {
   try {
@@ -20,36 +27,19 @@ onMounted(async () => {
 <template>
   <div class="dashboard">
     <header class="welcome-panel">
-      <p class="eyebrow">AUTHOR WORKSPACE</p>
-      <h1>欢迎回来</h1>
-      <p>在这里发布文章、查看访客动态，管理 {{ siteStore.settings.siteTitle }} 的外观与内容。</p>
-      <router-link :to="`${siteStore.adminRoot}/write`" class="primary-link"
-        >开始写作 <span aria-hidden="true">↗</span></router-link
-      >
-      <span class="decorative-mark" aria-hidden="true">✳</span>
+      <div>
+        <h1>欢迎回来</h1>
+        <p>在这里发布文章、查看访客动态，管理 {{ siteStore.settings.siteTitle }} 的外观与内容。</p>
+      </div>
+      <router-link :to="`${siteStore.adminRoot}/write`" class="primary-link"><Icon name="plus" :size="16" />开始写作</router-link>
     </header>
 
     <section class="workspace-grid" aria-label="管理入口">
-      <router-link :to="`${siteStore.adminRoot}/posts`" class="workspace-card">
-        <span class="card-index">01</span>
-        <span class="card-icon" aria-hidden="true">▤</span>
-        <h2>文章管理</h2>
-        <p>查看、编辑和整理已发布的文章。</p>
-        <span class="card-link">管理文章 →</span>
-      </router-link>
-      <router-link :to="`${siteStore.adminRoot}/visitors`" class="workspace-card">
-        <span class="card-index">02</span>
-        <span class="card-icon" aria-hidden="true">◷</span>
-        <h2>访客记录</h2>
-        <p>了解访问量、访客趋势和大家正在阅读的页面。</p>
-        <span class="card-link">查看访客 →</span>
-      </router-link>
-      <router-link :to="`${siteStore.adminRoot}/settings`" class="workspace-card workspace-card--subtle">
-        <span class="card-index">03</span>
-        <span class="card-icon" aria-hidden="true">⚙</span>
-        <h2>网站设置</h2>
-        <p>调整网站资料、评论开关、皮肤、相册和背景音乐。</p>
-        <span class="card-link">配置网站 →</span>
+      <router-link v-for="link in workspaceLinks" :key="link.segment" :to="`${siteStore.adminRoot}/${link.segment}`" class="workspace-card">
+        <span class="card-icon" aria-hidden="true"><Icon :name="link.icon" :size="19" /></span>
+        <h2>{{ link.label }}</h2>
+        <p>{{ link.description }}</p>
+        <span class="card-link">{{ link.action }}<Icon name="chevron-right" :size="14" /></span>
       </router-link>
     </section>
 
@@ -71,138 +61,137 @@ onMounted(async () => {
   margin: 0 auto;
 }
 .welcome-panel {
-  position: relative;
-  overflow: hidden;
-  padding: clamp(27px, 5vw, 52px);
-  border: 1px solid var(--border-solid);
-  border-radius: var(--radius-lg);
-  background: var(--surface-solid);
-}
-.eyebrow {
-  margin: 0 0 10px;
-  color: var(--primary);
-  font-size: 0.68rem;
-  font-weight: 700;
-  letter-spacing: 0.16em;
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 26px;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-xl);
+  background: var(--surface-primary);
 }
 .welcome-panel h1 {
   margin: 0;
-  font-family: var(--font-display);
-  font-size: clamp(2rem, 4vw, 2.8rem);
-  letter-spacing: -0.045em;
+  font-size: 24px;
 }
-.welcome-panel > p:not(.eyebrow) {
+.welcome-panel > div > p {
   max-width: 520px;
-  margin: 12px 0 20px;
+  margin: 10px 0 0;
   color: var(--text-secondary);
-  font-size: 0.92rem;
-  line-height: 1.75;
+  font-size: 13px;
+  line-height: 1.8;
 }
 .primary-link {
   display: inline-flex;
   align-items: center;
-  gap: 20px;
-  min-height: 40px;
-  padding: 0 15px;
-  border-radius: var(--radius-sm);
-  background: var(--primary);
-  color: white;
-  font-size: 0.82rem;
+  flex: 0 0 auto;
+  gap: 6px;
+  min-height: 44px;
+  padding-inline: 14px;
+  border-radius: var(--radius);
+  background: var(--accent);
+  color: var(--text-inverse);
+  font-size: 13px;
   font-weight: 600;
-  text-decoration: none;
 }
 .primary-link:hover {
-  background: var(--primary-hover);
-}
-.decorative-mark {
-  position: absolute;
-  right: 9%;
-  top: 50%;
-  transform: translateY(-50%);
-  color: var(--primary);
-  font-size: clamp(5rem, 14vw, 10rem);
-  opacity: 0.08;
+  background: var(--accent-dark);
 }
 .workspace-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 14px;
-  margin-top: 18px;
+  margin-top: 16px;
 }
 .workspace-card {
-  position: relative;
-  min-height: 198px;
-  padding: 22px;
-  border: 1px solid var(--border-solid);
-  border-radius: var(--radius);
-  background: var(--surface-solid);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 176px;
+  padding: 20px;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-xl);
+  background: var(--surface-primary);
   color: var(--text-primary);
-  text-decoration: none;
-  transition:
-    transform 150ms ease,
-    border-color 150ms ease;
 }
 .workspace-card:hover {
-  transform: translateY(-2px);
-  border-color: var(--primary);
-}
-.workspace-card--subtle {
-  background: var(--bg-secondary);
-}
-.card-index {
-  position: absolute;
-  top: 20px;
-  right: 20px;
-  color: var(--text-muted);
-  font-size: 0.7rem;
+  border-color: var(--accent);
 }
 .card-icon {
   display: grid;
   place-items: center;
-  width: 38px;
-  height: 38px;
+  width: 36px;
+  height: 36px;
+  margin-bottom: 8px;
   border-radius: var(--radius);
-  background: var(--primary-light);
-  color: var(--primary);
-  font-size: 1.2rem;
+  background: var(--accent-light);
+  color: var(--accent);
 }
 .workspace-card h2 {
-  margin: 18px 0 6px;
-  font-family: var(--font-display);
-  font-size: 1.1rem;
+  font-size: 15px;
 }
 .workspace-card p {
   margin: 0;
   color: var(--text-secondary);
-  font-size: 0.8rem;
-  line-height: 1.65;
+  font-size: 12px;
+  line-height: 1.8;
 }
 .card-link {
-  display: inline-block;
-  margin-top: 17px;
-  color: var(--primary);
-  font-size: 0.77rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: auto;
+  padding-top: 14px;
+  color: var(--accent);
+  font-size: 12px;
   font-weight: 600;
 }
 .dashboard-note {
-  margin: 20px 2px 0;
+  margin: 18px 2px 0;
   color: var(--text-muted);
-  font-size: 0.77rem;
+  font-size: 12px;
 }
-.summary-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-top: 16px; }
-.summary-grid article { display: grid; gap: 8px; padding: 18px; border: 1px solid var(--border-solid); border-radius: var(--radius); background: var(--surface-solid); }
-.summary-grid small { color: var(--text-muted); font-size: .76rem; }
-.summary-grid strong { font: 700 1.55rem var(--font-display); }
-@media (max-width: 760px) {
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+}
+.summary-grid article {
+  display: grid;
+  gap: 7px;
+  padding: 17px;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-lg);
+  background: var(--surface-primary);
+}
+.summary-grid small {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.summary-grid strong {
+  font-size: 22px;
+  font-variant-numeric: tabular-nums;
+}
+@media (max-width: 860px) {
   .workspace-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
   .workspace-card {
     min-height: 0;
   }
-  .summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .decorative-mark {
-    right: 4%;
+  .summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 600px) {
+  .welcome-panel {
+    align-items: stretch;
+    flex-direction: column;
+    padding: 20px;
+  }
+  .primary-link {
+    justify-content: center;
   }
 }
 </style>

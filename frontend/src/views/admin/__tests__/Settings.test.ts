@@ -130,4 +130,11 @@ describe('Settings brand asset fields', () => {
       expect(payload[item.key]).toBe(item.url)
     }
   })
+
+  it('groups real setting fields by meaning and keeps a single save path', async () => {
+    const wrapper = await mountSettings()
+    const groupTitles = wrapper.findAll('.panel-heading h2').map((heading) => heading.text())
+    expect(groupTitles).toEqual(['站点资料', '后台与访客', '评论与音乐', '视觉主题'])
+    expect(wrapper.findAll('form')).toHaveLength(1)
+  })
 })

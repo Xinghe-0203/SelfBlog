@@ -5,6 +5,7 @@ import { formatDate } from '@/utils'
 import { toast } from '@/utils/toast'
 import { useConfirm } from '@/composables/useConfirm'
 import { useSiteStore } from '@/stores/site'
+import Icon from '@/components/common/Icon.vue'
 import type { Post } from '@/types'
 
 const { confirm, ConfirmDialog } = useConfirm()
@@ -84,17 +85,16 @@ onMounted(fetchPosts)
   <div class="admin-posts">
     <header class="page-heading">
       <div>
-        <p class="eyebrow">CONTENT</p>
         <h1>文章管理</h1>
         <p>管理博客文章，编辑内容或检查前台展示。</p>
       </div>
-      <router-link :to="`${siteStore.adminRoot}/write`" class="new-post">＋ 写文章</router-link>
+      <router-link :to="`${siteStore.adminRoot}/write`" class="new-post"><Icon name="plus" :size="16" />写文章</router-link>
     </header>
 
     <form class="toolbar" @submit.prevent="submitSearch">
       <label class="search-box">
-        <span aria-hidden="true">⌕</span>
-        <input v-model="keyword" type="search" placeholder="搜索文章标题或关键词" />
+        <Icon name="search" :size="16" />
+        <input v-model="keyword" type="search" aria-label="搜索文章标题或关键词" placeholder="搜索文章标题或关键词" />
       </label>
       <select v-model="statusFilter" aria-label="筛选文章状态">
         <option value="">所有状态</option>
@@ -152,7 +152,7 @@ onMounted(fetchPosts)
 
     <nav v-if="!loading && !error && totalPages > 1" class="pagination" aria-label="文章管理分页">
       <button type="button" :disabled="currentPage <= 1" @click="changePage(currentPage - 1)">
-        ← 上一页
+        <Icon name="chevron-left" :size="16" />上一页
       </button>
       <span>{{ currentPage }} / {{ totalPages }}</span>
       <button
@@ -160,7 +160,7 @@ onMounted(fetchPosts)
         :disabled="currentPage >= totalPages"
         @click="changePage(currentPage + 1)"
       >
-        下一页 →
+        下一页<Icon name="chevron-right" :size="16" />
       </button>
     </nav>
     <ConfirmDialog />
@@ -169,7 +169,6 @@ onMounted(fetchPosts)
 
 <style scoped>
 .admin-posts {
-  max-width: 1100px;
   margin: 0 auto;
 }
 .page-heading {
@@ -177,38 +176,32 @@ onMounted(fetchPosts)
   align-items: end;
   justify-content: space-between;
   gap: 15px;
-  margin-bottom: 23px;
-}
-.eyebrow {
-  margin: 0 0 7px;
-  color: var(--primary);
-  font-size: 0.67rem;
-  font-weight: 700;
-  letter-spacing: 0.16em;
+  margin-bottom: 22px;
 }
 .page-heading h1 {
   margin: 0;
-  font-family: var(--font-display);
-  font-size: 1.8rem;
-  letter-spacing: -0.04em;
+  font-size: 24px;
 }
 .page-heading p:last-child {
   margin: 8px 0 0;
   color: var(--text-muted);
-  font-size: 0.83rem;
+  font-size: 13px;
 }
 .new-post {
+  display: inline-flex;
+  align-items: center;
   flex: 0 0 auto;
-  padding: 10px 13px;
-  border-radius: var(--radius-sm);
-  background: var(--primary);
-  color: white;
-  font-size: 0.8rem;
+  gap: 6px;
+  min-height: 44px;
+  padding-inline: 14px;
+  border-radius: var(--radius);
+  background: var(--accent);
+  color: var(--text-inverse);
+  font-size: 13px;
   font-weight: 600;
-  text-decoration: none;
 }
 .new-post:hover {
-  background: var(--primary-hover);
+  background: var(--accent-dark);
 }
 .toolbar {
   display: flex;
@@ -222,70 +215,76 @@ onMounted(fetchPosts)
   flex: 1;
   min-width: 0;
   padding: 0 11px;
-  border: 1px solid var(--border-solid);
-  border-radius: var(--radius-sm);
-  background: var(--surface-solid);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius);
+  background: var(--surface-primary);
   color: var(--text-muted);
 }
 .search-box:focus-within {
-  border-color: var(--primary);
+  border-color: var(--accent);
+  outline: 2px solid var(--accent-light);
+  outline-offset: 1px;
 }
 .search-box input {
   width: 100%;
   min-width: 0;
-  height: 40px;
+  height: 42px;
   border: 0;
   outline: 0;
   background: transparent;
   color: var(--text-primary);
   font: inherit;
-  font-size: 0.82rem;
+  font-size: 14px;
 }
 .toolbar select,
 .search-button {
-  min-height: 42px;
+  min-height: 44px;
   padding: 0 12px;
-  border: 1px solid var(--border-solid);
-  border-radius: var(--radius-sm);
-  background: var(--surface-solid);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius);
+  background: var(--surface-primary);
   color: var(--text-primary);
   font: inherit;
-  font-size: 0.8rem;
+  font-size: 13px;
 }
 .search-button {
-  background: var(--text-primary);
-  color: var(--surface-primary);
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--text-inverse);
   cursor: pointer;
 }
-.state-panel {
-  padding: 38px 20px;
-  border: 1px dashed var(--border-solid);
-  border-radius: var(--radius);
-  color: var(--text-muted);
-  text-align: center;
+.search-button:hover {
+  background: var(--accent-dark);
 }
-.state-panel a {
-  margin-left: 6px;
-  color: var(--primary);
-  text-decoration: none;
+.state-panel {
+  display: grid;
+  justify-items: start;
+  gap: 14px;
+  padding: 30px 22px;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-lg);
+  background: var(--surface-primary);
+  color: var(--text-secondary);
+  font-size: 14px;
 }
 .state-panel--error {
   color: var(--text-secondary);
 }
 .state-panel button {
-  margin-left: 9px;
-  padding: 7px 10px;
-  border: 1px solid var(--border-solid);
-  border-radius: var(--radius-sm);
+  min-height: 44px;
+  padding-inline: 14px;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius);
   background: transparent;
   color: var(--text-primary);
   cursor: pointer;
 }
 .post-table-wrap {
-  overflow: auto;
-  border: 1px solid var(--border-solid);
-  border-radius: var(--radius);
-  background: var(--surface-solid);
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-lg);
+  background: var(--surface-primary);
 }
 .post-table {
   width: 100%;
@@ -294,71 +293,73 @@ onMounted(fetchPosts)
 }
 .post-table th,
 .post-table td {
-  padding: 14px 15px;
-  border-bottom: 1px solid var(--border-solid);
+  padding: 13px 15px;
+  border-bottom: 1px solid var(--border-light);
   white-space: nowrap;
 }
 .post-table th {
-  background: var(--bg-secondary);
   color: var(--text-muted);
-  font-size: 0.72rem;
+  background: var(--bg-secondary);
+  font-size: 12px;
   font-weight: 600;
 }
 .post-table tbody tr:last-child td {
   border-bottom: 0;
 }
 .title-cell {
-  min-width: 260px;
+  min-width: 240px;
   white-space: normal !important;
+  overflow-wrap: anywhere;
 }
 .title-cell > a {
   color: var(--text-primary);
-  font-size: 0.84rem;
+  font-size: 14px;
   font-weight: 600;
-  text-decoration: none;
 }
 .title-cell > a:hover {
-  color: var(--primary);
+  color: var(--accent);
 }
 .category {
   display: block;
   margin-top: 4px;
   color: var(--text-muted);
-  font-size: 0.7rem;
+  font-size: 11px;
 }
 .status {
   display: inline-block;
-  padding: 4px 8px;
-  border-radius: var(--radius-xl);
+  padding: 3px 8px;
+  border-radius: var(--radius-xs);
   background: var(--bg-secondary);
-  color: var(--text-muted);
-  font-size: 0.7rem;
+  color: var(--text-secondary);
+  font-size: 11px;
 }
 .status-public {
-  background: var(--primary-light);
-  color: var(--primary);
+  background: var(--accent-light);
+  color: var(--accent);
 }
 .muted {
   color: var(--text-muted);
-  font-size: 0.76rem;
+  font-size: 12px;
 }
 .row-actions {
   display: flex;
-  gap: 10px;
+  gap: 4px;
 }
 .row-actions a,
 .row-actions button {
-  padding: 0;
-  border: 0;
-  background: none;
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding-inline: 9px;
+  border-radius: var(--radius-sm);
   color: var(--text-secondary);
-  cursor: pointer;
   font: inherit;
-  font-size: 0.75rem;
-  text-decoration: none;
+  font-size: 12px;
 }
-.row-actions a:hover {
-  color: var(--primary);
+.row-actions a:hover,
+.row-actions button:hover {
+  background: var(--bg-secondary);
+  color: var(--accent);
 }
 .row-actions button:hover {
   color: var(--error);
@@ -368,16 +369,23 @@ onMounted(fetchPosts)
   justify-content: center;
   align-items: center;
   gap: 17px;
-  padding: 19px 0;
+  padding: 18px 0 0;
   color: var(--text-muted);
-  font-size: 0.78rem;
+  font-size: 12px;
 }
 .pagination button {
-  border: 0;
-  background: none;
-  color: var(--primary);
-  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 44px;
+  padding-inline: 10px;
+  border-radius: var(--radius);
+  color: var(--accent);
   font: inherit;
+  font-size: 12px;
+}
+.pagination button:hover:not(:disabled) {
+  background: var(--accent-light);
 }
 .pagination button:disabled {
   color: var(--text-muted);
@@ -388,6 +396,9 @@ onMounted(fetchPosts)
   .page-heading {
     align-items: start;
   }
+  .new-post span {
+    display: none;
+  }
   .toolbar {
     flex-wrap: wrap;
   }
@@ -396,16 +407,6 @@ onMounted(fetchPosts)
   }
   .toolbar select {
     flex: 1;
-  }
-  .post-table th,
-  .post-table td {
-    padding: 11px 10px;
-  }
-  .title-cell {
-    min-width: 190px;
-  }
-  .row-actions {
-    gap: 8px;
   }
 }
 </style>

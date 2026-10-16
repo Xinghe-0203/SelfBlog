@@ -1,78 +1,59 @@
 <template>
   <div class="admin-tags">
     <div class="admin-container">
-      <div class="page-header">
-        <h2>标签管理</h2>
-      </div>
+      <header class="page-heading">
+        <div><h1>标签管理</h1><p>为文章建立标签，方便读者按主题查找。</p></div>
+      </header>
 
-      <div class="create-form glass">
-        <h3 class="form-title">新建标签</h3>
+      <form class="create-form" @submit.prevent="createTag">
+        <h2 class="form-title">新建标签</h2>
         <div class="form-row">
-          <input v-model="newTagName" type="text" class="form-input" placeholder="输入标签名称..." @keyup.enter="createTag" />
-          <button class="btn btn-primary" :disabled="!newTagName.trim() || creating" @click="createTag">
-            {{ creating ? '创建中...' : '创建' }}
+          <input v-model="newTagName" type="text" class="form-input" aria-label="标签名称" placeholder="输入标签名称" maxlength="40" />
+          <button class="btn btn-primary" type="submit" :disabled="!newTagName.trim() || creating">
+            {{ creating ? '创建中…' : '创建' }}
           </button>
         </div>
+      </form>
+
+      <div v-if="loading" class="table-container">
+        <table class="data-table">
+          <thead>
+            <tr><th>ID</th><th>名称</th><th>文章数</th><th>操作</th></tr>
+          </thead>
+          <tbody>
+            <tr v-for="i in 5" :key="i">
+              <td><div class="sk-line w-30"></div></td>
+              <td><div class="sk-line w-60"></div></td>
+              <td><div class="sk-line w-40"></div></td>
+              <td><div class="sk-line w-50"></div></td>
+            </tr>
+          </tbody>
+        </table>
       </div>
 
-      <div v-if="loading" class="loading-skeleton">
-        <div class="table-container glass">
-          <table class="data-table">
-            <thead>
-              <tr><th>ID</th><th>名称</th><th>文章数</th><th>操作</th></tr>
-            </thead>
-            <tbody>
-              <tr v-for="i in 5" :key="i">
-                <td><div class="sk-line w-30"></div></td>
-                <td><div class="sk-line w-60"></div></td>
-                <td><div class="sk-line w-40"></div></td>
-                <td><div class="sk-line w-50"></div></td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+      <div v-else-if="error" class="state-panel" role="alert">
+        <Icon name="info" :size="20" />
+        <p>{{ error }}</p>
+        <button class="btn btn-secondary" type="button" @click="fetchTags">重新加载</button>
       </div>
 
-      <div v-else-if="error" class="error-state glass">
-        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-          <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
-        </svg>
-        <h3>{{ error }}</h3>
-        <button class="btn btn-primary" @click="fetchTags">重试</button>
-      </div>
-
-      <div v-else class="table-container glass">
+      <div v-else class="table-container">
         <table class="data-table">
           <thead>
             <tr><th>ID</th><th>名称</th><th>文章数</th><th>操作</th></tr>
           </thead>
           <tbody>
             <tr v-if="tags.length === 0">
-              <td colspan="4" class="empty-cell">
-                <div class="empty-content">
-                  <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                    <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/>
-                    <line x1="7" y1="7" x2="7.01" y2="7"/>
-                  </svg>
-                  <span>暂无标签</span>
-                </div>
-              </td>
+              <td colspan="4" class="empty-cell"><div class="empty-content"><Icon name="tag" :size="22" /><span>暂无标签</span></div></td>
             </tr>
             <tr v-for="tag in tags" :key="tag.id">
               <td class="id-cell">{{ tag.id }}</td>
               <td class="tag-name">{{ tag.name }}</td>
-              <td>
-                <span class="count-badge">{{ tag.postCount || 0 }}</span>
-              </td>
+              <td><span class="count-badge">{{ tag.postCount || 0 }}</span></td>
               <td>
                 <div class="actions">
-                  <button class="btn btn-xs btn-ghost" @click="startEdit(tag)">编辑</button>
-                  <button class="btn btn-xs btn-ghost danger" @click="deleteTag(tag)">
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                      <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-                    </svg>
-                    删除
-                  </button>
+                  <button class="btn btn-ghost" type="button" @click="startEdit(tag)">编辑</button>
+                  <button class="btn btn-ghost danger" type="button" @click="deleteTag(tag)"><Icon name="trash" :size="14" />删除</button>
                 </div>
               </td>
             </tr>
@@ -80,29 +61,21 @@
         </table>
       </div>
 
-      <div v-if="totalPages > 1" class="pagination-wrapper">
-        <div class="pagination glass">
-          <button class="pagination-btn" :disabled="currentPage <= 1" @click="changePage(currentPage - 1)">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
-            上一页
-          </button>
-          <span class="page-info">第 {{ currentPage }} / {{ totalPages }} 页</span>
-          <button class="pagination-btn" :disabled="currentPage >= totalPages" @click="changePage(currentPage + 1)">
-            下一页
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
-          </button>
-        </div>
-      </div>
+      <nav v-if="totalPages > 1" class="pagination" aria-label="标签分页">
+        <button type="button" :disabled="currentPage <= 1" @click="changePage(currentPage - 1)"><Icon name="chevron-left" :size="16" />上一页</button>
+        <span class="page-info">第 {{ currentPage }} / {{ totalPages }} 页</span>
+        <button type="button" :disabled="currentPage >= totalPages" @click="changePage(currentPage + 1)">下一页<Icon name="chevron-right" :size="16" /></button>
+      </nav>
     </div>
 
     <Modal :show="editDialog" title="编辑标签" @close="editDialog = false">
       <div class="edit-form">
-        <label class="edit-label">标签名称</label>
-        <input v-model="editName" type="text" class="form-input" placeholder="输入标签名称" />
+        <label class="edit-label" for="tag-edit-name">标签名称</label>
+        <input id="tag-edit-name" v-model="editName" type="text" class="form-input" maxlength="40" placeholder="输入标签名称" />
       </div>
       <template #footer>
-        <button class="btn btn-secondary" @click="editDialog = false">取消</button>
-        <button class="btn btn-primary" :disabled="!editName.trim()" @click="submitEdit">保存</button>
+        <button class="btn btn-secondary" type="button" @click="editDialog = false">取消</button>
+        <button class="btn btn-primary" type="button" :disabled="!editName.trim()" @click="submitEdit">保存</button>
       </template>
     </Modal>
     <ConfirmDialog />
@@ -116,6 +89,7 @@ import { useLogger } from '../../utils/logger'
 import { toast } from '../../utils/toast'
 import { useConfirm } from '../../composables/useConfirm'
 import Modal from '../../components/common/Modal.vue'
+import Icon from '../../components/common/Icon.vue'
 
 const logger = useLogger('AdminTags')
 const { confirm, ConfirmDialog } = useConfirm()
@@ -209,8 +183,7 @@ onMounted(() => {
 
 <style scoped>
 .admin-tags {
-  padding: var(--spacing-lg);
-  min-height: 100vh;
+  min-height: 0;
 }
 
 .admin-container {
@@ -218,57 +191,57 @@ onMounted(() => {
   margin: 0 auto;
 }
 
-.page-header {
-  margin-bottom: var(--spacing-lg);
+.page-heading {
+  margin-bottom: 18px;
 }
 
-.page-header h2 {
-  font-size: 1.5rem;
-  font-weight: 700;
-  background: linear-gradient(135deg, var(--primary-start), var(--primary-end));
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
+.page-heading h1 {
+  margin: 0;
+  font-size: 24px;
+}
+
+.page-heading p {
+  margin: 8px 0 0;
+  color: var(--text-muted);
+  font-size: 13px;
 }
 
 .create-form {
-  padding: var(--spacing-lg);
-  margin-bottom: var(--spacing-lg);
-  background: var(--glass-bg);
-  backdrop-filter: var(--glass-blur);
-  -webkit-backdrop-filter: var(--glass-blur);
-  border: 1px solid var(--glass-border-wet);
+  padding: 18px;
+  margin-bottom: 16px;
+  border: 1px solid var(--border-light);
   border-radius: var(--radius-lg);
-  box-shadow: var(--glass-shadow-wet);
+  background: var(--surface-primary);
 }
 
 .form-title {
-  font-size: 1rem;
-  font-weight: 600;
+  margin-bottom: 12px;
   color: var(--text-primary);
-  margin-bottom: var(--spacing-md);
+  font-size: 15px;
+  font-weight: 600;
 }
 
 .form-row {
   display: flex;
-  gap: var(--spacing-sm);
+  gap: 8px;
 }
 
 .form-input {
   flex: 1;
-  padding: var(--spacing-sm) var(--spacing-md);
-  font-size: 0.875rem;
-  background: var(--surface);
-  border: 1px solid var(--glass-border);
+  min-width: 0;
+  padding: 11px 12px;
+  border: 1px solid var(--border-light);
   border-radius: var(--radius);
+  background: var(--surface-primary);
   color: var(--text-primary);
+  font-size: 16px;
   outline: none;
-  transition: all var(--transition);
 }
 
-.form-input:focus {
-  border-color: var(--primary);
-  box-shadow: 0 0 0 3px var(--primary-light);
+.form-input:focus-visible {
+  border-color: var(--accent);
+  outline: 2px solid var(--accent-light);
+  outline-offset: 1px;
 }
 
 .form-input::placeholder {
@@ -277,54 +250,30 @@ onMounted(() => {
 
 .table-container {
   overflow-x: auto;
-  background: var(--glass-bg);
-  backdrop-filter: var(--glass-blur);
-  -webkit-backdrop-filter: var(--glass-blur);
-  border: 1px solid var(--glass-border-wet);
+  overscroll-behavior-x: contain;
+  border: 1px solid var(--border-light);
   border-radius: var(--radius-lg);
-  box-shadow: var(--glass-shadow-wet);
-  position: relative;
-}
-
-.table-container::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent);
-  pointer-events: none;
-  z-index: 1;
+  background: var(--surface-primary);
 }
 
 .data-table {
   width: 100%;
   border-collapse: collapse;
+  text-align: left;
 }
 
 .data-table th,
 .data-table td {
-  padding: var(--spacing-md);
-  text-align: left;
-  border-bottom: 1px solid var(--glass-border);
+  padding: 13px 15px;
+  border-bottom: 1px solid var(--border-light);
+  white-space: nowrap;
 }
 
 .data-table th {
+  background: var(--bg-secondary);
+  color: var(--text-muted);
+  font-size: 12px;
   font-weight: 600;
-  color: var(--text-primary);
-  background: var(--surface);
-  font-size: 0.8125rem;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-.data-table tbody tr {
-  transition: all var(--transition);
-}
-
-.data-table tbody tr:hover {
-  background: var(--primary-light);
 }
 
 .data-table tbody tr:last-child td {
@@ -332,82 +281,107 @@ onMounted(() => {
 }
 
 .id-cell {
-  font-family: var(--font-mono);
-  font-size: 0.8125rem;
   color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 12px;
 }
 
 .tag-name {
-  font-weight: 500;
+  min-width: 160px;
   color: var(--text-primary);
+  font-size: 14px;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 
 .count-badge {
   display: inline-flex;
-  padding: 0.25rem 0.625rem;
-  font-size: 0.75rem;
+  padding: 2px 8px;
+  border-radius: var(--radius-xs);
+  background: var(--accent-light);
+  color: var(--accent);
+  font-size: 12px;
   font-weight: 600;
-  border-radius: var(--radius-full);
-  background: var(--primary-light);
-  color: var(--primary);
 }
 
 .actions {
   display: flex;
-  gap: var(--spacing-xs);
+  gap: 4px;
 }
 
-.pagination-wrapper {
-  margin-top: var(--spacing-lg);
-  display: flex;
-  justify-content: center;
+.actions .btn {
+  min-height: 36px;
+  padding-inline: 10px;
+  font-size: 12px;
+}
+
+.actions .danger {
+  color: var(--error);
 }
 
 .pagination {
   display: flex;
   align-items: center;
-  gap: var(--spacing-xs);
-  padding: var(--spacing-sm);
-  background: var(--glass-bg);
-  backdrop-filter: var(--glass-blur);
-  -webkit-backdrop-filter: var(--glass-blur);
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--glass-shadow);
+  justify-content: center;
+  gap: 16px;
+  padding-top: 18px;
 }
 
 .page-info {
-  font-size: 0.8125rem;
   color: var(--text-muted);
-  padding: 0 var(--spacing-md);
+  font-size: 12px;
+}
+
+.pagination button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 44px;
+  padding-inline: 10px;
+  border-radius: var(--radius);
+  color: var(--accent);
+  font-size: 12px;
+}
+
+.pagination button:hover:not(:disabled) {
+  background: var(--accent-light);
+}
+
+.pagination button:disabled {
+  color: var(--text-muted);
+  cursor: default;
+  opacity: 0.5;
 }
 
 .empty-cell {
+  padding: 40px 20px;
   text-align: center;
-  padding: var(--spacing-2xl);
 }
 
 .empty-content {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: var(--spacing-sm);
+  gap: 10px;
   color: var(--text-muted);
+  font-size: 13px;
 }
 
-.error-state {
-  text-align: center;
-  padding: var(--spacing-3xl);
+.state-panel {
+  display: grid;
+  justify-items: start;
+  gap: 14px;
+  padding: 28px 22px;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-lg);
+  background: var(--surface-primary);
   color: var(--text-secondary);
 }
 
-.error-state h3 {
-  margin: var(--spacing-md) 0 var(--spacing-lg);
-  font-size: 1rem;
-}
-
-.loading-skeleton {
-  padding: var(--spacing-lg) 0;
+.state-panel p {
+  margin: 0;
+  font-size: 14px;
 }
 
 .sk-line {
@@ -424,24 +398,25 @@ onMounted(() => {
 .sk-line.w-60 { width: 60%; }
 
 .edit-form {
-  padding: var(--spacing-sm) 0;
+  padding: 4px 0;
 }
 
 .edit-label {
   display: block;
-  font-size: 0.875rem;
-  font-weight: 500;
+  margin-bottom: 8px;
   color: var(--text-secondary);
-  margin-bottom: var(--spacing-sm);
+  font-size: 13px;
+  font-weight: 500;
 }
 
-@media (max-width: 768px) {
+@media (max-width: 640px) {
   .form-row {
     flex-direction: column;
   }
 
   .actions {
     flex-direction: column;
+    align-items: stretch;
   }
 }
 </style>

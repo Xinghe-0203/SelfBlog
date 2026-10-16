@@ -1,61 +1,34 @@
 <template>
   <div class="auth-page">
-    <div class="auth-card" :class="{ 'card-enter': mounted }">
-      <!-- Window chrome: title bar -->
-      <div class="chrome-bar" aria-hidden="true">
-        <span class="chrome-dot chrome-dot--red"></span>
-        <span class="chrome-dot chrome-dot--yellow"></span>
-        <span class="chrome-dot chrome-dot--green"></span>
-      </div>
-
-      <!-- Brand -->
-      <div class="auth-brand">
-        <div class="brand-icon">
-          <svg width="32" height="32" viewBox="0 0 56 56" fill="none">
-            <rect width="56" height="56" rx="16" fill="url(#logo-grad)" />
-            <path
-              d="M16 20h24M16 28h18M16 36h12"
-              stroke="white"
-              stroke-width="2.5"
-              stroke-linecap="round"
-            />
-            <circle cx="40" cy="36" r="4" fill="white" opacity="0.9" />
-            <defs>
-              <linearGradient id="logo-grad" x1="0" y1="0" x2="56" y2="56">
-                <!-- 跟随主题主色，避免与导航栏蓝色 Logo 不一致（原先硬编码为青色 #0D9488） -->
-                <stop stop-color="var(--accent)" />
-                <stop offset="1" stop-color="var(--accent-dark)" />
-              </linearGradient>
-            </defs>
-          </svg>
-        </div>
-        <div class="brand-text">
+    <div class="auth-card">
+      <header class="auth-brand">
+        <span class="brand-mark" aria-hidden="true">
+          <img v-if="siteStore.settings.siteLogoUrl" class="brand-mark--image" :src="siteStore.settings.siteLogoUrl" alt="" />
+          <Icon v-else name="logo" :size="20" />
+        </span>
+        <span class="brand-text">
           <span class="brand-name">{{ siteStore.settings.siteTitle }}</span>
           <span class="brand-tagline">作者管理入口</span>
-        </div>
-      </div>
+        </span>
+      </header>
 
-      <!-- Header -->
       <div class="auth-header">
-        <h1>欢迎回来</h1>
-        <p>仅作者管理员可以登录后台</p>
+        <h1>登录后台</h1>
+        <p>仅作者管理员可以登录；访客无需登录即可阅读文章。</p>
       </div>
 
-      <!-- Form -->
-      <form class="auth-form" @submit.prevent="handleLogin" novalidate>
+      <form class="auth-form" novalidate @submit.prevent="handleLogin">
         <div class="form-field">
           <label class="form-label" for="login-account">用户名 / 邮箱</label>
-          <div class="input-wrap">
-            <input
-              id="login-account"
-              v-model="form.account"
-              type="text"
-              class="form-input"
-              placeholder="请输入用户名或邮箱"
-              autocomplete="username"
-              required
-            />
-          </div>
+          <input
+            id="login-account"
+            v-model="form.account"
+            type="text"
+            class="form-input"
+            placeholder="请输入用户名或邮箱"
+            autocomplete="username"
+            required
+          />
         </div>
 
         <div class="form-field">
@@ -74,91 +47,41 @@
             <button
               type="button"
               class="input-toggle"
-              @click="showPassword = !showPassword"
               :aria-label="showPassword ? '隐藏密码' : '显示密码'"
-              tabindex="-1"
+              :aria-pressed="showPassword"
+              @click="showPassword = !showPassword"
             >
-              <svg
-                v-if="!showPassword"
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              >
-                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-                <circle cx="12" cy="12" r="3" />
-              </svg>
-              <svg
-                v-else
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              >
-                <path
-                  d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"
-                />
-                <line x1="1" y1="1" x2="23" y2="23" />
-              </svg>
+              <Icon :name="showPassword ? 'eye-off' : 'eye'" :size="17" />
             </button>
           </div>
         </div>
 
         <div class="form-row">
           <label class="check-label">
-            <input type="checkbox" v-model="form.remember" class="check-input" />
-            <span class="check-box">
-              <svg
-                width="10"
-                height="10"
-                viewBox="0 0 12 12"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              >
-                <polyline points="2 6 5 9 10 3" />
-              </svg>
-            </span>
+            <input v-model="form.remember" type="checkbox" class="check-input" />
+            <span class="check-box" aria-hidden="true"><Icon name="check" :size="12" /></span>
             <span class="check-text">记住我</span>
           </label>
-          <span class="link-subtle">请联系站点所有者重置登录凭据</span>
+          <span class="link-subtle">忘记密码请联系站点作者</span>
         </div>
 
-        <button type="submit" class="btn-primary" :disabled="loading">
-          <transition name="fade-swap" mode="out-in">
-            <span v-if="loading" key="spinner" class="btn-loading">
-              <span class="spinner"></span>
-              <span>登录中...</span>
-            </span>
-            <span v-else key="text">登录</span>
-          </transition>
+        <button type="submit" class="btn-primary" :disabled="loading" :aria-busy="loading">
+          <span v-if="loading" class="btn-loading"><span class="spinner" aria-hidden="true"></span>登录中…</span>
+          <span v-else>登录</span>
         </button>
       </form>
-
-      <div class="auth-footer">
-        <p>访客无需登录即可阅读和搜索文章。</p>
-      </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useUserStore } from '../../stores/user'
 import { useSiteStore } from '../../stores/site'
 import { useLogger } from '../../utils/logger'
 import { toast } from '../../utils/toast'
+import Icon from '@/components/common/Icon.vue'
 import type { LoginRequest } from '../../types/user'
 
 const router = useRouter()
@@ -169,18 +92,11 @@ const logger = useLogger('Login')
 
 const loading = ref(false)
 const showPassword = ref(false)
-const mounted = ref(false)
 
 const form = reactive({
   account: '',
   password: '',
   remember: false
-})
-
-onMounted(() => {
-  requestAnimationFrame(() => {
-    mounted.value = true
-  })
 })
 
 const isEmail = (str: string) => {
@@ -234,8 +150,8 @@ const handleLogin = async () => {
       logger.warn('Login failed', { message: result.message })
       toast.error(result.message || '登录失败')
     }
-  } catch (error: any) {
-    logger.error('Login error', { error: error.message })
+  } catch (error) {
+    logger.error('Login error', { error: (error as Error).message })
     toast.error('登录失败，请稍后重试')
   } finally {
     loading.value = false
@@ -244,165 +160,101 @@ const handleLogin = async () => {
 </script>
 
 <style scoped>
-/* ===== Page ===== */
 .auth-page {
-  min-height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: var(--spacing-lg);
-  background: var(--background-gradient);
-  position: relative;
+  min-height: 100dvh;
+  padding: 24px;
+  background: var(--bg-primary);
 }
 
-/* Subtle grid pattern for depth */
-.auth-page::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  background-image:
-    linear-gradient(rgba(0, 0, 0, 0.015) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(0, 0, 0, 0.015) 1px, transparent 1px);
-  background-size: 48px 48px;
-  pointer-events: none;
-  z-index: 0;
-}
-
-/* ===== Card — Faux-OS Window ===== */
 .auth-card {
-  position: relative;
-  z-index: 1;
   width: 100%;
-  max-width: 400px;
-  background: var(--surface-solid);
-  border: 1px solid var(--border-solid);
-  border-radius: var(--radius-xl);
-  box-shadow:
-    0 1px 3px rgba(0, 0, 0, 0.04),
-    0 8px 24px rgba(0, 0, 0, 0.06);
-  padding: 0 var(--spacing-xl) var(--spacing-xl);
-  opacity: 0;
-  transform: translateY(16px);
-  transition:
-    opacity 0.5s cubic-bezier(0.16, 1, 0.3, 1),
-    transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+  max-width: 380px;
+  padding: 28px;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-2xl);
+  background: var(--surface-primary);
+  box-shadow: var(--shadow-sm);
 }
 
-.auth-card.card-enter {
-  opacity: 1;
-  transform: translateY(0);
-}
-
-/* ===== Window Chrome Bar ===== */
-.chrome-bar {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: var(--spacing-md) 0;
-  margin-bottom: var(--spacing-xs);
-}
-
-.chrome-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  border: 1px solid rgba(0, 0, 0, 0.06);
-}
-
-.chrome-dot--red {
-  background: #ff5f57;
-}
-.chrome-dot--yellow {
-  background: #febc2e;
-}
-.chrome-dot--green {
-  background: #28c840;
-}
-
-/* ===== Brand ===== */
 .auth-brand {
   display: flex;
   align-items: center;
-  gap: var(--spacing-sm);
-  margin-bottom: var(--spacing-xl);
+  gap: 10px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--border-light);
 }
 
-.brand-icon {
-  flex-shrink: 0;
-  width: 36px;
-  height: 36px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+.brand-mark {
+  display: grid;
+  flex: 0 0 34px;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  overflow: hidden;
+  border-radius: var(--radius);
+  background: var(--accent-light);
+  color: var(--accent);
 }
 
-.brand-icon svg {
-  width: 32px;
-  height: 32px;
+.brand-mark--image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  background: transparent;
 }
 
 .brand-text {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
+  display: grid;
+  gap: 2px;
+  min-width: 0;
 }
 
 .brand-name {
-  font-family: var(--font-display);
-  font-size: var(--text-sm);
-  font-weight: var(--font-semibold);
+  overflow: hidden;
   color: var(--text-primary);
-  letter-spacing: var(--tracking-tight);
-  line-height: 1.2;
+  font-size: 14px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .brand-tagline {
-  font-size: 0.6875rem;
   color: var(--text-muted);
-  line-height: 1.2;
+  font-size: 11px;
 }
 
-/* ===== Header ===== */
 .auth-header {
-  margin-bottom: var(--spacing-xl);
+  margin-block: 24px 22px;
 }
 
 .auth-header h1 {
-  font-family: var(--font-display);
-  font-size: var(--text-2xl);
-  font-weight: var(--font-bold);
-  color: var(--text-primary);
-  letter-spacing: -0.02em;
-  line-height: var(--leading-tight);
-  margin-bottom: var(--spacing-1);
+  margin-bottom: 8px;
+  font-size: 22px;
 }
 
 .auth-header p {
-  font-size: var(--text-sm);
-  color: var(--text-muted);
   margin: 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.7;
 }
 
-/* ===== Form ===== */
 .auth-form {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-lg);
+  display: grid;
+  gap: 18px;
 }
 
-/* ===== Form Field ===== */
 .form-field {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-1_5);
+  display: grid;
+  gap: 7px;
 }
 
 .form-label {
-  font-size: 0.6875rem;
-  font-weight: var(--font-semibold);
   color: var(--text-secondary);
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
+  font-size: 13px;
 }
 
 .input-wrap {
@@ -412,178 +264,139 @@ const handleLogin = async () => {
 .form-input {
   width: 100%;
   height: 44px;
-  padding: 0 var(--spacing-md);
-  font-size: var(--text-base);
-  font-family: var(--font-sans);
-  background: var(--gray-50);
-  border: 1px solid var(--border-solid);
+  padding-inline: 12px;
+  border: 1px solid var(--border-light);
   border-radius: var(--radius);
+  background: var(--surface-primary);
   color: var(--text-primary);
-  outline: none;
-  transition:
-    border-color var(--duration-fast) var(--ease-default),
-    box-shadow var(--duration-fast) var(--ease-default);
-  box-sizing: border-box;
+  font-size: 16px;
 }
 
 .form-input--password {
-  padding-right: 44px;
+  padding-right: 48px;
 }
 
 .form-input::placeholder {
   color: var(--text-muted);
-  font-size: var(--text-sm);
+  font-size: 14px;
 }
 
 .form-input:hover {
-  border-color: var(--gray-300);
+  border-color: var(--text-muted);
 }
 
-.form-input:focus {
-  border-color: var(--primary);
-  box-shadow: 0 0 0 3px var(--primary-light);
-  background: var(--surface-solid);
+.form-input:focus-visible {
+  border-color: var(--accent);
+  outline: 2px solid var(--accent-light);
+  outline-offset: 1px;
 }
 
-/* Password toggle */
 .input-toggle {
   position: absolute;
-  right: 4px;
+  right: 2px;
   top: 50%;
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 40px;
   transform: translateY(-50%);
-  width: 36px;
-  height: 36px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: none;
-  border: none;
+  border-radius: var(--radius);
   color: var(--text-muted);
-  cursor: pointer;
-  border-radius: var(--radius-sm);
-  transition:
-    color var(--duration-fast) var(--ease-default),
-    background var(--duration-fast) var(--ease-default);
 }
 
 .input-toggle:hover {
-  color: var(--text-secondary);
-  background: var(--gray-100);
+  color: var(--text-primary);
 }
 
-/* ===== Row: checkbox + link ===== */
 .form-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 12px;
 }
 
 .check-label {
   display: flex;
   align-items: center;
-  gap: var(--spacing-sm);
+  gap: 8px;
   cursor: pointer;
   user-select: none;
 }
 
 .check-input {
   position: absolute;
-  opacity: 0;
   width: 0;
   height: 0;
+  opacity: 0;
   pointer-events: none;
 }
 
 .check-box {
+  display: grid;
+  place-items: center;
   width: 16px;
   height: 16px;
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-xs);
-  background: var(--surface-solid);
+  background: var(--surface-primary);
   color: transparent;
-  transition:
-    background var(--duration-fast) var(--ease-default),
-    border-color var(--duration-fast) var(--ease-default),
-    color var(--duration-fast) var(--ease-default);
 }
 
 .check-input:checked + .check-box {
-  background: var(--primary);
-  border-color: var(--primary);
-  color: white;
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--text-inverse);
 }
 
 .check-input:focus-visible + .check-box {
-  box-shadow: 0 0 0 3px var(--primary-light);
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .check-text {
-  font-size: var(--text-sm);
   color: var(--text-secondary);
+  font-size: 13px;
 }
 
 .link-subtle {
-  font-size: var(--text-sm);
   color: var(--text-muted);
-  text-decoration: none;
-  transition: color var(--duration-fast) var(--ease-default);
+  font-size: 12px;
 }
 
-.link-subtle:hover {
-  color: var(--primary);
-}
-
-/* ===== Primary Button ===== */
 .btn-primary {
-  width: 100%;
-  height: 48px;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: var(--spacing-sm);
-  padding: 0 var(--spacing-xl);
-  font-size: var(--text-base);
-  font-weight: var(--font-semibold);
-  font-family: var(--font-sans);
+  gap: 8px;
+  width: 100%;
+  min-height: 46px;
+  border-radius: var(--radius);
   background: var(--contrast-bg);
   color: var(--contrast-fg);
-  border: none;
-  border-radius: var(--radius);
-  cursor: pointer;
-  transition:
-    background var(--duration-fast) var(--ease-default),
-    transform var(--duration-instant) var(--ease-default),
-    box-shadow var(--duration-fast) var(--ease-default);
+  font-size: 15px;
+  font-weight: 600;
 }
 
 .btn-primary:hover:not(:disabled) {
   background: var(--contrast-bg-hover);
 }
 
-.btn-primary:active:not(:disabled) {
-  transform: scale(0.98);
-}
-
 .btn-primary:disabled {
-  opacity: 0.55;
+  opacity: 0.6;
   cursor: not-allowed;
 }
 
 .btn-loading {
   display: flex;
   align-items: center;
-  gap: var(--spacing-sm);
+  gap: 8px;
 }
 
 .spinner {
-  width: 16px;
-  height: 16px;
-  border: 2px solid rgba(255, 255, 255, 0.25);
-  border-top-color: white;
+  width: 15px;
+  height: 15px;
+  border: 2px solid color-mix(in srgb, currentColor 30%, transparent);
+  border-top-color: currentColor;
   border-radius: 50%;
   animation: spin 0.65s linear infinite;
 }
@@ -594,143 +407,13 @@ const handleLogin = async () => {
   }
 }
 
-/* ===== Divider ===== */
-.auth-divider {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-md);
-  margin: var(--spacing-xl) 0;
-}
-
-.auth-divider::before,
-.auth-divider::after {
-  content: '';
-  flex: 1;
-  height: 1px;
-  background: var(--border-solid);
-}
-
-.auth-divider span {
-  font-size: 0.625rem;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  font-weight: var(--font-medium);
-}
-
-/* ===== Footer Switch ===== */
-.auth-footer {
-  text-align: center;
-}
-
-.auth-footer p {
-  font-size: var(--text-sm);
-  color: var(--text-secondary);
-  margin: 0;
-}
-
-.link-primary {
-  color: var(--primary);
-  text-decoration: none;
-  font-weight: var(--font-semibold);
-  transition: color var(--duration-fast) var(--ease-default);
-}
-
-.link-primary:hover {
-  color: var(--primary-hover);
-}
-
-/* ===== Transition ===== */
-.fade-swap-enter-active,
-.fade-swap-leave-active {
-  transition:
-    opacity 0.12s ease,
-    transform 0.12s ease;
-}
-
-.fade-swap-enter-from {
-  opacity: 0;
-  transform: scale(0.92);
-}
-
-.fade-swap-leave-to {
-  opacity: 0;
-  transform: scale(0.92);
-}
-
-/* ===== Mobile ===== */
-@media (max-width: 640px) {
+@media (max-width: 480px) {
   .auth-page {
-    padding: 0;
-    align-items: stretch;
+    padding: 16px;
   }
 
   .auth-card {
-    max-width: none;
-    border-radius: 0;
-    border: none;
-    box-shadow: none;
-    min-height: 100vh;
-    min-height: 100dvh;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    padding: var(--spacing-lg) var(--spacing-lg) var(--spacing-2xl);
-  }
-
-  .chrome-bar {
-    justify-content: center;
-    padding-top: var(--spacing-xl);
-    margin-bottom: var(--spacing-md);
-  }
-
-  .auth-brand {
-    justify-content: center;
-    margin-bottom: var(--spacing-lg);
-  }
-
-  .auth-header {
-    text-align: center;
-    margin-bottom: var(--spacing-lg);
-  }
-
-  .form-input {
-    height: 48px;
-    font-size: 16px; /* Prevent iOS zoom */
-  }
-
-  .btn-primary {
-    height: 48px;
-    font-size: 1rem;
-  }
-
-  .input-toggle {
-    width: 44px;
-    height: 44px;
-    min-width: 44px;
-  }
-}
-
-/* ===== Accessibility ===== */
-@media (prefers-reduced-motion: reduce) {
-  .auth-card {
-    opacity: 1;
-    transform: none;
-    transition: none;
-  }
-
-  .btn-primary:active:not(:disabled) {
-    transform: none;
-  }
-
-  .fade-swap-enter-active,
-  .fade-swap-leave-active {
-    transition: none;
-  }
-
-  .spinner {
-    animation: none;
-    border-color: rgba(255, 255, 255, 0.5);
+    padding: 22px;
   }
 }
 </style>
