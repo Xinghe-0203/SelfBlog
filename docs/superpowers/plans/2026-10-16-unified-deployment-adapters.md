@@ -65,8 +65,18 @@ assert.match(sqliteCompose, /jdbc:sqlite:\/app\/data\//)
 - [x] UsegeneratedroutingconfiginlocalproxyoverdisposableJAR toverifyHTML404/head/body, API401/POSTbody/auth, UTF8query, publicmediaRangeandprotectedalbumdenial. ThisisnotrealVercelvalidation.
 - [x] Full`npm run test:deployment`andcoreplanregressions; inspectactualsource/lockchanges. Includefailedinputandsecret-safeerrors.
 - [x] RecordDocker/realVercel/SMPTextensionsonlyifactuallyrun; noexistingservices/dataorcloudresourceschanged.
-- [ ] Commit/pushonlyscopewithupdatedREADME/CHANGELOG/DEPLOYandverificationrecord, aspartofapproveddelivery.
+- [x] Commit/pushonlyscopewithupdatedREADME/CHANGELOG/DEPLOYandverificationrecord, aspartofapproveddelivery.
+
+## Execution Status (2026-10-16)
+
+Implemented and delivered with the core batch: `frontend/scripts/vercel-proxy.mjs` + `build-vercel-proxy.mjs` generate Build Output v3 routes
+(validated HTTPS origins, no second static frontend, no-store + security headers, Preview `X-Robots-Tag`), `vercel.json` uses
+`framework: null`, and Docker builds the real single JAR from the repository-root context with non-root runtime and
+data/uploads/gallery volumes (MySQL compose keeps existing volume names; SQLite has its own compose). `npm run test:deployment`
+covers both adapters with 27 assertions, and a local same-shape proxy smoke passed as part of the 8/8 live audit.
+Delivery commit `951dd08` plus fixes `4caff07`/docs `6d80337` are on `origin/main`. Not verified: Docker daemon execution
+and a real Vercel project/deployment.
 
 ## Plan Review
 
-Approvedspecsections9â€?0arecoveredbytasks1â€?, section11bytask3andcoreplanTask7. URLsandheaderpolicyarepurefunctionsunderNodebuiltin tests; lifecycle/filesystemtestsusetempdirectories. Runtimecapabilitylimitsandproductiondomainconfigurationareexplicit, notsilentlyassumed.
+Approvedspecsections9â€“10arecoveredbytasks1â€“2, section11bytask3andcoreplanTask7. URLsandheaderpolicyarepurefunctionsunderNodebuiltin tests; lifecycle/filesystemtestsusetempdirectories. Runtimecapabilitylimitsandproductiondomainconfigurationareexplicit, notsilentlyassumed.

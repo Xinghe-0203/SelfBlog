@@ -153,8 +153,18 @@ expect(document.querySelector('link[rel="canonical"]')?.getAttribute('href')).to
 - [x] ExtendlocaldisposableSQLite/JAR runner: JSdisabledarticle/About/custombody, noindex/404, sitemapfollowallparts, strictdraftisolation, bothpublicationresponseorders; rerunold31flowsand7widthfoundationchecks.
 - [x] Execute deployment-adapter tests andlocallygeneratedrouteproxy smoke; recordDocker/realVercellimits truthfully. Source review inline; reproduceactualfindingsREDbeforefix, rerunaffected/fullgates.
 - [x] Update README/CHANGELOG/DEPLOY/spec/ADR and `docs/reviews/2026-10-16-seo-deployment-verification.md` withexactevidence, notpromisedindexing.
-- [ ] Scopedcommits only, preserveuserCLAUDE/scratch/data, pushperprioruserdeliveryrequest, verifyremoteSHA. Do notdeploytoexistingruntimeorcloudwithoutauthorization.
+- [x] Scopedcommits only, preserveuserCLAUDE/scratch/data, pushperprioruserdeliveryrequest, verifyremoteSHA. Do notdeploytoexistingruntimeorcloudwithoutauthorization.
+
+## Execution Status (2026-10-16)
+
+Implemented and verified as one batch; delivery commit `951dd08` (feature) plus `4caff07` (live-audit fixes) and `6d80337` (docs) pushed to `origin/main`.
+
+- Frontend **41 files / 392 tests**, type-check, ESLint 0 errors and production build pass; deployment contracts **27/27**.
+- Backend **540 tests / 0 failures / 0 errors / 0 skipped**.
+- Real packaged-JAR + fresh-SQLite audit: **8/8** (JS-disabled reading, spoofed Host, published About/custom bodies, sitemap completeness, unpublish â†’ 404, Vue replacement, local proxy transport, no script errors/5xx) and the previous batch's browser regression **31/31**.
+- Live audit also produced the transaction-boundary fix: `ReadingPageService` has no class-level transaction, and 404 regressions run with `NOT_SUPPORTED` so no enclosing test transaction can hide rollback-only failures again.
+- Not verified: MySQL execution, Docker image build/run (no daemon), a real Vercel deployment, and search-engine indexing. `docs/reviews/2026-10-16-seo-deployment-verification.md` records all evidence and limits.
 
 ## Plan Review
 
-Spec sections1â€? map totasks1â€?/6; section8 totask5; sections9â€?0 tolinkeddeploymentplan; section11 totask7. Interfaces above are the contracts used by downstreamtasks. Core anddeployment adapters can be tested independently; no new feature is inferred from optionalplatformaccess.
+Spec sections1â€“7 map totasks1â€“4/6; section8 totask5; sections9â€“10 tolinkeddeploymentplan; section11 totask7. Interfaces above are the contracts used by downstreamtasks. Core anddeployment adapters can be tested independently; no new feature is inferred from optionalplatformaccess.
