@@ -187,6 +187,9 @@ public class RateLimitProperties {
         limits.put("/api/gallery/", gallery);
         limits.put("/api/admin/albums/", galleryUpload);
         limits.put("/api/admin/site-assets", siteAssetUpload);
+        limits.put("/api/site/pages", 120);
+        limits.put("/api/admin/pages", 60);
+        limits.put("/api/admin/page-navigation", 30);
         return limits;
     }
 }

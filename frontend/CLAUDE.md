@@ -13,7 +13,7 @@ npm run build          # 构建生产版本（先 vue-tsc --noEmit，再 Vite）
 npm run preview        # 预览生产版本
 npm run lint:check     # 只读 ESLint 检查（npm run lint 会改写文件）
 npm run type-check     # vue-tsc --noEmit（必过闸门）
-npm run test:run       # Vitest 单次运行（当前 31 文件 / 345 tests；原始基线 210）
+npm run test:run       # Vitest 单次运行（当前 41 文件 / 389 tests；原始基线 210）
 ```
 
 > 本机直接把 `npm run <script>` 跑在系统 PATH 上会失败（PATH 里有一条不配对的引号，
@@ -106,6 +106,9 @@ src/
 - 导航链接紧接搜索框，弹性空白放在右侧工具前；选中态 34px 胶囊与 44px 点击区域分开，不把原型触达尺寸直接照搬
 - 编辑器保存状态依据成功提交的完整内容快照；摘要/标签也计入未保存状态，旧请求不得把请求期间的新改动标成已保存。离开守卫测试必须通过 RouterView 挂载
 - 标签新建/编辑上限 20 字，以后端现有校验为准；不要只改输入框上限而不校验程序提交
+- 公开页面配置由 stores/pages + usePageConfig 消费；草稿只在后台编辑器/预览上下文，不能写进公开store或localStorage。PageFrame的局部变量不能覆盖全站主题，未配置时保持原比例
+- 页面预览通过空srcdoc真实视口挂载相同安全组件；不要把作者正文拼进srcdoc，不创建公开草稿URL，也不要为预览放宽X-Frame-Options。预览禁止修改文档head
+- 页面编辑/导航写入必须携带revision；只把提交快照标记为保存成功，跨页/卸载后忽略迟到响应。恢复默认只改草稿，发布需明确操作
 
 ## 路由约定
 

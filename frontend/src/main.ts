@@ -7,6 +7,7 @@ import router, { installAdminRoutes } from './router'
 import { useLogger } from './utils/logger'
 import { useSiteStore } from './stores/site'
 import { useUserStore } from './stores/user'
+import { usePagesStore } from './stores/pages'
 import { vScrollReveal } from './composables/useScrollReveal'
 import './styles/main.css'
 
@@ -45,6 +46,8 @@ async function bootstrap() {
   useUserStore(pinia).restoreFromStorage()
   app.use(router)
   app.mount('#app')
+  // Optional published configuration must not delay identity restoration or initial navigation.
+  void usePagesStore(pinia).loadManifest()
   logger.info('Application initialized', { version: '2.0.25', mode: import.meta.env.MODE })
 }
 

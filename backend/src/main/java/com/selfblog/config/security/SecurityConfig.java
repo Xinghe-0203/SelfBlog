@@ -163,7 +163,8 @@ public class SecurityConfig {
                                 "/api/v3/api-docs/**").permitAll()
                         .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
                         .requestMatchers("/api/admin/**").hasRole("admin")
-                        .requestMatchers(HttpMethod.GET, "/api/site/public", "/site/public").permitAll()
+                         .requestMatchers(HttpMethod.GET, "/api/site/public", "/site/public").permitAll()
+                         .requestMatchers(HttpMethod.GET, "/api/site/pages", "/api/site/pages/**", "/site/pages", "/site/pages/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/visitor/track", "/visitor/track").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/post/{id}", "/post/{id}").permitAll()
                         // 文章详情页底部的上一篇/下一篇，访客也要能拿

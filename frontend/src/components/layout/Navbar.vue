@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useThemeStore } from '@/stores/theme'
 import { useSiteStore } from '@/stores/site'
@@ -8,23 +8,77 @@ import { useScrollState } from '@/composables/useScrollState'
 import Icon from '@/components/common/Icon.vue'
 import type { IconName } from '@/components/common/icons'
 import NavbarMusicControl from './NavbarMusicControl.vue'
+import { usePagesStore } from '@/stores/pages'
+import { fitNavigation } from '@/utils/navigationFit'
 
 const router = useRouter()
 const route = useRoute()
 const themeStore = useThemeStore()
 const siteStore = useSiteStore()
 const music = useMusicStore()
+const pages = usePagesStore()
 const { scrolled } = useScrollState(16)
 const root = ref<HTMLElement | null>(null)
 const searchQuery = ref('')
-const panel = ref<'menu' | 'search' | 'music' | null>(null)
+const panel = ref<'menu' | 'search' | 'music' | 'more' | null>(null)
 let opener: HTMLElement | null = null
-const links: Array<{ to: string; label: string; icon: IconName }> = [
-  { to: '/', label: '首页', icon: 'home' },
-  { to: '/archives', label: '归档', icon: 'archive' },
-  { to: '/gallery', label: '相册', icon: 'image' },
-  { to: '/about', label: '关于', icon: 'info' }
-]
+const pageIcons: Record<string, IconName> = {
+  home: 'home',
+  archives: 'archive',
+  gallery: 'image',
+  about: 'info'
+}
+const links = computed(() =>
+  pages.navigation.map((link) => ({
+    ...link,
+    icon: pageIcons[link.pageId] || ('file-text' as IconName)
+  }))
+)
+const visibleCount = ref(4)
+const visibleLinks = computed(() => links.value.slice(0, visibleCount.value))
+const overflowLinks = computed(() => links.value.slice(visibleCount.value))
+let resizeObserver: ResizeObserver | undefined
+function fitLinks(): void {
+  const shell = root.value?.querySelector<HTMLElement>('.nav-shell')
+  if (!shell || !shell.clientWidth) {
+    visibleCount.value = Math.min(4, links.value.length)
+    return
+  }
+  const style = getComputedStyle(shell)
+  const brand = shell.querySelector<HTMLElement>('.brand')
+  const search = shell.querySelector<HTMLElement>('.nav-search')
+  const tools = shell.querySelector<HTMLElement>('.nav-actions')
+  const gap = Number.parseFloat(style.columnGap) || 0
+  const searchStyle = search ? getComputedStyle(search) : undefined
+  const searchWidth =
+    searchStyle?.display !== 'none'
+      ? Number.parseFloat(searchStyle?.flexBasis || '0') ||
+        search?.getBoundingClientRect().width ||
+        0
+      : 0
+  const available =
+    shell.clientWidth -
+    Number.parseFloat(style.paddingLeft) -
+    Number.parseFloat(style.paddingRight) -
+    (brand?.getBoundingClientRect().width || 0) -
+    searchWidth -
+    (tools?.getBoundingClientRect().width || 0) -
+    gap * (searchWidth ? 3 : 2)
+  const widths = [...(root.value?.querySelectorAll<HTMLElement>('.nav-measure-link') || [])].map(
+    (node) => node.getBoundingClientRect().width
+  )
+  const moreWidth =
+    root.value?.querySelector<HTMLElement>('.nav-measure-more')?.getBoundingClientRect().width || 68
+  visibleCount.value = fitNavigation(widths, available, moreWidth)
+}
+watch(
+  links,
+  async () => {
+    await nextTick()
+    fitLinks()
+  },
+  { deep: true }
+)
 
 function closePanel(restoreFocus = false): void {
   if (!panel.value) return
@@ -44,9 +98,12 @@ async function togglePanel(
   panel.value = next
   await nextTick()
   if (panel.value !== next) return
-  const id = { menu: 'nav-mobile-panel', music: 'nav-music-panel', search: 'nav-search-panel' }[
-    next
-  ]
+  const id = {
+    menu: 'nav-mobile-panel',
+    music: 'nav-music-panel',
+    search: 'nav-search-panel',
+    more: 'nav-more-panel'
+  }[next]
   const activePanel = root.value?.querySelector<HTMLElement>(`#${id}:not([inert])`)
   activePanel?.querySelector<HTMLElement>('input, button, a')?.focus({ preventScroll: true })
 }
@@ -68,7 +125,10 @@ function onOutside(event: Event): void {
   if (event.target instanceof Node && !root.value?.contains(event.target)) closePanel()
 }
 const onDialog = () => closePanel()
-const onResize = () => closePanel()
+const onResize = () => {
+  closePanel()
+  fitLinks()
+}
 watch(
   () => route.fullPath,
   () => closePanel()
@@ -84,12 +144,25 @@ onMounted(() => {
   document.addEventListener('keydown', onKeydown)
   document.addEventListener('selfblog:dialog-open', onDialog)
   window.addEventListener('resize', onResize)
+  void nextTick(() => {
+    fitLinks()
+    if (typeof ResizeObserver !== 'undefined' && root.value) {
+      resizeObserver = new ResizeObserver(fitLinks)
+      root.value
+        .querySelectorAll('.nav-shell, .brand, .nav-search, .nav-actions')
+        .forEach((node) => resizeObserver?.observe(node))
+    }
+  })
+  void document.fonts?.ready.then(() => {
+    if (root.value) fitLinks()
+  })
 })
 onBeforeUnmount(() => {
   document.removeEventListener('pointerdown', onOutside)
   document.removeEventListener('keydown', onKeydown)
   document.removeEventListener('selfblog:dialog-open', onDialog)
   window.removeEventListener('resize', onResize)
+  resizeObserver?.disconnect()
 })
 </script>
 
@@ -118,7 +191,7 @@ onBeforeUnmount(() => {
 
         <div class="nav-links" aria-label="博客导航">
           <router-link
-            v-for="link in links"
+            v-for="link in visibleLinks"
             :key="link.to"
             :to="link.to"
             active-class="active"
@@ -126,6 +199,18 @@ onBeforeUnmount(() => {
           >
             <Icon :name="link.icon" :size="16" /><span>{{ link.label }}</span>
           </router-link>
+          <button
+            v-if="overflowLinks.length"
+            class="nav-more"
+            type="button"
+            aria-label="更多页面"
+            aria-controls="nav-more-panel"
+            :aria-expanded="panel === 'more'"
+            :class="{ active: overflowLinks.some((link) => link.to === route.path) }"
+            @click="togglePanel('more', $event.currentTarget as HTMLElement)"
+          >
+            更多<Icon class="more-chevron" name="chevron-right" :size="14" />
+          </button>
         </div>
 
         <div class="nav-actions">
@@ -164,6 +249,34 @@ onBeforeUnmount(() => {
           </button>
         </div>
       </div>
+
+      <div class="nav-measure" aria-hidden="true" inert>
+        <span v-for="link in links" :key="link.pageId" class="nav-measure-link"
+          ><Icon :name="link.icon" :size="16" />{{ link.label }}</span
+        ><span class="nav-measure-more nav-more"
+          >更多<Icon class="more-chevron" name="chevron-right" :size="14"
+        /></span>
+      </div>
+      <Transition name="nav-panel" @before-leave="$event.setAttribute('inert', '')"
+        ><div
+          v-if="panel === 'more'"
+          id="nav-more-panel"
+          class="more-panel nav-panel functional-glass"
+          data-nav-panel
+          role="region"
+          aria-label="更多页面"
+        >
+          <router-link
+            v-for="link in overflowLinks"
+            :key="link.to"
+            :to="link.to"
+            active-class="active"
+            exact-active-class="active"
+            @click="closePanel()"
+            ><Icon :name="link.icon" :size="18" />{{ link.label }}</router-link
+          >
+        </div></Transition
+      >
 
       <Transition name="nav-panel" @before-leave="$event.setAttribute('inert', '')">
         <div
@@ -323,7 +436,8 @@ onBeforeUnmount(() => {
   gap: 2px;
 }
 /* Keep the approved 34px capsule inside a full-height keyboard/touch target. */
-.nav-links a {
+.nav-links a,
+.nav-measure-link {
   position: relative;
   isolation: isolate;
   display: flex;
@@ -337,6 +451,57 @@ onBeforeUnmount(() => {
   font-size: 13px;
   font-weight: 500;
   white-space: nowrap;
+}
+.nav-measure {
+  position: absolute;
+  left: -10000px;
+  top: 0;
+  display: flex;
+  width: max-content;
+  visibility: hidden;
+  pointer-events: none;
+}
+.nav-more {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  min-width: 44px;
+  height: 44px;
+  padding-inline: 12px;
+  border-radius: var(--radius-full);
+  color: var(--text-secondary);
+  font-size: 13px;
+  white-space: nowrap;
+}
+.nav-more:hover,
+.nav-more[aria-expanded='true'],
+.nav-more.active {
+  color: var(--accent);
+  background: var(--accent-light);
+}
+.more-chevron {
+  transform: rotate(90deg);
+}
+.more-panel {
+  display: grid;
+  gap: 4px;
+}
+.more-panel > a {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding-inline: 12px;
+  border-radius: var(--radius);
+  color: var(--text-secondary);
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+.more-panel > a:hover,
+.more-panel > a.active {
+  color: var(--accent);
+  background: var(--accent-light);
 }
 .nav-links a::before {
   position: absolute;
@@ -490,7 +655,8 @@ onBeforeUnmount(() => {
   .search-toggle {
     display: grid;
   }
-  .nav-links a {
+  .nav-links a,
+  .nav-measure-link {
     padding-inline: 10px;
   }
 }

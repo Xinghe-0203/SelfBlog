@@ -4,6 +4,32 @@
 
 ---
 
+## 未发布 — 逐页配置与独立内容页（第一批） (2026-10-16)
+
+### 说明
+
+- 新增后台页面管理：8类内置公开页/详情模板的独立文案、模块开关、受控样式与SEO字段；关于页支持独立Markdown正文。
+- 新增独立内容页、草稿/发布分离、真实组件预览、下线/删除和公开导航编辑；桌面链接按可用空间进入「更多」，手机保留完整导航。
+- 复用现有KV表，不修改schema；草稿不公开，数据库条件更新防止旧版本静默覆盖，slug唯一预留，配置按UTF-8字节限制。
+- 用户已取消全站放大：保持当前字号、导航高度和页面比例。未配置的页面继续采用现有内容与作者主题。
+- 全量验证：前端41文件/389测试、类型检查、Lint0错误/256警告、构建及本轮文件格式检查通过；后端491测试通过，含两项真实H2独立事务竞争。隔离SQLite浏览器**31/31**通过，含单JAR直连、UI确认下线/删除、390px深色预览和首屏请求顺序，见[验证记录](docs/reviews/2026-10-16-page-management-verification.md)。
+- 修复首屏配置摘要与About正文的并行加载顺序问题：同发布版本合并正文，版本更新则重新获取，不让摘要擦掉正文或旧响应覆盖新版本。
+- 本批完善运行时元数据，不声称搜索引擎已经收录；服务端HTML SEO及已知Docker/Vercel欠项仍属后续批次。
+
+### 影响文件
+
+| 文件 | 改动类型 |
+| --- | --- |
+| `backend/.../dto/site/PageModels.java`、`service/site/PageService.java`、`service/site/page/PageCatalog.java`、`service/site/impl/PageServiceImpl.java` | 新增：类型、白名单、版本化存储与发布/导航逻辑 |
+| `backend/.../controller/admin/AdminPageController.java`、`controller/site/PublicPageController.java`、安全/限流/站点设置配置 | 新增接口及权限、限流、保留路径 |
+| `frontend/src/{api,types,stores}/pages*`、`composables/usePage*.ts`、`components/pages/*` | 新增：公开配置、局部样式、安全正文及元数据生命周期 |
+| `frontend/src/views/admin/pages/*`、公开页面、导航、路由与启动入口 | 页面编辑/预览/导航及消费端接入 |
+| 对应前后端测试 | 新增草稿隔离、版本冲突、页面模块、路由保护、预览、导航与元数据回归 |
+| `docs/page-management.md`、`docs/decisions/001-versioned-pages-in-existing-kv.md`、README分册、规格/计划 | 使用指南、架构取舍、验证范围与限制 |
+| `backend/DEPLOY.md` | 升级、完整KV备份及旧后台命名空间兼容说明 |
+
+---
+
 ## 未发布 — 导航原型还原与前后端联调修正 (2026-10-16)
 
 ### 说明

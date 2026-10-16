@@ -79,3 +79,11 @@ npm run build
 - Use `src/api/` modules: the shared Axios interceptor returns the backend response envelope, not `AxiosResponse`; `response.data` is the business payload. It also owns queued token refresh and auth-failure cleanup of Pinia/storage.
 - `src/main.ts` restores auth state before installing the router; preserve this order. Routes are assembled from `src/router/modules/`, with guards in `src/router/guards.ts`.
 - `src/styles/main.css` is only the import entrypoint; design tokens live in `variables.css`, dark overrides in `dark-mode.css`. Confirmations use `src/composables/useConfirm.ts`; render its returned `ConfirmDialog` component as well as calling `confirm()`.
+
+## Configurable pages (2026-10-16)
+
+- Page management is `/api/admin/pages` plus `/api/admin/page-navigation`; published-only reads are `/api/site/pages`. Runtime adds `/api` automatically. Keep `page.draft.*` out of the global settings whitelist/public response.
+- PageService reuses `site_setting` without schema changes: separate draft/published documents, slug reservations and navigation revisions. Conditional database updates claim the expected revision; do not replace with process-local locks. Body10000 characters, one JSON document48KiB UTF-8.
+- Builtins cannot be deleted/unpublished. Custom slugs may change only before first publication. Keep existing adminPath=pages intact and require changing that path before custom content-page creation.
+- The user canceled whole-site enlargement: preserve default fonts/scale. PageFrame appearance variables stay local. Preview uses blank same-origin srcdoc plus the same components in an actual viewport, with no public draft route or relaxed security headers.
+- Final feature gates: frontend41 files/389 tests, typecheck/lint/build/changed-file format; backend491 tests. Live evidence and remaining SEO/deployment scope are in `docs/reviews/2026-10-16-page-management-verification.md`; don't treat runtime metadata as initial-HTML SEO or proof of search-engine indexing.

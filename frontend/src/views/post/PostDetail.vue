@@ -4,18 +4,25 @@ import { useRoute } from 'vue-router'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
 import { postApi } from '@/api/post'
-import { publicInteractionApi, type AnonymousLike, type GuestComment } from '@/api/public-interactions'
+import {
+  publicInteractionApi,
+  type AnonymousLike,
+  type GuestComment
+} from '@/api/public-interactions'
 import { formatDate, getSafeImageUrl } from '@/utils'
 import { estimateReadMinutes } from '@/utils/reading'
 import { useUserStore } from '@/stores/user'
 import { useSiteStore } from '@/stores/site'
-import { applySeoMeta, applyArticleJsonLd, setSeoSiteTitle } from '@/composables/useSeoMeta'
+import { usePageSeo } from '@/composables/usePageSeo'
 import { enhanceMarkdown } from '@/composables/useMarkdownEnhance'
 import { toast } from '@/utils/toast'
 import ImagePreview from '@/components/common/ImagePreview.vue'
 import MobileTocSheet from '@/components/post/MobileTocSheet.vue'
 import Icon from '@/components/common/Icon.vue'
 import type { Post } from '@/types'
+import PageFrame from '@/components/pages/PageFrame.vue'
+import { usePageConfig } from '@/composables/usePageConfig'
+const { config, text, module: showModule, isPreview, preview } = usePageConfig('post')
 
 interface TocItem {
   id: string
@@ -27,8 +34,23 @@ const route = useRoute()
 const userStore = useUserStore()
 const siteStore = useSiteStore()
 const post = ref<Post | null>(null)
+usePageSeo('post', () => ({
+  title: post.value?.title || '文章详情',
+  description:
+    post.value?.summary || post.value?.content.replace(/[#*`>_~-]/g, '').slice(0, 140) || '',
+  image: post.value?.coverUrl || post.value?.coverImage,
+  url: `/post/${post.value?.id || route.params.id}`,
+  type: post.value ? 'article' : 'website',
+  publishedTime: post.value?.createTime || post.value?.createdAt,
+  author: post.value?.nickname || post.value?.authorName,
+  tags: post.value?.tags?.map((tag) => tag.name),
+  indexable: !!post.value
+}))
 /** 上一篇 / 下一篇，缺失的方向为 null */
-const adjacent = ref<{ prev: { id: number; title: string } | null; next: { id: number; title: string } | null }>({
+const adjacent = ref<{
+  prev: { id: number; title: string } | null
+  next: { id: number; title: string } | null
+}>({
   prev: null,
   next: null
 })
@@ -93,45 +115,12 @@ const fetchPost = async () => {
   error.value = ''
   post.value = null
   try {
-    const response = await postApi.getPostById(String(route.params.id))
+    const response = await postApi.getPostById(preview?.articleId?.value || String(route.params.id))
     if (!response.data) {
       error.value = '文章不存在或已被删除。'
       return
     }
     post.value = response.data
-    // 分享到微信/微博/Twitter 时，抓取器读的是这几条静态 meta，
-    // 不更新就永远是首页标题和封面。
-    const detail = response.data
-    // 摘要优先用后端返回的 summary；缺失时从正文剥掉 Markdown 标记生成纯文本
-    const description =
-      detail.summary ||
-      detail.content
-        ?.replace(/!\[[^\]]*\]\([^)]*\)/g, '')
-        .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
-        .replace(/[#*`>_~-]/g, ' ')
-        .replace(/\s+/g, ' ')
-        .trim()
-        .slice(0, 140) ||
-      ''
-    setSeoSiteTitle(siteStore.settings.siteTitle)
-    applySeoMeta({
-      title: detail.title,
-      description,
-      image: detail.coverUrl || detail.coverImage,
-      url: `/post/${detail.id}`,
-      type: 'article',
-      publishedTime: detail.createTime,
-      author: detail.nickname || detail.authorName,
-      tags: (detail.tags || []).map((tag) => tag.name)
-    })
-    applyArticleJsonLd({
-      title: detail.title,
-      description,
-      image: detail.coverUrl || detail.coverImage,
-      url: `/post/${detail.id}`,
-      publishedTime: detail.createTime,
-      author: detail.nickname || detail.authorName
-    })
     comments.value = []
     commentsTotal.value = 0
     commentPage.value = 1
@@ -174,7 +163,7 @@ async function loadLikeStatus() {
 }
 
 async function toggleAnonymousLike() {
-  if (!post.value || liking.value) return
+  if (!post.value || liking.value || isPreview) return
   liking.value = true
   try {
     const response = await publicInteractionApi.toggleLike(Number(post.value.id))
@@ -189,7 +178,10 @@ async function toggleAnonymousLike() {
 async function loadComments(append = false) {
   if (!post.value || !siteStore.isCommentsEnabled) return
   try {
-    const response = await publicInteractionApi.getComments(Number(post.value.id), { pageNum: commentPage.value, pageSize: 10 })
+    const response = await publicInteractionApi.getComments(Number(post.value.id), {
+      pageNum: commentPage.value,
+      pageSize: 10
+    })
     const records = response.data?.records || []
     comments.value = append ? [...comments.value, ...records] : records
     commentsTotal.value = response.data?.total || 0
@@ -204,7 +196,7 @@ async function loadMoreComments() {
 }
 
 async function submitComment() {
-  if (!post.value || submittingComment.value) return
+  if (!post.value || submittingComment.value || isPreview) return
   const nickname = commentNickname.value.trim()
   const content = commentContent.value.trim()
   if (!nickname || !content) {
@@ -214,13 +206,19 @@ async function submitComment() {
   submittingComment.value = true
   try {
     await publicInteractionApi.createComment({ postId: Number(post.value.id), nickname, content })
-    try { localStorage.setItem('selfblog-comment-name', nickname) } catch { /* storage is optional */ }
+    try {
+      localStorage.setItem('selfblog-comment-name', nickname)
+    } catch {
+      /* storage is optional */
+    }
     commentContent.value = ''
     commentPage.value = 1
     await loadComments()
     toast.success('评论已发布，感谢分享。')
   } catch (err) {
-    toast.error((err as Error & { userMessage?: string }).userMessage || '评论提交失败，请稍后重试。')
+    toast.error(
+      (err as Error & { userMessage?: string }).userMessage || '评论提交失败，请稍后重试。'
+    )
   } finally {
     submittingComment.value = false
   }
@@ -287,7 +285,10 @@ watch(
 const scrollToHeading = (item: TocItem) => {
   const heading = contentRef.value?.querySelector(`#${item.id}`)
   if (!heading) return
-  heading.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' })
+  heading.scrollIntoView({
+    behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+    block: 'start'
+  })
   activeHeading.value = item.id
 }
 
@@ -334,7 +335,11 @@ function scheduleReadingProgress(): void {
 watch(() => route.params.id, fetchPost)
 
 onMounted(() => {
-  try { commentNickname.value = localStorage.getItem('selfblog-comment-name') || '访客' } catch { /* storage is optional */ }
+  try {
+    commentNickname.value = localStorage.getItem('selfblog-comment-name') || '访客'
+  } catch {
+    /* storage is optional */
+  }
   fetchPost()
   window.addEventListener('scroll', scheduleReadingProgress, { passive: true })
 })
@@ -347,14 +352,24 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="reading-progress" :style="{ width: `${readingProgress}%` }" aria-hidden="true"></div>
+  <div
+    v-if="!isPreview"
+    class="reading-progress"
+    :style="{ width: `${readingProgress}%` }"
+    aria-hidden="true"
+  ></div>
 
-  <div class="reader-page">
+  <PageFrame :config="config" class="reader-page">
     <div class="reader-topline">
-      <router-link to="/" class="back-link"><Icon name="chevron-left" :size="16" />所有文章</router-link>
-      <router-link v-if="post && userStore.isAdmin" :to="`${siteStore.adminRoot}/edit/${post.id}`" class="edit-link"
-        >编辑文章<Icon name="external" :size="14" /></router-link
+      <router-link to="/" class="back-link"
+        ><Icon name="chevron-left" :size="16" />所有文章</router-link
       >
+      <router-link
+        v-if="post && userStore.isAdmin"
+        :to="`${siteStore.adminRoot}/edit/${post.id}`"
+        class="edit-link"
+        >编辑文章<Icon name="external" :size="14"
+      /></router-link>
     </div>
 
     <div v-if="loading" class="state-panel" role="status">正在打开文章…</div>
@@ -364,7 +379,11 @@ onUnmounted(() => {
       <router-link to="/">返回首页</router-link>
     </div>
 
-    <article v-else-if="post" class="reader-layout" :class="{ 'reader-layout--no-toc': !toc.length }">
+    <article
+      v-else-if="post"
+      class="reader-layout"
+      :class="{ 'reader-layout--no-toc': !toc.length || !showModule('toc') }"
+    >
       <div class="article-column">
         <header class="article-header">
           <div v-if="post.tags?.length" class="article-tags">
@@ -374,8 +393,11 @@ onUnmounted(() => {
           </div>
           <p v-if="post.category" class="article-category">{{ post.category }}</p>
           <h1>{{ post.title }}</h1>
+          <p v-if="text('description', '')" class="article-summary">
+            {{ text('description', '') }}
+          </p>
           <p v-if="post.summary" class="article-summary">{{ post.summary }}</p>
-          <div class="article-meta">
+          <div v-if="showModule('meta')" class="article-meta">
             <time :datetime="post.createTime || post.createdAt">
               {{ formatDate(post.createTime || post.createdAt, 'YYYY年MM月DD日') }}
             </time>
@@ -390,7 +412,12 @@ onUnmounted(() => {
           </div>
         </header>
 
-        <img v-if="post.coverImage || post.coverUrl" class="article-cover" :src="getSafeImageUrl(post.coverImage || post.coverUrl)" alt="" />
+        <img
+          v-if="showModule('cover') && (post.coverImage || post.coverUrl)"
+          class="article-cover"
+          :src="getSafeImageUrl(post.coverImage || post.coverUrl)"
+          alt=""
+        />
 
         <div
           ref="contentRef"
@@ -399,19 +426,33 @@ onUnmounted(() => {
           @click="onContentClick"
         ></div>
 
-        <nav v-if="adjacent.prev || adjacent.next" class="post-adjacent" aria-label="相邻文章">
+        <nav
+          v-if="showModule('adjacent') && (adjacent.prev || adjacent.next)"
+          class="post-adjacent"
+          aria-label="相邻文章"
+        >
           <router-link v-if="adjacent.prev" class="adjacent-link" :to="`/post/${adjacent.prev.id}`">
             <span class="adjacent-label"><Icon name="chevron-left" :size="14" />上一篇</span>
             <span class="adjacent-title">{{ adjacent.prev.title }}</span>
           </router-link>
-          <router-link v-if="adjacent.next" class="adjacent-link adjacent-link--next" :to="`/post/${adjacent.next.id}`">
+          <router-link
+            v-if="adjacent.next"
+            class="adjacent-link adjacent-link--next"
+            :to="`/post/${adjacent.next.id}`"
+          >
             <span class="adjacent-label">下一篇<Icon name="chevron-right" :size="14" /></span>
             <span class="adjacent-title">{{ adjacent.next.title }}</span>
           </router-link>
         </nav>
 
         <section class="reader-interactions" :aria-label="`《${post.title}》的互动`">
-          <button class="like-action" :class="{ active: likeInfo.liked }" type="button" :disabled="liking" @click="toggleAnonymousLike">
+          <button
+            class="like-action"
+            :class="{ active: likeInfo.liked }"
+            type="button"
+            :disabled="liking"
+            @click="toggleAnonymousLike"
+          >
             <span aria-hidden="true">{{ likeInfo.liked ? '♥' : '♡' }}</span>
             {{ likeInfo.liked ? '已点赞' : '匿名点赞' }} <strong>{{ likeInfo.likeCount }}</strong>
           </button>
@@ -419,30 +460,68 @@ onUnmounted(() => {
         </section>
 
         <section v-if="siteStore.isCommentsEnabled" class="comments-section">
-          <header class="comments-heading"><h2>读者留言 <span>{{ commentsTotal }}</span></h2></header>
+          <header class="comments-heading">
+            <h2>
+              读者留言 <span>{{ commentsTotal }}</span>
+            </h2>
+          </header>
           <form class="comment-form" @submit.prevent="submitComment">
-            <label><span>昵称</span><input v-model="commentNickname" maxlength="80" placeholder="访客" required /></label>
-            <label><span>留言内容</span><textarea v-model="commentContent" maxlength="2000" rows="4" placeholder="写下你的想法…" required></textarea></label>
-            <div class="comment-form-footer"><small>友善交流，请勿填写敏感个人信息。</small><button type="submit" :disabled="submittingComment">{{ submittingComment ? '正在发布…' : '发布留言' }}</button></div>
+            <label
+              ><span>昵称</span
+              ><input v-model="commentNickname" maxlength="80" placeholder="访客" required
+            /></label>
+            <label
+              ><span>留言内容</span
+              ><textarea
+                v-model="commentContent"
+                maxlength="2000"
+                rows="4"
+                placeholder="写下你的想法…"
+                required
+              ></textarea>
+            </label>
+            <div class="comment-form-footer">
+              <small>友善交流，请勿填写敏感个人信息。</small
+              ><button type="submit" :disabled="submittingComment">
+                {{ submittingComment ? '正在发布…' : '发布留言' }}
+              </button>
+            </div>
           </form>
           <div v-if="comments.length" class="comment-list">
             <article v-for="comment in comments" :key="comment.id" class="reader-comment">
-              <div class="comment-avatar" aria-hidden="true">{{ comment.nickname.slice(0, 1) }}</div>
-              <div><header><strong>{{ comment.nickname }}</strong><time>{{ formatDate(comment.createTime, 'YYYY-MM-DD HH:mm') }}</time></header><p>{{ comment.content }}</p></div>
+              <div class="comment-avatar" aria-hidden="true">
+                {{ comment.nickname.slice(0, 1) }}
+              </div>
+              <div>
+                <header>
+                  <strong>{{ comment.nickname }}</strong
+                  ><time>{{ formatDate(comment.createTime, 'YYYY-MM-DD HH:mm') }}</time>
+                </header>
+                <p>{{ comment.content }}</p>
+              </div>
             </article>
           </div>
           <p v-else class="no-comments">还没有留言，欢迎成为第一个留言的人。</p>
-          <button v-if="comments.length < commentsTotal" class="load-more-comments" type="button" @click="loadMoreComments">加载更多留言</button>
+          <button
+            v-if="comments.length < commentsTotal"
+            class="load-more-comments"
+            type="button"
+            @click="loadMoreComments"
+          >
+            加载更多留言
+          </button>
         </section>
 
         <footer class="article-end">
           <span class="end-rule"></span>
           <p>感谢阅读</p>
-          <router-link to="/archives">继续浏览文章归档<Icon name="chevron-right" :size="14" /></router-link>
+          <router-link to="/archives"
+            >继续浏览文章归档<Icon name="chevron-right" :size="14"
+          /></router-link>
         </footer>
       </div>
 
-      <aside v-if="toc.length" class="article-aside">
+      <aside v-if="showModule('toc') && toc.length" class="article-aside">
         <div class="toc-card">
           <h2>文章目录</h2>
           <nav aria-label="文章目录">
@@ -461,7 +540,7 @@ onUnmounted(() => {
     </article>
 
     <MobileTocSheet
-      v-if="toc.length"
+      v-if="showModule('toc') && toc.length && !isPreview"
       :items="toc"
       :active-id="activeHeading"
       @select="scrollToHeading"
@@ -474,13 +553,13 @@ onUnmounted(() => {
       :show="true"
       @close="previewVisible = false"
     />
-  </div>
+  </PageFrame>
 </template>
 
 <style scoped>
 .reading-progress {
   position: fixed;
-   z-index: var(--z-sticky);
+  z-index: var(--z-sticky);
   top: 0;
   left: 0;
   height: 2px;
@@ -488,9 +567,9 @@ onUnmounted(() => {
   transition: width 90ms linear;
 }
 .reader-page {
-  max-width: 1120px;
+  max-width: var(--page-width, 1120px);
   margin: 0 auto;
-  padding: 24px 24px 48px;
+  padding: var(--page-padding-block, 24px) 24px 48px;
   color: var(--text-primary);
 }
 .reader-topline {
@@ -520,10 +599,12 @@ onUnmounted(() => {
   display: grid;
   grid-template-columns: minmax(0, 760px) 200px;
   justify-content: center;
-  gap: 32px;
+  gap: var(--page-section-gap, 32px);
   align-items: start;
 }
-.reader-layout--no-toc { grid-template-columns: minmax(0, 760px); }
+.reader-layout--no-toc {
+  grid-template-columns: minmax(0, 760px);
+}
 .article-column {
   min-width: 0;
 }
@@ -539,10 +620,50 @@ onUnmounted(() => {
   padding: 4px 0 25px;
   border-bottom: 1px solid var(--border-solid);
 }
-.reader-interactions { display: flex; align-items: center; gap: 14px; margin: 25px 0 30px; padding: 16px 0; border-top: 1px solid var(--border-solid); border-bottom: 1px solid var(--border-solid); }
-.like-action { display: inline-flex; align-items: center; flex-shrink: 0; gap: 7px; min-height: 44px; padding: 9px 13px; border: 1px solid var(--border-solid); border-radius: var(--radius); background: var(--surface-primary); color: var(--text-secondary); font: inherit; font-size: .82rem; cursor: pointer; }
-.like-action span { color: var(--like-accent); font-size: 1.1rem; }.like-action.active { border-color: var(--like-accent-border); background: var(--like-accent-soft); color: var(--like-accent-strong); }.like-action:disabled { opacity: .6; cursor: wait; }.like-action strong { font-size: .76rem; }
-.interaction-note { color: var(--text-muted); font-size: .72rem; }
+.reader-interactions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 25px 0 30px;
+  padding: 16px 0;
+  border-top: 1px solid var(--border-solid);
+  border-bottom: 1px solid var(--border-solid);
+}
+.like-action {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 7px;
+  min-height: 44px;
+  padding: 9px 13px;
+  border: 1px solid var(--border-solid);
+  border-radius: var(--radius);
+  background: var(--surface-primary);
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+.like-action span {
+  color: var(--like-accent);
+  font-size: 1.1rem;
+}
+.like-action.active {
+  border-color: var(--like-accent-border);
+  background: var(--like-accent-soft);
+  color: var(--like-accent-strong);
+}
+.like-action:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+.like-action strong {
+  font-size: 0.76rem;
+}
+.interaction-note {
+  color: var(--text-muted);
+  font-size: 0.72rem;
+}
 
 /* 上一篇 / 下一篇：博客阅读器的标准出口，避免读完只能在浏览器里按后退 */
 .post-adjacent {
@@ -560,17 +681,27 @@ onUnmounted(() => {
   border-radius: var(--radius);
   background: var(--surface-primary);
   text-decoration: none;
-  transition: border-color var(--duration-fast) var(--ease-default), transform var(--duration-fast) var(--ease-default);
+  transition:
+    border-color var(--duration-fast) var(--ease-default),
+    transform var(--duration-fast) var(--ease-default);
 }
 .adjacent-link:hover {
   border-color: var(--accent);
   transform: translateY(-1px);
 }
-.adjacent-link--next { text-align: right; }
-.adjacent-label { display: flex; align-items: center; gap: 4px; color: var(--text-muted); font-size: .7rem; }
+.adjacent-link--next {
+  text-align: right;
+}
+.adjacent-label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--text-muted);
+  font-size: 0.7rem;
+}
 .adjacent-title {
   color: var(--text-primary);
-  font-size: .88rem;
+  font-size: 0.88rem;
   font-weight: 600;
   line-height: 1.45;
   display: -webkit-box;
@@ -580,13 +711,142 @@ onUnmounted(() => {
   overflow: hidden;
 }
 @media (max-width: 640px) {
-  .adjacent-link--next { text-align: left; }
+  .adjacent-link--next {
+    text-align: left;
+  }
 }
-.comments-section { margin: 46px 0 30px; }
-.comments-heading { margin-bottom: 18px; }.comments-heading .eyebrow { margin: 0 0 6px; color: var(--primary); font-size: .67rem; font-weight: 700; letter-spacing: .15em; }.comments-heading h2 { margin: 0; font: 700 1.5rem var(--font-display); }.comments-heading h2 span { margin-left: 5px; color: var(--text-muted); font: 500 .85rem var(--font-sans); }
-.comment-form { display: grid; gap: 12px; padding: 17px; border: 1px solid var(--border-solid); border-radius: var(--radius); background: var(--surface-primary); }.comment-form label { display: grid; gap: 6px; color: var(--text-secondary); font-size: .75rem; }.comment-form input, .comment-form textarea { width: 100%; padding: 10px 12px; border: 1px solid var(--border-solid); border-radius: var(--radius-sm); background: var(--bg-primary); color: var(--text-primary); font: inherit; font-size: .85rem; }.comment-form textarea { resize: vertical; }.comment-form-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; }.comment-form-footer small { color: var(--text-muted); font-size: .7rem; }.comment-form-footer button { padding: 9px 13px; border: 0; border-radius: var(--radius-sm); background: var(--primary); color: white; font-size: .76rem; font-weight: 700; cursor: pointer; }.comment-form-footer button:disabled { opacity: .55; }
-.comment-list { display: grid; gap: 16px; margin-top: 22px; }.reader-comment { display: grid; grid-template-columns: 36px minmax(0, 1fr); gap: 12px; padding-bottom: 15px; border-bottom: 1px solid var(--border-solid); }.comment-avatar { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; background: var(--primary-light); color: var(--primary); font-weight: 700; }.reader-comment header { display: flex; align-items: center; gap: 10px; }.reader-comment header strong { font-size: .82rem; }.reader-comment time { color: var(--text-muted); font-size: .67rem; }.reader-comment p { margin: 7px 0 0; color: var(--text-secondary); font-size: .85rem; line-height: 1.7; white-space: pre-wrap; overflow-wrap: anywhere; }.no-comments { padding: 23px 0; color: var(--text-muted); font-size: .82rem; text-align: center; }
-.load-more-comments { display: block; margin: 16px auto; padding: 9px 13px; border: 1px solid var(--border-solid); border-radius: var(--radius-sm); background: var(--surface-primary); color: var(--primary); font-size: .78rem; cursor: pointer; }
+.comments-section {
+  margin: 46px 0 30px;
+}
+.comments-heading {
+  margin-bottom: 18px;
+}
+.comments-heading .eyebrow {
+  margin: 0 0 6px;
+  color: var(--primary);
+  font-size: 0.67rem;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+}
+.comments-heading h2 {
+  margin: 0;
+  font: 700 1.5rem var(--font-display);
+}
+.comments-heading h2 span {
+  margin-left: 5px;
+  color: var(--text-muted);
+  font: 500 0.85rem var(--font-sans);
+}
+.comment-form {
+  display: grid;
+  gap: 12px;
+  padding: 17px;
+  border: 1px solid var(--border-solid);
+  border-radius: var(--radius);
+  background: var(--surface-primary);
+}
+.comment-form label {
+  display: grid;
+  gap: 6px;
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+}
+.comment-form input,
+.comment-form textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border-solid);
+  border-radius: var(--radius-sm);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 0.85rem;
+}
+.comment-form textarea {
+  resize: vertical;
+}
+.comment-form-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.comment-form-footer small {
+  color: var(--text-muted);
+  font-size: 0.7rem;
+}
+.comment-form-footer button {
+  padding: 9px 13px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: var(--primary);
+  color: white;
+  font-size: 0.76rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.comment-form-footer button:disabled {
+  opacity: 0.55;
+}
+.comment-list {
+  display: grid;
+  gap: 16px;
+  margin-top: 22px;
+}
+.reader-comment {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr);
+  gap: 12px;
+  padding-bottom: 15px;
+  border-bottom: 1px solid var(--border-solid);
+}
+.comment-avatar {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--primary-light);
+  color: var(--primary);
+  font-weight: 700;
+}
+.reader-comment header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.reader-comment header strong {
+  font-size: 0.82rem;
+}
+.reader-comment time {
+  color: var(--text-muted);
+  font-size: 0.67rem;
+}
+.reader-comment p {
+  margin: 7px 0 0;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.no-comments {
+  padding: 23px 0;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  text-align: center;
+}
+.load-more-comments {
+  display: block;
+  margin: 16px auto;
+  padding: 9px 13px;
+  border: 1px solid var(--border-solid);
+  border-radius: var(--radius-sm);
+  background: var(--surface-primary);
+  color: var(--primary);
+  font-size: 0.78rem;
+  cursor: pointer;
+}
 .article-tags {
   display: flex;
   flex-wrap: wrap;
@@ -651,7 +911,7 @@ onUnmounted(() => {
   margin: 2em 0 0.7em;
   font-family: var(--font-display);
   line-height: 1.35;
-   scroll-margin-top: 0;
+  scroll-margin-top: 0;
 }
 .markdown-body :deep(h1) {
   font-size: 1.85rem;
@@ -968,9 +1228,17 @@ onUnmounted(() => {
   .markdown-body :deep(h2) {
     font-size: 1.35rem;
   }
-  .reader-interactions { flex-wrap: wrap; }
-  .comment-form-footer { flex-wrap: wrap; }
-  .comment-form-footer button { min-height: 44px; }
-  .reader-comment header { flex-wrap: wrap; }
+  .reader-interactions {
+    flex-wrap: wrap;
+  }
+  .comment-form-footer {
+    flex-wrap: wrap;
+  }
+  .comment-form-footer button {
+    min-height: 44px;
+  }
+  .reader-comment header {
+    flex-wrap: wrap;
+  }
 }
 </style>

@@ -5,6 +5,15 @@ import { postApi } from '@/api/post'
 import ArticleList from '@/components/post/ArticleList.vue'
 import Icon from '@/components/common/Icon.vue'
 import type { Post } from '@/types'
+import PageFrame from '@/components/pages/PageFrame.vue'
+import { usePageConfig } from '@/composables/usePageConfig'
+import { usePageSeo } from '@/composables/usePageSeo'
+const { config, text, module: showModule } = usePageConfig('search')
+usePageSeo('search', () => ({
+  title: text('title', '搜索文章'),
+  description: text('description', '按标题、摘要或正文内容查找。'),
+  url: '/search'
+}))
 
 const route = useRoute()
 const router = useRouter()
@@ -77,10 +86,12 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="search-page">
+  <PageFrame :config="config" class="search-page">
     <header class="search-heading">
-      <h1>搜索文章</h1>
-      <p>按标题、摘要或正文内容查找。</p>
+      <h1>{{ text('title', '搜索文章') }}</h1>
+      <p v-if="text('description', '按标题、摘要或正文内容查找。')">
+        {{ text('description', '按标题、摘要或正文内容查找。') }}
+      </p>
     </header>
 
     <form class="search-form" role="search" @submit.prevent="submitSearch">
@@ -89,7 +100,7 @@ onMounted(() => {
         id="article-search"
         v-model="query"
         type="search"
-        placeholder="输入关键词…"
+        :placeholder="text('placeholder', '输入关键词…')"
         maxlength="200"
       />
       <button type="submit" :disabled="loading || !query.trim()">
@@ -100,7 +111,7 @@ onMounted(() => {
     <section v-if="route.query.q" class="search-results" aria-live="polite">
       <div class="results-heading">
         <h2>搜索结果</h2>
-        <span v-if="!loading && !error">{{ totalResults }} 篇文章</span>
+        <span v-if="showModule('count') && !loading && !error">{{ totalResults }} 篇文章</span>
       </div>
 
       <div v-if="loading" class="state-panel" role="status">正在查找相关文章…</div>
@@ -109,7 +120,7 @@ onMounted(() => {
         <button type="button" @click="search(String(route.query.q || query))">重新搜索</button>
       </div>
       <div v-else-if="results.length === 0" class="state-panel">
-        <p>没有找到与“{{ route.query.q }}”相关的文章。</p>
+        <p>{{ text('empty', `没有找到与“${route.query.q}”相关的文章。`) }}</p>
         <span>试试更短的关键词，或检查拼写。</span>
       </div>
       <ArticleList v-else :posts="results" />
@@ -132,15 +143,15 @@ onMounted(() => {
       <Icon name="search" :size="28" />
       <p>输入关键词，开始阅读。</p>
     </section>
-  </div>
+  </PageFrame>
 </template>
 
 <style scoped>
 .search-page {
-  max-width: 920px;
+  max-width: var(--page-width, 920px);
   min-height: 55vh;
   margin: 0 auto;
-  padding: 24px 24px 48px;
+  padding: var(--page-padding-block, 24px) 24px 48px;
   color: var(--text-primary);
 }
 .search-heading {

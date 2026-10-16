@@ -27,7 +27,7 @@ public class SiteSettingsServiceImpl implements SiteSettingsService {
     );
     private static final Set<String> RESERVED_PATHS = Set.of(
             "api", "assets", "uploads", "post", "archives", "about", "search", "gallery",
-            "tag", "login", "password-reset", "favicon.ico", "robots.txt"
+            "tag", "pages", "login", "password-reset", "favicon.ico", "robots.txt"
     );
 
     private final SiteSettingMapper settingMapper;

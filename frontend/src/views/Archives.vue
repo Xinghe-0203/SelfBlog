@@ -3,6 +3,15 @@ import { computed, onMounted, ref } from 'vue'
 import { postApi } from '@/api/post'
 import { formatDate } from '@/utils'
 import type { Post } from '@/types'
+import PageFrame from '@/components/pages/PageFrame.vue'
+import { usePageConfig } from '@/composables/usePageConfig'
+import { usePageSeo } from '@/composables/usePageSeo'
+const { config, text, module: showModule } = usePageConfig('archives')
+usePageSeo('archives', () => ({
+  title: text('title', '文章归档'),
+  description: text('description', '按时间回看这里发布过的文章。'),
+  url: '/archives'
+}))
 
 interface ArchiveGroup {
   key: string
@@ -67,10 +76,12 @@ onMounted(fetchArchives)
 </script>
 
 <template>
-  <div class="archives-page">
+  <PageFrame :config="config" class="archives-page">
     <header class="page-heading">
-      <h1>文章归档</h1>
-      <p>按时间回看这里发布过的文章。</p>
+      <h1>{{ text('title', '文章归档') }}</h1>
+      <p v-if="text('description', '按时间回看这里发布过的文章。')">
+        {{ text('description', '按时间回看这里发布过的文章。') }}
+      </p>
     </header>
 
     <div v-if="loading" class="state-panel" role="status">正在整理文章归档…</div>
@@ -83,7 +94,7 @@ onMounted(fetchArchives)
     <div v-else class="archive-list">
       <section v-for="group in archiveGroups" :key="group.key" class="archive-group">
         <h2>
-          {{ group.label }}<span>{{ group.posts.length }}</span>
+          {{ group.label }}<span v-if="showModule('count')">{{ group.posts.length }}</span>
         </h2>
         <ol>
           <li v-for="post in group.posts" :key="post.id">
@@ -91,19 +102,21 @@ onMounted(fetchArchives)
               {{ formatDate(post.createTime || post.createdAt, 'MM月DD日') }}
             </time>
             <router-link :to="`/post/${post.id}`">{{ post.title }}</router-link>
-            <span v-if="post.category" class="category">{{ post.category }}</span>
+            <span v-if="showModule('category') && post.category" class="category">{{
+              post.category
+            }}</span>
           </li>
         </ol>
       </section>
     </div>
-  </div>
+  </PageFrame>
 </template>
 
 <style scoped>
 .archives-page {
-  max-width: 920px;
+  max-width: var(--page-width, 920px);
   margin: 0 auto;
-  padding: 24px 24px 48px;
+  padding: var(--page-padding-block, 24px) 24px 48px;
   color: var(--text-primary);
 }
 .page-heading {
@@ -129,11 +142,13 @@ onMounted(fetchArchives)
 .archive-group {
   display: grid;
   grid-template-columns: 145px minmax(0, 1fr);
-  gap: 24px;
+  gap: var(--page-section-gap, 24px);
   padding: 27px 0;
   border-bottom: 1px solid var(--border-solid);
 }
-.archive-group:last-child { border-bottom: 0; }
+.archive-group:last-child {
+  border-bottom: 0;
+}
 .archive-group h2 {
   display: flex;
   align-items: baseline;
@@ -209,7 +224,9 @@ onMounted(fetchArchives)
     grid-template-columns: 1fr;
     gap: 16px;
   }
-  .archive-list { padding-inline: 20px; }
+  .archive-list {
+    padding-inline: 20px;
+  }
   .archive-group h2 {
     margin: 0;
   }

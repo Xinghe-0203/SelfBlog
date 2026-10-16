@@ -3,21 +3,36 @@ import { mount, enableAutoUnmount, flushPromises } from '@vue/test-utils'
 import Gallery from '../Gallery.vue'
 import { galleryApi, type PhotoAlbum } from '@/api/gallery'
 import ImagePreview from '@/components/common/ImagePreview.vue'
+import { createPinia } from 'pinia'
 
-vi.mock('@/api/gallery', () => ({ galleryApi: { getAlbums: vi.fn(), getAlbum: vi.fn(), unlock: vi.fn() } }))
+vi.mock('@/api/gallery', () => ({
+  galleryApi: { getAlbums: vi.fn(), getAlbum: vi.fn(), unlock: vi.fn() }
+}))
 enableAutoUnmount(afterEach)
-const album: PhotoAlbum = { id: 1, title: '一段路途', privateAlbum: false, locked: false, photoCount: 2, sortOrder: 0, createTime: '2026-10-16', photos: [
-  { id: 1, imageUrl: '/uploads/one.jpg', caption: '第一张', sortOrder: 0 },
-  { id: 2, imageUrl: '/uploads/two.jpg', caption: '第二张', sortOrder: 1 }
-] }
-const response = <T,>(data: T) => ({ code: 200, message: 'ok', data })
+const album: PhotoAlbum = {
+  id: 1,
+  title: '一段路途',
+  privateAlbum: false,
+  locked: false,
+  photoCount: 2,
+  sortOrder: 0,
+  createTime: '2026-10-16',
+  photos: [
+    { id: 1, imageUrl: '/uploads/one.jpg', caption: '第一张', sortOrder: 0 },
+    { id: 2, imageUrl: '/uploads/two.jpg', caption: '第二张', sortOrder: 1 }
+  ]
+}
+const response = <T>(data: T) => ({ code: 200, message: 'ok', data })
 beforeEach(() => {
   vi.resetAllMocks()
   vi.mocked(galleryApi.getAlbums).mockResolvedValue(response([album]))
   vi.mocked(galleryApi.getAlbum).mockResolvedValue(response(album))
 })
 async function setup() {
-  const wrapper = mount(Gallery, { attachTo: document.body, global: { stubs: { teleport: true, transition: true } } })
+  const wrapper = mount(Gallery, {
+    attachTo: document.body,
+    global: { plugins: [createPinia()], stubs: { teleport: true, transition: true } }
+  })
   await flushPromises()
   return wrapper
 }
@@ -50,7 +65,9 @@ describe('gallery overlay and access flow', () => {
   })
 
   it('preserves password-to-token authorization without fetching locked photos early', async () => {
-    vi.mocked(galleryApi.getAlbums).mockResolvedValue(response([{ ...album, privateAlbum: true, locked: true, photos: undefined }]))
+    vi.mocked(galleryApi.getAlbums).mockResolvedValue(
+      response([{ ...album, privateAlbum: true, locked: true, photos: undefined }])
+    )
     vi.mocked(galleryApi.unlock).mockResolvedValue(response({ accessToken: 'short-lived-token' }))
     const wrapper = await setup()
     await wrapper.get('.album-card').trigger('click')
@@ -76,7 +93,11 @@ describe('gallery overlay and access flow', () => {
 
   it('does not reopen an album when its old detail response arrives after closing', async () => {
     let resolve!: (value: ReturnType<typeof response<PhotoAlbum>>) => void
-    vi.mocked(galleryApi.getAlbum).mockReturnValueOnce(new Promise((yes) => { resolve = yes }))
+    vi.mocked(galleryApi.getAlbum).mockReturnValueOnce(
+      new Promise((yes) => {
+        resolve = yes
+      })
+    )
     const wrapper = await setup()
     await wrapper.get('.album-card').trigger('click')
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))

@@ -17,6 +17,7 @@ export interface SeoMeta {
   publishedTime?: string
   author?: string
   tags?: string[]
+  indexable?: boolean
 }
 
 /** 站点名，用于拼接 `<title>`；由调用方在首次使用时传入一次即可。 */
@@ -27,7 +28,10 @@ export function setSeoSiteTitle(value: string): void {
 }
 
 function upsertMeta(attr: 'name' | 'property', key: string, content: string): void {
-  if (!content) return
+  if (!content) {
+    document.head.querySelectorAll(`meta[${attr}="${key}"]`).forEach((node) => node.remove())
+    return
+  }
   let el = document.head.querySelector<HTMLMetaElement>(`meta[${attr}="${key}"]`)
   if (!el) {
     el = document.createElement('meta')
@@ -64,6 +68,7 @@ export function applySeoMeta(meta: SeoMeta): void {
 
   document.title = fullTitle
   upsertMeta('name', 'description', description)
+  upsertMeta('name', 'robots', meta.indexable === false ? 'noindex,follow' : 'index,follow')
   upsertLink('canonical', url)
 
   upsertMeta('property', 'og:type', meta.type || 'website')
@@ -90,6 +95,9 @@ export function applySeoMeta(meta: SeoMeta): void {
       el.setAttribute('content', tag)
       document.head.appendChild(el)
     }
+  } else {
+    document.head.querySelectorAll('meta[property^="article:"]').forEach((node) => node.remove())
+    clearArticleJsonLd()
   }
 }
 

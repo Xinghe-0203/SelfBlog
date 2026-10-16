@@ -6,6 +6,10 @@ import { tagApi } from '@/api/tag'
 import ArticleList from '@/components/post/ArticleList.vue'
 import Icon from '@/components/common/Icon.vue'
 import type { Post, Tag } from '@/types'
+import PageFrame from '@/components/pages/PageFrame.vue'
+import { usePageConfig } from '@/composables/usePageConfig'
+import { usePageSeo } from '@/composables/usePageSeo'
+const { config, text, module: showModule, preview } = usePageConfig('tag')
 
 const route = useRoute()
 const tag = ref<Tag | null>(null)
@@ -15,6 +19,12 @@ const error = ref('')
 const currentPage = ref(1)
 const totalPages = ref(1)
 const totalPosts = ref(0)
+usePageSeo('tag', () => ({
+  title: tag.value?.name || '标签详情',
+  description: text('description', ''),
+  url: `/tag/${tag.value?.id || route.params.id}`,
+  indexable: !!tag.value
+}))
 const pageSize = 12
 
 const hasMore = computed(() => currentPage.value < totalPages.value)
@@ -23,7 +33,7 @@ const fetchTag = async () => {
   loading.value = true
   error.value = ''
   try {
-    const tagId = String(route.params.id)
+    const tagId = preview?.tagId?.value || String(route.params.id)
     const [tagResponse, postResponse] = await Promise.all([
       tagApi.getTagById(tagId),
       postApi.advancedSearch({ tagId, pageNum: 1, pageSize })
@@ -69,8 +79,10 @@ watch(() => route.params.id, fetchTag, { immediate: true })
 </script>
 
 <template>
-  <div class="tag-page">
-    <router-link to="/" class="back-link"><Icon name="chevron-left" :size="16" />返回首页</router-link>
+  <PageFrame :config="config" class="tag-page">
+    <router-link to="/" class="back-link"
+      ><Icon name="chevron-left" :size="16" />返回首页</router-link
+    >
 
     <div v-if="loading && !tag" class="state-panel" role="status">正在加载标签…</div>
     <div v-else-if="error && !tag" class="state-panel state-panel--error" role="alert">
@@ -80,7 +92,8 @@ watch(() => route.params.id, fetchTag, { immediate: true })
     <template v-else-if="tag">
       <header class="tag-heading">
         <h1><span>#</span>{{ tag.name }}</h1>
-        <p>{{ totalPosts }} 篇相关文章</p>
+        <p v-if="text('description', '')">{{ text('description', '') }}</p>
+        <p v-if="showModule('count')">{{ totalPosts }} 篇相关文章</p>
       </header>
 
       <div v-if="posts.length === 0" class="state-panel">这个标签下还没有文章。</div>
@@ -94,14 +107,14 @@ watch(() => route.params.id, fetchTag, { immediate: true })
       </div>
       <p v-else-if="posts.length" class="end-note">已显示该标签下的全部文章</p>
     </template>
-  </div>
+  </PageFrame>
 </template>
 
 <style scoped>
 .tag-page {
-  max-width: 920px;
+  max-width: var(--page-width, 920px);
   margin: 0 auto;
-  padding: 24px 24px 48px;
+  padding: var(--page-padding-block, 24px) 24px 48px;
   color: var(--text-primary);
 }
 .back-link {

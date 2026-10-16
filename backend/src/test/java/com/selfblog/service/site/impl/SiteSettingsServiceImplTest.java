@@ -109,4 +109,9 @@ class SiteSettingsServiceImplTest {
         assertEquals("新标题", updated.get("siteTitle"));
         assertFalse(updated.isEmpty());
     }
+
+    @Test
+    void newAdminPathCannotTakeCustomPageNamespace() {
+        assertThrows(BusinessException.class, () -> siteSettingsService.updateSettings(Map.of("adminPath", "pages")));
+    }
 }

@@ -36,6 +36,7 @@ import Toast from '@/components/common/Toast.vue'
 import MusicPlayer from '@/components/layout/MusicPlayer.vue'
 import { useSiteStore } from '@/stores/site'
 import { siteApi } from '@/api/site'
+import { applySeoMeta, setSeoSiteTitle } from '@/composables/useSeoMeta'
 
 const route = useRoute()
 const themeStore = useThemeStore()
@@ -80,11 +81,32 @@ onMounted(async () => {
   if (!isAdminPage.value) void recordVisitor()
 })
 
-watch(() => route.path, () => {
-  if (!isAdminPage.value) void recordVisitor()
-})
+watch(
+  () => route.path,
+  () => {
+    if (!isAdminPage.value) void recordVisitor()
+  }
+)
 
-watch(() => [siteStore.settings.themeSkin, siteStore.settings.themePrimaryColor] as const, applySiteTheme)
+watch(
+  () => route.fullPath,
+  () => {
+    if (!isAdminPage.value) return
+    setSeoSiteTitle(siteStore.settings.siteTitle)
+    applySeoMeta({
+      title: String(route.meta.title || '作者后台'),
+      type: 'website',
+      indexable: false,
+      url: route.path
+    })
+  },
+  { immediate: true }
+)
+
+watch(
+  () => [siteStore.settings.themeSkin, siteStore.settings.themePrimaryColor] as const,
+  applySiteTheme
+)
 
 function applySiteTheme() {
   siteStore.applyAppearance()

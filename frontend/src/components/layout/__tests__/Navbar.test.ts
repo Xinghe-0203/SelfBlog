@@ -7,6 +7,7 @@ import Navbar from '../Navbar.vue'
 import Icon from '@/components/common/Icon.vue'
 import { useSiteStore } from '@/stores/site'
 import { useMusicStore } from '@/stores/music'
+import { usePagesStore } from '@/stores/pages'
 
 /**
  * 用真实 memory router，而不是 `stubs: { RouterLink: true }`。
@@ -95,6 +96,28 @@ describe('Navbar', () => {
 
   it('renders four real navigation links', () => {
     expect(mountNavbar().findAll('.nav-links > a')).toHaveLength(4)
+  })
+
+  it('uses published navigation labels and exposes additional links through a focus-safe more panel', async () => {
+    router.addRoute({ path: '/pages/projects', component: Blank })
+    router.addRoute({ path: '/pages/links', component: Blank })
+    const pages = usePagesStore()
+    pages.navigation = [
+      ...pages.navigation,
+      { pageId: 'custom-projects', label: '项目', to: '/pages/projects' },
+      { pageId: 'custom-links', label: '友链', to: '/pages/links' }
+    ]
+    const wrapper = mountNavbar()
+    const trigger = wrapper.get<HTMLButtonElement>('.nav-more')
+    trigger.element.focus()
+    await trigger.trigger('click')
+    expect(wrapper.get('#nav-more-panel a[href="/pages/projects"]').text()).toBe('项目')
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    await nextTick()
+    expect(wrapper.find('#nav-more-panel').exists()).toBe(false)
+    expect(document.activeElement).toBe(trigger.element)
+    await wrapper.get('.menu-toggle').trigger('click')
+    expect(wrapper.findAll('.mobile-panel a')).toHaveLength(6)
   })
 
   // 首页必须用 exact-active-class："/" 是所有路径的前缀，用 active-class 会永远高亮。

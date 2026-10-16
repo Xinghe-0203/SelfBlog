@@ -166,7 +166,31 @@ focus regressions from independent review. See the
 [full report](../docs/reviews/2026-10-16-navigation-fidelity-and-fullstack-audit.md)
 for tested workflows and untested deployment environments.
 
-### Page layout notes
+### Configurable public pages
+
+- Author route `/<adminPath>/pages` manages8 built-in public-page/template configurations
+  plus published custom pages at `/pages/:slug`. About has a standalone Markdown body.
+- `stores/pages.ts` holds published data only; optional manifest loading does not block
+  auth restoration or router installation. Preview overrides are injected, never written
+  into shared public settings or browser storage.
+- `PageFrame` scopes safe accent/background/width/density settings. Defaults preserve the
+  existing global proportions; the user canceled whole-site110% scaling.
+- Draft editor saves only submitted snapshots, serializes writes and protects new in-flight
+  edits. Publication requires a saved revision; stale revisions remain editable after409.
+- Preview mounts the real sanitized components in a blank same-origin srcdoc viewport,
+  so mobile CSS media queries are evaluated at390px. No public preview URL or weakened
+  frame-security headers are needed.
+- Navbar measures available width for primary/More links, preserving search/link/tool
+  order and44px targets. The mobile menu contains the complete published navigation.
+- Runtime metadata clears old article/JSON-LD state and keeps missing/search/404/admin
+  pages noindex. Initial server HTML SEO remains a separate delivery batch.
+
+Final feature gates: **41 files / 389 tests**, strict type-check, ESLint **0 errors /
+256 warnings**, touched-file format check and production build pass. Real-service **31/31**
+passes, including direct packaged-JAR pages,390px dark preview and both initial About response orders. See [the author guide](../docs/page-management.md)
+and [verification record](../docs/reviews/2026-10-16-page-management-verification.md).
+
+### Shared layout conventions
 
 - `components/post/ArticleList.vue` is the single article-row language shared by home, search and tag; it never reserves a cover slot and drops thumbnails that fail to load.
 - Home builds its introduction from real site settings; the decorative image is the first usable cover from the first successful response and stays fixed for the visit.

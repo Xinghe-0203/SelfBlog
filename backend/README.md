@@ -191,7 +191,7 @@ Covering high-frequency queries: user post lists, category filtering, hot/latest
 ## Testing
 
 ```bash
-mvn test "-Dskip.npm=true" "-Dskip.installnodenpm=true"                 # 463 tests, ~1 min
+mvn test "-Dskip.npm=true" "-Dskip.installnodenpm=true"                 # 491 tests, ~1 min
 mvn test "-Dtest=AuthControllerTest" "-Dskip.npm=true" "-Dskip.installnodenpm=true"
 ```
 
@@ -215,7 +215,27 @@ See the [audit report](../docs/reviews/2026-10-16-navigation-fidelity-and-fullst
 for exact scope. This does **not** validate a real MySQL deployment, Docker build,
 SMTP delivery or external media providers.
 
-## Docker
+## Page management
+
+`PageService` stores separate versioned draft/published documents and slug reservations
+in the existing `site_setting` table, outside the global public-settings whitelist.
+No schema migration is required. Database conditional updates enforce expected revisions
+and return409 on conflict; public manifests exclude bodies and never contain drafts.
+
+Author endpoints are under `/api/admin/pages` and `/api/admin/page-navigation`;
+published reads are under `/api/site/pages`. Both capability whitelists and strict
+request decoding reject unknown fields. Body limit10000 characters; one serialized
+document limit48KiB UTF-8. Back up the entire database, not only the site-settings API.
+See [the page-management guide](../docs/page-management.md) and
+[the storage decision](../docs/decisions/001-versioned-pages-in-existing-kv.md).
+
+The final full suite with this feature passes **491 tests / 0 failures / 0 errors / 0 skipped**,
+including two real independent-transaction H2 concurrency tests. A disposable SQLite/browser
+audit passes **31/31**, including direct access to the packaged single-JAR frontend and
+safe authenticated preview while retaining DENY frame headers. See [the verification record](../docs/reviews/2026-10-16-page-management-verification.md)
+for final evidence and limits; this does not verify MySQL or Docker.
+
+## Docker status
 
 The container files (`Dockerfile`, `docker-compose.yml`) still target an older multi-module layout and do **not** build the single JAR correctly yet — the expected artifact name and the frontend build context are out of date. Until that setup is reworked, deploy with the single-JAR flow above.
 

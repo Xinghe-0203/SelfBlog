@@ -62,6 +62,18 @@ export function createAdminRoutes(adminPath: string): RouteRecordRaw[] {
           meta: { ...adminMeta, title: '相册管理' }
         },
         {
+          path: 'pages',
+          name: 'AdminPages',
+          component: lazyLoad(() => import('@/views/admin/pages/PagesManagement.vue')),
+          meta: { ...adminMeta, title: '页面管理' }
+        },
+        {
+          path: 'pages/:id',
+          name: 'AdminPageEdit',
+          component: lazyLoad(() => import('@/views/admin/pages/PageEditor.vue')),
+          meta: { ...adminMeta, title: '编辑页面' }
+        },
+        {
           path: 'settings',
           name: 'AdminSettings',
           component: lazyLoad(() => import('@/views/admin/Settings.vue')),

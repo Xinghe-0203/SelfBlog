@@ -19,6 +19,7 @@ const routes = [
   '/admin/visitors',
   '/admin/comments',
   '/admin/albums',
+  '/admin/pages',
   '/admin/settings'
 ].map((path) => ({ path, component: Blank }))
 
@@ -89,7 +90,7 @@ describe('AdminLayout', () => {
     const wrapper = mountLayout()
 
     // 侧栏直接渲染内置图标，不再包一层 .nav-icon 文本容器。
-    expect(wrapper.findAll('.sidebar-nav .icon')).toHaveLength(7)
+    expect(wrapper.findAll('.sidebar-nav .icon')).toHaveLength(8)
     expect(wrapper.findAll('.sidebar-nav a').every((node) => node.text().length > 0)).toBe(true)
     expect(wrapper.find('.menu-button .icon').exists()).toBe(true)
     expect(wrapper.find('.close-menu .icon').exists()).toBe(true)
@@ -145,6 +146,7 @@ describe('AdminLayout', () => {
       '/admin/visitors',
       '/admin/comments',
       '/admin/albums',
+      '/admin/pages',
       '/admin/settings'
     ])
     const theme = useThemeStore()

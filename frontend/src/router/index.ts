@@ -46,6 +46,15 @@ const router = createRouter({
 setupGuards(router)
 
 export function installAdminRoutes(adminPath: string): void {
+  // Preserve a legacy /pages author entry instead of silently taking its namespace.
+  if (adminPath !== 'pages' && !router.hasRoute('ContentPage')) {
+    router.addRoute({
+      path: '/pages/:slug',
+      name: 'ContentPage',
+      component: () => import('@/views/pages/ContentPage.vue'),
+      meta: { title: '内容页' }
+    })
+  }
   for (const route of createAdminRoutes(adminPath)) {
     router.addRoute(route)
   }
