@@ -2,30 +2,31 @@
 
 Vue 3 frontend for a single-author personal blog. Public pages focus on reading, search, archives, about, and tags; writing and content management are protected by administrator-only routes.
 
-**Version**: v2.0.25 | **Vue**: 3.4.21 | **Vite**: 5.2.0
+**Version**: v2.0.25 | **Vue**: 3.5.44 | **Vite**: 6.4.4
 
 ## Tech Stack
 
 | Component | Version | Purpose |
 |-----------|---------|---------|
-| Vue | 3.4.21 | UI framework (Composition API) |
-| Vite | 5.2.0 | Build tool |
+| Vue | 3.5.44 | UI framework (Composition API) |
+| Vite | 6.4.4 | Build tool |
 | Vue Router | 4.3.0 | Routing |
 | Pinia | 2.1.7 | State management |
 | Axios | 1.7.4 | HTTP client |
 | Marked | 12.0.1 | Markdown rendering |
 | DOMPurify | 3.0.9 | XSS protection |
-| Highlight.js | 11.9 | Code highlighting |
-| TypeScript | 5.x | Type safety |
+| TypeScript | 6.0 | Type safety |
+| Vitest | 4.1.8 | Unit tests (jsdom + @vue/test-utils) |
 
 ## Quick Start
 
 ```bash
-npm ci              # Install locked dependencies (Node 22.13+ or 24+)
+npm ci              # Install locked dependencies (Node 22.22+ / 24.15+ / 26+; engine-strict)
 npm run dev         # Dev server (http://localhost:3000)
 npm run build       # Production build (→ dist/)
 npm run preview     # Preview production build
 npm run lint:check  # Non-mutating ESLint check
+npm run test:run    # Unit tests (Vitest, single run)
 ```
 
 Dev server proxies `/api` requests to `http://localhost:8825`.
@@ -35,79 +36,21 @@ For production, Maven builds the Vue assets and embeds them into `backend/target
 
 ```
 src/
-├── api/                # API modules (17)
-│   ├── index.ts        # Axios instance, interceptors, token refresh
-│   ├── user.ts         # Auth, profile, avatar
-│   ├── post.ts         # Article CRUD, drafts
-│   ├── comment.ts      # Comments
-│   ├── like.ts         # Likes
-│   ├── collect.ts      # Collections
-│   ├── follow.ts       # Follow/followers
-│   ├── notification.ts # Notifications
-│   ├── message.ts      # Private messages
-│   ├── circle.ts       # Campus circle
-│   ├── tag.ts          # Tags
-│   ├── topic.ts        # Topics
-│   ├── trending.ts     # Trending
-│   ├── media.ts        # File upload
-│   ├── report.ts       # Reports
-│   ├── share.ts        # Sharing
-│   └── admin.ts        # Admin API
+├── api/                # Axios modules + interceptors (index, site, admin, post, media, …)
 ├── components/
-│   ├── common/         # 8 reusable components
-│   │   ├── BackToTop.vue
-│   │   ├── EmptyState.vue
-│   │   ├── FileUploader.vue
-│   │   ├── ImagePreview.vue
-│   │   ├── Modal.vue
-│   │   ├── PostCard.vue
-│   │   ├── Skeleton.vue
-│   │   └── Toast.vue
-│   ├── layout/         # 3 layout components
-│   │   ├── Footer.vue
-│   │   ├── Navbar.vue
-│   │   └── PageTransition.vue
-│   └── admin/          # Site settings brand-asset field
-│       └── SiteAssetField.vue
-├── composables/
-│   └── useConfirm.ts   # Promise-based confirm dialog
-├── router/
-│   ├── index.ts        # Router entry
-│   ├── guards.ts       # Navigation guards
-│   ├── helpers.ts      # Lazy loading helper
-│   └── modules/        # Route modules
-│       ├── auth.ts     # Author login and password reset
-│       ├── home.ts     # Home, archives, about
-│       ├── post.ts     # Public article detail and protected editor
-│       ├── discover.ts # Article search and tags
-│       └── admin.ts    # Dashboard, articles, tags
-├── stores/
-│   ├── user.ts         # Auth state, token management
-│   ├── theme.ts        # Light/dark theme
-│   └── app.ts          # Global app state
-├── styles/
-│   └── main.css        # Global styles, CSS variables
+│   ├── common/         # Reusable UI: Button, Card, Input, Icon, Modal, Toast, ImagePreview, BackToTop, …
+│   ├── layout/         # Navbar, Footer, MusicPlayer
+│   ├── home/           # PostCardList, HomeSidebar
+│   ├── post/           # MobileTocSheet (article reading extras)
+│   ├── circle/         # Campus circle widgets
+│   └── admin/          # SiteAssetField (brand asset uploads)
+├── composables/        # useConfirm, useScrollState, useMarkdownEnhance, useSeoMeta, usePagination, useScrollReveal
+├── router/             # Entry, guards, lazy helpers, per-domain modules
+├── stores/             # Pinia: site, theme, user
+├── styles/             # Tokens + base + components + dark mode + a11y (entry: main.css)
 ├── types/              # TypeScript type definitions
-│   ├── common.ts       # ApiResponse, PaginatedData
-│   ├── user.ts         # User types
-│   ├── post.ts         # Post types
-│   ├── circle.ts       # Circle types
-│   └── ...             # Domain-specific types
-├── utils/
-│   ├── index.ts        # General utilities
-│   └── logger.ts       # Frontend logging
-├── views/              # Public blog and author workspace pages
-│   ├── Home.vue
-│   ├── auth/           # Login, Register, PasswordReset
-│   ├── post/           # PostDetail, PostEdit, PostSearch
-│   ├── circle/         # Circle, CircleDetail, CirclePost
-│   ├── user/           # Profile, Drafts, Collections, Messages, etc.
-│   ├── admin/          # Dashboard, Users, Posts, Reports, Statistics
-│   ├── search/         # Search
-│   ├── trending/       # Trending
-│   ├── topic/          # TopicDetail
-│   ├── tag/            # TagDetail
-│   └── common/         # NotFound, Report
+├── utils/              # crypto, logger, toast, visitor, reading
+├── views/              # Home / About / Archives + admin, auth, post, circle, user, gallery, search, tag, topic, trending, common
 ├── App.vue
 └── main.ts
 ```
@@ -143,12 +86,14 @@ themeStore.isDark        // Dark mode status
 themeStore.toggleTheme() // Toggle light/dark
 ```
 
-### `app` store
+### `site` store
 
 ```ts
-const appStore = useAppStore()
-appStore.loading         // Global loading state
-appStore.toggleSidebar() // Sidebar toggle
+const siteStore = useSiteStore()
+siteStore.settings        // Public site settings (title, logo, favicon, music…)
+siteStore.adminPath       // Configurable admin entry
+siteStore.applySettings(partial)
+await siteStore.loadPublicSettings()
 ```
 
 ## Design System
@@ -162,37 +107,31 @@ compatibility but resolve to solid colors with `--glass-blur: none`.
 
 ```css
 :root {
-  --primary: #4a90d9;
-  --glass-bg: rgba(255, 255, 255, 0.15);
-  --glass-blur: 20px;
-  --page-max-width: 1400px;
+  --accent: #165DFF;
+  --radius: 12px;
+  --surface-primary: #FFFFFF;
 }
-[data-theme="dark"] { /* Dark mode overrides */ }
+html.dark-mode { /* Dark mode overrides live in dark-mode.css */ }
 ```
 
-### Utility Classes
+### Legacy glass classes
 
-| Class | Effect |
-|-------|--------|
-| `.glass` | Glass morphism (blur 20px) |
-| `.glass-rain` | Rain glass (blur 24px + drops) |
-| `.water-drops` | Water drop decorations |
-| `.glass-shine` | Light sweep animation |
-| `.ripple` | Click ripple animation |
-| `.wet-glow` | Wet glow shadow |
+The `.glass*` / `.water-drops` utilities remain for backward compatibility but
+resolve to solid surfaces (`--glass-blur: none`); new UI uses the `--surface-*`
+tokens instead of glass effects.
 
 ## Security
 
 - **XSS**: All user HTML sanitized via DOMPurify before rendering
 - **Markdown**: `marked.parse()` → `DOMPurify.sanitize()` pipeline
-- **Token**: Access token in memory, refresh token in localStorage, auto-refresh on 401
+- **Token**: Access + refresh tokens stored encoded in localStorage/sessionStorage; the Axios layer queues requests and auto-refreshes on 401, clearing auth state when refresh fails
 - **Single-author mode**: guests can read/search; registration is disabled; only an administrator can access writing and management routes
 
 ## Router Guards
 
-- `requiresAuth` — Redirects to `/login` if not authenticated
-- `requiresAdmin` — Redirects to `/` if not admin
-- `guestOnly` — Redirects to `/` if already logged in
+- `requiresAuth` / `requiresAdmin` — unauthenticated visitors go to the configurable admin login (`/<adminPath>`); expired tokens are cleared first
+- `requiresAdmin` — non-admin accounts are redirected home with a toast
+- `guest` — logged-in users are redirected home
 
 ## Build Output
 

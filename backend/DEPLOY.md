@@ -94,7 +94,7 @@ mvn spring-boot:run
 
 ```bash
 cd frontend
-npm ci                         # Node 22.13+ 或 Node 24+
+npm ci                         # Node 22.22+ / 24.15+ / 26+（engine-strict）
 npm run dev                    # http://localhost:3000
 ```
 

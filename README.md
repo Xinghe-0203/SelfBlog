@@ -4,7 +4,7 @@
 [![Version](https://img.shields.io/badge/version-v2.0.25-blue)](https://github.com/Xinghe-0203)
 [![Java](https://img.shields.io/badge/Java-21-orange)](https://www.oracle.com/java/)
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.3.13-green)](https://spring.io/projects/spring-boot)
-[![Vue](https://img.shields.io/badge/Vue-3.4.21-brightgreen)](https://vuejs.org/)
+[![Vue](https://img.shields.io/badge/Vue-3.5.44-brightgreen)](https://vuejs.org/)
 [![MySQL](https://img.shields.io/badge/MySQL-8.0+-blue)](https://www.mysql.com/)
 
 基于 Spring Boot 3 + Vue 3 的单人作者个人博客。生产部署只需一个内置 Vue 前端的可执行 JAR 和配置好的 `.env`；默认使用 SQLite 文件数据库与进程内 Caffeine 缓存。访客可阅读、搜索文章、匿名点赞、留言和浏览相册；作者从可配置入口进入后台管理内容与站点设置。升级时保留已有文章数据。
@@ -51,15 +51,15 @@
 | 技术 | 版本 | 说明 |
 |------|------|------|
 | **TypeScript** | 6.x | 编程语言 |
-| **Vue** | 3.4.21 | UI 框架（Composition API） |
-| **Vite** | 5.2.0 | 构建工具 |
+| **Vue** | 3.5.44 | UI 框架（Composition API） |
+| **Vite** | 6.4.4 | 构建工具 |
 | **Vue Router** | 4.3.0 | 前端路由 |
 | **Pinia** | 2.1.7 | 状态管理 |
 | **Axios** | 1.7.4 | HTTP 客户端 |
 | **Marked** | 12.0.1 | Markdown 渲染 |
 | **DOMPurify** | 3.0.9 | XSS 防护 |
-| **Highlight.js** | 11.9 | 代码高亮 |
-| **npm** | 9+ | 包管理工具 |
+| **Vitest** | 4.1.8 | 单元测试 |
+| **npm** | 11.x | 包管理工具（构建时自动安装） |
 
 ### 数据库
 
@@ -90,12 +90,13 @@
 ### 文章系统
 - 作者使用 Markdown 编辑器发布、编辑文章并管理草稿
 - 标签管理、全文搜索、文章归档与阅读量统计
+- 文章页提供目录、代码复制/折叠、标题锚点与图片灯箱等阅读体验
 - 访客可匿名点赞、提交文章留言；评论和访客统计可在后台开关
 - 支持公开相册与短期令牌保护的密码相册
 
 ### 管理后台
 - 作者工作台、文章、标签、访客、评论、相册和网站设置管理
-- 可调整后台路径、站点资料、主题皮肤、强调色和背景音乐
+- 可调整后台路径、站点资料、主题皮肤、强调色和背景音乐；站点 Logo、浏览器图标、作者头像与背景音乐支持直接上传
 - 历史文章与社区数据表保留；作者写入与管理 API 仅管理员可访问
 
 ---
@@ -137,9 +138,9 @@ SelfBlog/
 │   ├── vite.config.ts              # Vite 构建配置
 │   ├── tsconfig.json               # TypeScript 配置
 │   └── src/
-│       ├── api/                    # API 模块（17 个）
-│       ├── views/                  # 页面组件（30 个）
-│       ├── components/             # 通用组件（11 个）
+│       ├── api/                    # API 模块（20 个）
+│       ├── views/                  # 页面组件（45 个）
+│       ├── components/             # 通用组件（24 个）
 │       ├── stores/                 # Pinia 状态管理（3 个 Store）
 │       ├── router/                 # 路由配置（模块化）
 │       ├── composables/            # 组合式函数
@@ -163,7 +164,7 @@ SelfBlog/
 |------|----------|------|
 | JDK | 21 LTS | 后端编译与运行 |
 | Maven | 3.8+ | 后端构建 |
-| Node.js | 22.13+ 或 24+ | 仅构建时由 Maven 插件自动安装；单 JAR 运行无需 Node |
+| Node.js | 22.22+ / 24.15+ / 26+ | 仅构建时由 Maven 插件自动安装；单 JAR 运行无需 Node |
 | MySQL | 8.0+ | 可选数据库；默认 SQLite 无需安装 |
 
 ### 推荐：构建并运行单 JAR
@@ -268,7 +269,7 @@ Controller（控制器）→ Service（服务）→ Mapper（数据访问）→ 
 | 令牌黑名单 | 登出时加入黑名单，防止重放攻击 |
 | 登录锁定 | 5 次失败锁定 15 分钟（原子操作） |
 | XSS 防护 | 服务端 Jsoup HTML 净化 + 前端 DOMPurify |
-| 限流 | 23 个端点限流（RateLimitInterceptor） |
+| 限流 | 路径前缀限流（RateLimitInterceptor）；站点资源上传 30 次/分钟 |
 | SQL 注入 | MyBatis Plus 参数化查询 |
 | CORS | 可配置白名单，生产环境禁止 `*` |
 | 数据校验 | Spring Validation（@Valid、@NotBlank） |
