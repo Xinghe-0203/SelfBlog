@@ -95,7 +95,9 @@ CREATE TABLE IF NOT EXISTS blog_post_tag (
     post_id BIGINT NOT NULL,
     tag_id BIGINT NOT NULL,
     create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    is_deleted INT DEFAULT 0
+    is_deleted INT DEFAULT 0,
+    -- 与 MySQL/SQLite 一致：同一篇同一标签只有一行，重插依赖 upsert 恢复 is_deleted
+    UNIQUE(post_id, tag_id)
 );
 
 -- ============================================================================

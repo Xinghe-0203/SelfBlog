@@ -155,6 +155,30 @@ describe('author editor smoke coverage', () => {
     )
   })
 
+  it('keeps a free-typed tag name in the publish payload and limits input to the backend rule', async () => {
+    vi.mocked(tagApi.getTagList).mockResolvedValue(response([{ id: 5, name: '已有标签' }]))
+    const { wrapper } = await setup()
+    const tagInput = wrapper.get('.tag-input')
+    expect(tagInput.attributes('maxlength')).toBe('20')
+
+    await tagInput.setValue('已有标签')
+    await tagInput.trigger('keyup.enter')
+    await tagInput.setValue('全新标签')
+    await tagInput.trigger('keyup.enter')
+
+    await fillPost(wrapper)
+    await wrapper.get('.header-actions .btn-primary').trigger('click')
+    await wrapper.get('.modal-footer .btn-primary').trigger('click')
+    await flushPromises()
+
+    const payload = vi.mocked(postApi.createPost).mock.calls[0]?.[0] as {
+      tagIds?: number[]
+      tagNames?: string[]
+    }
+    expect(payload.tagIds).toEqual([5])
+    expect(payload.tagNames).toEqual(['已有标签', '全新标签'])
+  })
+
   it('keeps the publish opener enabled while confirmation captures and returns its focus', async () => {
     const { wrapper } = await setup()
     await fillPost(wrapper)

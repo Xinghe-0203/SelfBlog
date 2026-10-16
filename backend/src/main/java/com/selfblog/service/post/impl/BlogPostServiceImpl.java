@@ -33,6 +33,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -642,16 +643,30 @@ public class BlogPostServiceImpl extends ServiceImpl<BlogPostMapper, BlogPost> i
         }
     }
 
+    /**
+     * 解析文章标签：tagIds 与 tagNames 是并集，而不是二选一。
+     *
+     * <p>编辑器会同时提交两个字段（已有标签带 id，新输入的标签只有名字）。
+     * 旧实现只要 tagIds 非空就完全忽略 tagNames，导致“已有标签 + 新标签”混用时
+     * 新标签被静默丢弃。这里统一按名字 getOrCreate 后与 id 去重合并。
+     */
     private List<Long> resolveTagIds(List<Long> tagIds, List<String> tagNames) {
-        if (tagIds != null && !tagIds.isEmpty()) {
-            return tagIds;
+        Set<Long> resolved = new LinkedHashSet<>();
+        if (tagIds != null) {
+            for (Long id : tagIds) {
+                if (id != null) {
+                    resolved.add(id);
+                }
+            }
         }
-        if (tagNames == null || tagNames.isEmpty()) {
-            return null;
+        if (tagNames != null) {
+            for (String name : tagNames) {
+                Long id = blogTagService.getOrCreateTag(name);
+                if (id != null) {
+                    resolved.add(id);
+                }
+            }
         }
-        return tagNames.stream()
-                .map(name -> blogTagService.getOrCreateTag(name))
-                .filter(Objects::nonNull)
-                .collect(Collectors.toList());
+        return resolved.isEmpty() ? null : List.copyOf(resolved);
     }
 }

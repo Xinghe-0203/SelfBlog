@@ -20,10 +20,23 @@
         </foreach>
     </insert>
 
-    <!-- 根据文章ID查询所有媒体关联 -->
+    <!-- 默认（H2 兼容）: 批量插入文章媒体关联 -->
+    <insert id="batchInsert">
+        INSERT INTO blog_post_media (post_id, media_id, display_order, create_time)
+        VALUES
+        <foreach collection="mediaIds" item="mediaId" index="idx" separator=",">
+            (#{postId}, #{mediaId}, #{idx}, CURRENT_TIMESTAMP)
+        </foreach>
+    </insert>
+
+    <!--
+      根据文章ID查询有效媒体关联。
+      手写 SQL 必须自己带软删除条件（见根 CLAUDE.md）：setPostMedia 是先逻辑删除
+      再插入新关联，若这里不过滤 is_deleted=0，编辑器与公开接口会带回已移除的旧图。
+    -->
     <select id="selectByPostId" resultType="com.selfblog.entity.BlogPostMedia">
         SELECT * FROM blog_post_media
-        WHERE post_id = #{postId}
+        WHERE post_id = #{postId} AND is_deleted = 0
         ORDER BY display_order ASC, id ASC
     </select>
 

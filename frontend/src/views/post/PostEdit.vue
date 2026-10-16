@@ -702,7 +702,7 @@
               placeholder="输入标签搜索..."
               @keyup.enter="addTag"
               @input="filterTags"
-              maxlength="50"
+              maxlength="20"
             />
           </div>
           <div v-if="filteredTags.length" class="suggested-tags">

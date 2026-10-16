@@ -2,27 +2,37 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.selfblog.mapper.BlogPostTagMapper">
 
-    <!-- MySQL: 批量插入文章标签关联（忽略重复） -->
+    <!--
+      文章标签关联的“写入”不是纯插入：
+      blog_post_tag 有 UNIQUE(post_id, tag_id)，而编辑文章时旧关联行会被逻辑删除
+      （is_deleted=1）。如果这里用 INSERT IGNORE / INSERT OR IGNORE，旧的已删除行
+      仍占据唯一键，插入被静默忽略，结果是“编辑一次文章，标签全部消失，且再也加不回来”。
+      因此各数据库都改为 upsert：命中唯一键时把 is_deleted 复位为 0（等于恢复关联）。
+    -->
+
+    <!-- MySQL: 命中唯一键时恢复未删除标记 -->
     <insert id="batchInsertPostTags" databaseId="mysql">
-        INSERT IGNORE INTO blog_post_tag (post_id, tag_id) VALUES
+        INSERT INTO blog_post_tag (post_id, tag_id, is_deleted) VALUES
         <foreach collection="tagIds" item="tagId" separator=",">
-            (#{postId}, #{tagId})
+            (#{postId}, #{tagId}, 0)
         </foreach>
+        ON DUPLICATE KEY UPDATE is_deleted = 0
     </insert>
 
-    <!-- SQLite: 批量插入文章标签关联（忽略重复） -->
+    <!-- SQLite: UPSERT（需要 UNIQUE(post_id, tag_id)，schema 已包含） -->
     <insert id="batchInsertPostTags" databaseId="sqlite">
-        INSERT OR IGNORE INTO blog_post_tag (post_id, tag_id) VALUES
+        INSERT INTO blog_post_tag (post_id, tag_id, is_deleted) VALUES
         <foreach collection="tagIds" item="tagId" separator=",">
-            (#{postId}, #{tagId})
+            (#{postId}, #{tagId}, 0)
         </foreach>
+        ON CONFLICT(post_id, tag_id) DO UPDATE SET is_deleted = 0
     </insert>
 
-    <!-- 默认（H2兼容）: 批量插入文章标签关联 -->
+    <!-- 默认（H2 兼容）: 同样按唯一键合并并恢复未删除标记 -->
     <insert id="batchInsertPostTags">
-        INSERT INTO blog_post_tag (post_id, tag_id) VALUES
+        MERGE INTO blog_post_tag (post_id, tag_id, is_deleted) KEY(post_id, tag_id) VALUES
         <foreach collection="tagIds" item="tagId" separator=",">
-            (#{postId}, #{tagId})
+            (#{postId}, #{tagId}, 0)
         </foreach>
     </insert>
 
