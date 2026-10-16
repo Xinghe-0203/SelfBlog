@@ -71,3 +71,7 @@
 从backend以JDK21运行Maven：`test -Dskip.npm=true -Dskip.installnodenpm=true`；已有前端构建后执行`package -DskipTests -Dskip.npm=true -Dskip.installnodenpm=true`检查单JAR打包。
 
 Chrome真实联调脚本和含临时凭据的运行目录只保留本地，不作为仓库CI入口或部署脚本；本文区分实际执行结果与可直接复跑的仓库测试。
+
+## 交付
+
+页面管理实现提交 `3e1249a` 已推送 `origin/main`，远端SHA已核对。用户已有的根 `CLAUDE.md` 修改和本地工作笔记未混入提交；没有操作现有运行数据或部署到公网。后续SEO/部署批次保持未完成状态。

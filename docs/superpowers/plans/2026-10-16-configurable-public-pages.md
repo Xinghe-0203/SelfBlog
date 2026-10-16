@@ -118,7 +118,7 @@ expect(pageApi.publish).not.toHaveBeenCalled()
 - [x] Re-run existing17 real-service workflow checks plus seven-width foundation checks. Check 320/390/768/820/960/1024/1440px, dark/reduced-motion/keyboard and no default enlargement.
 - [x] Request independent read-only review (attempt interrupted by quota; no independent approval). Complete inline review, reproduce findings with failed regressions before fixes, and rerun gates.
 - [x] Update README variants, CHANGELOG and `docs/` author guide with exact feature/endpoint/limit details and evidence. Keep initial-HTML SEO and Docker work explicitly unshipped until their separate batches.
-- [ ] Commit only scoped product/spec/plan/docs; preserve root CLAUDE.md and scratch notes. Push only reviewed delivery per the user's earlier request.
+- [x] Commit only scoped product/spec/plan/docs; preserve root CLAUDE.md and scratch notes. Implementation `3e1249a` pushed to origin/main and remote SHA verified.
 
 ## Plan Self-Review
 
@@ -131,3 +131,4 @@ All first-batch spec sections map to tasks1–6. Separate draft/public keys and 
 - Actual packagedJAR-launched SQLite/Chrome audit31/31, including native bundled routes, retainedDENY headers, UI-confirmed unpublish/delete,390px dark preview and both first-load response orders. Original seven-width/audio checks pass.
 - `PagePreviewContent.vue` was separated from the srcdoc viewport presenter so actual media queries work without relaxing frame security. Content route is installed in router/index.ts only after the server admin namespace is known.
 - Independent review attempt has no result due quota; inline review findings and exact verification limits are recorded in the linked review document, not described as independent approval.
+- Delivery: implementation commit `3e1249af18d9f226f9357739f5789bd3e8ba8083` is on origin/main. No existing database/uploads or user-owned root CLAUDE.md changes were included.
