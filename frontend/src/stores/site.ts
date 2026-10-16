@@ -20,6 +20,8 @@ export interface SiteSettings {
   faviconUrl: string
   /** 顶栏与后台侧边栏的品牌图标；为空时回落内置 Icon name="logo"。 */
   siteLogoUrl: string
+  /** 站点正式地址（origin）；为空时服务端回落到 SITE_BASE_URL 或当前访问地址。 */
+  siteBaseUrl: string
 }
 
 const defaults: SiteSettings = {
@@ -38,7 +40,8 @@ const defaults: SiteSettings = {
   themePrimaryColor: '#165DFF',
   footerText: '用文字记录生活，用好奇探索世界。',
   faviconUrl: '',
-  siteLogoUrl: ''
+  siteLogoUrl: '',
+  siteBaseUrl: ''
 }
 
 /** 运行时注入的 favicon 节点标记，用来和 index.html 里的静态兜底区分。 */
@@ -94,10 +97,19 @@ export const useSiteStore = defineStore('site', () => {
     if (!root) return
     root.dataset.skin = settings.value.themeSkin || 'ocean'
     root.style.setProperty('--site-primary', settings.value.themePrimaryColor || '#165DFF')
-    root.style.setProperty('--accent', 'color-mix(in srgb, var(--site-primary) var(--accent-strength, 100%), var(--accent-blend, white))')
+    root.style.setProperty(
+      '--accent',
+      'color-mix(in srgb, var(--site-primary) var(--accent-strength, 100%), var(--accent-blend, white))'
+    )
     root.style.setProperty('--primary', 'var(--accent)')
-    root.style.setProperty('--accent-light', 'color-mix(in srgb, var(--accent) 10%, var(--surface-primary))')
-    root.style.setProperty('--accent-dark', 'color-mix(in srgb, var(--accent) 82%, var(--accent-shade, black))')
+    root.style.setProperty(
+      '--accent-light',
+      'color-mix(in srgb, var(--accent) 10%, var(--surface-primary))'
+    )
+    root.style.setProperty(
+      '--accent-dark',
+      'color-mix(in srgb, var(--accent) 82%, var(--accent-shade, black))'
+    )
   }
 
   function applySettings(input: Partial<SiteSettings> | Record<string, string>): void {

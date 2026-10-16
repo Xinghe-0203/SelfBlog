@@ -137,4 +137,33 @@ describe('Settings brand asset fields', () => {
     expect(groupTitles).toEqual(['站点资料', '后台与访客', '评论与音乐', '视觉主题'])
     expect(wrapper.findAll('form')).toHaveLength(1)
   })
+
+  it('saves the site domain, documents the env fallback and surfaces backend validation errors', async () => {
+    const wrapper = await mountSettings()
+    const label = wrapper
+      .findAll('label')
+      .find((candidate) => candidate.text().includes('网站域名'))
+    if (!label) throw new Error('missing 网站域名 field')
+    expect(label.text()).toContain('.env')
+    expect(label.text()).toContain('sitemap')
+
+    await label.get('input').setValue('https://blog.example.com')
+    updateSettings.mockResolvedValue({
+      code: 200,
+      message: 'OK',
+      data: { ...useSiteStore().settings, siteBaseUrl: 'https://blog.example.com' }
+    })
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+    expect(updateSettings.mock.calls[0]?.[0]).toMatchObject({
+      siteBaseUrl: 'https://blog.example.com'
+    })
+
+    updateSettings.mockRejectedValue({
+      userMessage: '网站域名需为 http(s) 站点地址（如 https://blog.example.com）'
+    })
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+    expect(wrapper.get('[role="alert"]').text()).toContain('网站域名需为')
+  })
 })

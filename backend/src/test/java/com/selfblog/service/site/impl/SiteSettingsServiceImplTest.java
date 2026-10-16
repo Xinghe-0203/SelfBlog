@@ -114,4 +114,27 @@ class SiteSettingsServiceImplTest {
     void newAdminPathCannotTakeCustomPageNamespace() {
         assertThrows(BusinessException.class, () -> siteSettingsService.updateSettings(Map.of("adminPath", "pages")));
     }
+
+    @Test
+    @DisplayName("updateSettings_AcceptsSiteOriginAndAllowsClearingIt")
+    void updateSettings_AcceptsSiteOriginAndAllowsClearingIt() {
+        var updated = siteSettingsService.updateSettings(Map.of("siteBaseUrl", "https://blog.example.com"));
+        assertEquals("https://blog.example.com", updated.get("siteBaseUrl"));
+        assertTrue(siteSettingsService.getPublicSettings().containsKey("siteBaseUrl"));
+
+        var cleared = siteSettingsService.updateSettings(Map.of("siteBaseUrl", ""));
+        assertEquals("", cleared.get("siteBaseUrl"));
+    }
+
+    @Test
+    @DisplayName("updateSettings_RejectsNonOriginSiteDomains")
+    void updateSettings_RejectsNonOriginSiteDomains() {
+        for (String value : java.util.List.of("blog.example.com", "https://blog.example.com/path",
+                "https://user:pass@blog.example.com", "javascript://blog.example.com",
+                "https://blog.example.com,evil.test", "https://blog.example.com?q=1", "https://blog.example.com#frag")) {
+            var error = assertThrows(BusinessException.class,
+                    () -> siteSettingsService.updateSettings(Map.of("siteBaseUrl", value)), value);
+            assertEquals(400, error.getCode(), value);
+        }
+    }
 }

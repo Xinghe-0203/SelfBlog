@@ -105,4 +105,22 @@ class DiscoveryControllerTest {
         assertFalse(feed.contains("991002"));
         assertTrue(feed.contains("https://blog.example.com/post/"));
     }
+
+    @Test void adminConfiguredDomainTakesEffectImmediatelyAndFallsBackWhenCleared() throws Exception {
+        settings.updateSettings(java.util.Map.of("siteBaseUrl", "https://custom.example.com"));
+
+        mvc.perform(get("/robots.txt"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("Sitemap: https://custom.example.com/sitemap.xml")));
+        mvc.perform(get("/"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("content=\"https://custom.example.com\"")))
+                .andExpect(content().string(not(containsString("blog.example.com"))));
+        mvc.perform(get("/sitemap.xml"))
+                .andExpect(content().string(containsString("https://custom.example.com/sitemap-site.xml")));
+
+        settings.updateSettings(java.util.Map.of("siteBaseUrl", ""));
+        mvc.perform(get("/robots.txt"))
+                .andExpect(content().string(containsString("Sitemap: https://blog.example.com/sitemap.xml")));
+    }
 }

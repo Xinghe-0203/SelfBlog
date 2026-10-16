@@ -23,7 +23,7 @@ public class SiteSettingsServiceImpl implements SiteSettingsService {
             "siteTitle", "siteDescription", "authorName", "authorBio", "authorAvatar",
             "adminPath", "commentsEnabled", "visitorTrackingEnabled", "musicEnabled",
             "musicUrl", "musicTitle", "themeSkin", "themePrimaryColor", "footerText",
-            "faviconUrl", "siteLogoUrl"
+            "faviconUrl", "siteLogoUrl", "siteBaseUrl"
     );
     private static final Set<String> RESERVED_PATHS = Set.of(
             "api", "assets", "uploads", "post", "archives", "about", "search", "gallery",
@@ -105,6 +105,7 @@ public class SiteSettingsServiceImpl implements SiteSettingsService {
         values.put("authorAvatar", "");
         values.put("faviconUrl", "");
         values.put("siteLogoUrl", "");
+        values.put("siteBaseUrl", "");
         values.put("adminPath", normalizeAdminPath(configuredAdminPath));
         values.put("commentsEnabled", "true");
         values.put("visitorTrackingEnabled", "true");
@@ -148,6 +149,15 @@ public class SiteSettingsServiceImpl implements SiteSettingsService {
             case "musicUrl", "authorAvatar", "faviconUrl", "siteLogoUrl" -> {
                 if (!value.isBlank() && !(value.startsWith("https://") || value.startsWith("http://") || value.startsWith("/uploads/"))) {
                     throw new BusinessException(400, "请填写 http(s) 地址或站内 /uploads/ 文件路径");
+                }
+            }
+            case "siteBaseUrl" -> {
+                // 留空 = 未设置，回落到 SITE_BASE_URL/请求地址；填写时必须是站点 origin。
+                if (value.isBlank()) return;
+                try {
+                    com.selfblog.service.site.seo.SiteOrigin.normalize(value);
+                } catch (IllegalArgumentException e) {
+                    throw new BusinessException(400, "网站域名需为 http(s) 站点地址（如 https://blog.example.com），不要包含路径、参数或账号密码");
                 }
             }
             default -> { }

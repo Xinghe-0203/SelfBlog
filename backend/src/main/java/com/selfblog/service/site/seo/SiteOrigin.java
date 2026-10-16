@@ -1,26 +1,53 @@
 package com.selfblog.service.site.seo;
 
+import com.selfblog.service.site.SiteSettingsService;
 import jakarta.servlet.http.HttpServletRequest;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import java.net.URI;
 import java.util.Locale;
 import java.util.Set;
 
-/** One canonical origin for HTML, runtime metadata and discovery documents. */
+/**
+ * One canonical origin for HTML, runtime metadata and discovery documents.
+ *
+ * <p>优先级：后台「网站设置 → 网站域名」（保存即生效，缓存随设置更新清理）→ 环境变量
+ * {@code SITE_BASE_URL}（部署默认值）→ 直连请求推导（仅本地开发）。数据库里存在直接改坏的值时
+ * 记录警告并安全回落，不能让整站无法访问。
+ */
 @Component
 public class SiteOrigin {
-    private final String configured;
+    private static final Logger log = LoggerFactory.getLogger(SiteOrigin.class);
 
-    public SiteOrigin(@Value("${SITE_BASE_URL:}") String configured) {
+    private final String configured;
+    private final SiteSettingsService settings;
+
+    public SiteOrigin(@Value("${SITE_BASE_URL:}") String configured, SiteSettingsService settings) {
         this.configured = configured == null || configured.isEmpty() ? null : normalize(configured);
+        this.settings = settings;
     }
 
     public String resolve(HttpServletRequest request) {
+        String stored = storedOrigin();
+        if (stored != null) return stored;
         if (configured != null) return configured;
         String host = request.getServerName();
         if (host.contains(":") && !host.startsWith("[")) host = "[" + host + "]";
         return normalize(request.getScheme() + "://" + host + ":" + request.getServerPort());
+    }
+
+    /** 后台设置里的域名；空或非法都返回 null 交给下一优先级。 */
+    private String storedOrigin() {
+        String raw = settings.getSettings().get("siteBaseUrl");
+        if (raw == null || raw.isBlank()) return null;
+        try {
+            return normalize(raw);
+        } catch (IllegalArgumentException error) {
+            log.warn("siteBaseUrl 配置无效，已回落到 SITE_BASE_URL/请求地址（请到后台网站设置修正）");
+            return null;
+        }
     }
 
     public static String normalize(String raw) {
