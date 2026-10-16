@@ -74,14 +74,18 @@
 2. **媒体关联查询未过滤软删除**：`BlogPostMediaMapper.selectByPostId` 会把“编辑文章时移除的旧配图”继续返回给编辑器与公开接口；同时该 mapper 缺少 H2 兜底语句（H2 运行直接报 `Invalid bound statement`）。已补 `is_deleted = 0` 与兜底批量插入。
 3. **混用标签时新标签被静默丢弃**：编辑器同时发送 `tagIds`（已有标签）与 `tagNames`（新输入），后端旧逻辑“tagIds 非空即忽略 tagNames”。已改为并集解析（名字 `getOrCreate` 后与 id 去重合并）。
 4. **写作页标签输入上限 50 字与后端 20 字不一致**：与后台标签管理页对齐为 20 字，仍以后端校验为准。
+5. **同类排查（同批修复）**：标签删除后重建同名标签（唯一名称 + 逻辑删除 → 旧代码返回 null/NPE）；趋势表每日 upsert 未复位删除标记且查询未过滤软删行；文章接口 `category`/`coverImage` 缺长度校验（库列 50/500，超长报 500）；H2 测试库补齐生产已有的 7 个唯一键（此前仅 2 个），消除“生产有约束、测试没有”的盲区。
+6. **唯一键冲突的异常类型不可移植（真实联调两轮才修净）**：Spring 只把 H2/MySQL 的唯一键冲突翻译成 `DuplicateKeyException`；SQLite（SQLState null、error code 19）实际抛出 `UncategorizedSQLException`。第一版只捕获 `DuplicateKeyException`、第二版只捕获 `DataIntegrityViolationException`，都在真实 SQLite 上继续 500，而本机 H2 测试是绿的。最终统一捕获 `DataAccessException` 并**只在找到冲突行时转换**。同类共 5 处（标签、页面地址预留 → 409、关注、动态点赞、用户创建、话题创建）。验证：`BlogTagConflictTest`、`PageSlugConflictTest`（使用真实 SQLite 异常形态）+ 真实 JAR 联调第 11 项。
 
 回归与证据：
 
 - `PostTagLifecycleTest`：编辑保留、移除、重新添加、`tagIds`+`tagNames` 混用（RED→GREEN）。
 - `BlogPostMediaMapperTest`：替换媒体后不返回软删行（先因缺少 H2 语句 RED，再补语句+过滤 GREEN）。
 - `PostEdit.test.ts`：输入上限 20 与发布载荷同时包含 id 与名字。
-- 真实联调新增“编辑已发布文章保留标签、移除后可恢复”检查（第 10 项，10/10 通过）；浏览器回归新增“编辑器标签输入上限 20”，单独复跑 **32/32** 通过（曾与另一套联调并行运行时，About 发布响应等待 12 秒超时；单独运行时同一检查通过，判定为资源竞争而非产品问题）。
-- 当前闸门：后端 548 / 前端 394 / 部署契约 27；Docker、MySQL、真实 Vercel 仍未验证。
+- 同类排查新增：`BlogTagLifecycleTest`（删除后重建恢复原行、发布流程复用已删名称）、`BlogTrendingMapperTest`（每日 upsert 复位删除标记）、`BlogPostControllerTest`（分类/封面超长返回 400 而不是数据库 500）；测试库补齐生产唯一键。
+- 真实联调新增“编辑已发布文章保留标签、移除后可恢复”（第 10 项）与“标签删除后重建恢复原行”（第 11 项）；浏览器回归新增“编辑器标签输入上限 20”，单独复跑 **32/32** 通过（曾与另一套联调并行运行时，About 发布响应等待 12 秒超时；单独运行时同一检查通过，判定为资源竞争而非产品问题）。
+- 当前闸门：后端 559 / 前端 394 / 部署契约 27；Docker、MySQL、真实 Vercel 仍未验证。
+- 环境备注：连续多轮联调后出现 Chrome 残留进程（23 个）与一次 `ERR_NO_BUFFER_SPACE`；清理残留并顺序重跑后恢复。清理过程中误停了用户此前启动的 Vite 开发服务器（127.0.0.1:3000），已用相同命令立即重启并确认 HTTP 200。
 
 ## 站点域名后台化（2026-10-16 追加）
 

@@ -13,7 +13,14 @@
 - **修复：同时提交 `tagIds` 与 `tagNames` 时新标签被静默丢弃。** 编辑器会同时发送两个字段（已有标签带 id、新输入只有名字），后端旧逻辑“tagIds 非空就忽略 tagNames”。现按并集解析（名字走 getOrCreate 后与 id 去重合并），混用场景不再丢标签。
 - **修复：写作页标签输入上限 50 字，与后端 20 字限制不一致**（此前只修过后台标签管理页）。输入框改为 20 字，仍以后端校验为准。
 - 新增回归：`PostTagLifecycleTest`（编辑保留/移除/恢复/混用）、`BlogPostMediaMapperTest`（替换媒体不返回软删行）、`PostEdit.test.ts`（输入上限与发布载荷契约）；真实单 JAR 联调新增“编辑后标签保留、可恢复”检查。
-- 全量验证：前端 41 文件/394 测试、类型检查与 Lint 通过；后端 548 测试通过；真实 JAR + SQLite 联调 10/10、上一批浏览器回归 32/32（新增“编辑器标签输入上限”检查）。
+- **同类问题系统排查（同一批次）**：
+  - **标签删除后重建同名标签**：`blog_tag.name` 唯一 + 逻辑删除，旧 `createTag`/`getOrCreateTag` 在唯一键冲突后按“未删除”条件查询只能拿到 null → 创建接口返回空、发文章时该标签丢失（实测 NPE/500）。改为原始查询找回同名行并恢复 `is_deleted=0`（新增 `selectRawByName`/`restoreById`）。
+  - **趋势表同类缺陷**：`blog_trending` 唯一键 (post_id, date) + 逻辑删除；每日 upsert 未复位 `is_deleted`（被删过的那天永远查不到），查询也未过滤软删行。三种方言的 upsert 统一复位标记并补齐查询条件。
+  - **文章接口缺长度校验**：`category`（库列 50）与 `coverImage`（库列 500）没有 DTO 约束，超长会在数据库层报 500（SQLite 甚至静默存入）。补 `@Size` 后统一返回 400。
+  - **测试库对齐生产约束**：H2 补上 `blog_tag(name)`、`blog_like`、`blog_collect`、`blog_follow`、`blog_trending`、`blog_draft_tag` 的唯一键（此前只有 2 个约束），这类“生产有唯一键、测试没有”的盲区不再出现。
+  - **唯一键冲突的异常类型不可移植（真实联调两轮才修净）**：Spring 只把 H2/MySQL 的唯一键冲突翻译成 `DuplicateKeyException`；SQLite 的 SQLState 为 null、error code 19，最终抛的是 `UncategorizedSQLException`。第一版只捕获 `DuplicateKeyException`（SQLite 仍 500），第二版捕获 `DataIntegrityViolationException`（仍不够），最终统一捕获可移植父类 `DataAccessException`，并且**只在真正找到冲突行时转换**，找不到就保留原始异常。同类共修复 5 处：标签创建/取用、页面地址预留（→409）、关注、动态点赞、用户创建、话题创建。
+  - 排查中确认无需改动：点赞/收藏/关注早已使用“原始查询 + 恢复标记”的正确写法；`BlogPostMapper.fullTextSearch*`、社区 Circle/Topic 的少数 SQL 只有 MySQL/SQLite 变体（H2 无兜底），但当前无调用方或仅旧社区路径，未扩大改动范围。
+- 全量验证：前端 41 文件/394 测试、类型检查与 Lint 通过；后端 559 测试通过；真实 JAR + SQLite 联调 11/11（新增“标签删除后重建”）、浏览器回归 32/32。
 
 ### 影响文件
 
@@ -26,6 +33,13 @@
 | `backend/src/test/.../PostTagLifecycleTest.java`、`mapper/BlogPostMediaMapperTest.java` | 新增回归 |
 | `frontend/src/views/post/PostEdit.vue` | 标签输入上限对齐后端 20 字 |
 | `frontend/src/views/post/__tests__/PostEdit.test.ts` | 新增输入上限与载荷契约断言 |
+| `backend/.../mapper/BlogTagMapper.java`、`service/post/impl/BlogTagServiceImpl.java` | 同名标签重建时恢复原行（原始查询 + 复位标记） |
+| `backend/.../mapper/BlogTrendingMapper.xml` | upsert 复位 `is_deleted`；查询补软删条件 |
+| `backend/.../dto/post/PostCreateRequest.java`、`controller/BlogPostControllerTest.java` | 分类/封面长度约束与 400 断言 |
+| `backend/src/test/resources/schema.sql` | 测试库补齐生产已有的唯一键（tag/like/collect/follow/trending/draft_tag） |
+| `backend/.../service/post/BlogTagLifecycleTest.java`、`mapper/BlogTrendingMapperTest.java` | 新增回归 |
+| `backend/.../BlogTagConflictTest.java`、`service/site/impl/PageSlugConflictTest.java` | 唯一键冲突的异常类型契约（H2/MySQL/SQLite） |
+| `backend/.../service/{site/impl/PageServiceImpl,social/impl/FollowServiceImpl,circle/impl/CircleInteractionServiceImpl,auth/impl/SysUserServiceImpl,content/impl/TopicServiceImpl}.java` | 统一捕获 `DataIntegrityViolationException` |
 
 ---
 
