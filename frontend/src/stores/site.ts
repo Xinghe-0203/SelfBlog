@@ -89,14 +89,20 @@ export const useSiteStore = defineStore('site', () => {
     () => settings.value.musicEnabled === 'true' && !!settings.value.musicUrl
   )
 
+  function applyAppearance(): void {
+    const root = document.getElementById('selfblog')
+    if (!root) return
+    root.dataset.skin = settings.value.themeSkin || 'ocean'
+    root.style.setProperty('--site-primary', settings.value.themePrimaryColor || '#165DFF')
+    root.style.setProperty('--accent', 'color-mix(in srgb, var(--site-primary) var(--accent-strength, 100%), var(--accent-blend, white))')
+    root.style.setProperty('--primary', 'var(--accent)')
+    root.style.setProperty('--accent-light', 'color-mix(in srgb, var(--accent) 10%, var(--surface-primary))')
+    root.style.setProperty('--accent-dark', 'color-mix(in srgb, var(--accent) 82%, var(--accent-shade, black))')
+  }
+
   function applySettings(input: Partial<SiteSettings> | Record<string, string>): void {
     settings.value = { ...settings.value, ...input }
-    const appRoot = document.getElementById('selfblog')
-    if (appRoot) appRoot.setAttribute('data-skin', settings.value.themeSkin || 'ocean')
-    if (appRoot) {
-      appRoot.style.setProperty('--accent', settings.value.themePrimaryColor || '#165DFF')
-      appRoot.style.setProperty('--primary', settings.value.themePrimaryColor || '#165DFF')
-    }
+    applyAppearance()
     document.title = settings.value.siteTitle || defaults.siteTitle
     applyFavicon(settings.value.faviconUrl || '')
   }
@@ -119,6 +125,7 @@ export const useSiteStore = defineStore('site', () => {
     isCommentsEnabled,
     isMusicEnabled,
     applySettings,
+    applyAppearance,
     loadPublicSettings
   }
 })

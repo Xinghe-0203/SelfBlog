@@ -12,9 +12,9 @@ html {
   scroll-behavior: smooth;
   /* 顶栏是 fixed 浮动胶囊，原生锚点跳转需要给它让位，
      否则 #hash 跳转后标题会被压在导航下面。 */
-  scroll-padding-top: 96px;
+  scroll-padding-top: var(--anchor-offset);
   -webkit-text-size-adjust: 100%;
-  color-scheme: light dark;
+  color-scheme: light;
 }
 
 body {
@@ -27,10 +27,15 @@ body {
   color: var(--text-primary);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  transition: background var(--transition-slow), color var(--transition-slow);
   min-height: 100vh;
   overflow-x: hidden;
   position: relative;
+}
+
+#selfblog {
+  min-height: 100vh;
+  background: var(--bg-primary);
+  color: var(--text-primary);
 }
 
 /* ==================== Scrollbar — Minimal ==================== */
@@ -63,12 +68,12 @@ body {
 
 /* ==================== Text Selection ==================== */
 ::selection {
-  background: rgba(31, 108, 159, 0.15);
+  background: var(--accent-light);
   color: var(--text-primary);
 }
 
 .dark-mode ::selection {
-  background: rgba(31, 108, 159, 0.30);
+  background: var(--accent-light);
 }
 
 /* ==================== Image Loading ==================== */
@@ -99,17 +104,4 @@ button {
   cursor: pointer;
   border: none;
   background: none;
-}
-
-/* ==================== Responsive Base Font Size ==================== */
-@media (max-width: 640px) {
-  html {
-    font-size: 14px;
-  }
-}
-
-@media (min-width: 1600px) {
-  html {
-    font-size: 17px;
-  }
 }

@@ -99,4 +99,18 @@ describe('site store brand assets', () => {
     store.applySettings({ faviconUrl: '' })
     expect(injected()).toBeNull()
   })
+
+  it('derives soft accent colors from the configured primary', () => {
+    const root = document.createElement('div')
+    root.id = 'selfblog'
+    document.body.appendChild(root)
+    try {
+      useSiteStore().applySettings({ themePrimaryColor: '#a34466' })
+      expect(root.style.getPropertyValue('--site-primary')).toBe('#a34466')
+      expect(root.style.getPropertyValue('--accent')).toContain('var(--site-primary)')
+      expect(root.style.getPropertyValue('--accent-light')).toContain('color-mix')
+    } finally {
+      root.remove()
+    }
+  })
 })

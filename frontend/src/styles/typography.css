@@ -2,14 +2,14 @@
 a {
   color: var(--accent);
   text-decoration: none;
-  transition: all var(--transition);
+  transition: opacity var(--transition-fast);
 }
 
 a:hover {
   color: var(--accent-dark);
 }
 
-/* ==================== Heading System — Serif Display ==================== */
+/* ==================== Heading System — System Sans ==================== */
 h1, h2, h3, h4, h5, h6 {
   font-family: var(--font-display);
   color: var(--text-primary);

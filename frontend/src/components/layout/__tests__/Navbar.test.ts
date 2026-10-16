@@ -5,6 +5,7 @@ import { createPinia, setActivePinia } from 'pinia'
 import { createRouter, createMemoryHistory } from 'vue-router'
 import Navbar from '../Navbar.vue'
 import { useSiteStore } from '@/stores/site'
+import { useMusicStore } from '@/stores/music'
 
 /**
  * 用真实 memory router，而不是 `stubs: { RouterLink: true }`。
@@ -45,9 +46,10 @@ async function scrollTo(y: number): Promise<void> {
 let pinia: ReturnType<typeof createPinia>
 let router: ReturnType<typeof createRouter>
 
-function mountNavbar() {
+function mountNavbar(realTransition = false) {
   return mount(Navbar, {
-    global: { plugins: [pinia, router] }
+    attachTo: document.body,
+    global: { plugins: [pinia, router], stubs: { transition: !realTransition } }
   })
 }
 
@@ -133,13 +135,11 @@ describe('Navbar', () => {
     expect(wrapper.find('.site-nav-wrap').classes()).not.toContain('is-scrolled')
   })
 
-  // 这里只断言状态 class；实际隐藏效果由 CSS 的 @media (max-width: 760px) 决定，
-  // jsdom 不跑媒体查询，所以视觉效果只能目视验证。
-  it('marks the nav as hidden while scrolling down, and reveals it on the way up', async () => {
+  it('keeps navigation visible in both scroll directions', async () => {
     const wrapper = mountNavbar()
 
     await scrollTo(400)
-    expect(wrapper.find('.site-nav-wrap').classes()).toContain('is-hidden')
+    expect(wrapper.find('.site-nav-wrap').classes()).not.toContain('is-hidden')
 
     await scrollTo(200)
     expect(wrapper.find('.site-nav-wrap').classes()).not.toContain('is-hidden')
@@ -158,5 +158,69 @@ describe('Navbar', () => {
     expect(wrapper.find('.theme-button .icon').exists()).toBe(true)
     expect(wrapper.find('.menu-toggle .icon').exists()).toBe(true)
     expect(wrapper.find('.theme-button').text()).toBe('')
+  })
+
+  it('closes the menu on a programmatic route change', async () => {
+    const wrapper = mountNavbar()
+    await wrapper.get('.menu-toggle').trigger('click')
+    await router.push('/archives')
+    await nextTick()
+    expect(wrapper.get('.menu-toggle').attributes('aria-expanded')).toBe('false')
+    expect(wrapper.find('.mobile-panel').exists()).toBe(false)
+  })
+
+  it('submits a trimmed query but does not navigate for whitespace', async () => {
+    const wrapper = mountNavbar()
+    await wrapper.get('.nav-search input').setValue('   ')
+    await wrapper.get('.nav-search').trigger('submit')
+    expect(router.currentRoute.value.path).toBe('/')
+    await wrapper.get('.nav-search input').setValue('  Vue  ')
+    await wrapper.get('.nav-search').trigger('submit')
+    await router.isReady()
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(router.currentRoute.value.fullPath).toBe('/search?q=Vue')
+  })
+
+  it('keeps search, music and menu panels mutually exclusive', async () => {
+    useMusicStore().configure({ enabled: true, url: '/uploads/song.mp3', title: 'Song' })
+    const wrapper = mountNavbar()
+    await wrapper.get('.menu-toggle').trigger('click')
+    await wrapper.get('.music-trigger').trigger('click')
+    expect(wrapper.find('.mobile-panel').exists()).toBe(false)
+    expect(wrapper.find('.music-panel').exists()).toBe(true)
+    await wrapper.get('.search-toggle').trigger('click')
+    expect(wrapper.find('.music-panel').exists()).toBe(false)
+    expect(wrapper.find('.search-panel').exists()).toBe(true)
+  })
+
+  it('focuses the arriving search input even while a music panel is leaving', async () => {
+    useMusicStore().configure({ enabled: true, url: '/uploads/song.mp3', title: 'Song' })
+    const wrapper = mountNavbar(true)
+    await wrapper.get('.music-trigger').trigger('click')
+    await wrapper.get('.search-toggle').trigger('click')
+    expect(document.activeElement).toBe(wrapper.get('.search-panel input').element)
+  })
+
+  it('closes on Escape and restores the opening button focus', async () => {
+    const wrapper = mountNavbar()
+    const trigger = wrapper.get<HTMLButtonElement>('.menu-toggle')
+    trigger.element.focus()
+    await trigger.trigger('click')
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    await nextTick()
+    expect(wrapper.find('.mobile-panel').exists()).toBe(false)
+    expect(document.activeElement).toBe(trigger.element)
+  })
+
+  it('closes on outside pointer input or a modal opening', async () => {
+    const wrapper = mountNavbar()
+    await wrapper.get('.menu-toggle').trigger('click')
+    document.body.dispatchEvent(new Event('pointerdown', { bubbles: true }))
+    await nextTick()
+    expect(wrapper.find('.mobile-panel').exists()).toBe(false)
+    await wrapper.get('.menu-toggle').trigger('click')
+    document.dispatchEvent(new Event('selfblog:dialog-open'))
+    await nextTick()
+    expect(wrapper.find('.mobile-panel').exists()).toBe(false)
   })
 })

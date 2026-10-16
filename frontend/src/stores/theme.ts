@@ -14,6 +14,7 @@ export const useThemeStore = defineStore('theme', () => {
   const theme = ref<ThemeMode>('light')
   let mediaQuery: MediaQueryList | null = null
   let mediaHandler: (() => void) | null = null
+  let themeFrame = 0
 
   // 计算属性
   const currentTheme = computed<'light' | 'dark'>(() => {
@@ -36,11 +37,11 @@ export const useThemeStore = defineStore('theme', () => {
     }
     theme.value = savedTheme
 
-    // 应用主题
-    applyTheme()
-
     // 清理旧监听器
     destroyTheme()
+
+    // 应用主题
+    applyTheme()
 
     // 监听系统主题变化
     mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
@@ -54,6 +55,9 @@ export const useThemeStore = defineStore('theme', () => {
 
   // 清理监听器
   function destroyTheme(): void {
+    if (themeFrame) cancelAnimationFrame(themeFrame)
+    themeFrame = 0
+    document.documentElement.classList.remove('theme-changing')
     if (mediaQuery && mediaHandler) {
       mediaQuery.removeEventListener('change', mediaHandler)
       mediaQuery = null
@@ -63,6 +67,8 @@ export const useThemeStore = defineStore('theme', () => {
 
   // 应用主题
   function applyTheme(): void {
+    if (themeFrame) cancelAnimationFrame(themeFrame)
+    document.documentElement.classList.add('theme-changing')
     const effectiveTheme = currentTheme.value
     isDarkMode.value = effectiveTheme === 'dark'
 
@@ -71,6 +77,13 @@ export const useThemeStore = defineStore('theme', () => {
     } else {
       document.documentElement.classList.remove('dark-mode')
     }
+    // Let Vue's app-root class and the document palette settle in the same paint.
+    themeFrame = requestAnimationFrame(() => {
+      themeFrame = requestAnimationFrame(() => {
+        document.documentElement.classList.remove('theme-changing')
+        themeFrame = 0
+      })
+    })
   }
 
   // 切换主题

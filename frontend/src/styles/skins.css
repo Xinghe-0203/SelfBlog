@@ -8,7 +8,7 @@
   --border-light: #dce4d2;
   --text-primary: #26372a;
   --text-secondary: #586b5a;
-  --text-muted: #7f907e;
+  --text-muted: #687c66;
   --accent: #2d7c54;
   --accent-light: #e4f2e8;
   --accent-dark: #1d6541;
@@ -23,7 +23,7 @@
   --border-light: #e4dff0;
   --text-primary: #302b3d;
   --text-secondary: #625b72;
-  --text-muted: #8c849c;
+  --text-muted: #776d89;
   --accent: #7555b7;
   --accent-light: #eee8fa;
   --accent-dark: #5b3f98;
@@ -38,13 +38,22 @@
   --border-light: #eadbd0;
   --text-primary: #3f3028;
   --text-secondary: #735d50;
-  --text-muted: #9a8170;
+  --text-muted: #856c5b;
   --accent: #c45b3e;
   --accent-light: #fbe9df;
   --accent-dark: #a8442d;
 }
 
 #selfblog[data-skin='midnight'] {
+  --accent-strength: 62%;
+  --accent-shade: white;
+  --contrast-bg: #ebebeb;
+  --contrast-bg-hover: #fff;
+  --contrast-bg-active: #d6d6d6;
+  --contrast-fg: #111;
+  --text-inverse: #111;
+  --functional-glass-edge: rgb(255 255 255 / 11%);
+  --functional-glass-shadow: 0 9px 30px rgb(0 0 0 / 24%);
   --bg-primary: #101823;
   --bg-secondary: #172332;
   --bg-tertiary: #202f40;

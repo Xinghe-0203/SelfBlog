@@ -1,6 +1,9 @@
-import { describe, it, expect } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { afterEach, describe, it, expect } from 'vitest'
+import { mount, enableAutoUnmount } from '@vue/test-utils'
+import { nextTick } from 'vue'
 import MobileTocSheet from '../MobileTocSheet.vue'
+
+enableAutoUnmount(afterEach)
 
 const items = [
   { id: 'section-0', text: '第一节', level: 1 },
@@ -9,10 +12,35 @@ const items = [
 ]
 
 function mountSheet(activeId = '') {
-  return mount(MobileTocSheet, { props: { items, activeId } })
+  return mount(MobileTocSheet, { props: { items, activeId }, global: { stubs: { teleport: true, transition: true } } })
 }
 
 describe('MobileTocSheet', () => {
+  it('moves focus inside a sheet opened from its initially closed trigger', async () => {
+    const wrapper = mount(MobileTocSheet, { props: { items }, attachTo: document.body, global: { stubs: { teleport: true } } })
+    await wrapper.get('.toc-fab').trigger('click')
+    await nextTick()
+    expect(document.activeElement).toBe(wrapper.get('.toc-close').element)
+  })
+  it('locks scrolling and closes with Escape', async () => {
+    const wrapper = mountSheet()
+    await wrapper.get('.toc-fab').trigger('click')
+    expect(document.body.style.overflow).toBe('hidden')
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+    await nextTick()
+    expect(wrapper.find('.toc-panel').exists()).toBe(false)
+    expect(document.body.style.overflow).toBe('')
+  })
+
+  it('closes and releases scrolling when resized to a desktop directory', async () => {
+    const wrapper = mountSheet()
+    await wrapper.get('.toc-fab').trigger('click')
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1200 })
+    window.dispatchEvent(new Event('resize'))
+    await nextTick()
+    expect(wrapper.find('.toc-panel').exists()).toBe(false)
+    expect(document.body.style.overflow).toBe('')
+  })
   it('renders one button per item with level classes and the active class', async () => {
     const wrapper = mountSheet('section-1')
     await wrapper.find('.toc-fab').trigger('click')

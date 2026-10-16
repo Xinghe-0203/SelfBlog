@@ -1,266 +1,59 @@
 <script setup lang="ts">
-import { ref, watch, onBeforeUnmount } from 'vue'
+import { computed, ref, watch, onBeforeUnmount } from 'vue'
+import { overlayTarget, useDialog } from '@/composables/useDialog'
+import Icon from './Icon.vue'
 
-const props = defineProps<{
-  images?: string[]
-  initialIndex?: number
-  show?: boolean
-}>()
+const props = defineProps<{ images?: string[]; captions?: string[]; initialIndex?: number; show?: boolean }>()
+const emit = defineEmits<{ close: [] }>()
+const panel = ref<HTMLElement | null>(null)
+const currentIndex = ref(0)
+const open = computed(() => props.show === true && !!props.images?.length)
+// Lightboxes visually outrank ordinary dialogs, so keyboard ownership does too.
+const { isTop, layer } = useDialog(open, panel, () => emit('close'), 1)
 
-const emit = defineEmits<{
-  close: []
-}>()
+watch(() => [props.show, props.initialIndex, props.images?.length] as const, () => {
+  currentIndex.value = Math.max(0, Math.min(props.initialIndex || 0, (props.images?.length || 1) - 1))
+}, { immediate: true })
 
-const currentIndex = ref(props.initialIndex ?? 0)
-
-let bodyOverflowCount = 0
-
-watch(
-  () => props.show,
-  (val) => {
-    if (val) {
-      bodyOverflowCount++
-      if (bodyOverflowCount === 1) {
-        document.body.style.overflow = 'hidden'
-      }
-      document.addEventListener('keydown', handleKeydown)
-    } else {
-      bodyOverflowCount = Math.max(0, bodyOverflowCount - 1)
-      if (bodyOverflowCount === 0) {
-        document.body.style.overflow = ''
-      }
-      document.removeEventListener('keydown', handleKeydown)
-    }
-  },
-  { immediate: true }
-)
-
-const prev = (): void => {
-  if (currentIndex.value > 0) currentIndex.value--
+function prev(): void { if (currentIndex.value > 0) currentIndex.value-- }
+function next(): void { if (currentIndex.value < (props.images?.length || 0) - 1) currentIndex.value++ }
+function handleKeydown(event: KeyboardEvent): void {
+  if (!open.value || !isTop()) return
+  if (event.key === 'ArrowLeft') { event.preventDefault(); prev() }
+  if (event.key === 'ArrowRight') { event.preventDefault(); next() }
 }
-const next = (): void => {
-  if (props.images && currentIndex.value < props.images.length - 1) currentIndex.value++
-}
-
-/**
- * 用函数声明而不是 const 箭头函数：上面的 watch(..., { immediate: true })
- * 在 setup 阶段就会执行一次并引用它，const 会撞 TDZ —— 初始 show=true 时
- * keydown 监听根本挂不上，Escape / 方向键全部失效。
- */
-function handleKeydown(e: KeyboardEvent): void {
-  if (e.key === 'Escape') emit('close')
-  if (e.key === 'ArrowLeft') prev()
-  if (e.key === 'ArrowRight') next()
-}
-
-onBeforeUnmount(() => {
-  document.removeEventListener('keydown', handleKeydown)
-  bodyOverflowCount = Math.max(0, bodyOverflowCount - 1)
-  if (bodyOverflowCount === 0) {
-    document.body.style.overflow = ''
-  }
-})
+document.addEventListener('keydown', handleKeydown)
+onBeforeUnmount(() => document.removeEventListener('keydown', handleKeydown))
 </script>
 
 <template>
-  <Teleport to="body">
-    <Transition name="preview">
-      <div v-if="show && images?.length" class="preview-overlay" role="dialog" aria-modal="true" @click.self="emit('close')" tabindex="0">
-        <button class="preview-close" aria-label="关闭" @click="emit('close')">&times;</button>
-        <button v-if="images.length > 1" class="preview-nav prev" aria-label="上一张" @click="prev">&#8249;</button>
-        <img :src="images[currentIndex]" class="preview-img" @click.stop />
-        <button v-if="images.length > 1" class="preview-nav next" aria-label="下一页" @click="next">&#8250;</button>
-        <div class="preview-counter">{{ currentIndex + 1 }} / {{ images.length }}</div>
+  <Teleport :to="overlayTarget()">
+    <Transition name="preview" @before-leave="$event.setAttribute('inert', '')">
+      <div v-if="open && images" ref="panel" class="preview-overlay" :style="{ zIndex: `calc(var(--z-preview) + ${layer})` }" role="dialog" aria-modal="true" aria-label="图片预览" tabindex="-1" @click.self="emit('close')">
+        <button type="button" class="preview-close" aria-label="关闭" @click="emit('close')"><Icon name="close" :size="22" /></button>
+        <button v-if="images.length > 1" type="button" class="preview-nav prev" aria-label="上一张" :disabled="currentIndex === 0" @click="prev"><Icon name="chevron-left" :size="24" /></button>
+        <img :src="images[currentIndex]" class="preview-img" :alt="captions?.[currentIndex] || `图片 ${currentIndex + 1}`" />
+        <button v-if="images.length > 1" type="button" class="preview-nav next" aria-label="下一张" :disabled="currentIndex >= images.length - 1" @click="next"><Icon name="chevron-right" :size="24" /></button>
+        <div class="preview-footer" aria-live="polite"><p v-if="captions?.[currentIndex]" class="preview-caption">{{ captions[currentIndex] }}</p><span class="preview-counter">{{ currentIndex + 1 }} / {{ images.length }}</span></div>
       </div>
     </Transition>
   </Teleport>
 </template>
 
 <style scoped>
-.preview-overlay {
-  position: fixed;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(0, 0, 0, 0.85);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  z-index: var(--z-preview);
-  cursor: zoom-out;
-}
-
-.preview-close {
-  position: absolute;
-  top: var(--spacing-lg);
-  right: var(--spacing-lg);
-  width: 48px;
-  height: 48px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 2rem;
-  color: white;
-  background: var(--glass-bg);
-  backdrop-filter: var(--glass-blur);
-  -webkit-backdrop-filter: var(--glass-blur);
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-full);
-  cursor: pointer;
-  z-index: 1;
-  transition: all var(--transition);
-}
-
-.preview-close:hover {
-  background: var(--error);
-  border-color: var(--error);
-  transform: rotate(90deg) scale(1.1);
-}
-
-.preview-nav {
-  position: absolute;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 52px;
-  height: 52px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 2.5rem;
-  color: white;
-  background: var(--glass-bg);
-  backdrop-filter: var(--glass-blur);
-  -webkit-backdrop-filter: var(--glass-blur);
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-full);
-  cursor: pointer;
-  z-index: 1;
-  transition: all var(--transition);
-}
-
-.preview-nav:hover {
-  background: var(--primary);
-  border-color: var(--primary);
-  transform: translateY(-50%) scale(1.1);
-  box-shadow: var(--shadow-glow-primary);
-}
-
-.preview-nav.prev {
-  left: var(--spacing-lg);
-}
-
-.preview-nav.next {
-  right: var(--spacing-lg);
-}
-
-.preview-img {
-  max-width: 90%;
-  max-height: 90%;
-  object-fit: contain;
-  border-radius: var(--radius-lg);
-  cursor: default;
-  box-shadow: var(--shadow-xl);
-  transition: transform var(--transition-slow) cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-
-.preview-img:hover {
-  transform: scale(1.02);
-}
-
-.preview-counter {
-  position: absolute;
-  bottom: var(--spacing-xl);
-  left: 50%;
-  transform: translateX(-50%);
-  padding: var(--spacing-sm) var(--spacing-lg);
-  font-size: 0.875rem;
-  color: white;
-  background: var(--glass-bg);
-  backdrop-filter: var(--glass-blur);
-  -webkit-backdrop-filter: var(--glass-blur);
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-full);
-}
-
-.preview-enter-active {
-  transition: opacity var(--duration-normal) ease;
-}
-
-.preview-leave-active {
-  transition: opacity var(--duration-normal) ease;
-}
-
-.preview-enter-from {
-  opacity: 0;
-}
-
-.preview-leave-to {
-  opacity: 0;
-}
-
-.preview-enter-active .preview-img {
-  animation: previewZoomIn var(--duration-slow) cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-
-.preview-leave-active .preview-img {
-  animation: previewZoomOut var(--duration-normal) ease forwards;
-}
-
-@keyframes previewZoomIn {
-  from {
-    transform: scale(0.8);
-    opacity: 0;
-  }
-  to {
-    transform: scale(1);
-    opacity: 1;
-  }
-}
-
-@keyframes previewZoomOut {
-  from {
-    transform: scale(1);
-    opacity: 1;
-  }
-  to {
-    transform: scale(0.9);
-    opacity: 0;
-  }
-}
-
-@media (max-width: 768px) {
-  .preview-close {
-    top: var(--spacing-sm);
-    right: var(--spacing-sm);
-    width: 40px;
-    height: 40px;
-    font-size: 1.5rem;
-  }
-
-  .preview-nav {
-    width: 40px;
-    height: 40px;
-    font-size: 2rem;
-  }
-
-  .preview-nav.prev {
-    left: var(--spacing-sm);
-  }
-
-  .preview-nav.next {
-    right: var(--spacing-sm);
-  }
-
-  .preview-img {
-    max-width: 95%;
-    max-height: 85%;
-    border-radius: var(--radius);
-  }
-
-  .preview-counter {
-    bottom: var(--spacing-md);
-    font-size: 0.75rem;
-    padding: var(--spacing-xs) var(--spacing-md);
-  }
-}
+.preview-overlay { position: fixed; inset: 0; z-index: var(--z-preview); display: flex; align-items: center; justify-content: center; background: var(--preview-scrim); cursor: zoom-out; }
+.preview-close, .preview-nav { position: absolute; z-index: 1; display: grid; place-items: center; width: 48px; height: 48px; border: 1px solid rgb(255 255 255 / 20%); border-radius: var(--radius); background: rgb(20 26 36 / 80%); color: white; }
+.preview-close { top: 20px; right: 20px; }
+.preview-nav { top: 50%; transform: translateY(-50%); }
+.preview-nav.prev { left: 20px; }
+.preview-nav.next { right: 20px; }
+.preview-close:hover, .preview-nav:hover { background: rgb(54 65 82 / 95%); }
+.preview-nav:disabled { opacity: .3; cursor: default; }
+.preview-img { max-width: calc(100% - 40px); max-height: calc(100dvh - 140px); object-fit: contain; border-radius: var(--radius); cursor: default; }
+.preview-footer { position: absolute; bottom: max(24px, env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%); max-width: 85%; text-align: center; }
+.preview-caption { margin-bottom: 6px; color: white; font-size: 13px; overflow-wrap: anywhere; }
+.preview-counter { display: inline-block; padding: 6px 14px; border-radius: var(--radius); color: white; background: rgb(20 26 36 / 80%); font-size: 13px; font-variant-numeric: tabular-nums; }
+.preview-enter-active, .preview-leave-active { transition: opacity 180ms ease; }
+.preview-enter-from, .preview-leave-to { opacity: 0; }
+@media (max-width: 768px) { .preview-close { top: 10px; right: 10px; } .preview-nav.prev { left: 10px; } .preview-nav.next { right: 10px; } .preview-img { max-width: calc(100% - 20px); } }
 </style>

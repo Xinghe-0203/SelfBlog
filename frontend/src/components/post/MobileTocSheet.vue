@@ -3,11 +3,11 @@
  * MobileTocSheet.vue — 移动端文章目录抽屉
  *
  * 窄屏下侧边目录（PostDetail 的 .article-aside）会隐藏，这里用左下角浮动胶囊 + 底部抽屉
- * 复用同一份 toc 数据。不注册全局事件、不用 Teleport：状态全部收在组件内，
- * 测试可以像普通组件一样挂载；宽屏由 CSS 媒体查询整块隐藏（与 PostDetail 的 861px 断点一致）。
+ * 复用同一份 toc 数据和全局浮层生命周期；1020px 及以下避免侧栏挤压正文。
  */
-import { ref } from 'vue'
+import { onBeforeUnmount, onMounted, ref } from 'vue'
 import Icon from '@/components/common/Icon.vue'
+import { overlayTarget, useDialog } from '@/composables/useDialog'
 
 interface TocItem {
   id: string
@@ -25,23 +25,29 @@ const emit = defineEmits<{
 }>()
 
 const open = ref(false)
+const panel = ref<HTMLElement | null>(null)
+const { layer } = useDialog(open, panel, () => { open.value = false })
+const onResize = () => { if (window.innerWidth >= 1021) open.value = false }
+onMounted(() => window.addEventListener('resize', onResize))
+onBeforeUnmount(() => window.removeEventListener('resize', onResize))
 
 function selectItem(item: TocItem): void {
-  emit('select', item)
   open.value = false
+  emit('select', item)
 }
 </script>
 
 <template>
   <div class="toc-sheet">
-    <button type="button" class="toc-fab" aria-label="打开文章目录" @click="open = true">
+    <button type="button" class="toc-fab functional-glass" aria-label="打开文章目录" :aria-expanded="open" @click="open = true">
       <Icon name="file-text" :size="18" />
       <span>目录</span>
     </button>
 
+    <Teleport :to="overlayTarget()">
     <template v-if="open">
-      <div class="toc-backdrop" @click="open = false"></div>
-      <div class="toc-panel" role="dialog" aria-modal="true" aria-label="文章目录">
+      <div class="toc-backdrop" :style="{ zIndex: `calc(var(--z-modal) + ${layer})` }" @click="open = false"></div>
+      <div ref="panel" class="toc-panel functional-glass" :style="{ zIndex: `calc(var(--z-modal) + ${layer} + 1)` }" role="dialog" aria-modal="true" aria-label="文章目录" tabindex="-1">
         <header class="toc-panel-head">
           <span class="toc-panel-title">文章目录</span>
           <button type="button" class="toc-close" aria-label="关闭目录" @click="open = false">
@@ -61,11 +67,12 @@ function selectItem(item: TocItem): void {
         </nav>
       </div>
     </template>
+    </Teleport>
   </div>
 </template>
 
 <style scoped>
-/* 左下角浮动胶囊：右下角已被返回顶部与音乐播放器占用，移动端目录放左侧互不遮挡 */
+/* 目录在左，返回顶部在右；音乐已移入导航。 */
 .toc-fab {
   position: fixed;
   left: 18px;
@@ -76,8 +83,8 @@ function selectItem(item: TocItem): void {
   gap: 6px;
   padding: 10px 16px;
   border: 1px solid var(--border-solid);
-  border-radius: var(--radius-full);
-  background: var(--surface-primary);
+  border-radius: var(--radius);
+  min-height: 44px;
   color: var(--text-secondary);
   box-shadow: var(--shadow-lg);
   font: inherit;
@@ -96,7 +103,7 @@ function selectItem(item: TocItem): void {
   position: fixed;
   inset: 0;
   z-index: var(--z-modal-backdrop);
-  background: rgba(0, 0, 0, 0.45);
+  background: var(--scrim);
 }
 
 .toc-panel {
@@ -110,7 +117,6 @@ function selectItem(item: TocItem): void {
   flex-direction: column;
   padding: 18px 20px 24px;
   border-radius: var(--radius-2xl) var(--radius-2xl) 0 0;
-  background: var(--surface-primary);
   box-shadow: var(--shadow-2xl);
   color: var(--text-primary);
 }
@@ -127,10 +133,10 @@ function selectItem(item: TocItem): void {
 .toc-close {
   display: grid;
   place-items: center;
-  width: 30px;
-  height: 30px;
+  width: 44px;
+  height: 44px;
   border: 0;
-  border-radius: var(--radius-full);
+  border-radius: var(--radius);
   background: var(--bg-secondary);
   color: var(--text-secondary);
   cursor: pointer;
@@ -170,10 +176,11 @@ function selectItem(item: TocItem): void {
   font-weight: 600;
 }
 
-/* 861px 以上改用侧边目录，整块隐藏（含浮动胶囊） */
-@media (min-width: 861px) {
+/* 1021px 以上改用侧边目录，整块隐藏（含浮动胶囊） */
+@media (min-width: 1021px) {
   .toc-sheet {
     display: none;
   }
+  .toc-panel, .toc-backdrop { display: none; }
 }
 </style>

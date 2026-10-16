@@ -1,3 +1,8 @@
+/* Theme colors change together; don't interpolate dark foreground against light paper. */
+.theme-changing *, .theme-changing *::before, .theme-changing *::after {
+  transition-property: none !important;
+}
+
 /* ==================== Accessibility — Reduced Motion ==================== */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {

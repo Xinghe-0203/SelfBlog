@@ -30,7 +30,18 @@ export const icons = {
     '<path d="M9 18V6.5l10-2v11"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="16.5" cy="15.5" r="2.5"/>',
   play: '<path d="M8 5.5 18.5 12 8 18.5z"/>',
   pause: '<path d="M9 5.5v13M15 5.5v13"/>',
+  repeat: '<path d="m16 3 4 4-4 4M20 7H7a3 3 0 0 0-3 3M8 21l-4-4 4-4M4 17h13a3 3 0 0 0 3-3"/>',
+  volume: '<path d="M4 9h4l5-4v14l-5-4H4zM16 9a5 5 0 0 1 0 6M19 6a9 9 0 0 1 0 12"/>',
+  'chevron-left': '<path d="m15 5-7 7 7 7"/>',
+  'chevron-right': '<path d="m9 5 7 7-7 7"/>',
+  lock: '<rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3M12 14v3"/>',
   'arrow-up': '<path d="M12 19V5M6 11l6-6 6 6"/>',
+  eye: '<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/>',
+  'eye-off': '<path d="M4 4l16 16"/><path d="M10.6 6.1A9.9 9.9 0 0 1 12 6c6 0 9.5 6 9.5 6a17 17 0 0 1-2.4 3.2M6.6 8.2A17 17 0 0 0 2.5 12S6 18 12 18a9.8 9.8 0 0 0 3.3-.6"/><path d="M9.9 9.9a3 3 0 1 0 4.2 4.2"/>',
+  check: '<path d="m5 12.5 4.5 4.5L19 7.5"/>',
+  plus: '<path d="M12 5v14M5 12h14"/>',
+  refresh: '<path d="M20 11a8 8 0 1 0-2.3 6.3"/><path d="M20 5v6h-6"/>',
+  trash: '<path d="M4.5 7h15M9.5 7V4.5h5V7M6.5 7l1 12.5h9L17.5 7"/><path d="M10.5 11v5M13.5 11v5"/>',
   external:
     '<path d="M14 4.5h5.5V10M19 5l-8 8"/><path d="M18 13.5V19a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5.5"/>'
 } as const

@@ -1,28 +1,27 @@
 /* =============================================================================
-   SelfBlog Design System v6.0 — "清爽科技蓝"
+   SelfBlog Design System — 清透空间 / Compact Glass
    =============================================================================
 
-   Aesthetic: Clean tech-blue with soft neutrals. School blog vibe —
-   fresh, youthful, professional but not flashy.
-
-   Palette source: User-defined 清爽科技蓝 scheme.
+   Quiet neutral reading surfaces; translucent functional chrome only.
+   Author-configured primary colors remain authoritative.
    Accessibility targets: WCAG 2.1 AA contrast on all text/surface pairs.
    ============================================================================= */
 
 /* ==================== CSS Variables — 清爽科技蓝 Theme ==================== */
-:root {
+:root,
+#selfblog {
   /* ---------------------------------------------------------------
      Canvas / Background
      --------------------------------------------------------------- */
-  --bg-primary:    #F8FAFC;         /* 页面背景 — 浅灰蓝，减少刺眼 */
-  --bg-secondary:  #F1F5F9;         /* 次级区域背景 */
-  --bg-tertiary:   #EDF2F7;
+  --bg-primary:    #F5F6F8;
+  --bg-secondary:  #EEF0F4;
+  --bg-tertiary:   #E7EAF0;
 
   /* ---------------------------------------------------------------
      Surfaces
      --------------------------------------------------------------- */
   --surface-primary:   #FFFFFF;     /* 卡片背景 — 纯白，与页面背景形成轻微对比 */
-  --surface-secondary: #FAFBFC;
+  --surface-secondary: #F9FAFC;
 
   /* ---------------------------------------------------------------
      Contrast Surface — 高对比实心表面（主按钮 / 反色块）
@@ -47,23 +46,23 @@
   /* ---------------------------------------------------------------
      Borders / Dividers
      --------------------------------------------------------------- */
-  --border-light:      #E5E6EB;     /* 浅灰分割线，不抢视线 */
-  --border-ultra-light: #F0F1F5;
+  --border-light:      #E3E6EC;
+  --border-ultra-light: #EDF0F4;
 
   /* ---------------------------------------------------------------
      Text — 三级灰度梯度
      --------------------------------------------------------------- */
-  --text-primary:   #1D2129;         /* 标题文字 — 深灰，比纯黑柔和 */
-  --text-secondary: #4E5969;         /* 正文文字 — 中灰 */
-  --text-muted:     #86909C;         /* 辅助文字 — 浅灰（时间、统计） */
+  --text-primary:   #262A31;
+  --text-secondary: #67707E;
+  --text-muted:     #707A88;
   --text-inverse:   #FFFFFF;
 
   /* ---------------------------------------------------------------
      Primary — 柔和蓝 #165DFF
      --------------------------------------------------------------- */
-  --accent:       #165DFF;           /* 主色 — 沉稳耐看的蓝 */
-  --accent-light: #E8F3FF;           /* 浅蓝 — hover、标签选中、卡片高亮 */
-  --accent-dark:  #0E42D2;           /* 深蓝 — active/pressed */
+  --accent:       #165DFF;
+  --accent-light: color-mix(in srgb, var(--accent) 10%, var(--surface-primary));
+  --accent-dark:  color-mix(in srgb, var(--accent) 82%, black);
 
   /* ---------------------------------------------------------------
      Secondary — 活力橙 #FF7D00（点赞、评论、热门标签点缀）
@@ -115,14 +114,14 @@
   --primary-hover:  var(--accent-dark);
   --primary-active: var(--accent-dark);
   --primary-light:  var(--accent-light);
-  --primary-subtle: rgba(22, 93, 255, 0.04);
-  --primary-glow:   rgba(22, 93, 255, 0.20);
+  --primary-subtle: color-mix(in srgb, var(--accent) 4%, transparent);
+  --primary-glow:   color-mix(in srgb, var(--accent) 20%, transparent);
 
   /* Backward-Compatibility — Accent System */
   --accent-hover:   var(--accent-dark);
   --accent-active:  var(--accent-dark);
-  --accent-subtle:  rgba(22, 93, 255, 0.04);
-  --accent-glow:    rgba(22, 93, 255, 0.20);
+  --accent-subtle:  var(--primary-subtle);
+  --accent-glow:    var(--primary-glow);
 
   /* Backward-Compatibility — Semantic Glow */
   --success-glow: rgba(0, 180, 42, 0.15);
@@ -132,10 +131,10 @@
 
   /* Backward-Compatibility — Semantic Aliases */
   --background:       var(--bg-primary);
-  --background-solid: #F8FAFC;
-  --surface:          #FFFFFF;
-  --surface-solid:    #FFFFFF;
-  --surface-raised:   #FFFFFF;
+  --background-solid: var(--bg-primary);
+  --surface:          var(--surface-primary);
+  --surface-solid:    var(--surface-primary);
+  --surface-raised:   var(--surface-secondary);
   --border:           var(--border-ultra-light);
   --border-solid:     var(--border-light);
   --border-strong:    var(--gray-300);
@@ -143,21 +142,29 @@
   /* ---------------------------------------------------------------
      Backward-Compatibility — Glass System (solid surfaces)
      --------------------------------------------------------------- */
-  --glass-bg:           #FFFFFF;
-  --glass-bg-light:     #FFFFFF;
-  --glass-bg-heavy:     #FFFFFF;
+  --glass-bg:           var(--surface-primary);
+  --glass-bg-light:     var(--surface-secondary);
+  --glass-bg-heavy:     var(--surface-primary);
   --glass-border:       var(--border-light);
   --glass-border-frost: var(--border-light);
   --glass-shadow:       var(--shadow-sm);
   --glass-shadow-frost: var(--shadow-md);
   --glass-blur:         none;
   --glass-blur-heavy:   none;
-  --glass-hover:        #F8FAFC;
+  --glass-hover:        var(--bg-secondary);
   --glass-shine:        none;
   --glass-frost-glow:   none;
   --glass-border-wet:   var(--border-light);
   --glass-shadow-wet:   var(--shadow-md);
   --glass-wet-glow:     none;
+
+  /* Explicit opt-in: never turn legacy content cards into glass. */
+  --functional-glass-bg: color-mix(in srgb, var(--surface-primary) 88%, transparent);
+  --functional-glass-edge: color-mix(in srgb, var(--surface-primary) 90%, transparent);
+  --functional-glass-blur: 16px;
+  --functional-glass-shadow: 0 9px 30px rgb(20 32 51 / 9%);
+  --scrim: rgb(16 23 35 / 46%);
+  --preview-scrim: rgb(7 11 18 / 94%);
 
   /* ---------------------------------------------------------------
      Decorative Colors — 校园活力点缀（紫色微调）
@@ -184,8 +191,7 @@
      全部使用系统字体栈：不请求任何外部字体，避免国内网络下 Google Fonts
      超时阻塞渲染。中文必须显式回退（苹方/微软雅黑/思源黑体），
      否则中文会落到浏览器默认字体，与西文混排时字重和字距都不一致。 */
-  --font-display: 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia,
-                  'Songti SC', 'Source Han Serif SC', 'Noto Serif CJK SC', 'SimSun', serif;
+  --font-display: var(--font-sans);
   --font-sans:    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
                   'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei',
                   'Source Han Sans SC', 'Noto Sans CJK SC', Helvetica, Arial, sans-serif;
@@ -274,31 +280,30 @@
   --spacing-4xl: var(--space-24);
 
   /* ---------------------------------------------------------------
-     Border Radius — Generous
+     Border Radius — Compact
      ---------------------------------------------------------------
-     整体上移一档，让卡片/输入框/按钮呈现明显的大 R 角。
-     --radius-full 保持 9999px：胶囊选中态和圆形头像共用它，
-     同一个值同时覆盖"小方块变圆"和"胶囊"，不必再开新 token。 */
+      8px controls, 12–14px content groups, 16px panels.
+      Capsules are reserved for the slim navbar and circular controls. */
   --radius-none: 0;
-  --radius-xs:   6px;
-  --radius-sm:   8px;
-  --radius:      12px;
-  --radius-md:   12px;
-  --radius-lg:   16px;
-  --radius-xl:   20px;
-  --radius-2xl:  24px;
-  --radius-3xl:  32px;
+  --radius-xs:   4px;
+  --radius-sm:   6px;
+  --radius:      8px;
+  --radius-md:   8px;
+  --radius-lg:   12px;
+  --radius-xl:   14px;
+  --radius-2xl:  16px;
+  --radius-3xl:  20px;
   --radius-full: 9999px;
 
   /* ---------------------------------------------------------------
-     Shadows — 明显层次感，卡片悬浮效果
+     Shadows — Quiet depth, mostly for functional layers
      --------------------------------------------------------------- */
-  --shadow-xs:   0 1px 3px rgba(0, 0, 0, 0.06);
-  --shadow-sm:   0 2px 6px rgba(0, 0, 0, 0.08);
-  --shadow:      0 4px 12px rgba(0, 0, 0, 0.10);
-  --shadow-md:   0 6px 16px rgba(0, 0, 0, 0.12);
-  --shadow-lg:   0 8px 24px rgba(0, 0, 0, 0.14);
-  --shadow-xl:   0 12px 32px rgba(0, 0, 0, 0.16);
+  --shadow-xs:   0 1px 2px rgb(20 32 51 / 3%);
+  --shadow-sm:   0 2px 6px rgb(20 32 51 / 4%);
+  --shadow:      0 4px 12px rgb(20 32 51 / 6%);
+  --shadow-md:   0 6px 20px rgb(20 32 51 / 8%);
+  --shadow-lg:   0 8px 28px rgb(20 32 51 / 10%);
+  --shadow-xl:   0 12px 36px rgb(20 32 51 / 12%);
   --shadow-2xl:  0 16px 48px rgba(0, 0, 0, 0.20);
   --shadow-inner:inset 0 2px 4px rgba(0, 0, 0, 0.06);
 
@@ -352,8 +357,9 @@
   /* ---------------------------------------------------------------
      Navbar
      --------------------------------------------------------------- */
-  --navbar-bg:     rgba(255, 255, 255, 0.95);
-  --navbar-height: 64px;
+  --navbar-bg:     var(--functional-glass-bg);
+  --navbar-height: 52px;
+  --anchor-offset: 96px;
 
   /* ---------------------------------------------------------------
      Secondary / Accent colors (for likes, comments, hot tags)
@@ -375,25 +381,20 @@
      --------------------------------------------------------------- */
   --z-dropdown:        1000;
   --z-sticky:          1020;
+  --z-nav-panel:       1030;
   --z-fixed:           1030;
   --z-overlay:         1040;
   --z-modal-backdrop:  1050;
   --z-modal:           1060;
   --z-popover:         1070;
   --z-tooltip:         1080;
-  --z-toast:           1090;
+  --z-toast:           1120;
   --z-preview:         1100;
 
   /* ---------------------------------------------------------------
      Background Gradient — 清爽蓝灰渐变
      --------------------------------------------------------------- */
-  --background-gradient: linear-gradient(
-    160deg,
-    #F8FAFC 0%,
-    #F1F5F9 40%,
-    #EDF2F7 70%,
-    #F1F5F9 100%
-  );
+  --background-gradient: var(--bg-primary);
 
   /* Brand Gradient — Now monochrome blue */
   --brand-gradient:    linear-gradient(135deg, var(--accent), var(--accent-dark));

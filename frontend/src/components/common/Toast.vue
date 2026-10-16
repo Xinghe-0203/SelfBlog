@@ -1,5 +1,5 @@
 <template>
-  <Teleport to="body">
+  <Teleport :to="overlayTarget()">
     <div class="toast-container">
       <TransitionGroup name="toast" tag="div">
         <div
@@ -31,7 +31,7 @@
           </svg>
           <span class="toast-message">{{ toast.message }}</span>
           <button v-if="toast.action" class="toast-action" @click.stop="handleAction(toast)">{{ toast.action.text }}</button>
-          <button class="toast-close" @click="removeToast(toast.id)">
+          <button class="toast-close" aria-label="关闭通知" @click="removeToast(toast.id)">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <line x1="18" y1="6" x2="6" y2="18"/>
               <line x1="6" y1="6" x2="18" y2="18"/>
@@ -48,6 +48,7 @@
 import { ref, watch, onMounted, onBeforeUnmount } from 'vue'
 import { toasts, removeToast, pauseToast, resumeToast } from '@/utils/toast'
 import type { ToastItem } from '@/utils/toast'
+import { overlayTarget } from '@/composables/useDialog'
 
 const progressStyles = ref<Record<number, number>>({})
 

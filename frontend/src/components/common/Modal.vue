@@ -1,65 +1,22 @@
 <script setup lang="ts">
-import { watch, onBeforeUnmount } from 'vue'
+import { computed, ref } from 'vue'
+import { overlayTarget, useDialog } from '@/composables/useDialog'
+import Icon from './Icon.vue'
 
-let bodyOverflowCount = 0
-
-const props = defineProps<{
-  show?: boolean
-  title?: string
-  width?: string
-  closable?: boolean
-}>()
-
-const emit = defineEmits<{
-  close: []
-}>()
-
-const handleKeydown = (e: KeyboardEvent): void => {
-  if (e.key === 'Escape' && props.closable && props.show) {
-    emit('close')
-  }
-}
-
-watch(
-  () => props.show,
-  (val) => {
-    if (val) {
-      bodyOverflowCount++
-      if (bodyOverflowCount === 1) {
-        document.body.style.overflow = 'hidden'
-      }
-      document.addEventListener('keydown', handleKeydown)
-    } else {
-      bodyOverflowCount = Math.max(0, bodyOverflowCount - 1)
-      if (bodyOverflowCount === 0) {
-        document.body.style.overflow = ''
-      }
-      document.removeEventListener('keydown', handleKeydown)
-    }
-  },
-  { immediate: true }
-)
-
-onBeforeUnmount(() => {
-  bodyOverflowCount = Math.max(0, bodyOverflowCount - 1)
-  if (bodyOverflowCount === 0) {
-    document.body.style.overflow = ''
-  }
-  document.removeEventListener('keydown', handleKeydown)
-})
+const props = defineProps<{ show?: boolean; title?: string; width?: string; closable?: boolean }>()
+const emit = defineEmits<{ close: [] }>()
+const panel = ref<HTMLElement | null>(null)
+const { layer } = useDialog(computed(() => props.show === true), panel, () => { if (props.closable) emit('close') })
 </script>
 
 <template>
-  <Teleport to="body">
-    <Transition name="modal">
-      <div v-if="show" class="modal-overlay" role="dialog" aria-modal="true" @click.self="closable && emit('close')">
-        <div class="modal-content" :style="{ maxWidth: width }">
-          <div class="modal-header">
-            <h3>{{ title }}</h3>
-            <button v-if="closable" class="modal-close" aria-label="关闭" @click="emit('close')">&times;</button>
-          </div>
+  <Teleport :to="overlayTarget()">
+    <Transition name="modal" @before-leave="$event.setAttribute('inert', '')">
+      <div v-if="show" class="modal-overlay" :style="{ zIndex: `calc(var(--z-modal) + ${layer})` }" @click.self="closable && emit('close')">
+        <div ref="panel" class="modal-content" :style="{ maxWidth: width }" role="dialog" aria-modal="true" :aria-label="title || '对话框'" tabindex="-1">
+          <header class="modal-header"><h3>{{ title }}</h3><button v-if="closable" type="button" class="modal-close" aria-label="关闭" @click="emit('close')"><Icon name="close" :size="20" /></button></header>
           <div class="modal-body"><slot /></div>
-          <div v-if="$slots.footer" class="modal-footer"><slot name="footer" /></div>
+          <footer v-if="$slots.footer" class="modal-footer"><slot name="footer" /></footer>
         </div>
       </div>
     </Transition>
@@ -67,141 +24,18 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: var(--spacing-lg);
-  background: rgba(0, 0, 0, 0.4);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
-  z-index: var(--z-modal);
-}
-
-.modal-content {
-  width: 90%;
-  max-width: 580px;
-  background: var(--glass-bg);
-  backdrop-filter: var(--glass-blur);
-  -webkit-backdrop-filter: var(--glass-blur);
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-xl);
-  box-shadow: var(--shadow-xl);
-  max-height: 85vh;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.modal-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: var(--spacing-lg) var(--spacing-xl) 0;
-  border-bottom: 1px solid var(--glass-border);
-}
-
-.modal-header h3 {
-  font-size: 1.125rem;
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
-.modal-close {
-  width: 36px;
-  height: 36px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.5rem;
-  background: transparent;
-  border: 1px solid transparent;
-  color: var(--text-muted);
-  cursor: pointer;
-  border-radius: var(--radius);
-  transition: all var(--transition);
-}
-
-.modal-close:hover {
-  background: var(--error-light);
-  color: var(--error);
-  border-color: var(--error-light);
-  transform: rotate(90deg);
-}
-
-.modal-body {
-  padding: var(--spacing-lg) var(--spacing-xl);
-  overflow-y: auto;
-  flex: 1;
-}
-
-.modal-footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--spacing-md);
-  padding: var(--spacing-md) var(--spacing-xl);
-  border-top: 1px solid var(--glass-border);
-  background: var(--primary-light);
-}
-
-.modal-enter-active {
-  transition: opacity var(--duration-normal) ease;
-}
-
-.modal-leave-active {
-  transition: opacity var(--duration-normal) ease;
-}
-
-.modal-enter-active .modal-content {
-  transition: transform var(--duration-slow) cubic-bezier(0.34, 1.56, 0.64, 1), opacity var(--duration-normal) ease;
-}
-
-.modal-leave-active .modal-content {
-  transition: transform var(--duration-normal) ease, opacity var(--duration-normal) ease;
-}
-
-.modal-enter-from {
-  opacity: 0;
-}
-
-.modal-leave-to {
-  opacity: 0;
-}
-
-.modal-enter-from .modal-content {
-  transform: scale(0.92) translateY(20px);
-  opacity: 0;
-}
-
-.modal-leave-to .modal-content {
-  transform: scale(0.95) translateY(10px);
-  opacity: 0;
-}
-
-@media (max-width: 640px) {
-  .modal-overlay {
-    padding: var(--spacing-sm);
-    align-items: flex-end;
-  }
-
-  .modal-content {
-    width: 100%;
-    max-height: 90vh;
-    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
-  }
-
-  .modal-header {
-    padding: var(--spacing-md) var(--spacing-lg) 0;
-  }
-
-  .modal-body {
-    padding: var(--spacing-md) var(--spacing-lg);
-  }
-
-  .modal-footer {
-    padding: var(--spacing-sm) var(--spacing-lg);
-  }
-}
+.modal-overlay { position: fixed; inset: 0; z-index: var(--z-modal); display: flex; align-items: center; justify-content: center; padding: 24px; background: var(--scrim); }
+.modal-content { display: flex; flex-direction: column; width: 100%; max-width: 580px; max-height: min(85dvh, 880px); overflow: hidden; border: 1px solid var(--border-solid); border-radius: var(--radius-2xl); background: var(--surface-primary); color: var(--text-primary); box-shadow: var(--shadow-xl); }
+.modal-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 20px; border-bottom: 1px solid var(--border-light); }
+.modal-header h3 { font-size: 17px; font-weight: 600; overflow-wrap: anywhere; }
+.modal-close { display: grid; flex: 0 0 44px; place-items: center; width: 44px; height: 44px; margin: -4px -10px -4px 0; border-radius: var(--radius); color: var(--text-secondary); }
+.modal-close:hover { background: var(--bg-secondary); color: var(--text-primary); }
+.modal-body { flex: 1; min-height: 0; padding: 20px; overflow-y: auto; overscroll-behavior: contain; }
+.modal-footer { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 12px; padding: 14px 20px; border-top: 1px solid var(--border-light); background: var(--surface-secondary); }
+.modal-enter-active, .modal-leave-active { transition: opacity 180ms ease; }
+.modal-enter-active .modal-content, .modal-leave-active .modal-content { transition: transform 220ms var(--ease-out); }
+.modal-enter-from, .modal-leave-to { opacity: 0; }
+.modal-enter-from .modal-content, .modal-leave-to .modal-content { transform: translateY(8px); }
+@media (max-width: 640px) { .modal-overlay { padding: 12px; } .modal-content { max-height: 90dvh; } .modal-header, .modal-footer { padding-inline: 16px; } .modal-body { padding: 16px; } }
+@media (prefers-reduced-motion: reduce) { .modal-enter-from .modal-content, .modal-leave-to .modal-content { transform: none; } }
 </style>

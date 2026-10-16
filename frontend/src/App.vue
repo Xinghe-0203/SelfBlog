@@ -1,5 +1,6 @@
 <template>
   <div id="selfblog" :class="{ 'dark-mode': isDarkMode }">
+    <div id="overlay-root" />
     <a href="#main-content" class="skip-link">跳转到主要内容</a>
     <Navbar v-if="!isAdminPage" />
     <main id="main-content" class="app-main" :class="{ 'app-main--admin': isAdminPage }">
@@ -17,7 +18,7 @@
       </router-view>
     </main>
     <Footer v-if="!isAdminPage" />
-    <MusicPlayer v-if="!isAdminPage" />
+    <MusicPlayer />
     <BackToTop />
     <Toast />
   </div>
@@ -86,11 +87,7 @@ watch(() => route.path, () => {
 watch(() => [siteStore.settings.themeSkin, siteStore.settings.themePrimaryColor] as const, applySiteTheme)
 
 function applySiteTheme() {
-  const root = document.getElementById('selfblog')
-  if (!root) return
-  root.dataset.skin = siteStore.settings.themeSkin || 'ocean'
-  root.style.setProperty('--primary', siteStore.settings.themePrimaryColor || '#165DFF')
-  root.style.setProperty('--accent', siteStore.settings.themePrimaryColor || '#165DFF')
+  siteStore.applyAppearance()
 }
 
 function recordVisitor() {

@@ -1,13 +1,14 @@
-/* ==================== Dark Mode — Warm Canvas Dark ==================== */
-.dark-mode {
+/* Explicit app selector keeps local token aliases theme-aware. */
+.dark-mode,
+#selfblog.dark-mode {
   /* Canvas / Background */
-  --bg-primary:    #191919;
-  --bg-secondary:  #202020;
-  --bg-tertiary:   #262626;
+  --bg-primary:    #171A20;
+  --bg-secondary:  #252A33;
+  --bg-tertiary:   #2C323D;
 
   /* Surfaces */
-  --surface-primary:   #202020;
-  --surface-secondary: #262626;
+  --surface-primary:   #20242C;
+  --surface-secondary: #272C36;
 
   /* Contrast Surface — 深色模式下反转为浅底深字，
      既保持足够对比，又不会像纯黑按钮那样与背景糊在一起。 */
@@ -22,19 +23,24 @@
   --code-border: #333333;
 
   /* Borders */
-  --border-light:      #333333;
+  --border-light:      #333944;
   --border-ultra-light: rgba(255, 255, 255, 0.06);
 
   /* Text */
-  --text-primary:   #EBEBEB;
-  --text-secondary: #999999;
-  --text-muted:     #666666;
+  --text-primary:   #EDF0F5;
+  --text-secondary: #A7AFBC;
+  --text-muted:     #939DAD;
   --text-inverse:   #111111;
 
   /* Accent — Slightly brighter blue for dark backgrounds */
-  --accent:       #4BA3D4;
-  --accent-light: rgba(75, 163, 212, 0.12);
-  --accent-dark:  #6BB8E2;
+  --accent:       #8FB6EE;
+  --accent-strength: 62%;
+  --accent-blend: white;
+  --accent-shade: white;
+  --accent-light: color-mix(in srgb, var(--accent) 12%, var(--surface-primary));
+  --accent-dark:  color-mix(in srgb, var(--accent) 82%, white);
+  --functional-glass-edge: rgb(255 255 255 / 11%);
+  --functional-glass-shadow: 0 9px 30px rgb(0 0 0 / 24%);
 
   /* Semantic Colors — Dark mode lighter tones */
   --success:       #5CA862;
@@ -71,15 +77,15 @@
   --primary-start:  var(--accent);
   --primary-end:    var(--accent-dark);
   --primary-hover:  var(--accent-dark);
-  --primary-active: #3A8FBE;
+  --primary-active: var(--accent-dark);
   --primary-light:  var(--accent-light);
-  --primary-subtle: rgba(75, 163, 212, 0.06);
-  --primary-glow:   rgba(75, 163, 212, 0.20);
+  --primary-subtle: color-mix(in srgb, var(--accent) 6%, transparent);
+  --primary-glow:   color-mix(in srgb, var(--accent) 20%, transparent);
 
   --accent-hover:   var(--accent-dark);
-  --accent-active:  #3A8FBE;
-  --accent-subtle:  rgba(75, 163, 212, 0.06);
-  --accent-glow:    rgba(75, 163, 212, 0.20);
+  --accent-active:  var(--accent-dark);
+  --accent-subtle:  var(--primary-subtle);
+  --accent-glow:    var(--primary-glow);
 
   --success-glow: rgba(92, 168, 98, 0.15);
   --warning-glow: rgba(200, 154, 61, 0.15);
@@ -87,26 +93,26 @@
   --info-glow:    rgba(75, 163, 212, 0.15);
 
   /* Backward-Compatibility — Semantic Aliases */
-  --background:       var(--bg-secondary);
-  --background-solid: #202020;
-  --surface:          #202020;
-  --surface-solid:    #202020;
-  --surface-raised:   #262626;
+  --background:       var(--bg-primary);
+  --background-solid: var(--bg-primary);
+  --surface:          var(--surface-primary);
+  --surface-solid:    var(--surface-primary);
+  --surface-raised:   var(--surface-secondary);
   --border:           var(--border-ultra-light);
   --border-solid:     var(--border-light);
   --border-strong:    var(--gray-300);
 
   /* Backward-Compatibility — Glass System (now solid in dark) */
-  --glass-bg:           #202020;
-  --glass-bg-light:     #262626;
-  --glass-bg-heavy:     #1A1A1A;
+  --glass-bg:           var(--surface-primary);
+  --glass-bg-light:     var(--surface-secondary);
+  --glass-bg-heavy:     var(--surface-primary);
   --glass-border:       var(--border-light);
   --glass-border-frost: var(--border-light);
   --glass-shadow:       var(--shadow-sm);
   --glass-shadow-frost: var(--shadow-md);
   --glass-blur:         none;
   --glass-blur-heavy:   none;
-  --glass-hover:        #262626;
+  --glass-hover:        var(--bg-secondary);
   --glass-shine:        none;
   --glass-frost-glow:   none;
   --glass-border-wet:   var(--border-light);
@@ -114,8 +120,8 @@
   --glass-wet-glow:     none;
 
   /* Backward-Compatibility — Decorative Colors */
-  --blue:        #4BA3D4;
-  --blue-light:  rgba(75, 163, 212, 0.12);
+  --blue:        var(--accent);
+  --blue-light:  var(--accent-light);
   --green:       #5CA862;
   --green-light: rgba(92, 168, 98, 0.12);
   --purple:      #9B8ABF;
@@ -153,16 +159,10 @@
   --skeleton-highlight: #262626;
 
   /* Navbar */
-  --navbar-bg: rgba(25, 25, 25, 0.92);
+  --navbar-bg: var(--functional-glass-bg);
 
   /* Background Gradient */
-  --background-gradient: linear-gradient(
-    160deg,
-    #191919 0%,
-    #1E1E1E 40%,
-    #222222 70%,
-    #191919 100%
-  );
+  --background-gradient: var(--bg-primary);
 
   /* Brand Gradient */
   --brand-gradient:    linear-gradient(135deg, var(--accent), var(--accent-dark));
@@ -172,9 +172,4 @@
 /* ==================== Color Scheme ==================== */
 .dark-mode {
   color-scheme: dark;
-}
-
-/* ==================== Theme Transition ==================== */
-body {
-  transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
 }
