@@ -17,8 +17,8 @@ $mvn = 'C:\Users\Zora\.m2\wrapper\dists\apache-maven-3.9.12\59fe215c0ad6947fea90
 
 - **Always pass `-Dskip.npm=true -Dskip.installnodenpm=true` for backend test runs.** `pom.xml` wires `frontend-maven-plugin`, which otherwise runs `npm ci` + `npm run build` in `../frontend` on every build (bound to `initialize`/`generate-resources`). With the skips a single test class finishes in ~8s; without them the whole frontend is rebuilt first.
 - **Consequence: a plain `mvn test` mutates frontend build output.** Never run it while frontend files are mid-edit.
-- Baseline as of 2026-10-15: `mvn test` = **386 tests, 0 failures, BUILD SUCCESS**. Never leave the suite below that.
-- The plugin provisions its own Node **v24.15.0** at `backend/target/frontend/node/` (`node.exe`, `npm.cmd`, `npx.cmd`, npm 11.12.1). This is the Node that satisfies `engine-strict`; see the frontend section.
+- Baseline as of 2026-10-16: `mvn test` = **463 tests, 0 failures, BUILD SUCCESS**. Never leave the suite below that.
+- The plugin provisions its own Node **v24.15.0** at `backend/target/frontend/node/` (`node.exe`, `npm.cmd`, `npx.cmd`, npm 11.12.1). This is the Node that satisfies `engine-strict`; see the frontend section. It lives under `target/`, so a `mvn clean` (or manual target cleanup) removes it — the next full Maven build re-provisions it.
 
 ```sh
 mvn spring-boot:run
@@ -41,6 +41,7 @@ Java source root: `backend/src/main/java/com/selfblog/`.
 
 - Post/circle CRUD services delegate queries and interactions to `PostQueryService`/`PostInteractionService` and `CircleQueryService`/`CircleInteractionService`; modify the owning service rather than duplicating logic in the facade.
 - Use `common.result.Result<T>` and `common.exception.BusinessException`; obtain identity through `utils.SecurityUtils` (`getCurrentUserId()` requires login; `getCurrentUserIdOrNull()` allows guests). Public endpoints also need an explicit rule in `config/security/SecurityConfig.java`.
+- Site brand assets (logo / favicon / avatar / music) go through `SiteAssetService` + `AdminSiteAssetController` (`POST /api/admin/site-assets`): per-kind extension whitelist, magic-number sniffing and SVG sanitization, stored under `uploads/site-assets/<kind>/` and served from `/uploads/**`. Do not reuse `MediaService` — it re-encodes every image to JPG.
 - User articles and circle posts publish directly with `status=1`; do not introduce a pending-review gate despite the existing moderation APIs/status fields.
 - Preserve service transaction conventions: writes use `@Transactional(rollbackFor = Exception.class)`, reads use `@Transactional(readOnly = true)`.
 - Database changes must account for MySQL `backend/schema.sql`, SQLite `src/main/resources/schema-sqlite.sql`, and H2 `src/test/resources/schema.sql`. SQLite initialization uses `CREATE TABLE IF NOT EXISTS`, so schema edits do not migrate existing files.
@@ -50,8 +51,10 @@ Java source root: `backend/src/main/java/com/selfblog/`.
 
 Commands below run from `frontend/`. `.npmrc` sets `engine-strict=true`, and the locked tree requires Node `^22.22.2 || ^24.15.0 || >=26.0.0` (from `abbrev@5.0.0`, reached via `@vue/test-utils` → `js-beautify` → `nopt`). Anything below that — including Node 24.0–24.14 — hard-fails `npm ci`/`npm install` with `EBADENGINE`; `npm ci --engine-strict=false` bypasses the gate for local work.
 
-- **A satisfying Node already exists in the repo tree.** The backend's `frontend-maven-plugin` provisions Node **v24.15.0** + npm **11.12.1** at `backend/target/frontend/node/` (`node.exe`, `npm.cmd`, `npx.cmd`). Prefix `PATH` with that directory to run any npm script under a Node that clears `engine-strict` — e.g. `$env:PATH = "C:\…\backend\target\frontend\node;$env:PATH"; npm install --dry-run` reports `up to date` with **no** `EBADENGINE`, while the machine's own Node 24.14.0 fails the gate. Prefer this over `--engine-strict=false`.
-- `node_modules` in this checkout was originally installed on Linux, so Windows lacked the `.bin/*.cmd` shims and win32 native packages; that has since been repaired in place (`@rollup/rollup-win32-x64-msvc`, `@esbuild/win32-x64`), and `package.json`/`package-lock.json` were left untouched. `npm run` scripts work.
+- **A satisfying Node exists in the repo tree (after a Maven build).** The backend's `frontend-maven-plugin` provisions Node **v24.15.0** + npm **11.12.1** at `backend/target/frontend/node/` (`node.exe`, `npm.cmd`, `npx.cmd`). Prefix `PATH` with that directory to run any npm script under a Node that clears `engine-strict` — e.g. `$env:PATH = "C:\…\backend\target\frontend\node;$env:PATH"; npm install --dry-run` reports `up to date` with **no** `EBADENGINE`, while the machine's own Node 24.14.0 fails the gate. Prefer this over `--engine-strict=false`. If that directory is missing (fresh `target/` cleanup), run a Maven build once to re-provision it, or call `node_modules/.bin/<tool>` directly.
+- On this machine a bare `npm run <script>` fails on the default PATH (verified 2026-10-16): the system PATH contains an unmatched quote (`C:\Program Files\Java\jdk-25\bin"`), which derails `cmd.exe`'s PATH parsing so the `.bin` shims cannot resolve bare `node`. Prefix the provisioned Node directory as above (what all verified commands here do), or call the shims directly.
+- `node_modules` has since been reinstalled on Windows with the provisioned Node (`npm ci`), so the `.bin/*.cmd` shims and win32 native packages (`@rollup/rollup-win32-x64-msvc`, `@esbuild/win32-x64`) are present; `package.json`/`package-lock.json` were left untouched.
+- Test baseline as of 2026-10-16: `npm run test:run` = **17 files / 210 tests**, all passing (~6s). `lint:check`, `type-check` and `build` are green at the same commit; never leave the suite below that.
 
 ```sh
 npm ci

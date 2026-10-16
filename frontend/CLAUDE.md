@@ -7,66 +7,74 @@
 ## 常用命令
 
 ```bash
-npm install        # 安装依赖
-npm run dev        # 启动开发服务器 (端口 3000)
-npm run build      # 构建生产版本
-npm run preview    # 预览生产版本
-npm run lint       # 代码检查
+npm ci                 # 安装锁定依赖（Node ^22.22.2 || ^24.15.0 || >=26.0.0，engine-strict）
+npm run dev            # 启动开发服务器 (端口 3000)
+npm run build          # 构建生产版本（先 vue-tsc --noEmit，再 Vite）
+npm run preview        # 预览生产版本
+npm run lint:check     # 只读 ESLint 检查（npm run lint 会改写文件）
+npm run type-check     # vue-tsc --noEmit（必过闸门）
+npm run test:run       # Vitest 单次运行（基线 17 文件 / 210 tests）
 ```
+
+> 本机直接把 `npm run <script>` 跑在系统 PATH 上会失败（PATH 里有一条不配对的引号，
+> 垫片解析不到裸 `node`）。用仓库内 provisioned Node 兜底：
+> `$env:PATH = "C:\…\backend\target\frontend\node;$env:PATH"`（该目录由 Maven 插件生成，
+> `target/` 被清理后需先跑一次 Maven 构建）；或直接调用 `node_modules/.bin/` 下的可执行垫片。
 
 ## 技术栈
 
-- Vue 3.4.21 (Composition API)
-- Vite 5.2.0
+- Vue 3.5.44 (Composition API)
+- Vite 6.4.4
 - Vue Router 4.3.0
 - Pinia 2.1.7
 - Axios 1.7.4
 - Marked 12.0.1 (Markdown)
-- Highlight.js 11.9
 - DOMPurify 3.0.9 (XSS 防护)
+- TypeScript 6.0 + Vitest 4.1.8（单元测试，jsdom + @vue/test-utils）
 
 ## 项目结构
 
 ```
 src/
-├── api/            # API 接口 (17个模块)
-├── components/     # 组件 (共20个)
-│   ├── common/     # 通用组件 (11个)
+├── api/            # API 接口 (20 个模块)
+├── components/     # 组件 (24 个)
+│   ├── common/     # 通用组件 (12 个)
 │   │   ├── BackToTop.vue     # 返回顶部
 │   │   ├── Button.vue        # 通用按钮
 │   │   ├── Card.vue          # 通用卡片
 │   │   ├── CollectButton.vue # 收藏按钮
-│   │   ├── EmptyState.vue    # 空状态提示
 │   │   ├── FollowButton.vue  # 关注按钮
+│   │   ├── Icon.vue          # 内置 SVG 图标
 │   │   ├── ImagePreview.vue  # 图片预览灯箱
 │   │   ├── Input.vue         # 通用输入框
 │   │   ├── LikeButton.vue    # 点赞按钮
 │   │   ├── Modal.vue         # 通用模态框
 │   │   ├── Tag.vue           # 标签组件
-│   │   └── Toast.vue         # Toast通知
-│   ├── circle/     # Circle组件 (4个)
-│   │   ├── CirclePostCard.vue    # Circle文章卡片
-│   │   ├── CircleSidebar.vue     # Circle侧边栏
+│   │   └── Toast.vue         # Toast 通知
+│   ├── circle/     # Circle 组件 (4 个)
+│   │   ├── CirclePostCard.vue    # Circle 文章卡片
+│   │   ├── CircleSidebar.vue     # Circle 侧边栏
 │   │   ├── CreatePostModal.vue   # 创建帖子弹窗
 │   │   └── QuickComposer.vue     # 快速发布器
-│   └── layout/     # 布局组件 (3个)
-│       ├── Footer.vue        # 页脚
-│       ├── Navbar.vue        # 导航栏
-│       └── PageTransition.vue # 页面过渡动画
-├── composables/    # 组合式函数
-│   └── useConfirm.js         # 确认对话框
+│   ├── home/       # 首页组件 (HomeFilters, HomeSidebar, PostCardList)
+│   ├── layout/     # 布局组件 (3 个: Footer, MusicPlayer, Navbar)
+│   ├── post/       # 文章组件 (MobileTocSheet)
+│   └── admin/      # 后台组件 (SiteAssetField)
+├── composables/    # 组合式函数 (useConfirm / useScrollState / useMarkdownEnhance / useSeoMeta / usePagination / useScrollReveal)
 ├── router/         # 路由配置
-├── stores/         # Pinia 状态管理 (3个store)
-├── styles/         # 样式文件
-├── utils/          # 工具函数
-└── views/          # 页面组件 (37个)
+├── stores/         # Pinia 状态管理 (site / theme / user)
+├── styles/         # 样式文件（入口 main.css）
+├── utils/          # 工具函数 (crypto / logger / toast / visitor / reading)
+└── views/          # 页面组件 (45 个)
 ```
 
-## v2.0 新特性
+## 主要特性
 
-- 清爽科技蓝 (Clean Tech Blue) UI 设计，CSS 变量驱动的设计系统 v6.0
-- Circle 功能增强
-- 性能优化 (懒加载、虚拟滚动)
+- 单人作者博客：访客只读、搜索、匿名点赞与留言；写作与管理需要管理员登录
+- 「清爽科技蓝」设计系统：CSS 变量 token、深色模式、5 套皮肤、内置 SVG 图标
+- 阅读体验：目录（移动端抽屉）、代码复制/折叠、标题锚点、图片灯箱、按正文估算阅读时长
+- 站点品牌资源上传：Logo / 浏览器图标 / 作者头像 / 背景音乐（`SiteAssetField.vue`）
+- 生产为内嵌前端的单 JAR，前端无需独立部署
 
 ## 设计系统
 
@@ -106,19 +114,21 @@ src/
 统一使用 `.env` 文件配置（开发/生产环境通用）：
 
 ```env
-VITE_API_BASE_URL=/api          # API基础路径
-VITE_APP_TITLE=个人博客          # 应用标题
-VITE_APP_VERSION=2.0.25         # 版本号
-VITE_API_TARGET=http://localhost:8825  # 开发环境代理目标
+VITE_APP_TITLE=个人博客                     # 应用标题（代码实际消费）
+VITE_API_TARGET=http://localhost:8825       # 开发环境代理目标（vite.config.ts 消费）
+VITE_API_BASE_URL=/api                      # 保留位：axios 在 src/api/index.ts 硬编码 /api，未被消费
+VITE_APP_VERSION=2.0.25                     # 保留位：当前未被代码消费
 ```
 
 如需本地覆盖，创建 `.env.local`（不提交 git）。
 
-## Vercel 部署
+## Vercel 部署（可选）
 
 1. Root Directory 设为 `frontend`
 2. Framework Preset 选 `Vite`
-3. `vercel.json` 已配置 `/api` 和 `/uploads` 代理到后端
+3. `vercel.json` 已把 `/api` 与 `/uploads` 重写到已配置的后端域名
+
+生产环境的推荐方式仍是后端单 JAR 直接内嵌前端（不走 Vercel）。
 
 ## v2.0.22 修复记录
 

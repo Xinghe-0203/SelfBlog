@@ -59,7 +59,7 @@ The first startup creates the author account from `ADMIN_USERNAME` (default `adm
 ## Project Structure
 
 ```
-src/main/java/com/example/selfblog/
+src/main/java/com/selfblog/
 ├── controller/
 │   ├── auth/         # AuthController, PasswordController
 │   ├── user/         # SysUserController
@@ -143,17 +143,27 @@ The site runs in single-author mode: registration is disabled and password authe
 
 | Variable | Default | Required | Description |
 |----------|---------|----------|-------------|
-| `DB_TYPE` | sqlite | No | `sqlite` (default) or `mysql` |
-| `DB_URL_SQLITE` | `jdbc:sqlite:./data/selfblog.db` | No | SQLite file URL |
+| `DB_TYPE` | `sqlite` | No | `sqlite` (default) or `mysql` |
+| `DB_URL_SQLITE` | `jdbc:sqlite:campus_blog.db` | No | SQLite file URL; relative paths resolve against the working directory |
 | `DB_HOST` / `DB_PORT` / `DB_NAME` / `DB_USERNAME` | — | MySQL only | MySQL connection details |
 | `DB_PASSWORD` | — | MySQL only | MySQL password (min 8 chars) |
 | `JWT_SECRET` | — | **Yes** | Random JWT/hash secret (min 32 chars) |
+| `JWT_EXPIRATION` | `86400000` | No | Access-token lifetime in ms (24h) |
+| `JWT_REFRESH_EXPIRATION` | `604800000` | No | Refresh-token lifetime in ms (7d) |
 | `ADMIN_USERNAME` | `admin` | No | Initial administrator username |
 | `ADMIN_PASSWORD` | — | **Yes** | Initial administrator password (min 12 chars) |
+| `ADMIN_NICKNAME` | `站长` | No | Initial administrator nickname |
 | `ADMIN_PATH` | `admin` | No | Initial author route; editable in settings |
-| `SERVER_PORT` | 8825 | No | Server port |
-| `CORS_ALLOWED_ORIGINS` | localhost:3000,localhost:8825 | No | CORS whitelist |
-| `MAIL_*` | — | No | SMTP configuration |
+| `SERVER_PORT` | `8825` | No | Server port |
+| `SITE_BASE_URL` | — | No | Public origin used in feeds/sitemap behind a reverse proxy |
+| `CORS_ALLOWED_ORIGINS` | `http://localhost:3000,http://localhost:8825` | No | CORS whitelist; `*` is rejected in production |
+| `AVATAR_ALLOWED_DOMAINS` | `localhost,127.0.0.1` | No | Allowed hosts for avatar URLs |
+| `UPLOAD_MAX_FILE_SIZE` | `52428800` | No | Max single upload (bytes, 50 MB) |
+| `UPLOAD_MAX_REQUEST_SIZE` | `104857600` | No | Max multipart request (bytes, 100 MB) |
+| `SWAGGER_ENABLED` | `true` | No | Toggle API docs (disabled under the `prod` profile) |
+| `MAIL_*` | — | No | SMTP configuration for password reset (`MAIL_SSL_ENABLED` defaults to `true`) |
+| `ENV_VALIDATION_ENABLED` | `true` | No | Startup environment validation |
+| `MYBATIS_SQL_LOG` | — | No | Optional SQL logging implementation class |
 
 ## Performance
 
@@ -180,22 +190,15 @@ Covering high-frequency queries: user post lists, category filtering, hot/latest
 ## Testing
 
 ```bash
-mvn test                            # All tests
-mvn test -Dtest=AuthControllerTest  # Single test class
+mvn test "-Dskip.npm=true" "-Dskip.installnodenpm=true"                 # 463 tests, ~1 min
+mvn test "-Dtest=AuthControllerTest" "-Dskip.npm=true" "-Dskip.installnodenpm=true"
 ```
 
-Tests use H2 in-memory database (`application-test.yml`), random port, no impact on production data.
+Always pass the two skip flags for test-only runs: without them the `frontend-maven-plugin` runs `npm ci` + `npm run build` in `../frontend` first and mutates the frontend build output. Tests use an in-memory H2 database on a random port, with no impact on production data.
 
 ## Docker
 
-```bash
-cp .env.example .env        # Configure DB_PASSWORD and JWT_SECRET
-docker-compose up -d        # Start MySQL + App
-docker-compose logs -f      # View logs
-docker-compose down         # Stop
-```
-
-Multi-stage build: JDK 21 (build) → JRE 21 Alpine (runtime). Runs as non-root user `appuser` (UID 1001).
+The container files (`Dockerfile`, `docker-compose.yml`) still target an older multi-module layout and do **not** build the single JAR correctly yet — the expected artifact name and the frontend build context are out of date. Until that setup is reworked, deploy with the single-JAR flow above.
 
 ## API Modules
 

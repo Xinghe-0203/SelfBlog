@@ -30,7 +30,7 @@ ADMIN_PATH=admin
 mvn package -DskipTests
 ```
 
-产物：`target/selfblog.jar`。完整验证可执行 `mvn test`，该命令也会触发前端安装和构建。
+产物：`target/selfblog.jar`。完整验证可执行 `mvn test`，该命令也会触发前端安装和构建；只跑测试时请加 `-Dskip.npm=true -Dskip.installnodenpm=true`，避免每次重建前端。
 
 ## 2. 运行
 

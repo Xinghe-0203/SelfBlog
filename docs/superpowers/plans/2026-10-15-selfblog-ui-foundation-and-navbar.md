@@ -40,7 +40,7 @@
 - Consumes: 无
 - Produces: 全站可用的 `--radius-xs/sm/md/lg/xl/2xl/3xl`（数值上调一档）；`--radius-full` 保持 `9999px` 不变
 
-- [ ] **Step 1: 替换圆角 scale**
+- [x] **Step 1: 替换圆角 scale**
 
 把 `variables.css` 中这一整块：
 
@@ -81,7 +81,7 @@
   --radius-full: 9999px;
 ```
 
-- [ ] **Step 2: 验证格式化与 lint**
+- [x] **Step 2: 验证格式化与 lint**
 
 Run: `npm run lint:check`
 Expected: 0 error（存量 warning 不计）
@@ -89,12 +89,12 @@ Expected: 0 error（存量 warning 不计）
 Run: `npx prettier --check --end-of-line auto src/styles/variables.css`
 Expected: 该文件仍报 warn —— 这是**存量**漂移（全仓库 96 个文件都不符合 prettier），不是本次改动引入的。本次编辑必须与文件现有风格一致（对齐的冒号、`—` 破折号），不要去 reformat 整个文件。
 
-- [ ] **Step 3: 目视确认没有灾难性回归**
+- [x] **Step 3: 目视确认没有灾难性回归**
 
 Run: `npm run dev`
 Expected: 打开 `http://localhost:3000`，卡片、按钮、输入框圆角明显变大；没有元素被撑破或裁切。深色模式（右上角切换）同样正常。
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add frontend/src/styles/variables.css
@@ -116,7 +116,7 @@ git commit -m "style: lift the border-radius scale one step for larger corner ra
   - `icons.ts`：`export type IconName = keyof typeof icons`，`export const icons: Record<IconName, string>`，`export const iconNames: IconName[]`
   - `Icon.vue`：props `{ name: IconName; size?: number }`（`size` 默认 `20`），渲染 `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">`
 
-- [ ] **Step 1: 写图标注册表的失败测试**
+- [x] **Step 1: 写图标注册表的失败测试**
 
 创建 `frontend/src/components/common/__tests__/icons.test.ts`：
 
@@ -177,12 +177,12 @@ describe('icon registry', () => {
 })
 ```
 
-- [ ] **Step 2: 运行测试确认失败**
+- [x] **Step 2: 运行测试确认失败**
 
 Run: `npm run test:run -- src/components/common/__tests__/icons.test.ts`
 Expected: FAIL，报错 `Failed to resolve import "../icons"`
 
-- [ ] **Step 3: 实现图标注册表**
+- [x] **Step 3: 实现图标注册表**
 
 创建 `frontend/src/components/common/icons.ts`：
 
@@ -223,12 +223,12 @@ export type IconName = keyof typeof icons
 export const iconNames = Object.keys(icons) as IconName[]
 ```
 
-- [ ] **Step 4: 运行测试确认通过**
+- [x] **Step 4: 运行测试确认通过**
 
 Run: `npm run test:run -- src/components/common/__tests__/icons.test.ts`
 Expected: PASS，21 个图标 × 4 组断言全绿
 
-- [ ] **Step 5: 实现 Icon 组件**
+- [x] **Step 5: 实现 Icon 组件**
 
 创建 `frontend/src/components/common/Icon.vue`：
 
@@ -273,12 +273,12 @@ const fragment = computed(() => icons[props.name] ?? icons.logo)
 </style>
 ```
 
-- [ ] **Step 6: 验证类型与 lint**
+- [x] **Step 6: 验证类型与 lint**
 
 Run: `npm run type-check && npm run lint:check`
 Expected: 两条都通过
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add frontend/src/components/common/icons.ts frontend/src/components/common/Icon.vue frontend/src/components/common/__tests__/icons.test.ts
@@ -297,7 +297,7 @@ git commit -m "feat: add built-in SVG icon registry and Icon component"
 - Consumes: 无
 - Produces: `useScrollState(threshold?: number)` → `{ scrolled: Ref<boolean>; direction: Ref<'up' | 'down'> }`。必须在组件 `setup()` 内调用（用了 `onMounted`/`onUnmounted`）。`threshold` 默认 `16`。
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 创建 `frontend/src/composables/__tests__/useScrollState.test.ts`：
 
@@ -410,12 +410,12 @@ describe('useScrollState', () => {
 })
 ```
 
-- [ ] **Step 2: 运行测试确认失败**
+- [x] **Step 2: 运行测试确认失败**
 
 Run: `npm run test:run -- src/composables/__tests__/useScrollState.test.ts`
 Expected: FAIL，报错 `Failed to resolve import "../useScrollState"`
 
-- [ ] **Step 3: 实现 composable**
+- [x] **Step 3: 实现 composable**
 
 创建 `frontend/src/composables/useScrollState.ts`：
 
@@ -475,12 +475,12 @@ export function useScrollState(threshold = 16): ScrollState {
 }
 ```
 
-- [ ] **Step 4: 运行测试确认通过**
+- [x] **Step 4: 运行测试确认通过**
 
 Run: `npm run test:run -- src/composables/__tests__/useScrollState.test.ts`
 Expected: PASS，7 个用例全绿
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add frontend/src/composables/useScrollState.ts frontend/src/composables/__tests__/useScrollState.test.ts
@@ -502,7 +502,7 @@ git commit -m "feat: add rAF-throttled useScrollState composable"
   - `export function mimeForIcon(url: string): string` —— `.svg`→`image/svg+xml`，`.ico`→`image/x-icon`，其余 `image/png`
   - `export function applyFavicon(url: string): void` —— 幂等：先清掉所有 `link[rel][data-runtime]`，再按 `url` 决定是否注入。`url` 为空时只做清理，保留 `index.html:12` 的静态兜底。
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 创建 `frontend/src/stores/__tests__/site.test.ts`：
 
@@ -611,12 +611,12 @@ describe('site store brand assets', () => {
 })
 ```
 
-- [ ] **Step 2: 运行测试确认失败**
+- [x] **Step 2: 运行测试确认失败**
 
 Run: `npm run test:run -- src/stores/__tests__/site.test.ts`
 Expected: FAIL，报错 `mimeForIcon is not a function` 或 `faviconUrl` 为 `undefined`
 
-- [ ] **Step 3: 重写 site store**
+- [x] **Step 3: 重写 site store**
 
 用以下内容整体替换 `frontend/src/stores/site.ts`：
 
@@ -735,12 +735,12 @@ export const useSiteStore = defineStore('site', () => {
 })
 ```
 
-- [ ] **Step 4: 运行测试确认通过**
+- [x] **Step 4: 运行测试确认通过**
 
 Run: `npm run test:run -- src/stores/__tests__/site.test.ts`
 Expected: PASS，11 个用例全绿
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add frontend/src/stores/site.ts frontend/src/stores/__tests__/site.test.ts
@@ -759,7 +759,7 @@ git commit -m "feat: add faviconUrl/siteLogoUrl settings keys with runtime favic
 - Consumes: `useScrollState`（Task 3）、`Icon.vue`（Task 2）、`siteStore.settings.siteLogoUrl`（Task 4）
 - Produces: 根元素 `.site-nav-wrap` 上的 `is-scrolled` / `is-hidden` class；`.brand-mark--image` 用于上传的 logo
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 创建 `frontend/src/components/layout/__tests__/Navbar.test.ts`：
 
@@ -897,12 +897,12 @@ describe('Navbar', () => {
 })
 ```
 
-- [ ] **Step 2: 运行测试确认失败**
+- [x] **Step 2: 运行测试确认失败**
 
 Run: `npm run test:run -- src/components/layout/__tests__/Navbar.test.ts`
 Expected: FAIL，`.brand-mark--image` 不存在、`.site-nav-wrap` 无 `is-scrolled`、图标断言失败
 
-- [ ] **Step 3: 重写 Navbar**
+- [x] **Step 3: 重写 Navbar**
 
 用以下内容整体替换 `frontend/src/components/layout/Navbar.vue`：
 
@@ -1299,12 +1299,12 @@ const search = () => {
 </style>
 ```
 
-- [ ] **Step 4: 运行测试确认通过**
+- [x] **Step 4: 运行测试确认通过**
 
 Run: `npm run test:run -- src/components/layout/__tests__/Navbar.test.ts`
 Expected: PASS，7 个用例全绿
 
-- [ ] **Step 5: 目视确认滚动态**
+- [x] **Step 5: 目视确认滚动态**
 
 Run: `npm run dev`
 Expected:
@@ -1314,7 +1314,7 @@ Expected:
 - 375px 宽（DevTools）下滚导航收走，上滚立刻回来
 - 深色模式下毛玻璃与胶囊底色都正常，文字不发灰
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add frontend/src/components/layout/Navbar.vue frontend/src/components/layout/__tests__/Navbar.test.ts
@@ -1332,7 +1332,7 @@ git commit -m "feat: rebuild navbar with scroll states, icon set and pill active
 - Consumes: 无
 - Produces: `html { scroll-padding-top: 96px }`，供 `PostDetail.vue` 后续的标题锚点复用
 
-- [ ] **Step 1: 补 scroll-padding-top**
+- [x] **Step 1: 补 scroll-padding-top**
 
 把 `base.css` 中的：
 
@@ -1359,7 +1359,7 @@ html {
 }
 ```
 
-- [ ] **Step 2: 全量校验**
+- [x] **Step 2: 全量校验**
 
 Run: `npm run lint:check && npm run type-check && npm run test:run`
 Expected: 三条全过；测试数量比改动前多出本计划新增的用例，且无既有用例失败
@@ -1367,12 +1367,12 @@ Expected: 三条全过；测试数量比改动前多出本计划新增的用例�
 Run: `npx prettier --check --end-of-line auto <本计划新增/修改过的每个文件>`
 Expected: 全部通过。**不要跑 `npm run format:check`** —— 它在本仓库基线就失败（96 个文件），跟本计划无关。
 
-- [ ] **Step 3: 生产构建验证**
+- [x] **Step 3: 生产构建验证**
 
 Run: `npm run build`
 Expected: `vue-tsc --noEmit` 无报错，Vite 构建成功产出 `dist/`
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add frontend/src/styles/base.css
@@ -1400,3 +1400,18 @@ git commit -m "style: add scroll-padding-top so anchors clear the floating navba
 4. 深浅两套主题各过一遍
 5. DevTools 开 `prefers-reduced-motion: reduce`，确认过渡被关掉但功能仍在
 6. `npm run test:run` 全绿、`npm run build` 成功
+
+---
+
+## 完成记录（2026-10-16）
+
+本计划全部任务已实现并提交；当初"不在本计划内"的后续批次（C 后台侧栏 / D 资源上传 / E 阅读体验 / F 全站圆角）也已在 2026-10-16 全部完成，见 `CHANGELOG.md`。
+
+| 任务 | 提交 |
+| --- | --- |
+| Task 1 圆角 scale 上移 | `a396d06` |
+| Task 2 内置图标系统 | `648a4ed` |
+| Task 3 `useScrollState` | `b7cb8ac` |
+| Task 4 `faviconUrl` / `siteLogoUrl` 设置键 | `0cedebd` |
+| Task 5 Navbar 三态 + 胶囊 + 品牌 logo | `f9a0916`、`76b6d2f` |
+| Task 6 `scroll-padding-top` | `a226695` |
