@@ -4,6 +4,26 @@
 
 ---
 
+## 未发布 — 死代码清理与文档同步 (2026-10-17)
+
+### 说明
+
+- 删除 **22 个长期零引用的前端文件**：从未注册路由的校友圈树（`router/modules/circle.ts`、`views/circle/*`、`components/circle/*`）、无入口的管理页（`CircleManagement.vue`、`TopicsManagement.vue`）、旧首页组件（`HomeFilters/HomeSidebar/PostCardList.vue`）、旧页面（`TopicDetail.vue`、`TrendingPage.vue`、`PasswordReset.vue`、`Register.vue`）、`Card.vue`、`usePagination.ts`、`vo.ts`、`api/topic.ts`、`types/topic.ts` 等；每个删除前都用引用扫描确认无任何导入（含测试）。
+- 同时移除 `api/admin.ts` 中已无消费者的 circle/topic 接口封装与相关类型导出。**后端社区/话题接口与数据表保留**（仍是管理员 API 的一部分），只是删掉死掉的前端入口。
+- 文档同步：`frontend/CLAUDE.md`（结构、Vercel 代理模型、删除清单，并移除过时的 v2.0.22 重复修复表）、`frontend/README.md`（结构）、根 `README.md`（文档索引补齐 `docs/`、测试数）、`backend/README.md`（测试数与前端入口说明）、`AGENTS.md`（清理记录与最新计数）。
+- 验证：前端 41 文件/394 测试、类型检查、构建与 lint（0 错误；警告从 256 降至 159，因删除死代码而自然减少）；死文件扫描结果为“无未引用文件”；重打包单 JAR 后浏览器回归 **32/32** 通过。
+- 未改动：后端业务代码、数据库结构、用户根 `CLAUDE.md`（其“已知问题”里关于 circle 路由的说明已过时，但该文件带有你的未提交修改，保持不动）。
+
+### 影响文件
+
+| 文件 | 改动类型 |
+| --- | --- |
+| 上列 22 个前端文件 | 删除（零引用死代码） |
+| `frontend/src/api/admin.ts`、`types/index.ts`、`types/admin.ts` | 移除失效的 circle/topic 封装与导出 |
+| `README.md`、`frontend/README.md`、`frontend/CLAUDE.md`、`backend/README.md`、`AGENTS.md` | 文档同步 |
+
+---
+
 ## 未发布 — 文章发布/编辑的标签与媒体修复 (2026-10-17)
 
 ### 说明（均为“先复现、再修复”）

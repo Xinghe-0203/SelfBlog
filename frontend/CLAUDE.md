@@ -39,36 +39,31 @@ npm run test:deployment # node:test：Vercel 代理生成器 + Docker/Compose �
 
 ```
 src/
-├── api/            # API 接口 (20 个模块)
+├── api/            # API 接口（含 admin/site/post/media/pages 等模块）
 ├── components/     # Vue 组件
 │   ├── common/     # 通用组件
 │   │   ├── BackToTop.vue     # 返回顶部
 │   │   ├── Button.vue        # 通用按钮
-│   │   ├── Card.vue          # 通用卡片
 │   │   ├── CollectButton.vue # 收藏按钮
 │   │   ├── FollowButton.vue  # 关注按钮
-│   │   ├── Icon.vue          # 内置 SVG 图标
+│   │   ├── Icon.vue          # 内置 SVG 图标（icons.ts 注册表）
 │   │   ├── ImagePreview.vue  # 图片预览灯箱
 │   │   ├── Input.vue         # 通用输入框
 │   │   ├── LikeButton.vue    # 点赞按钮
 │   │   ├── Modal.vue         # 通用模态框
 │   │   ├── Tag.vue           # 标签组件
 │   │   └── Toast.vue         # Toast 通知
-│   ├── circle/     # Circle 组件 (4 个)
-│   │   ├── CirclePostCard.vue    # Circle 文章卡片
-│   │   ├── CircleSidebar.vue     # Circle 侧边栏
-│   │   ├── CreatePostModal.vue   # 创建帖子弹窗
-│   │   └── QuickComposer.vue     # 快速发布器
-│   ├── home/       # 首页组件 (HomeFilters, HomeSidebar, PostCardList)
-│   ├── layout/     # Footer / Navbar / NavbarMusicControl / headless MusicPlayer
+│   ├── layout/     # Navbar / Footer / NavbarMusicControl / headless MusicPlayer
 │   ├── post/       # ArticleList / MobileTocSheet
-│   └── admin/      # 后台组件 (SiteAssetField)
-├── composables/    # useDialog / useConfirm / useScrollState / useMarkdownEnhance / useSeoMeta / usePagination / useScrollReveal
-├── router/         # 路由配置
-├── stores/         # Pinia 状态管理 (site / theme / user / music)
+│   ├── pages/      # PageFrame / MarkdownContent / ContentPageView（逐页配置与安全正文）
+│   └── admin/      # SiteAssetField 等后台字段组件
+├── composables/    # useDialog / useConfirm / useScrollState / useMarkdownEnhance / useSeoMeta / usePageConfig / usePageSeo / useScrollReveal
+├── router/         # 路由配置（modules/ + guards）
+├── stores/         # Pinia 状态管理 (site / theme / user / music / pages)
 ├── styles/         # 样式文件（入口 main.css）
+├── types/          # TypeScript 类型定义
 ├── utils/          # 工具函数 (crypto / logger / toast / visitor / reading)
-└── views/          # 页面组件 (45 个)
+└── views/          # 页面组件（Home/About/Archives、post、pages、admin(+pages)、gallery、search、tag、user、auth、common）
 ```
 
 ## 主要特性
@@ -146,24 +141,25 @@ VITE_APP_VERSION=2.0.25                     # 保留位：当前未被代码消�
 
 ## Vercel 部署（可选）
 
-1. Root Directory 设为 `frontend`
-2. Framework Preset 选 `Vite`
-3. `vercel.json` 已把 `/api` 与 `/uploads` 重写到已配置的后端域名
+Vercel 只作为**统一反向代理**指向已部署的 JAR，不在平台侧再构建一份前端：
 
-生产环境的推荐方式仍是后端单 JAR 直接内嵌前端（不走 Vercel）。
+1. Root Directory 设为 `frontend`，Framework Preset 选 **Other**（不要选 Vite 自动预案）。
+2. 配置 `SELFBLOG_BACKEND_ORIGIN`（源站 HTTPS origin）与 `SITE_BASE_URL`（正式访客 origin），两者必须不同，否则构建失败。
+3. Build Command 使用 `node scripts/build-vercel-proxy.mjs`，生成 Build Output v3 路由把全部路径/方法转发到源站；Preview 环境自带 `X-Robots-Tag: noindex,nofollow`。
 
-## v2.0.22 修复记录
+生产环境的推荐方式仍是后端单 JAR 直接内嵌前端（不走 Vercel）；完整步骤见 [backend/DEPLOY.md](../backend/DEPLOY.md) 第 9 节。
 
-| 问题 | 修复文件 | 修复内容 |
-|------|----------|----------|
-| 移动端宽度不一致 | `PostSearch.vue` | `max-width` 改为 `var(--container-xl)` + `@media` |
-| 私信头像不显示 | `Messages.vue` | 内联SVG → `/default-avatar.png` |
-| 草稿ID提取失败 | `PostEdit.vue` | 兼容 `res.data` 为数字或对象 |
-| 写文章加载旧内容 | `PostEdit.vue` | 移除无条件 `fetchDraft()` |
-| CSS line-clamp | 8个文件 | 添加标准 `line-clamp` 属性 |
-| 弹窗@提及 | `Circle.vue` | 添加 mention 搜索和选择 |
-| 弹窗多话题 | `Circle.vue` | `selectedTopic` → `selectedTopics` 数组 |
-| 弹窗草稿 | `Circle.vue` | 关闭保存/打开恢复 |
+## 已删除的历史死代码（2026-10-17）
+
+以下文件曾长期无人引用（从未注册路由或早已被替换），已删除；`CHANGELOG.md` 记录完整清单：
+
+- `router/modules/circle.ts`、`views/circle/*`、`components/circle/*`（校友圈 UI 从未注册路由）
+- `views/admin/{CircleManagement,TopicsManagement}.vue`、`api/topic.ts`、`types/topic.ts`
+- `views/{topic/TopicDetail,trending/TrendingPage,auth/PasswordReset,auth/Register}.vue`
+- `components/home/*`（旧首页组件，现由 `views/Home.vue` 自行实现）
+- `components/common/Card.vue`、`composables/usePagination.ts`、`types/vo.ts`
+
+后端对应的社区/话题接口与数据表仍保留（管理员 API 未删除），只是不再有对应前端入口。
 
 ## 注意事项
 

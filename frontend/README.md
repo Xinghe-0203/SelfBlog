@@ -38,21 +38,20 @@ For production, Maven builds the Vue assets and embeds them into `backend/target
 
 ```
 src/
-├── api/                # Axios modules + interceptors (index, site, admin, post, media, …)
+├── api/                # Axios modules + interceptors (index, site, admin, post, media, pages, gallery, …)
 ├── components/
-│   ├── common/         # Reusable UI: Button, Card, Input, Icon, Modal, Toast, ImagePreview, BackToTop, …
+│   ├── common/         # Reusable UI: Button, Input, Icon, Modal, Toast, ImagePreview, BackToTop, …
 │   ├── layout/         # Navbar, Footer, headless MusicPlayer, NavbarMusicControl
-│   ├── home/           # PostCardList, HomeSidebar
 │   ├── post/           # ArticleList + MobileTocSheet (shared rows and reading extras)
-│   ├── circle/         # Campus circle widgets
+│   ├── pages/          # PageFrame, MarkdownContent, ContentPageView (page config + safe body)
 │   └── admin/          # SiteAssetField (brand asset uploads)
-├── composables/        # useDialog, useConfirm, useScrollState, useMarkdownEnhance, useSeoMeta, usePagination, useScrollReveal
+├── composables/        # useDialog, useConfirm, useScrollState, useMarkdownEnhance, useSeoMeta, usePageConfig, usePageSeo, useScrollReveal
 ├── router/             # Entry, guards, lazy helpers, per-domain modules
-├── stores/             # Pinia: site, theme, user, music
+├── stores/             # Pinia: site, theme, user, music, pages
 ├── styles/             # Tokens + base + components + dark mode + a11y (entry: main.css)
 ├── types/              # TypeScript type definitions
 ├── utils/              # crypto, logger, toast, visitor, reading
-├── views/              # Home / About / Archives + admin, auth, post, circle, user, gallery, search, tag, topic, trending, common
+├── views/              # Home / About / Archives + admin(+pages), auth, post, pages, user, gallery, search, tag, common
 ├── App.vue
 └── main.ts
 ```

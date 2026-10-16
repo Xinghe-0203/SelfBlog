@@ -116,7 +116,7 @@
 - `robots.txt` 按实际后台路径生成；`SITE_BASE_URL` 统一 canonical/订阅/地图的对外地址
 - 支持 Docker（MySQL 或 SQLite 二选一）与 **Vercel 统一反向代理**；不在 Vercel 单独部署第二份前端
 - 这些是“可被抓取”的技术条件，**不代表搜索引擎已经收录**；部署细节见[部署指南](backend/DEPLOY.md)
-- 本批验证：前端394 / 后端548项测试，部署契约27项；[SEO/部署验证记录](docs/reviews/2026-10-16-seo-deployment-verification.md)
+- 本批验证：前端394 / 后端559项测试，部署契约27项；[SEO/部署验证记录](docs/reviews/2026-10-16-seo-deployment-verification.md)
 - 站点正式域名可在后台「网站设置」修改（后台设置的优先级高于 `.env` 的 `SITE_BASE_URL`，留空自动回落）
 
 ### 界面与导航音乐
@@ -346,7 +346,11 @@ Controller（控制器）→ Service（服务）→ Mapper（数据访问）→ 
 | 更新日志 | [CHANGELOG.md](CHANGELOG.md) | 版本变更记录 |
 | 后端文档 | [backend/README.md](backend/README.md) | 后端详细文档 |
 | 前端文档 | [frontend/README.md](frontend/README.md) | 前端详细文档 |
-| 部署文档 | [backend/DEPLOY.md](backend/DEPLOY.md) | 生产环境部署指南 |
+| 部署文档 | [backend/DEPLOY.md](backend/DEPLOY.md) | 生产环境部署指南（含 Docker 与 Vercel） |
+| 页面管理说明 | [docs/page-management.md](docs/page-management.md) | 后台逐页配置/内容页/导航使用指南 |
+| 架构决策 | [docs/decisions/](docs/decisions/) | ADR：KV 版本化存储、单一 origin 阅读 HTML |
+| 验证记录 | [docs/reviews/](docs/reviews/) | 各批次真实验证证据与已知限制 |
+| 设计与实施历史 | [docs/superpowers/](docs/superpowers/) | 历史规格与计划（当时状态记录，当前行为以 CHANGELOG 与验证记录为准） |
 | API 文档 | http://localhost:8825/doc.html | 启动后端后访问 |
 
 ---
