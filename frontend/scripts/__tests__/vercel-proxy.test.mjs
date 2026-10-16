@@ -20,7 +20,16 @@ test('uses one external source for HTML, API, assets, uploads and discovery', ()
   assert.equal(route.dest, 'https://origin.example.com/$1')
   assert.equal(route.methods, undefined)
   const match = new RegExp(`^${route.src}$`)
-  for (const path of ['/', '/post/12', '/pages/projects', '/api/user/login', '/assets/index-hash.js', '/uploads/site-assets/music/a.mp3', '/feed.xml', '/sitemap-posts-2.xml']) {
+  for (const path of [
+    '/',
+    '/post/12',
+    '/pages/projects',
+    '/api/user/login',
+    '/assets/index-hash.js',
+    '/uploads/site-assets/music/a.mp3',
+    '/feed.xml',
+    '/sitemap-posts-2.xml'
+  ]) {
     assert.equal(path.replace(match, route.dest), `https://origin.example.com${path}`)
   }
 })
@@ -38,23 +47,46 @@ test('disables shared rewrite caching and retains security headers', () => {
 
 test('preview and an unspecified environment are never indexable', () => {
   for (const VERCEL_ENV of ['preview', 'development', undefined]) {
-    assert.equal(createProxyConfig({ ...production, VERCEL_ENV }).routes.at(-1).headers['X-Robots-Tag'], 'noindex,nofollow')
+    assert.equal(
+      createProxyConfig({ ...production, VERCEL_ENV }).routes.at(-1).headers['X-Robots-Tag'],
+      'noindex,nofollow'
+    )
   }
 })
 
-for (const value of ['', undefined, 'http://origin.example.com', 'https://user:my-secret@example.com', 'https://example.com/path', 'https://example.com?q=x', 'https://example.com/#x', 'https://example.com\\evil', 'https://example.com,other.test', ' https://example.com', 'https://example.com\n', 'https://localhost', 'https://127.0.0.1', 'https://10.0.0.1']) {
+for (const value of [
+  '',
+  undefined,
+  'http://origin.example.com',
+  'https://user:my-secret@example.com',
+  'https://example.com/path',
+  'https://example.com?q=x',
+  'https://example.com/#x',
+  'https://example.com\\evil',
+  'https://example.com,other.test',
+  ' https://example.com',
+  'https://example.com\n',
+  'https://localhost',
+  'https://127.0.0.1',
+  'https://10.0.0.1'
+]) {
   test(`rejects invalid backend origin without leaking its value: ${JSON.stringify(value)?.replace('my-secret', 'REDACTED')}`, () => {
-    assert.throws(() => createProxyConfig({ ...production, SELFBLOG_BACKEND_ORIGIN: value }), error => {
-      assert.match(error.message, /SELFBLOG_BACKEND_ORIGIN/)
-      assert.doesNotMatch(error.message, /my-secret/)
-      return true
-    })
+    assert.throws(
+      () => createProxyConfig({ ...production, SELFBLOG_BACKEND_ORIGIN: value }),
+      (error) => {
+        assert.match(error.message, /SELFBLOG_BACKEND_ORIGIN/)
+        assert.doesNotMatch(error.message, /my-secret/)
+        return true
+      }
+    )
   })
 }
 
 test('requires a valid public origin, rejects a self-referencing upstream', () => {
   assert.throws(() => createProxyConfig({ ...production, SITE_BASE_URL: '' }))
-  assert.throws(() => createProxyConfig({ ...production, SITE_BASE_URL: 'https://origin.example.com' }))
+  assert.throws(() =>
+    createProxyConfig({ ...production, SITE_BASE_URL: 'https://origin.example.com' })
+  )
   for (const name of ['VERCEL_URL', 'VERCEL_BRANCH_URL', 'VERCEL_PROJECT_PRODUCTION_URL']) {
     assert.throws(() => createProxyConfig({ ...production, [name]: 'origin.example.com' }))
   }
@@ -70,7 +102,12 @@ test('writes only a routing deployment, not another frontend bundle', async () =
   assert.deepEqual(await readdir(join(out, 'static')), [])
   assert.equal(await readFile(join(directory, 'keep.txt'), 'utf8'), 'unrelated')
   await writeProxyOutput({ ...production, VERCEL_ENV: 'preview' }, out)
-  assert.equal(JSON.parse(await readFile(join(out, 'config.json'), 'utf8')).routes.at(-1).headers['X-Robots-Tag'], 'noindex,nofollow')
+  assert.equal(
+    JSON.parse(await readFile(join(out, 'config.json'), 'utf8')).routes.at(-1).headers[
+      'X-Robots-Tag'
+    ],
+    'noindex,nofollow'
+  )
 })
 
 test('refuses stale static artifacts instead of deploying or deleting them', async () => {

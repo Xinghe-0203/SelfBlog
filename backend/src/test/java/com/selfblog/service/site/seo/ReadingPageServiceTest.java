@@ -11,6 +11,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.Map;
@@ -35,6 +36,7 @@ class ReadingPageServiceTest {
         clearSiteCache();
         jdbc.update("DELETE FROM blog_post");
         jdbc.update("DELETE FROM blog_tag");
+        jdbc.update("DELETE FROM blog_post_tag");
         jdbc.update("DELETE FROM photo_album");
         jdbc.update("DELETE FROM site_setting WHERE setting_key LIKE 'page.%'");
         jdbc.update("INSERT INTO blog_post(id,user_id,title,summary,content,status,is_deleted,create_time,view_count) VALUES(770001,1,'公开文章','公开摘要','## 正文标题\n\n正文内容段落。',1,0,TIMESTAMP '2026-10-15 10:00:00',3)");
@@ -122,6 +124,40 @@ class ReadingPageServiceTest {
         assertEquals("技术", tag.displayTitle());
         assertEquals(404, reading.resolve("/tag/999", null).status());
         assertEquals(404, reading.resolve("/tag/abc", null).status());
+    }
+
+    @Test
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    void missingTargetsAre404EvenWithoutAnEnclosingTransaction() {
+        // 真实请求没有测试事务：内层服务的 404 不得把外层事务标记为 rollback-only，
+        // 否则生产环境会变成 500（本轮真实联调发现）。
+        var slug = "regress-" + java.util.UUID.randomUUID().toString().substring(0, 8);
+        var created = pages.createPage(slug, "回归页面");
+        String customId = null;
+        try {
+            customId = created.id();
+            var saved = pages.saveDraft(customId, created.draft().revision(), null,
+                    config(Map.of("title", "回归页面", "body", "正文")));
+            var published = pages.publish(customId, saved.draft().revision());
+            assertEquals(200, reading.resolve("/pages/" + slug, null).status());
+            pages.unpublish(customId, published.draft().revision());
+            var offline = reading.resolve("/pages/" + slug, null);
+            assertEquals(404, offline.status());
+            assertEquals(SeoModels.Kind.NOT_FOUND, offline.kind());
+            assertEquals(404, reading.resolve("/post/424242", null).status());
+            assertEquals(404, reading.resolve("/tag/424242", null).status());
+        } finally {
+            if (customId != null) {
+                var current = pages.getEditor(customId);
+                pages.deletePage(customId, current.draft().revision());
+            }
+            settingMapper.deleteById("page.slug." + slug);
+            // NOT_SUPPORTED 测试的数据会被真实提交，逐个清理，避免污染其他测试类。
+            jdbc.update("DELETE FROM blog_post_tag WHERE post_id = 770001");
+            jdbc.update("DELETE FROM blog_post WHERE id IN (770001, 770002)");
+            jdbc.update("DELETE FROM blog_tag WHERE id = 660001");
+            jdbc.update("DELETE FROM photo_album WHERE id IN (550001, 550002)");
+        }
     }
 
     private PageConfig config(Map<String, Object> values) { return json.convertValue(values, PageConfig.class); }

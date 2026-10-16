@@ -135,7 +135,8 @@ public class SitemapService {
     }
 
     private static int shardCount(long total) {
-        return (int) Math.max(1, (total + SHARD_SIZE - 1) / SHARD_SIZE);
+        // 空集合没有分片；索引与分片必须对“存在性”给出同一答案。
+        return (int) ((total + SHARD_SIZE - 1) / SHARD_SIZE);
     }
 
     private static String part(String kind, int number) {

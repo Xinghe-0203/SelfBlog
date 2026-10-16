@@ -88,6 +88,15 @@ class SitemapServiceTest {
         assertFalse(sitemaps.index(BASE).contains("sitemap-pages-1.xml"));
     }
 
+    @Test void emptyCollectionsAreNotAdvertisedAndTheirShardsAreReal404() {
+        // 索引不能列出一个永远不会成功返回的分片。
+        String index = sitemaps.index(BASE);
+        assertFalse(index.contains("sitemap-tags-1.xml"), "empty tag collection must not be advertised");
+        assertFalse(index.contains("sitemap-posts-1.xml"), "no published posts must not be advertised");
+        assertEquals(404, assertThrows(BusinessException.class, () -> sitemaps.shard("tags", 1, BASE)).getCode());
+        assertEquals(404, assertThrows(BusinessException.class, () -> sitemaps.shard("pages", 1, BASE)).getCode());
+    }
+
     private static int occurrences(String xml) {
         return xml.split("<url>", -1).length - 1;
     }

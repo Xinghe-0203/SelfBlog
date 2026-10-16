@@ -31,11 +31,15 @@ import java.util.regex.Pattern;
 /**
  * 公开阅读页面的组装入口：把路径解析为只含已发布数据的 {@link SeoModels.ReadingPage}。
  *
- * <p>只读事务；不增加阅读量、不记录访客、不读取管理草稿或相册解锁令牌。
+ * <p>只读；不增加阅读量、不记录访客、不读取管理草稿或相册解锁令牌。
  * 未知路径按 404 处理，后台命名空间与历史账户路由保留启动壳并强制 noindex。
+ *
+ * <p><b>刻意不声明类级 {@code @Transactional}</b>：这里会调用 PageService/PostQueryService
+ * 的“找不到就抛 404”查询，而异常会让共享事务被标记为 rollback-only；一旦外层与内层
+ * 共享事务，404 就会在提交时变成 {@code UnexpectedRollbackException}（实测为 500）。
+ * 让每个内层查询使用自己的只读事务，才能把“不存在”安全地转换成 404 页面。
  */
 @Service
-@Transactional(readOnly = true)
 public class ReadingPageService {
     private static final int HOME_PAGE_SIZE = 9;
     private static final int MAX_LIST = 100;

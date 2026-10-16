@@ -4,7 +4,7 @@ import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 
 const root = new URL('../../../', import.meta.url)
-const read = path => readFile(new URL(path, root), 'utf8')
+const read = (path) => readFile(new URL(path, root), 'utf8')
 
 test('Docker builds the exact JAR with Maven and both repository projects', async () => {
   const dockerfile = await read('backend/Dockerfile')
@@ -21,7 +21,8 @@ test('runtime is nonroot, owns media/data directories and contains its healthche
   const dockerfile = await read('backend/Dockerfile')
   assert.match(dockerfile, /FROM eclipse-temurin:21-jre/)
   assert.match(dockerfile, /apt-get install .*curl/)
-  for (const path of ['/app/data', '/app/uploads', '/app/gallery-media']) assert.ok(dockerfile.includes(path))
+  for (const path of ['/app/data', '/app/uploads', '/app/gallery-media'])
+    assert.ok(dockerfile.includes(path))
   assert.match(dockerfile, /USER appuser/)
   assert.match(dockerfile, /HEALTHCHECK[\s\S]*curl -f/)
   assert.match(dockerfile, /ENTRYPOINT \["java", "-jar", "\/app\/selfblog\.jar"\]/)
@@ -53,7 +54,22 @@ test('SQLite deployment has explicit persistent database and both media stores',
 
 test('root build context excludes secrets, existing data and local-only work', async () => {
   const ignore = await read('.dockerignore')
-  for (const pattern of ['**/.env', '**/*.db', '**/*-wal', '**/*-shm', '**/uploads', '**/gallery-media', '.git', '**/node_modules', '**/target', '**/dist', 'task_plan.md', 'findings.md', 'progress.md']) assert.ok(ignore.split(/\r?\n/).includes(pattern), pattern)
+  for (const pattern of [
+    '**/.env',
+    '**/*.db',
+    '**/*-wal',
+    '**/*-shm',
+    '**/uploads',
+    '**/gallery-media',
+    '.git',
+    '**/node_modules',
+    '**/target',
+    '**/dist',
+    'task_plan.md',
+    'findings.md',
+    'progress.md'
+  ])
+    assert.ok(ignore.split(/\r?\n/).includes(pattern), pattern)
 })
 
 test('Vercel project does not auto-generate a Vite SPA fallback', async () => {
