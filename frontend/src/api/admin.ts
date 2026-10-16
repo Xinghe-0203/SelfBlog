@@ -13,18 +13,13 @@ import type {
   AdminPostListParams,
   HandleReportRequest,
   HandleUserStatusRequest,
-  AdminCircleListParams,
   User,
   Post,
-  CirclePost,
   Report,
   Tag,
-  Topic,
   Comment,
   CreateTagRequest,
-  UpdateTagRequest,
-  CreateTopicRequest,
-  UpdateTopicRequest
+  UpdateTagRequest
 } from '@/types'
 
 const logger = useLogger('AdminApi')
@@ -115,10 +110,7 @@ export const adminApi = {
   /**
    * 获取待审核文章
    */
-  getReviewList(params: {
-    pageNum?: number
-    pageSize?: number
-  }): Promise<PaginatedResponse<Post>> {
+  getReviewList(params: { pageNum?: number; pageSize?: number }): Promise<PaginatedResponse<Post>> {
     return api.get('/admin/post/review-list', { params })
   },
 
@@ -144,29 +136,16 @@ export const adminApi = {
   },
 
   // Comment management
-  getCommentList(params: { pageNum?: number; pageSize?: number; postId?: number }): Promise<PaginatedResponse<Comment>> {
+  getCommentList(params: {
+    pageNum?: number
+    pageSize?: number
+    postId?: number
+  }): Promise<PaginatedResponse<Comment>> {
     return api.get('/admin/comment/list', { params })
   },
 
   deleteComment(commentId: number | string): Promise<ApiResponse> {
     return api.delete(`/admin/comment/${commentId}`)
-  },
-
-  // Circle management
-  getCircleList(params: AdminCircleListParams): Promise<PaginatedResponse<CirclePost>> {
-    return api.get('/admin/circle/list', { params })
-  },
-
-  getCircleDetail(id: number | string): Promise<ApiResponse<CirclePost>> {
-    return api.get(`/admin/circle/${id}`)
-  },
-
-  deleteCirclePost(id: number | string): Promise<ApiResponse> {
-    return api.delete(`/admin/circle/${id}`)
-  },
-
-  updateCircleStatus(id: number | string, data: { status: number }): Promise<ApiResponse> {
-    return api.put(`/admin/circle/${id}/status`, data)
   },
 
   // Tag management
@@ -184,26 +163,5 @@ export const adminApi = {
 
   deleteTag(id: number | string): Promise<ApiResponse> {
     return api.delete(`/admin/tag/${id}`)
-  },
-
-  // Topic management
-  getTopicList(params: { pageNum?: number; pageSize?: number }): Promise<PaginatedResponse<Topic>> {
-    return api.get('/admin/topic/list', { params })
-  },
-
-  createTopic(data: CreateTopicRequest): Promise<ApiResponse<Topic>> {
-    return api.post('/admin/topic', data)
-  },
-
-  updateTopic(id: number | string, data: UpdateTopicRequest): Promise<ApiResponse<Topic>> {
-    return api.put(`/admin/topic/${id}`, data)
-  },
-
-  deleteTopic(id: number | string): Promise<ApiResponse> {
-    return api.delete(`/admin/topic/${id}`)
-  },
-
-  updateTopicStatus(id: number | string, data: { status: number }): Promise<ApiResponse> {
-    return api.put(`/admin/topic/${id}/status`, data)
   }
 }

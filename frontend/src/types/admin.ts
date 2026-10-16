@@ -89,9 +89,3 @@ export interface HandleUserStatusRequest {
   status: number
   reason?: string
 }
-
-/** 校友圈列表参数 */
-export interface AdminCircleListParams extends PaginationParams {
-  keyword?: string
-  status?: number
-}
