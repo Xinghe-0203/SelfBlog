@@ -2,7 +2,8 @@
 import { onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { postApi } from '@/api/post'
-import { formatDate, truncateText } from '@/utils'
+import ArticleList from '@/components/post/ArticleList.vue'
+import Icon from '@/components/common/Icon.vue'
 import type { Post } from '@/types'
 
 const route = useRoute()
@@ -78,7 +79,6 @@ onMounted(() => {
 <template>
   <div class="search-page">
     <header class="search-heading">
-      <p class="eyebrow">SEARCH THE JOURNAL</p>
       <h1>搜索文章</h1>
       <p>按标题、摘要或正文内容查找。</p>
     </header>
@@ -112,29 +112,11 @@ onMounted(() => {
         <p>没有找到与“{{ route.query.q }}”相关的文章。</p>
         <span>试试更短的关键词，或检查拼写。</span>
       </div>
-      <div v-else class="result-list">
-        <article v-for="post in results" :key="post.id" class="result-item">
-          <div class="result-meta">
-            <time :datetime="post.createTime || post.createdAt">
-              {{ formatDate(post.createTime || post.createdAt, 'YYYY年MM月DD日') }}
-            </time>
-            <span v-if="post.category">{{ post.category }}</span>
-          </div>
-          <h3>
-            <router-link :to="`/post/${post.id}`">{{ post.title }}</router-link>
-          </h3>
-          <p>{{ truncateText(post.summary || post.content, 200) }}</p>
-          <div v-if="post.tags?.length" class="result-tags">
-            <router-link v-for="tag in post.tags.slice(0, 4)" :key="tag.id" :to="`/tag/${tag.id}`"
-              >#{{ tag.name }}</router-link
-            >
-          </div>
-        </article>
-      </div>
+      <ArticleList v-else :posts="results" />
 
       <nav v-if="totalPages > 1 && !loading" class="pagination" aria-label="搜索结果分页">
         <button type="button" :disabled="currentPage <= 1" @click="changePage(currentPage - 1)">
-          ← 上一页
+          <Icon name="chevron-left" :size="16" />上一页
         </button>
         <span>{{ currentPage }} / {{ totalPages }}</span>
         <button
@@ -142,12 +124,12 @@ onMounted(() => {
           :disabled="currentPage >= totalPages"
           @click="changePage(currentPage + 1)"
         >
-          下一页 →
+          下一页<Icon name="chevron-right" :size="16" />
         </button>
       </nav>
     </section>
     <section v-else class="search-prompt">
-      <span aria-hidden="true">⌕</span>
+      <Icon name="search" :size="28" />
       <p>输入关键词，开始阅读。</p>
     </section>
   </div>
@@ -155,27 +137,19 @@ onMounted(() => {
 
 <style scoped>
 .search-page {
-  max-width: 790px;
+  max-width: 920px;
   min-height: 55vh;
   margin: 0 auto;
-  padding: 53px 24px 24px;
+  padding: 24px 24px 48px;
   color: var(--text-primary);
 }
 .search-heading {
   padding-bottom: 26px;
-  text-align: center;
-}
-.eyebrow {
-  margin: 0 0 10px;
-  color: var(--primary);
-  font-size: 0.69rem;
-  font-weight: 700;
-  letter-spacing: 0.16em;
 }
 .search-heading h1 {
   margin: 0;
   font-family: var(--font-display);
-  font-size: clamp(2.1rem, 5vw, 3rem);
+  font-size: 30px;
   letter-spacing: -0.045em;
 }
 .search-heading > p:last-child {
@@ -188,7 +162,7 @@ onMounted(() => {
   gap: 9px;
   padding: 8px;
   border: 1px solid var(--border-solid);
-  border-radius: var(--radius);
+  border-radius: var(--radius-lg);
   background: var(--surface-solid);
   box-shadow: var(--shadow-sm);
 }
@@ -215,7 +189,7 @@ onMounted(() => {
   min-width: 88px;
   padding: 0 15px;
   border: 0;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius);
   background: var(--primary);
   color: white;
   cursor: pointer;
@@ -231,14 +205,14 @@ onMounted(() => {
   opacity: 0.55;
 }
 .search-results {
-  padding-top: 38px;
+  padding-top: 28px;
 }
 .results-heading {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
   padding-bottom: 12px;
-  border-bottom: 1px solid var(--border-solid);
+  margin-bottom: 8px;
 }
 .results-heading h2 {
   margin: 0;
@@ -248,48 +222,6 @@ onMounted(() => {
 .results-heading > span {
   color: var(--text-muted);
   font-size: 0.78rem;
-}
-.result-item {
-  padding: 21px 2px 22px;
-  border-bottom: 1px solid var(--border-solid);
-}
-.result-meta {
-  display: flex;
-  gap: 12px;
-  color: var(--text-muted);
-  font-size: 0.75rem;
-}
-.result-item h3 {
-  margin: 8px 0 6px;
-  font-family: var(--font-display);
-  font-size: 1.22rem;
-  line-height: 1.4;
-}
-.result-item h3 a {
-  color: var(--text-primary);
-  text-decoration: none;
-}
-.result-item h3 a:hover {
-  color: var(--primary);
-}
-.result-item > p {
-  margin: 0;
-  color: var(--text-secondary);
-  font-size: 0.85rem;
-  line-height: 1.75;
-}
-.result-tags {
-  display: flex;
-  gap: 10px;
-  margin-top: 10px;
-}
-.result-tags a {
-  color: var(--primary);
-  font-size: 0.73rem;
-  text-decoration: none;
-}
-.result-tags a:hover {
-  text-decoration: underline;
 }
 .state-panel {
   margin-top: 20px;
@@ -329,6 +261,10 @@ onMounted(() => {
   font-size: 0.8rem;
 }
 .pagination button {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 44px;
   border: 0;
   background: none;
   color: var(--primary);
@@ -369,13 +305,10 @@ onMounted(() => {
 }
 @media (max-width: 600px) {
   .search-page {
-    padding: 34px 18px 20px;
+    padding: 8px 18px 36px;
   }
   .search-form button {
     min-width: 68px;
-  }
-  .result-item h3 {
-    font-size: 1.08rem;
   }
 }
 </style>

@@ -14,6 +14,7 @@ import { enhanceMarkdown } from '@/composables/useMarkdownEnhance'
 import { toast } from '@/utils/toast'
 import ImagePreview from '@/components/common/ImagePreview.vue'
 import MobileTocSheet from '@/components/post/MobileTocSheet.vue'
+import Icon from '@/components/common/Icon.vue'
 import type { Post } from '@/types'
 
 interface TocItem {
@@ -286,7 +287,7 @@ watch(
 const scrollToHeading = (item: TocItem) => {
   const heading = contentRef.value?.querySelector(`#${item.id}`)
   if (!heading) return
-  heading.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  heading.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' })
   activeHeading.value = item.id
 }
 
@@ -321,16 +322,26 @@ const updateReadingProgress = () => {
   activeHeading.value = activeId
 }
 
+let progressFrame = 0
+function scheduleReadingProgress(): void {
+  if (progressFrame) return
+  progressFrame = requestAnimationFrame(() => {
+    progressFrame = 0
+    updateReadingProgress()
+  })
+}
+
 watch(() => route.params.id, fetchPost)
 
 onMounted(() => {
   try { commentNickname.value = localStorage.getItem('selfblog-comment-name') || '访客' } catch { /* storage is optional */ }
   fetchPost()
-  window.addEventListener('scroll', updateReadingProgress, { passive: true })
+  window.addEventListener('scroll', scheduleReadingProgress, { passive: true })
 })
 
 onUnmounted(() => {
-  window.removeEventListener('scroll', updateReadingProgress)
+  window.removeEventListener('scroll', scheduleReadingProgress)
+  if (progressFrame) cancelAnimationFrame(progressFrame)
   headingObserver?.disconnect()
 })
 </script>
@@ -340,9 +351,9 @@ onUnmounted(() => {
 
   <div class="reader-page">
     <div class="reader-topline">
-      <router-link to="/" class="back-link">← 所有文章</router-link>
+      <router-link to="/" class="back-link"><Icon name="chevron-left" :size="16" />所有文章</router-link>
       <router-link v-if="post && userStore.isAdmin" :to="`${siteStore.adminRoot}/edit/${post.id}`" class="edit-link"
-        >编辑文章 ↗</router-link
+        >编辑文章<Icon name="external" :size="14" /></router-link
       >
     </div>
 
@@ -353,22 +364,15 @@ onUnmounted(() => {
       <router-link to="/">返回首页</router-link>
     </div>
 
-    <article v-else-if="post" class="reader-layout">
+    <article v-else-if="post" class="reader-layout" :class="{ 'reader-layout--no-toc': !toc.length }">
       <div class="article-column">
-        <img
-          v-if="post.coverImage"
-          class="article-cover"
-          :src="getSafeImageUrl(post.coverImage)"
-          :alt="post.title"
-        />
-
         <header class="article-header">
           <div v-if="post.tags?.length" class="article-tags">
             <router-link v-for="tag in post.tags" :key="tag.id" :to="`/tag/${tag.id}`"
               >#{{ tag.name }}</router-link
             >
           </div>
-          <p class="eyebrow">{{ post.category || '文章' }}</p>
+          <p v-if="post.category" class="article-category">{{ post.category }}</p>
           <h1>{{ post.title }}</h1>
           <p v-if="post.summary" class="article-summary">{{ post.summary }}</p>
           <div class="article-meta">
@@ -386,6 +390,8 @@ onUnmounted(() => {
           </div>
         </header>
 
+        <img v-if="post.coverImage || post.coverUrl" class="article-cover" :src="getSafeImageUrl(post.coverImage || post.coverUrl)" alt="" />
+
         <div
           ref="contentRef"
           class="markdown-body"
@@ -395,11 +401,11 @@ onUnmounted(() => {
 
         <nav v-if="adjacent.prev || adjacent.next" class="post-adjacent" aria-label="相邻文章">
           <router-link v-if="adjacent.prev" class="adjacent-link" :to="`/post/${adjacent.prev.id}`">
-            <span class="adjacent-label">← 上一篇</span>
+            <span class="adjacent-label"><Icon name="chevron-left" :size="14" />上一篇</span>
             <span class="adjacent-title">{{ adjacent.prev.title }}</span>
           </router-link>
           <router-link v-if="adjacent.next" class="adjacent-link adjacent-link--next" :to="`/post/${adjacent.next.id}`">
-            <span class="adjacent-label">下一篇 →</span>
+            <span class="adjacent-label">下一篇<Icon name="chevron-right" :size="14" /></span>
             <span class="adjacent-title">{{ adjacent.next.title }}</span>
           </router-link>
         </nav>
@@ -413,7 +419,7 @@ onUnmounted(() => {
         </section>
 
         <section v-if="siteStore.isCommentsEnabled" class="comments-section">
-          <header class="comments-heading"><div><p class="eyebrow">GUESTBOOK</p><h2>读者留言 <span>{{ commentsTotal }}</span></h2></div></header>
+          <header class="comments-heading"><h2>读者留言 <span>{{ commentsTotal }}</span></h2></header>
           <form class="comment-form" @submit.prevent="submitComment">
             <label><span>昵称</span><input v-model="commentNickname" maxlength="80" placeholder="访客" required /></label>
             <label><span>留言内容</span><textarea v-model="commentContent" maxlength="2000" rows="4" placeholder="写下你的想法…" required></textarea></label>
@@ -432,13 +438,12 @@ onUnmounted(() => {
         <footer class="article-end">
           <span class="end-rule"></span>
           <p>感谢阅读</p>
-          <router-link to="/archives">继续浏览文章归档 →</router-link>
+          <router-link to="/archives">继续浏览文章归档<Icon name="chevron-right" :size="14" /></router-link>
         </footer>
       </div>
 
       <aside v-if="toc.length" class="article-aside">
         <div class="toc-card">
-          <p class="eyebrow">CONTENTS</p>
           <h2>文章目录</h2>
           <nav aria-label="文章目录">
             <button
@@ -462,10 +467,6 @@ onUnmounted(() => {
       @select="scrollToHeading"
     />
 
-    <!--
-      ImagePreview 的 currentIndex 只在初始化时读一次 initialIndex，
-      所以每次打开都靠 v-if 重新挂载 —— 否则连续点开不同图片会复用上一次的索引。
-    -->
     <ImagePreview
       v-if="previewVisible"
       :images="contentImages"
@@ -479,7 +480,7 @@ onUnmounted(() => {
 <style scoped>
 .reading-progress {
   position: fixed;
-  z-index: 1200;
+   z-index: var(--z-sticky);
   top: 0;
   left: 0;
   height: 2px;
@@ -489,17 +490,21 @@ onUnmounted(() => {
 .reader-page {
   max-width: 1120px;
   margin: 0 auto;
-  padding: 32px 24px 20px;
+  padding: 24px 24px 48px;
   color: var(--text-primary);
 }
 .reader-topline {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 24px;
+  margin-bottom: 20px;
 }
 .back-link,
 .edit-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 44px;
   color: var(--text-muted);
   font-size: 0.8rem;
   text-decoration: none;
@@ -513,11 +518,12 @@ onUnmounted(() => {
 }
 .reader-layout {
   display: grid;
-  grid-template-columns: minmax(0, 760px) 220px;
+  grid-template-columns: minmax(0, 760px) 200px;
   justify-content: center;
-  gap: 56px;
+  gap: 32px;
   align-items: start;
 }
+.reader-layout--no-toc { grid-template-columns: minmax(0, 760px); }
 .article-column {
   min-width: 0;
 }
@@ -525,8 +531,8 @@ onUnmounted(() => {
   display: block;
   width: 100%;
   max-height: 410px;
-  margin-bottom: 34px;
-  border-radius: var(--radius);
+  margin-block: 24px 0;
+  border-radius: var(--radius-lg);
   object-fit: cover;
 }
 .article-header {
@@ -534,7 +540,7 @@ onUnmounted(() => {
   border-bottom: 1px solid var(--border-solid);
 }
 .reader-interactions { display: flex; align-items: center; gap: 14px; margin: 25px 0 30px; padding: 16px 0; border-top: 1px solid var(--border-solid); border-bottom: 1px solid var(--border-solid); }
-.like-action { display: inline-flex; align-items: center; gap: 7px; padding: 9px 13px; border: 1px solid var(--border-solid); border-radius: 999px; background: var(--surface-primary); color: var(--text-secondary); font: inherit; font-size: .82rem; cursor: pointer; }
+.like-action { display: inline-flex; align-items: center; flex-shrink: 0; gap: 7px; min-height: 44px; padding: 9px 13px; border: 1px solid var(--border-solid); border-radius: var(--radius); background: var(--surface-primary); color: var(--text-secondary); font: inherit; font-size: .82rem; cursor: pointer; }
 .like-action span { color: var(--like-accent); font-size: 1.1rem; }.like-action.active { border-color: var(--like-accent-border); background: var(--like-accent-soft); color: var(--like-accent-strong); }.like-action:disabled { opacity: .6; cursor: wait; }.like-action strong { font-size: .76rem; }
 .interaction-note { color: var(--text-muted); font-size: .72rem; }
 
@@ -561,7 +567,7 @@ onUnmounted(() => {
   transform: translateY(-1px);
 }
 .adjacent-link--next { text-align: right; }
-.adjacent-label { color: var(--text-muted); font-size: .7rem; letter-spacing: .04em; }
+.adjacent-label { display: flex; align-items: center; gap: 4px; color: var(--text-muted); font-size: .7rem; }
 .adjacent-title {
   color: var(--text-primary);
   font-size: .88rem;
@@ -595,18 +601,17 @@ onUnmounted(() => {
 .article-tags a:hover {
   text-decoration: underline;
 }
-.eyebrow {
+.article-category {
   margin: 0 0 9px;
   color: var(--primary);
   font-size: 0.69rem;
   font-weight: 700;
-  letter-spacing: 0.14em;
 }
 .article-header h1 {
   margin: 0;
   font-family: var(--font-display);
-  font-size: clamp(2rem, 5vw, 3.25rem);
-  line-height: 1.15;
+  font-size: clamp(28px, 3.2vw, 38px);
+  line-height: 1.4;
   letter-spacing: -0.045em;
   overflow-wrap: anywhere;
 }
@@ -646,7 +651,7 @@ onUnmounted(() => {
   margin: 2em 0 0.7em;
   font-family: var(--font-display);
   line-height: 1.35;
-  scroll-margin-top: 105px;
+   scroll-margin-top: 0;
 }
 .markdown-body :deep(h1) {
   font-size: 1.85rem;
@@ -722,9 +727,12 @@ onUnmounted(() => {
   opacity: 0.6;
 }
 .markdown-body :deep(.code-copy) {
-  padding: 3px 10px;
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 3px 12px;
   border: 1px solid var(--code-border);
-  border-radius: var(--radius-full);
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--code-text);
   font: inherit;
@@ -838,6 +846,10 @@ onUnmounted(() => {
   font-size: 1.1rem;
 }
 .article-end a {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 44px;
   color: var(--primary);
   font-size: 0.8rem;
   text-decoration: none;
@@ -847,7 +859,7 @@ onUnmounted(() => {
 }
 .article-aside {
   position: sticky;
-  top: 105px;
+  top: var(--anchor-offset);
 }
 .toc-card {
   padding: 17px 0;
@@ -870,6 +882,9 @@ onUnmounted(() => {
   overflow: auto;
 }
 .toc-card button {
+  display: flex;
+  align-items: center;
+  min-height: 34px;
   padding: 5px 0;
   border: 0;
   background: none;
@@ -921,7 +936,7 @@ onUnmounted(() => {
   border-color: var(--primary);
   color: var(--primary);
 }
-@media (max-width: 860px) {
+@media (max-width: 1020px) {
   .reader-layout {
     grid-template-columns: minmax(0, 760px);
   }
@@ -932,17 +947,17 @@ onUnmounted(() => {
 }
 @media (max-width: 600px) {
   .reader-page {
-    padding: 26px 18px 14px;
+    padding: 8px 18px 36px;
   }
   .reader-layout {
     gap: 25px;
   }
   .article-cover {
     max-height: 240px;
-    margin-bottom: 24px;
+    margin-bottom: 0;
   }
   .article-header h1 {
-    font-size: 2rem;
+    font-size: 28px;
   }
   .markdown-body {
     font-size: 1rem;
@@ -953,5 +968,9 @@ onUnmounted(() => {
   .markdown-body :deep(h2) {
     font-size: 1.35rem;
   }
+  .reader-interactions { flex-wrap: wrap; }
+  .comment-form-footer { flex-wrap: wrap; }
+  .comment-form-footer button { min-height: 44px; }
+  .reader-comment header { flex-wrap: wrap; }
 }
 </style>

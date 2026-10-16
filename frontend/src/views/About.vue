@@ -1,132 +1,35 @@
 <script setup lang="ts">
 import { useSiteStore } from '@/stores/site'
+import { getSafeImageUrl } from '@/utils'
+import Icon from '@/components/common/Icon.vue'
 const siteStore = useSiteStore()
 </script>
 
 <template>
   <div class="about-page">
-    <header class="about-hero">
-      <p class="eyebrow">ABOUT THIS SITE</p>
-      <h1>关于 {{ siteStore.settings.siteTitle }}</h1>
-      <p class="lead">{{ siteStore.settings.siteDescription }}</p>
-    </header>
-
-    <div class="about-copy">
-      <section>
-        <h2>{{ siteStore.settings.authorName }}</h2>
-        <p>{{ siteStore.settings.authorBio }}</p>
-      </section>
-      <section>
-        <h2>如何浏览</h2>
-        <p>
-          你可以在首页查看最新文章，在归档页按月份回顾旧文，也可以通过搜索或文章标签找到感兴趣的内容。
-        </p>
-        <div class="about-links">
-          <router-link to="/archives">查看文章归档 <span aria-hidden="true">↗</span></router-link>
-          <router-link to="/search">搜索文章 <span aria-hidden="true">↗</span></router-link>
-        </div>
-      </section>
-      <aside class="reader-note">
-        <span class="note-mark" aria-hidden="true">“</span>
-        <p>感谢阅读。愿每一次记录，都能成为下一次出发的线索。</p>
-      </aside>
-    </div>
+    <section class="author-profile">
+      <img v-if="siteStore.settings.authorAvatar" class="profile-avatar" :src="getSafeImageUrl(siteStore.settings.authorAvatar)" alt="作者头像" />
+      <span v-else class="profile-avatar profile-initial" aria-hidden="true">{{ siteStore.settings.authorName.slice(0, 1) }}</span>
+      <div class="profile-copy"><p class="profile-label">关于作者</p><h1>{{ siteStore.settings.authorName }}</h1><p class="author-bio">{{ siteStore.settings.authorBio }}</p></div>
+    </section>
+    <section class="about-site"><h2>{{ siteStore.settings.siteTitle }}</h2><p>{{ siteStore.settings.siteDescription }}</p><nav aria-label="继续阅读"><router-link to="/archives"><Icon name="archive" :size="18" />文章归档</router-link><router-link to="/gallery"><Icon name="image" :size="18" />相册</router-link><router-link to="/search"><Icon name="search" :size="18" />搜索文章</router-link></nav></section>
   </div>
 </template>
 
 <style scoped>
-.about-page {
-  max-width: 920px;
-  margin: 0 auto;
-  padding: 58px 24px 30px;
-  color: var(--text-primary);
-}
-.about-hero {
-  padding: 38px 0 43px;
-  border-bottom: 1px solid var(--border-solid);
-}
-.eyebrow {
-  margin: 0 0 12px;
-  color: var(--primary);
-  font-size: 0.69rem;
-  font-weight: 700;
-  letter-spacing: 0.16em;
-}
-.about-hero h1 {
-  margin: 0;
-  font-family: var(--font-display);
-  font-size: clamp(2.25rem, 5vw, 3.5rem);
-  letter-spacing: -0.05em;
-}
-.lead {
-  max-width: 620px;
-  margin: 16px 0 0;
-  color: var(--text-secondary);
-  font-size: 1.05rem;
-  line-height: 1.8;
-}
-.about-copy {
-  max-width: 700px;
-  padding-top: 34px;
-}
-.about-copy section {
-  margin-bottom: 35px;
-}
-.about-copy h2 {
-  margin: 0 0 12px;
-  font-family: var(--font-display);
-  font-size: 1.34rem;
-  letter-spacing: -0.025em;
-}
-.about-copy section p {
-  margin: 0;
-  color: var(--text-secondary);
-  font-size: 0.96rem;
-  line-height: 1.95;
-}
-.about-links {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 22px;
-  margin-top: 16px;
-}
-.about-links a {
-  color: var(--primary);
-  font-size: 0.85rem;
-  font-weight: 600;
-  text-decoration: none;
-}
-.about-links a:hover {
-  text-decoration: underline;
-}
-.reader-note {
-  display: flex;
-  align-items: start;
-  gap: 15px;
-  margin-top: 40px;
-  padding: 22px 24px;
-  border-left: 3px solid var(--primary);
-  background: var(--bg-secondary);
-}
-.note-mark {
-  color: var(--primary);
-  font-family: var(--font-display);
-  font-size: 3rem;
-  line-height: 0.8;
-}
-.reader-note p {
-  margin: 0;
-  color: var(--text-secondary);
-  font-family: var(--font-display);
-  font-size: 1.05rem;
-  line-height: 1.7;
-}
-@media (max-width: 600px) {
-  .about-page {
-    padding: 34px 18px 20px;
-  }
-  .about-hero {
-    padding: 25px 0 30px;
-  }
-}
+.about-page { max-width: 920px; margin-inline: auto; padding: 24px 24px 48px; }
+.author-profile { display: flex; align-items: flex-start; gap: 28px; padding: 34px; border: 1px solid var(--border-light); border-radius: var(--radius-xl); background: var(--surface-primary); }
+.profile-avatar { flex: 0 0 80px; width: 80px; height: 80px; border-radius: var(--radius-full); object-fit: cover; }
+.profile-initial { display: grid; place-items: center; background: var(--accent-light); color: var(--accent); font-size: 28px; }
+.profile-copy { min-width: 0; }
+.profile-label { font-size: 12px; color: var(--text-muted); margin-bottom: 7px; }
+.profile-copy h1 { font-size: 30px; overflow-wrap: anywhere; }
+.author-bio { margin-top: 18px; white-space: pre-line; overflow-wrap: anywhere; font-size: 16px; line-height: 1.9; }
+.about-site { margin: 32px 34px 0; }
+.about-site h2 { font-size: 18px; }
+.about-site p { margin-block: 12px 20px; font-size: 14px; }
+.about-site nav { display: flex; flex-wrap: wrap; gap: 12px; }
+.about-site a { display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 8px 12px; border: 1px solid var(--border-light); border-radius: var(--radius); background: var(--surface-primary); color: var(--text-secondary); font-size: 13px; }
+.about-site a:hover { color: var(--accent); border-color: var(--accent); }
+@media (max-width: 600px) { .about-page { padding: 8px 18px 36px; } .author-profile { flex-direction: column; gap: 20px; padding: 24px; } .profile-avatar { flex-basis: 64px; width: 64px; height: 64px; } .profile-copy h1 { font-size: 26px; } .about-site { margin-inline: 6px; } }
 </style>

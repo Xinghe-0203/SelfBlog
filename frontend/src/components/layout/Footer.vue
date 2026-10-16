@@ -36,9 +36,9 @@ const siteStore = useSiteStore()
   align-items: center;
   justify-content: space-between;
   gap: 24px;
-  max-width: 1040px;
+  max-width: 1130px;
   margin: 0 auto;
-  padding: 26px 24px 32px;
+  padding: 24px 30px 30px;
 }
 
 .footer-title {
@@ -61,6 +61,9 @@ const siteStore = useSiteStore()
 }
 
 .footer-links a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
   color: var(--text-secondary);
   font-size: 0.8125rem;
   text-decoration: none;

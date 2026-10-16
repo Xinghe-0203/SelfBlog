@@ -69,7 +69,6 @@ onMounted(fetchArchives)
 <template>
   <div class="archives-page">
     <header class="page-heading">
-      <p class="eyebrow">ARCHIVE</p>
       <h1>文章归档</h1>
       <p>按时间回看这里发布过的文章。</p>
     </header>
@@ -102,26 +101,18 @@ onMounted(fetchArchives)
 
 <style scoped>
 .archives-page {
-  max-width: 820px;
+  max-width: 920px;
   margin: 0 auto;
-  padding: 55px 24px 25px;
+  padding: 24px 24px 48px;
   color: var(--text-primary);
 }
 .page-heading {
-  padding-bottom: 30px;
-  border-bottom: 1px solid var(--border-solid);
-}
-.eyebrow {
-  margin: 0 0 10px;
-  color: var(--primary);
-  font-size: 0.69rem;
-  font-weight: 700;
-  letter-spacing: 0.16em;
+  padding-bottom: 24px;
 }
 .page-heading h1 {
   margin: 0;
   font-family: var(--font-display);
-  font-size: clamp(2.2rem, 5vw, 3.2rem);
+  font-size: 30px;
   letter-spacing: -0.045em;
 }
 .page-heading > p:last-child {
@@ -130,15 +121,19 @@ onMounted(fetchArchives)
   font-size: 0.93rem;
 }
 .archive-list {
-  padding-top: 14px;
+  padding: 0 26px;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-xl);
+  background: var(--surface-primary);
 }
 .archive-group {
   display: grid;
-  grid-template-columns: 170px minmax(0, 1fr);
-  gap: 26px;
+  grid-template-columns: 145px minmax(0, 1fr);
+  gap: 24px;
   padding: 27px 0;
   border-bottom: 1px solid var(--border-solid);
 }
+.archive-group:last-child { border-bottom: 0; }
 .archive-group h2 {
   display: flex;
   align-items: baseline;
@@ -208,12 +203,13 @@ onMounted(fetchArchives)
 }
 @media (max-width: 620px) {
   .archives-page {
-    padding: 34px 18px 20px;
+    padding: 8px 18px 36px;
   }
   .archive-group {
     grid-template-columns: 1fr;
     gap: 16px;
   }
+  .archive-list { padding-inline: 20px; }
   .archive-group h2 {
     margin: 0;
   }

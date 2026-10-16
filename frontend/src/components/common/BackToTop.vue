@@ -1,18 +1,18 @@
 <template>
   <button
-    class="back-to-top"
+    type="button"
+    class="back-to-top functional-glass"
     :class="{ visible: isVisible }"
     @click="scrollToTop"
     aria-label="返回顶部"
   >
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <polyline points="18 15 12 9 6 15"/>
-    </svg>
+    <Icon name="arrow-up" :size="19" />
   </button>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
+import Icon from './Icon.vue'
 
 const isVisible = ref(false)
 let ticking = false
@@ -30,7 +30,7 @@ const handleScroll = () => {
 const scrollToTop = () => {
   window.scrollTo({
     top: 0,
-    behavior: 'smooth'
+    behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth'
   })
 }
 
@@ -53,11 +53,8 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--surface-solid);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
   border: 1px solid var(--border-solid);
-  border-radius: var(--radius-full);
+  border-radius: var(--radius);
   color: var(--text-secondary);
   cursor: pointer;
   opacity: 0;
@@ -98,8 +95,6 @@ onUnmounted(() => {
   .back-to-top {
     bottom: 20px;
     right: 20px;
-    width: 40px;
-    height: 40px;
   }
 }
 
@@ -107,8 +102,6 @@ onUnmounted(() => {
   .back-to-top {
     bottom: 16px;
     right: 16px;
-    width: 38px;
-    height: 38px;
   }
 }
 </style>

@@ -3,7 +3,8 @@ import { computed, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { postApi } from '@/api/post'
 import { tagApi } from '@/api/tag'
-import { formatDate, truncateText } from '@/utils'
+import ArticleList from '@/components/post/ArticleList.vue'
+import Icon from '@/components/common/Icon.vue'
 import type { Post, Tag } from '@/types'
 
 const route = useRoute()
@@ -69,7 +70,7 @@ watch(() => route.params.id, fetchTag, { immediate: true })
 
 <template>
   <div class="tag-page">
-    <router-link to="/" class="back-link">← 返回首页</router-link>
+    <router-link to="/" class="back-link"><Icon name="chevron-left" :size="16" />返回首页</router-link>
 
     <div v-if="loading && !tag" class="state-panel" role="status">正在加载标签…</div>
     <div v-else-if="error && !tag" class="state-panel state-panel--error" role="alert">
@@ -78,31 +79,12 @@ watch(() => route.params.id, fetchTag, { immediate: true })
 
     <template v-else-if="tag">
       <header class="tag-heading">
-        <p class="eyebrow">ARTICLE TAG</p>
         <h1><span>#</span>{{ tag.name }}</h1>
         <p>{{ totalPosts }} 篇相关文章</p>
       </header>
 
       <div v-if="posts.length === 0" class="state-panel">这个标签下还没有文章。</div>
-      <div v-else class="tag-posts">
-        <article v-for="post in posts" :key="post.id" class="tag-post">
-          <div class="post-meta">
-            <time :datetime="post.createTime || post.createdAt">
-              {{ formatDate(post.createTime || post.createdAt, 'YYYY年MM月DD日') }}
-            </time>
-            <span v-if="post.category">{{ post.category }}</span>
-          </div>
-          <h2>
-            <router-link :to="`/post/${post.id}`">{{ post.title }}</router-link>
-          </h2>
-          <p>{{ truncateText(post.summary || post.content, 180) }}</p>
-          <div v-if="post.tags?.length" class="post-tags">
-            <router-link v-for="item in post.tags" :key="item.id" :to="`/tag/${item.id}`"
-              >#{{ item.name }}</router-link
-            >
-          </div>
-        </article>
-      </div>
+      <ArticleList v-else :posts="posts" heading="h2" />
 
       <div v-if="error && posts.length" class="load-error" role="alert">{{ error }}</div>
       <div v-if="hasMore" class="load-more">
@@ -117,14 +99,17 @@ watch(() => route.params.id, fetchTag, { immediate: true })
 
 <style scoped>
 .tag-page {
-  max-width: 790px;
+  max-width: 920px;
   margin: 0 auto;
-  padding: 42px 24px 25px;
+  padding: 24px 24px 48px;
   color: var(--text-primary);
 }
 .back-link {
-  display: inline-block;
-  margin-bottom: 25px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 44px;
+  margin-bottom: 12px;
   color: var(--text-muted);
   font-size: 0.8rem;
   text-decoration: none;
@@ -134,19 +119,11 @@ watch(() => route.params.id, fetchTag, { immediate: true })
 }
 .tag-heading {
   padding: 8px 0 25px;
-  border-bottom: 1px solid var(--border-solid);
-}
-.eyebrow {
-  margin: 0 0 9px;
-  color: var(--primary);
-  font-size: 0.69rem;
-  font-weight: 700;
-  letter-spacing: 0.16em;
 }
 .tag-heading h1 {
   margin: 0;
   font-family: var(--font-display);
-  font-size: clamp(2.1rem, 5vw, 3.2rem);
+  font-size: 30px;
   letter-spacing: -0.045em;
   overflow-wrap: anywhere;
 }
@@ -158,49 +135,6 @@ watch(() => route.params.id, fetchTag, { immediate: true })
   margin: 10px 0 0;
   color: var(--text-muted);
   font-size: 0.84rem;
-}
-.tag-post {
-  padding: 23px 2px 25px;
-  border-bottom: 1px solid var(--border-solid);
-}
-.post-meta {
-  display: flex;
-  gap: 12px;
-  color: var(--text-muted);
-  font-size: 0.75rem;
-}
-.tag-post h2 {
-  margin: 8px 0 6px;
-  font-family: var(--font-display);
-  font-size: 1.28rem;
-  line-height: 1.4;
-}
-.tag-post h2 a {
-  color: var(--text-primary);
-  text-decoration: none;
-}
-.tag-post h2 a:hover {
-  color: var(--primary);
-}
-.tag-post > p {
-  margin: 0;
-  color: var(--text-secondary);
-  font-size: 0.86rem;
-  line-height: 1.75;
-}
-.post-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin-top: 11px;
-}
-.post-tags a {
-  color: var(--primary);
-  font-size: 0.74rem;
-  text-decoration: none;
-}
-.post-tags a:hover {
-  text-decoration: underline;
 }
 .state-panel {
   margin-top: 25px;
@@ -219,6 +153,7 @@ watch(() => route.params.id, fetchTag, { immediate: true })
   padding-top: 22px;
 }
 .load-more button {
+  min-height: 44px;
   padding: 9px 15px;
   border: 1px solid var(--border-solid);
   border-radius: var(--radius-sm);
@@ -245,10 +180,7 @@ watch(() => route.params.id, fetchTag, { immediate: true })
 }
 @media (max-width: 600px) {
   .tag-page {
-    padding: 30px 18px 20px;
-  }
-  .tag-post h2 {
-    font-size: 1.12rem;
+    padding: 8px 18px 36px;
   }
 }
 </style>
