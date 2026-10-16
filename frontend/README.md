@@ -39,14 +39,14 @@ src/
 ├── api/                # Axios modules + interceptors (index, site, admin, post, media, …)
 ├── components/
 │   ├── common/         # Reusable UI: Button, Card, Input, Icon, Modal, Toast, ImagePreview, BackToTop, …
-│   ├── layout/         # Navbar, Footer, MusicPlayer
+│   ├── layout/         # Navbar, Footer, headless MusicPlayer, NavbarMusicControl
 │   ├── home/           # PostCardList, HomeSidebar
 │   ├── post/           # MobileTocSheet (article reading extras)
 │   ├── circle/         # Campus circle widgets
 │   └── admin/          # SiteAssetField (brand asset uploads)
-├── composables/        # useConfirm, useScrollState, useMarkdownEnhance, useSeoMeta, usePagination, useScrollReveal
+├── composables/        # useDialog, useConfirm, useScrollState, useMarkdownEnhance, useSeoMeta, usePagination, useScrollReveal
 ├── router/             # Entry, guards, lazy helpers, per-domain modules
-├── stores/             # Pinia: site, theme, user
+├── stores/             # Pinia: site, theme, user, music
 ├── styles/             # Tokens + base + components + dark mode + a11y (entry: main.css)
 ├── types/              # TypeScript type definitions
 ├── utils/              # crypto, logger, toast, visitor, reading
@@ -82,7 +82,7 @@ userStore.fetchUser()
 
 ```ts
 const themeStore = useThemeStore()
-themeStore.isDark        // Dark mode status
+themeStore.isDarkMode    // Dark mode status
 themeStore.toggleTheme() // Toggle light/dark
 ```
 
@@ -98,17 +98,27 @@ await siteStore.loadPublicSettings()
 
 ## Design System
 
-Clean tech-blue ("清爽科技蓝") design system: CSS-variable tokens for color, spacing,
-radius and shadows, a first-class dark mode, and five selectable light/dark skins.
-Surfaces are solid by default — the legacy glass tokens (`--glass-*`) are kept for
-compatibility but resolve to solid colors with `--glass-blur: none`.
+Compact Glass design foundation: neutral gray-white canvas, system sans typography,
+8px controls, 12–14px content groups and 16px panels. The author's primary color and
+five selectable skins remain authoritative; soft accent colors derive from that color.
+Theme changes settle foreground/background together rather than interpolating unreadable palettes.
+
+Content surfaces and legacy `--glass-*` tokens remain solid. Only functional chrome
+opts into `.functional-glass`; unsupported blur, reduced transparency and high contrast
+fall back to solid surfaces. Reduced motion removes panel displacement and looping sound bars.
+
+The [approved whole-site redesign](../docs/superpowers/specs/2026-10-16-selfblog-ios-glass-redesign-design.md)
+has three batches, all implemented: foundation/navigation/music, the public reading
+pages (shared `ArticleList`, rebuilt home/archives/about/404/search/tag/reader/gallery)
+and the author workspace (compact admin shell with a focus-managed drawer, unified
+page hierarchy, shared album dialog, login card and editor shell).
 
 ### CSS Variables
 
 ```css
 :root {
   --accent: #165DFF;
-  --radius: 12px;
+  --radius: 8px;
   --surface-primary: #FFFFFF;
 }
 html.dark-mode { /* Dark mode overrides live in dark-mode.css */ }
@@ -116,9 +126,28 @@ html.dark-mode { /* Dark mode overrides live in dark-mode.css */ }
 
 ### Legacy glass classes
 
-The `.glass*` / `.water-drops` utilities remain for backward compatibility but
-resolve to solid surfaces (`--glass-blur: none`); new UI uses the `--surface-*`
-tokens instead of glass effects.
+The `.glass*` / `.water-drops` utilities remain for backward compatibility and do not
+enable translucent content cards. New solid content uses `--surface-*`; new functional
+glass uses `--functional-glass-*` with a solid fallback.
+
+### Navigation, music and overlays
+
+- Navbar stays 52px high (50px on mobile); scrolling never hides/resizes it. Search, menu and music panels are mutually exclusive and close on Escape/outside input/route changes.
+- `App.vue` mounts exactly one headless `MusicPlayer` outside route transitions, including admin routes. `stores/music.ts` owns transport state; `NavbarMusicControl` only presents controls.
+- Reuse `musicEnabled/musicUrl/musicTitle`; never autoplay or restore playback intent. Public navigation preserves audio; admin entry pauses. A source change/disable invalidates pending playback and detaches old listeners.
+- Only volume/loop preferences are stored. Unknown duration disables seeking; playback failures stay inline; unsupported volume adjustment shows a device-volume hint.
+- `#overlay-root` is inside `#selfblog` and outside page transforms. `useDialog` provides a shared stack, top-only Escape, Tab containment, focus restoration and owned scroll locking for Modal/ImagePreview/MobileTocSheet. Notifications also portal there to inherit skins.
+
+### Verification (whole-site redesign, 2026-10-16)
+
+Vitest: **30 files / 328 tests**. Type-check passes; ESLint has no errors (existing warnings only); Vite production build passes. Chrome checked 320/390/768/820/960/1024/1440px, 44px navigation actions, stable heights, Escape/focus, dark mode, reduced motion, overlay layers and real generated-WAV playback/public continuity/admin pause/source replacement. Batches 2–3 were additionally checked at 1440/1024/820/768/390px across eight public routes plus login → seven author screens, the 390px admin drawer, table scrolling and the editor. API data was browser-fixtured; no backend or existing user data was changed.
+
+### Page layout notes
+
+- `components/post/ArticleList.vue` is the single article-row language shared by home, search and tag; it never reserves a cover slot and drops thumbnails that fail to load.
+- Home builds its introduction from real site settings; the decorative image is the first usable cover from the first successful response and stays fixed for the visit.
+- Reader pages render title/metadata before the optional cover; the side TOC and the mobile sheet share a 1020px breakpoint.
+- Admin pages share one heading/hierarchy pattern; `AdminLayout` owns the drawer's focus, Escape and scroll lock, and the album manager reuses the shared `Modal` instead of its own overlay.
 
 ## Security
 

@@ -62,7 +62,7 @@ src/
 │   └── admin/      # 后台组件 (SiteAssetField)
 ├── composables/    # 组合式函数 (useConfirm / useScrollState / useMarkdownEnhance / useSeoMeta / usePagination / useScrollReveal)
 ├── router/         # 路由配置
-├── stores/         # Pinia 状态管理 (site / theme / user)
+├── stores/         # Pinia 状态管理 (site / theme / user / music)
 ├── styles/         # 样式文件（入口 main.css）
 ├── utils/          # 工具函数 (crypto / logger / toast / visitor / reading)
 └── views/          # 页面组件 (45 个)
@@ -71,7 +71,11 @@ src/
 ## 主要特性
 
 - 单人作者博客：访客只读、搜索、匿名点赞与留言；写作与管理需要管理员登录
-- 「清爽科技蓝」设计系统：CSS 变量 token、深色模式、5 套皮肤、内置 SVG 图标
+- 清透空间设计底座：CSS 变量 token、深色模式、5 套皮肤、内置 SVG 图标；正文实底，导航与临时控件按需使用玻璃
+- 文章列表统一由 `components/post/ArticleList.vue` 渲染；首页、搜索、标签共用同一套行样式，无封面不留占位图
+- 阅读页把标题/时间/阅读时长放在封面之前；目录侧栏与移动端抽屉共用 1020px 断点
+- 后台使用同一套「标题 + 说明 + 内容区」层级；抽屉的焦点、Esc 与滚动锁由 `AdminLayout` 的 `useDialog` 统一负责
+- 导航音乐：单一 headless 音频宿主，不自动播放，公开换页连续，进入后台暂停；控件不创建额外 audio
 - 阅读体验：目录（移动端抽屉）、代码复制/折叠、标题锚点、图片灯箱、按正文估算阅读时长
 - 站点品牌资源上传：Logo / 浏览器图标 / 作者头像 / 背景音乐（`SiteAssetField.vue`）
 - 生产为内嵌前端的单 JAR，前端无需独立部署
@@ -90,6 +94,13 @@ src/
   - `--code-bg` / `--code-text` / `--code-border` — 代码块，两种主题下都保持深色
   - `--contrast-bg` / `--contrast-bg-hover` / `--contrast-bg-active` / `--contrast-fg` — 高对比实心按钮（浅色模式近黑，深色模式自动反转为浅底深字）
 - 组件只引用语义 token，不直接写十六进制色值
+- 圆角：按钮/输入框 8px，内容分组 12–14px，面板 16px；细长导航、圆形头像/播放键才用 `--radius-full`
+- `.functional-glass` 是显式功能层，不要把旧 `.glass` 正文卡片改为半透明；透明/高对比降级在 glassmorphism.css
+- `#overlay-root` 在 App 的主题根内、路由过渡外；模态层用 `useDialog`，不要另建 body 滚动计数或直接传送到裸 body
+- `MusicPlayer` 是唯一音频宿主，常驻 App；共享动作在 `stores/music.ts`，NavbarMusicControl 只消费状态。不可恢复自动播放或把音频移进面板
+- 文章行统一走 `components/post/ArticleList.vue`（首页/搜索/标签复用）；新增列表页面不要另写一套行标记
+- 后台页面沿用 `AdminLayout` 的「标题 + 说明 + 内容区」层级；列表/表格用容器横向滚动，不要靠隐藏列或缩字号适配
+- 后台抽屉的焦点、Esc 与滚动锁由 `AdminLayout` 内的 `useDialog` 负责；不要再用各自的 `bodyOverflowCount` 或固定 z-index 遮罩
 
 ## 路由约定
 

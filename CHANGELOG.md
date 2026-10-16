@@ -4,6 +4,94 @@
 
 ---
 
+## 未发布 — 清透空间重设计（三）：作者工作台 (2026-10-16)
+
+### 说明
+
+- 后台侧栏改为常驻紧凑结构：品牌 → 现有作者模块 → 主题切换/返回博客；导航选中态用浅色填充，触达区域 44px，不再使用文字符号图标。
+- 移动端抽屉接管焦点与滚动锁：Esc 关闭并把焦点还给菜单按钮，路由切换自动收起，`aria-expanded`/`aria-controls` 完整。
+- 登录页去掉仿 macOS 窗口装饰与网格背景，改为单一紧凑卡片；保留原有限制（用户名 3–20 位、密码 ≥8 位）、记住我、跳转校验与 busy 状态。
+- 概览、文章、标签、访客、评论、相册、设置统一「标题 → 说明 → 内容区」层级：去掉全大写英文标签与装饰性序号/星形符号，按钮/输入框 8px、分组卡 12–16px，表格在窄屏内横向滚动而不挤压列、也不隐藏关键操作。
+- 访客图表、热门页面、评论状态、相册上传与密码相册、设置分组（站点资料 / 后台与访客 / 评论与音乐 / 视觉主题）与字段语义保持不变；相册弹窗改用共享 Modal（层级、Esc、焦点回收与灯箱互不干扰）。
+- 写作页保留 Markdown 编辑、撤销重做、工具栏、预览、草稿、封面、分类、标签与发布流程，只把外壳与控件收敛到同一套表面/圆角/触达标准。
+
+### 验证
+
+- 前端 30 文件 / 328 测试通过；类型检查、Lint（0 错误）与生产构建通过。
+- 新增回归：侧栏路由/ Esc /焦点、编辑器草稿与发布、相册密码与灯箱、设置分组、公共页搜索/归档/关于/404 与 `ArticleList`。
+- Chrome 实测：8 条公开路由 × 1440/1024/820/768/390px 无横向溢出、无小于 32px 的操作控件；登录 → 7 个后台入口标题与选中态、暗色切换、390px 抽屉 + 滚动锁、表格横向滚动、写作页填写均通过；无页面错误。API 为浏览器测试数据，未改动既有数据库或上传目录。
+
+### 影响文件
+
+| 文件 | 改动类型 |
+|------|----------|
+| `frontend/src/views/admin/AdminLayout.vue` | 紧凑侧栏、抽屉焦点/滚动、主题切换 |
+| `frontend/src/views/admin/Dashboard.vue`、`Posts.vue`、`TagsManagement.vue`、`Visitors.vue`、`Comments.vue`、`Albums.vue`、`Settings.vue` | 统一层级与控制台样式；相册改用共享 Modal |
+| `frontend/src/views/auth/Login.vue` | 去掉窗口装饰，收敛登录卡片 |
+| `frontend/src/views/post/PostEdit.vue` | 编辑器外壳/工具栏/侧栏表面与圆角统一 |
+| `frontend/src/views/__tests__/`、`views/post/__tests__/`、`views/gallery/__tests__/`、`views/admin/__tests__/`、`components/post/__tests__/` | 新增/扩展行为回归 |
+| `README.md`、`frontend/README.md`、`frontend/CLAUDE.md` | 结构与验证记录 |
+
+---
+
+## 未发布 — 清透空间重设计（二）：公开阅读路径 (2026-10-16)
+
+### 说明
+
+- 新增 `ArticleList` 文章行组件（日期/分类 → 标题 → 摘要 → 标签/阅读时长，可选右侧缩略图，无封面不留空槽，缩略图加载失败自动移除），首页、搜索、标签共用同一套排版。
+- 首页改为「真实站点配置的介绍区 + 单列文章列表 + 224px 作者侧栏」，侧栏在 ≤960px 收起；介绍区装饰图取首批成功加载文章中的第一张封面并在本次停留内保持不变，无封面或加载失败使用中性底色，不额外请求接口。
+- 归档改成年月分组 + 文章行（保留全部翻页归档查询）；关于页改为作者资料主导；404 提供具名搜索与返回操作；页脚与返回顶部统一圆角、图标与 44px 触达，并遵循减少动效。
+- 阅读页把标题/摘要/时间/阅读时长提到封面之前；正文使用系统无衬线、约 760px 行宽，侧边目录与移动端抽屉断点统一到 1020px；保留净化链路、代码复制/折叠、标题锚点、灯箱、相邻文章、匿名点赞与留言。阅读进度改为按帧合并并支持取消。
+- 相册改用共享 Modal/ImagePreview：修复低于导航的遮罩层级、Esc、焦点回收与滚动锁；保留公开/密码相册与短期令牌流程，新增详情加载、失败重试与响应代际保护。
+
+### 验证
+
+- 新增 `ArticleList`、首页、公共页、相册与阅读页回归后，全量前端测试为 30 文件 / 328 测试通过；类型检查、Lint 与构建通过。
+- Chrome 实测 1440/1024/820/768/390px：公开路由无横向溢出，封面/侧栏/目录按断点重排，灯箱高于导航且关闭后相册仍打开。
+
+### 影响文件
+
+| 文件 | 改动类型 |
+|------|----------|
+| `frontend/src/components/post/ArticleList.vue` | 新增：共享文章行 |
+| `frontend/src/views/Home.vue`、`Archives.vue`、`About.vue`、`common/NotFound.vue`、`search/Search.vue`、`tag/TagDetail.vue` | 版式重做，复用文章行 |
+| `frontend/src/views/post/PostDetail.vue`、`components/post/MobileTocSheet.vue` | 阅读层级、进度按帧合并、目录断点 |
+| `frontend/src/views/gallery/Gallery.vue` | 接入共享浮层、失败重试与竞态保护 |
+| `frontend/src/components/layout/Footer.vue`、`components/common/BackToTop.vue` | 统一紧凑控件与减少动效 |
+
+---
+
+## 未发布 — 清透空间重设计（一）：紧凑导航与音乐 (2026-10-16)
+
+### 说明
+
+- 采用已确认的灰白画布、系统无衬线字体与小圆角层级；正文实底，玻璃仅用于功能层，并提供透明度/高对比/减少动效降级。保留作者皮肤及主色，派生相应软底与 hover 色。
+- 导航按品牌 → 搜索 → 图标文字链接 → 音乐/主题排列，桌面 52px、手机 50px，滚动不改高度、不隐藏；小屏保持 44px 工具触达，面板互斥并支持 Esc/外部点击/换页关闭。
+- 背景音乐从右下悬浮条移入导航，唯一音频宿主不自动播放；提供播放/暂停、有效进度、音量、单曲循环、行内错误与重试。公开换页连续，进入后台暂停，替换/禁用音源阻止旧异步播放恢复。
+- 弹窗、灯箱和目录使用统一主题浮层、顶部对话框键盘处理、焦点回收与滚动锁；灯箱重新打开时同步初始照片，无图片不锁页面。
+- 本批只完成底座/导航/音乐，不把仍待重做的首页、公开阅读页及作者工作台计为完成。无后端/API/schema/依赖改动。
+
+### 验证
+
+- 前端 23 文件 / 267 测试通过；类型检查、Lint（0 错误，272 既有警告）和生产构建通过。
+- Chrome 七档宽度、亮暗/减少动效、焦点与层级检查通过；生成 WAV 验证真实播放、公开换页连续、后台暂停与音源替换。API 为浏览器测试数据，未操作既有数据库或上传文件。
+
+### 影响文件
+
+| 文件 | 改动类型 |
+|------|----------|
+| `frontend/src/App.vue` | 常驻唯一音频宿主、稳定主题浮层与外观应用 |
+| `frontend/src/styles/{variables,dark-mode,skins,base,glassmorphism,components,typography,a11y}.css` | 紧凑 token、系统字体、功能玻璃与可访问降级 |
+| `frontend/src/stores/{music,site,theme}.ts` | 音频生命周期、主色推导、同步主题切换 |
+| `frontend/src/components/layout/{Navbar,NavbarMusicControl,MusicPlayer}.vue` | 响应式导航与音乐面板/宿主拆分 |
+| `frontend/src/composables/useDialog.ts` | 共享对话框栈、焦点与滚动管理 |
+| `frontend/src/components/common/{Modal,ImagePreview,Toast}.vue`、`icons.ts`、`components/post/MobileTocSheet.vue` | 浮层接入、图标与目录适配 |
+| `frontend/src/**/__tests__/` 相关测试 | 音频/导航/主题/浮层与回归用例 |
+| `docs/superpowers/specs/2026-10-16-selfblog-ios-glass-redesign-design.md`、`docs/superpowers/plans/2026-10-16-compact-glass-*.md` | 已确认设计与三批实施计划 |
+| `README.md`、`frontend/README.md`、`frontend/CLAUDE.md` | 已实现边界、结构与验证记录 |
+
+---
+
 ## 未发布 — 修复单 JAR 模式下静态 favicon 的 401 (2026-10-16)
 
 ### 修复
