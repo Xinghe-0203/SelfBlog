@@ -1,0 +1,41 @@
+# ============================================
+# 构建上下文排除文件（仓库根目录）
+# backend/docker-compose*.yml 使用 context: .. 构建，
+# 因此规则写在仓库根；真实密钥、既有数据与本地笔记都不进入镜像层。
+# ============================================
+
+# 环境与密钥
+**/.env
+**/.env.*
+**/*.pem
+**/*.key
+
+# 既有数据库与 WAL/SHM
+**/*.db
+**/*.db-wal
+**/*.db-shm
+**/*.sqlite
+**/*.sqlite3
+**/*-wal
+**/*-shm
+
+# 既有媒体（只应存在于宿主磁盘/数据卷）
+**/uploads
+**/gallery-media
+
+# 版本控制与本地工作笔记
+.git
+task_plan.md
+findings.md
+progress.md
+.superpowers
+
+# 依赖与构建产物（容器内重新安装/构建）
+**/node_modules
+**/target
+**/dist
+**/.vercel
+
+# 日志与临时文件
+**/*.log
+**/*.tmp

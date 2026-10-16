@@ -56,7 +56,21 @@ function upsertLink(rel: string, href: string): void {
 function absolute(url: string): string {
   if (!url) return ''
   if (/^https?:\/\//i.test(url)) return url
-  return window.location.origin + (url.startsWith('/') ? url : '/' + url)
+  const origin = canonicalOrigin()
+  return origin + (url.startsWith('/') ? url : '/' + url)
+}
+
+/**
+ * 服务端渲染的阅读 HTML 会带上 selfblog-site-origin（配置的站点对外地址）。
+ * 反向代理/预览域名与正式域名不同时，canonical 与分享图必须沿用它，
+ * 否则挂载瞬间就会把服务端写好的地址改回请求主机。Vite 本地开发没有该标记时回落浏览器 origin。
+ */
+function canonicalOrigin(): string {
+  const marker = document.head
+    .querySelector<HTMLMetaElement>('meta[name="selfblog-site-origin"]')
+    ?.content.trim()
+  if (marker && /^https?:\/\/[^/?#\s\\]+$/i.test(marker)) return marker.replace(/\/+$/, '')
+  return window.location.origin
 }
 
 export function applySeoMeta(meta: SeoMeta): void {

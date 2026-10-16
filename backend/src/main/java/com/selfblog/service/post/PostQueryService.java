@@ -24,6 +24,12 @@ public interface PostQueryService extends IService<BlogPost> {
      */
     PostDetailResponse getPostDetail(Long postId);
 
+    /** Published-only public document; unlike author detail, never exposes an unpublished post. No counters. */
+    PostDetailResponse getPublishedPostDetail(Long postId);
+
+    /** Stable ID-ordered metadata pagination for discovery; size1..1000, no body selected. */
+    IPage<BlogPost> getPublishedMetadata(long page, long size);
+
     /**
      * 分页查询文章列表
      */

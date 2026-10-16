@@ -47,3 +47,4 @@ node_modules/
 *.db-wal
 *.db-shm
 backend/gallery-media/
+**/.vercel/

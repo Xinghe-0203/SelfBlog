@@ -1,0 +1,64 @@
+# ============================================
+# SelfBlog - Docker Compose 配置（SQLite 方案）
+# 只有应用服务：SQLite 文件、上传与相册媒体全部持久化到命名卷。
+#
+# 与 docker-compose.yml（MySQL）二选一，不要同时启动。
+# 已有数据库不会自动迁移：把既有 campus_blog.db 放进 sqlite_data 卷
+# 或改用 MySQL 方案，再启动本文件。
+#
+# 使用：docker compose -f backend/docker-compose.sqlite.yml up -d --build
+# ============================================
+
+services:
+  app:
+    build:
+      # 上下文为仓库根：镜像里同时构建 backend 与内嵌的 frontend
+      context: ..
+      dockerfile: backend/Dockerfile
+    container_name: selfblog-app
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      # 显式选择 SQLite；数据库文件与 WAL/SHM 同目录持久化
+      DB_TYPE: sqlite
+      DB_URL_SQLITE: jdbc:sqlite:/app/data/campus_blog.db
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRATION: ${JWT_EXPIRATION:-86400000}
+      JWT_REFRESH_EXPIRATION: ${JWT_REFRESH_EXPIRATION:-604800000}
+      SERVER_PORT: 8825
+      # 站点对外地址（RSS/Atom/sitemap/canonical 的绝对链接）。
+      # 放在 HTTPS 反向代理后请显式设置，例如：
+      # SITE_BASE_URL: https://blog.example.com
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:8825}
+      SPRING_PROFILES_ACTIVE: prod
+    ports:
+      - "127.0.0.1:8825:8825"
+    volumes:
+      # 数据库、上传、相册媒体：升级镜像不会清空
+      - sqlite_data:/app/data
+      - app_uploads:/app/uploads
+      - app_gallery_media:/app/gallery-media
+    healthcheck:
+      # curl 已由运行镜像安装，健康检查与镜像内容一致
+      test: ["CMD", "curl", "-f", "http://localhost:8825/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+    logging:
+      driver: json-file
+      options:
+        max-size: 50m
+        max-file: '5'
+
+# ============================================
+# 卷配置（数据持久化）
+# ============================================
+volumes:
+  sqlite_data:
+    driver: local
+  app_uploads:
+    driver: local
+  app_gallery_media:
+    driver: local

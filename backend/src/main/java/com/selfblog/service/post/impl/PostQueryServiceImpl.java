@@ -81,6 +81,29 @@ public class PostQueryServiceImpl extends ServiceImpl<BlogPostMapper, BlogPost> 
             }
         }
 
+        return assemblePostDetail(post);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PostDetailResponse getPublishedPostDetail(Long postId) {
+        BlogPost post = getOne(new LambdaQueryWrapper<BlogPost>()
+                .eq(BlogPost::getId, postId).eq(BlogPost::getStatus, PostStatus.PUBLISHED.getValue()));
+        if (post == null) throw new BusinessException(404, "文章不存在");
+        return assemblePostDetail(post);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public IPage<BlogPost> getPublishedMetadata(long page, long size) {
+        if (page < 1 || size < 1 || size > 1000 || page > Long.MAX_VALUE / size) throw new IllegalArgumentException("Invalid metadata page");
+        return page(new Page<>(page, size), new LambdaQueryWrapper<BlogPost>()
+                .select(BlogPost::getId, BlogPost::getTitle, BlogPost::getSummary, BlogPost::getCategory,
+                        BlogPost::getCoverUrl, BlogPost::getCreateTime, BlogPost::getUpdateTime)
+                .eq(BlogPost::getStatus, PostStatus.PUBLISHED.getValue()).orderByAsc(BlogPost::getId));
+    }
+
+    private PostDetailResponse assemblePostDetail(BlogPost post) {
         PostDetailResponse response = new PostDetailResponse();
         response.setId(post.getId());
         response.setUserId(post.getUserId());

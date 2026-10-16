@@ -1,0 +1,114 @@
+package com.selfblog.service.site.seo;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.selfblog.common.exception.BusinessException;
+import org.jsoup.Jsoup;
+import org.jsoup.nodes.Document;
+import org.jsoup.nodes.Element;
+import org.springframework.stereotype.Component;
+
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * 把构建产物 index.html 克隆成每次请求独立的公开阅读文档。
+ *
+ * <p>head 中的 title/description/robots/canonical/OG/Twitter/JSON-LD 全部重建，
+ * 避免旧值与服务器渲染值叠加；Vite 的哈希资源、图标与订阅发现引用原样保留。
+ */
+@Component
+public class ReadingHtmlRenderer {
+
+    private final ReadingTemplate template;
+    private final ReadingContent content = new ReadingContent();
+    private final ObjectMapper json = new ObjectMapper();
+
+    public ReadingHtmlRenderer(ReadingTemplate template) {
+        this.template = template;
+    }
+
+    public String render(SeoModels.ReadingPage page, String origin) {
+        Document doc = Jsoup.parse(template.load());
+        Element head = doc.head();
+
+        head.select("title, meta[name=description], meta[name=robots], meta[property^=og:], meta[name^=twitter:], "
+                + "link[rel=canonical], meta[name=selfblog-site-origin], script[type=application/ld+json]").remove();
+
+        SeoModels.Meta meta = page.meta();
+        head.appendElement("meta").attr("name", "selfblog-site-origin").attr("content", origin);
+        head.appendElement("title").text(meta.title());
+        if (meta.description() != null && !meta.description().isBlank()) {
+            head.appendElement("meta").attr("name", "description").attr("content", meta.description());
+        }
+        head.appendElement("meta").attr("name", "robots").attr("content", meta.indexable() ? "index,follow" : "noindex,follow");
+
+        String canonical = absolute(origin, meta.path());
+        if (canonical != null) head.appendElement("link").attr("rel", "canonical").attr("href", canonical);
+        meta(head, "property", "og:type", meta.type() == null ? "website" : meta.type());
+        meta(head, "property", "og:title", meta.title());
+        if (meta.description() != null && !meta.description().isBlank()) meta(head, "property", "og:description", meta.description());
+        String image = absolute(origin, meta.image());
+        if (image != null) meta(head, "property", "og:image", image);
+        if (canonical != null) meta(head, "property", "og:url", canonical);
+        meta(head, "name", "twitter:card", "summary_large_image");
+        meta(head, "name", "twitter:title", meta.title());
+        if (meta.description() != null && !meta.description().isBlank()) meta(head, "name", "twitter:description", meta.description());
+        if (image != null) meta(head, "name", "twitter:image", image);
+
+        if (page.kind() == SeoModels.Kind.POST) appendJsonLd(head, page, canonical, image);
+
+        Element app = doc.getElementById("app");
+        if (app != null && page.kind() != SeoModels.Kind.SHELL) {
+            head.appendElement("link").attr("rel", "stylesheet").attr("href", "/seo-reading.css");
+            app.empty();
+            app.appendChild(content.render(page));
+        }
+        return doc.outerHtml();
+    }
+
+    /** 极简安全错误页：模板缺失或渲染失败时也返回可读、不可索引的文档。 */
+    public String error(int status) {
+        return "<!DOCTYPE html><html lang=\"zh-CN\"><head><meta charset=\"UTF-8\">"
+                + "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">"
+                + "<meta name=\"robots\" content=\"noindex,follow\"><title>页面暂时无法显示</title></head>"
+                + "<body><main><h1>页面暂时无法显示</h1><p>请稍后重试。</p></main></body></html>";
+    }
+
+    private void appendJsonLd(Element head, SeoModels.ReadingPage page, String canonical, String image) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("@context", "https://schema.org");
+        payload.put("@type", "BlogPosting");
+        payload.put("headline", page.displayTitle());
+        if (canonical != null) payload.put("mainEntityOfPage", canonical);
+        if (image != null) payload.put("image", List.of(image));
+        SeoModels.Meta meta = page.meta();
+        if (meta.description() != null && !meta.description().isBlank()) payload.put("description", meta.description());
+        if (meta.publishedTime() != null) payload.put("datePublished", meta.publishedTime());
+        if (meta.author() != null) payload.put("author", Map.of("@type", "Person", "name", meta.author()));
+        if (page.site() != null && page.site().title() != null && !page.site().title().isBlank()) {
+            payload.put("publisher", Map.of("@type", "Organization", "name", page.site().title()));
+        }
+        try {
+            String jsonText = json.writeValueAsString(payload)
+                    .replace("<", "\\u003c")
+                    .replace("\u2028", "\\u2028")
+                    .replace("\u2029", "\\u2029");
+            Element script = head.appendElement("script").attr("type", "application/ld+json")
+                    .attr("id", "selfblog-article-jsonld");
+            script.appendChild(new org.jsoup.nodes.DataNode(jsonText));
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            throw new BusinessException(500, "页面元数据生成失败");
+        }
+    }
+
+    private static void meta(Element head, String attr, String key, String value) {
+        head.appendElement("meta").attr(attr, key).attr("content", value);
+    }
+
+    private String absolute(String origin, String pathOrUrl) {
+        if (pathOrUrl == null || pathOrUrl.isBlank() || origin == null) return null;
+        String value = SiteOrigin.absolute(origin, pathOrUrl);
+        return value.isEmpty() ? null : value;
+    }
+}

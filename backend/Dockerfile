@@ -1,89 +1,62 @@
 # ============================================
 # SelfBlog - Dockerfile
 # 多阶段构建：Build Stage + Runtime Stage
+#
+# 构建上下文必须是仓库根目录（backend 与 frontend 是同级目录）：
+#   docker build -f backend/Dockerfile -t selfblog .
+# 或使用 backend/docker-compose*.yml（已配置 context: ..）。
 # ============================================
 
 # ============================================
 # Stage 1: Build Stage
-# 使用 JDK 21 构建应用
+# Maven 与 JDK 21 都来自同一个官方镜像，构建机不需要本机 Maven/Node。
+# frontend-maven-plugin 会在容器内安装锁定的 Node 24 / npm 并执行 npm ci。
 # ============================================
-FROM eclipse-temurin:21-jdk AS build
+FROM maven:3.9-eclipse-temurin-21 AS build
 
-# 设置工作目录
 WORKDIR /build
 
-# 复制 Maven 配置文件（利用 Docker 缓存层）
-COPY pom.xml .
+# 先复制后端声明与源码；前端目录与 backend 同级，插件通过 ../frontend 找到它。
+COPY backend/pom.xml backend/pom.xml
+COPY backend/src backend/src
+COPY frontend/ frontend/
 
-# 下载依赖（单独一层，利用缓存）
-RUN mvn dependency:go-offline -B
-
-# 复制源代码
-COPY src ./src
-
-# 构建应用（跳过测试以加快构建速度）
-RUN mvn clean package -DskipTests
+# 产出 target/selfblog.jar（finalName=selfblog），前端已内嵌为 static。
+RUN mvn -B -f backend/pom.xml clean package -DskipTests
 
 # ============================================
 # Stage 2: Runtime Stage
-# 使用 JRE 21 运行应用（镜像更小）
+# 只保留 JRE、JAR 与健康检查工具；非 root 运行。
 # ============================================
-FROM eclipse-temurin:21-jre-alpine AS runtime
+FROM eclipse-temurin:21-jre AS runtime
 
-# ============================================
-# 安全配置：创建非 root 用户运行应用
-# ============================================
-# 创建应用目录
-RUN mkdir -p /app/uploads && \
-    addgroup -g 1001 -S appgroup && \
-    adduser -u 1001 -S appuser -G appgroup
+# curl 供 HEALTHCHECK 使用，镜像内必须真实存在（不再声明未安装的 wget）。
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/* \
+    && groupadd -g 1001 appgroup \
+    && useradd -u 1001 -g appgroup -m -s /usr/sbin/nologin appuser
 
-# 设置工作目录
 WORKDIR /app
 
-# 复制构建产物（从上一个阶段）
-COPY --from=build /build/target/backend-0.0.1-SNAPSHOT.jar app.jar
+# 复制唯一的运行产物。数据库、上传与相册媒体都放到容器外的持久化卷。
+COPY --from=build /build/backend/target/selfblog.jar /app/selfblog.jar
 
-# 复制初始化脚本
-COPY entrypoint.sh /app/entrypoint.sh
+RUN mkdir -p /app/data /app/uploads /app/gallery-media \
+    && chown -R appuser:appgroup /app
 
-# 创建上传目录（持久化）并设置权限
-RUN chown -R appuser:appgroup /app
-
-# 安装 wget 用于健康检查（非 root 用户可执行）
-RUN apk add --no-cache wget mysql-client
-
-# 设置生产环境Profile
-ENV SPRING_PROFILES_ACTIVE=prod
-
-# ============================================
-# 环境变量配置
-# ============================================
-# 默认环境变量（生产环境应通过 -e 参数或 env_file 覆盖）
+# 默认环境变量（生产请通过 env_file / -e 覆盖敏感值）。
+# SQLite 的位置由 DB_URL_SQLITE 决定，指南中指向 /app/data。
 ENV SERVER_PORT=8825 \
-    JAVA_OPTS="-Xms512m -Xmx1024m -XX:+UseG1GC" \
     TZ=Asia/Shanghai
 
-# 暴露端口
 EXPOSE 8825
 
-# ============================================
-# 健康检查配置
-# ============================================
-# 检查应用健康状态：等待 30 秒后开始检查，每 10 秒检查一次，超时 5 秒
-# 如果连续 3 次检查失败则认为容器不健康
-# 使用 Spring Actuator health 端点而非 Knife4j API 文档页面
+# 数据库就绪由 Compose 的 depends_on: condition: service_healthy 负责，
+# 应用自身仍会在启动时校验 JWT_SECRET / ADMIN_PASSWORD / 数据库配置。
 HEALTHCHECK --interval=10s --timeout=5s --start-period=60s --retries=3 \
-    CMD wget -qO- http://localhost:8825/actuator/health >/dev/null 2>&1 || exit 1
+    CMD curl -f http://localhost:8825/actuator/health || exit 1
 
-# ============================================
-# 启动配置
-# ============================================
-# 设置入口点脚本执行权限（必须在 USER 之前执行）
-RUN chmod +x /app/entrypoint.sh
-
-# 切换到非 root 用户
 USER appuser
 
-# 入口脚本处理环境变量和数据库迁移
-ENTRYPOINT ["/app/entrypoint.sh"]
+ENTRYPOINT ["java", "-jar", "/app/selfblog.jar"]

@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc --noEmit && vite build",
+    "build:vercel-proxy": "node scripts/build-vercel-proxy.mjs",
+    "test:deployment": "node --test scripts/__tests__/*.test.mjs",
     "preview": "vite preview",
     "lint": "eslint src --fix",
     "lint:check": "eslint src",

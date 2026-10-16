@@ -186,9 +186,10 @@ public class SecurityConfig {
                     // /feed.xml、/atom.xml、/sitemap.xml 带扩展名，不会被下面的 SPA 回退
                     // （[^\.]* 只匹配不含点号的路径）命中，必须单独放行，否则会落到
                     // 末尾「仅 ROLE_admin」的兜底规则返回 401，订阅器与爬虫都取不到。
-                    // /favicon.svg 同理：它是 index.html 的默认图标兜底。
-                    authorize.requestMatchers("/", "/index.html", "/assets/**", "/favicon.ico", "/favicon.svg",
-                            "/robots.txt", "/feed.xml", "/atom.xml", "/sitemap.xml",
+                    // /favicon.svg 同理：它是 index.html 的默认图标兜底；
+                    // /seo-reading.css 是服务端阅读 HTML 的局部样式。
+                    authorize.requestMatchers("/", "/index.html", "/assets/**", "/favicon.ico", "/favicon.svg", "/seo-reading.css",
+                            "/robots.txt", "/feed.xml", "/atom.xml", "/sitemap.xml", "/sitemap-site.xml", "/sitemap-*.xml",
                             "/{path:^(?!api$|assets$|uploads$|actuator$|v3$|swagger-ui$|doc\\.html$)[^\\.]*$}",
                             "/{path:^(?!api$|assets$|uploads$|actuator$|v3$|swagger-ui$|doc\\.html$)[^\\.]*$}/**").permitAll();
                 }

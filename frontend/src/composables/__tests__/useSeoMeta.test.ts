@@ -5,7 +5,7 @@ import { pageSeo } from '../usePageSeo'
 beforeEach(() => {
   document.head
     .querySelectorAll(
-      'meta[property^="article:"], meta[name="description"], script[type="application/ld+json"]'
+      'meta[property^="article:"], meta[name="description"], script[type="application/ld+json"], meta[name="selfblog-site-origin"]'
     )
     .forEach((node) => node.remove())
   setSeoSiteTitle('博客')
@@ -54,6 +54,42 @@ describe('page metadata lifecycle', () => {
     expect(document.head.querySelector('meta[property="article:published_time"]')).toBeNull()
     expect(document.head.querySelector('meta[name="robots"]')?.getAttribute('content')).toBe(
       'noindex,follow'
+    )
+  })
+  it('uses the server-provided canonical origin instead of the request host', () => {
+    document.head.insertAdjacentHTML(
+      'beforeend',
+      '<meta name="selfblog-site-origin" content="https://blog.example.com">'
+    )
+    applySeoMeta({ title: '文章', url: '/post/9', image: '/uploads/a.jpg', type: 'article' })
+    applyArticleJsonLd({ title: '文章', url: '/post/9', image: '/uploads/a.jpg' })
+    expect(document.head.querySelector('link[rel="canonical"]')?.getAttribute('href')).toBe(
+      'https://blog.example.com/post/9'
+    )
+    expect(document.head.querySelector('meta[property="og:url"]')?.getAttribute('content')).toBe(
+      'https://blog.example.com/post/9'
+    )
+    expect(document.head.querySelector('meta[property="og:image"]')?.getAttribute('content')).toBe(
+      'https://blog.example.com/uploads/a.jpg'
+    )
+    expect(document.getElementById('selfblog-article-jsonld')?.textContent).toContain(
+      'https://blog.example.com/post/9'
+    )
+  })
+  it('falls back to the browser origin when no server marker exists', () => {
+    applySeoMeta({ title: '文章', url: '/post/9' })
+    expect(document.head.querySelector('link[rel="canonical"]')?.getAttribute('href')).toBe(
+      `${window.location.origin}/post/9`
+    )
+  })
+  it('ignores a malformed server marker instead of emitting a broken canonical URL', () => {
+    document.head.insertAdjacentHTML(
+      'beforeend',
+      '<meta name="selfblog-site-origin" content="javascript:alert(1)">'
+    )
+    applySeoMeta({ title: '文章', url: '/post/9' })
+    expect(document.head.querySelector('link[rel="canonical"]')?.getAttribute('href')).toBe(
+      `${window.location.origin}/post/9`
     )
   })
 })

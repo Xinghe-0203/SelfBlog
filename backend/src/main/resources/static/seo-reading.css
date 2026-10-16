@@ -1,0 +1,159 @@
+/* 服务端阅读区域样式：只作用于 .seo-reading，Vue 挂载替换该区域后不再影响应用。 */
+.seo-reading {
+  --seo-accent: #165dff;
+  max-width: var(--seo-width, 920px);
+  margin-inline: auto;
+  padding: 32px 24px 64px;
+  color: #1f2933;
+  background: transparent;
+  font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'PingFang SC',
+    'Microsoft YaHei', sans-serif;
+  line-height: 1.8;
+  overflow-wrap: anywhere;
+}
+.seo-reading a {
+  color: var(--seo-accent);
+  text-decoration: none;
+}
+.seo-reading a:hover {
+  text-decoration: underline;
+}
+.seo-reading .seo-nav nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid rgba(128, 128, 128, 0.25);
+  font-size: 14px;
+}
+.seo-reading h1 {
+  margin: 24px 0 10px;
+  font-size: 28px;
+  line-height: 1.35;
+}
+.seo-reading h2 {
+  margin: 32px 0 12px;
+  font-size: 19px;
+}
+.seo-reading .seo-heading p,
+.seo-reading .seo-post-meta,
+.seo-reading .seo-hint,
+.seo-reading .seo-empty {
+  color: #52606d;
+  font-size: 14px;
+}
+.seo-reading .seo-entries {
+  display: grid;
+  gap: 18px;
+  margin: 18px 0 24px;
+  padding: 0;
+  list-style: none;
+}
+.seo-reading .seo-entries li {
+  display: grid;
+  gap: 6px;
+}
+.seo-reading .seo-entries a {
+  font-size: 17px;
+  font-weight: 600;
+}
+.seo-reading .seo-entries time,
+.seo-reading .seo-count {
+  color: #7b8794;
+  font-size: 13px;
+}
+.seo-reading .seo-entries p {
+  margin: 0;
+  color: #3e4c59;
+  font-size: 14px;
+}
+.seo-reading .seo-count {
+  margin-left: 8px;
+}
+.seo-reading .seo-body {
+  font-size: 16px;
+}
+.seo-reading .seo-body img,
+.seo-reading .seo-cover {
+  max-width: 100%;
+  height: auto;
+  border-radius: 10px;
+}
+.seo-reading .seo-body pre {
+  padding: 14px 16px;
+  overflow-x: auto;
+  border-radius: 10px;
+  background: #1f2933;
+  color: #f5f7fa;
+}
+.seo-reading .seo-body code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+.seo-reading .seo-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-top: 32px;
+  padding-top: 18px;
+  border-top: 1px solid rgba(128, 128, 128, 0.25);
+}
+.seo-reading .seo-author,
+.seo-reading .seo-site {
+  margin-top: 28px;
+  padding: 20px;
+  border: 1px solid rgba(128, 128, 128, 0.25);
+  border-radius: 12px;
+}
+.seo-reading .seo-author h2,
+.seo-reading .seo-site h2 {
+  margin-top: 0;
+}
+
+/* 受控外观：与页面管理的白名单取值一致 */
+.seo-reading.seo-bg-soft {
+  background: rgba(128, 128, 128, 0.06);
+  border-radius: 14px;
+}
+.seo-reading.seo-bg-paper {
+  background: rgba(216, 194, 153, 0.14);
+  border-radius: 14px;
+}
+.seo-reading.seo-width-narrow {
+  --seo-width: 760px;
+}
+.seo-reading.seo-width-wide {
+  --seo-width: 1100px;
+}
+.seo-reading.seo-density-compact {
+  line-height: 1.6;
+  padding-block: 20px 40px;
+}
+.seo-reading.seo-density-comfortable {
+  line-height: 2;
+  padding-block: 44px 80px;
+}
+
+@media (max-width: 600px) {
+  .seo-reading {
+    padding: 20px 18px 48px;
+  }
+  .seo-reading h1 {
+    font-size: 24px;
+  }
+}
+@media (prefers-color-scheme: dark) {
+  .seo-reading {
+    color: #e4e7eb;
+  }
+  .seo-reading .seo-heading p,
+  .seo-reading .seo-post-meta,
+  .seo-reading .seo-hint,
+  .seo-reading .seo-empty,
+  .seo-reading .seo-entries time,
+  .seo-reading .seo-count {
+    color: #9aa5b1;
+  }
+  .seo-reading .seo-entries p {
+    color: #cbd2d9;
+  }
+}
