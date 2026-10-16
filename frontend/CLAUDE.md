@@ -13,7 +13,8 @@ npm run build          # 构建生产版本（先 vue-tsc --noEmit，再 Vite）
 npm run preview        # 预览生产版本
 npm run lint:check     # 只读 ESLint 检查（npm run lint 会改写文件）
 npm run type-check     # vue-tsc --noEmit（必过闸门）
-npm run test:run       # Vitest 单次运行（当前 41 文件 / 389 tests；原始基线 210）
+npm run test:run       # Vitest 单次运行（当前 41 文件 / 392 tests；原始基线 210）
+npm run test:deployment # node:test：Vercel 代理生成器 + Docker/Compose 源契约（27 项）
 ```
 
 > 本机直接把 `npm run <script>` 跑在系统 PATH 上会失败（PATH 里有一条不配对的引号，
@@ -109,6 +110,8 @@ src/
 - 公开页面配置由 stores/pages + usePageConfig 消费；草稿只在后台编辑器/预览上下文，不能写进公开store或localStorage。PageFrame的局部变量不能覆盖全站主题，未配置时保持原比例
 - 页面预览通过空srcdoc真实视口挂载相同安全组件；不要把作者正文拼进srcdoc，不创建公开草稿URL，也不要为预览放宽X-Frame-Options。预览禁止修改文档head
 - 页面编辑/导航写入必须携带revision；只把提交快照标记为保存成功，跨页/卸载后忽略迟到响应。恢复默认只改草稿，发布需明确操作
+- 服务端阅读HTML由JAR按请求组装（`backend/.../service/site/seo/`），Vue挂载会整体替换`#app`内的`.seo-reading`：不要给它加跨页面依赖或期望它存活。`useSeoMeta`优先读取`meta[name=selfblog-site-origin]`确定canonical/分享图origin，Vite本地开发无标记时才回落浏览器origin
+- `vercel.json`不再部署第二份静态前端：`framework:null` + `scripts/build-vercel-proxy.mjs`生成Build Output v3转发到同一源站。不要恢复Vite自动预设、独立`dist`发布或写死域名；部署契约测试用`npm run test:deployment`
 
 ## 路由约定
 

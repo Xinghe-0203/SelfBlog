@@ -57,7 +57,7 @@ Substitute only the test selector. Fromfrontend prepend`../backend/target/fronte
 
 Files: create SiteOrigin/SafeMarkdown and `backend/src/test/java/com/selfblog/service/site/seo/{SiteOriginTest,SafeMarkdownTest}.java`; updatepom with a pinned CommonMark dependency.
 
-- [ ] Write pure unit tests before classes exist. Assertions include:
+- [x] Write pure unit tests before classes exist. Assertions include:
 
 ```java
 var request = new MockHttpServletRequest();
@@ -68,29 +68,29 @@ assertThrows(IllegalArgumentException.class, () -> new SiteOrigin("https://user:
 assertFalse(new SafeMarkdown().render("<script>alert(1)</script>\n\n[x](javascript:alert(1))").contains("<script"));
 ```
 
-- [ ] Run targetedtest selectors and record missing-featureRED, not unrelated environment failure.
-- [ ] Implement URI validation (scheme/host/port/root-only/no credentials/query/fragment/backslash/control/multivalue); strip trailingroot slash and defaultport. Use direct request origin only when blankconfigured. SafeMarkdown escapesrawHTML, sanitizesrenderedHTML with explicit protocols and noevents/style/frames/SVG.
-- [ ] Run targeted testsGREEN, including relative links/images and heading/code preservation. Add backendREADME dependency/origin notes with actual validation.
+- [x] Run targetedtest selectors and record missing-featureRED, not unrelated environment failure.
+- [x] Implement URI validation (scheme/host/port/root-only/no credentials/query/fragment/backslash/control/multivalue); strip trailingroot slash and defaultport. Use direct request origin only when blankconfigured. SafeMarkdown escapesrawHTML, sanitizesrenderedHTML with explicit protocols and noevents/style/frames/SVG.
+- [x] Run targeted testsGREEN, including relative links/images and heading/code preservation. Add backendREADME dependency/origin notes with actual validation.
 
 ### Task2: Strict published query path
 
 Files: modify PostQueryService/Impl; test `backend/src/test/java/com/selfblog/service/post/PublishedPostQueryTest.java`. Read full controller→service→mapper→entity chain before edits; no new SQL needed when generatedqueries suffice.
 
-- [ ] Create H2 transactional tests: author-ownedstatus0 is404 onstrictmethod but existingmethod stillreturnsit; deleted/unpublished records absent; metadata body isnull; two pages are stable and have correcttotal.
+- [x] Create H2 transactional tests: author-ownedstatus0 is404 onstrictmethod but existingmethod stillreturnsit; deleted/unpublished records absent; metadata body isnull; two pages are stable and have correcttotal.
 
 ```java
 assertThrows(BusinessException.class, () -> queries.getPublishedPostDetail(unpublishedId));
 assertTrue(queries.getPublishedMetadata(1, 1000).getRecords().stream().allMatch(p -> p.getContent() == null));
 ```
 
-- [ ] RunPublishedPostQueryTest RED. Add strict generatedselect and factorprivate DTO assembly without changingoldauthorpolicy.
-- [ ] Run new and existing post query/controller testsGREEN; counts unchanged after public reads.
+- [x] RunPublishedPostQueryTest RED. Add strict generatedselect and factorprivate DTO assembly without changingoldauthorpolicy.
+- [x] Run new and existing post query/controller testsGREEN; counts unchanged after public reads.
 
 ### Task3: Published reading models and safe document rendering
 
 Files: create SeoModels/ReadingContent/ReadingPageService/ReadingHtmlRenderer/CSS; tests `ReadingPageServiceTest.java`, `ReadingHtmlRendererTest.java` inservice/site/seo.
 
-- [ ] Write tests with mocked owningservices (no mockedHtmlrenderoutput): postfullbody, publishedAbout/custom, homepagination, missing/illegal ID404, emptysite200, adminPath=pages precedence, privatealbum metadata only and template noindex. A representative model assertion:
+- [x] Write tests with mocked owningservices (no mockedHtmlrenderoutput): postfullbody, publishedAbout/custom, homepagination, missing/illegal ID404, emptysite200, adminPath=pages precedence, privatealbum metadata only and template noindex. A representative model assertion:
 
 ```java
 var page = reading.resolve("/pages/projects", null);
@@ -99,15 +99,15 @@ assertTrue(page.contentHtml().contains("项目正文"));
 verify(pages, never()).getEditor(anyString());
 ```
 
-- [ ] Add renderer tests using an explicit built-index fixture with hashedassets; parse output viaJsoup, assertarticletext/meta/canonical, one#app, safescriptJSON, no duplicated tags, retainedassets, no sharedDocmutation. Includemissingtemplate503 test.
-- [ ] Observe RED, implement models/content/classifier/document units, keep service methods readOnly. Lists bounded to existinghomepage size and100 forarchive/tag; unsafeURL/text neverrawconcatenated. NoUA branches or account queries.
-- [ ] Run focusedGREEN withXSS andmodule/stylecases. Template loadedlazily so test-only backend does not requirefrontendbuild; unavailabletemplate makesHTML503, not wholeAPIstartupfailure.
+- [x] Add renderer tests using an explicit built-index fixture with hashedassets; parse output viaJsoup, assertarticletext/meta/canonical, one#app, safescriptJSON, no duplicated tags, retainedassets, no sharedDocmutation. Includemissingtemplate503 test.
+- [x] Observe RED, implement models/content/classifier/document units, keep service methods readOnly. Lists bounded to existinghomepage size and100 forarchive/tag; unsafeURL/text neverrawconcatenated. NoUA branches or account queries.
+- [x] Run focusedGREEN withXSS andmodule/stylecases. Template loadedlazily so test-only backend does not requirefrontendbuild; unavailabletemplate makesHTML503, not wholeAPIstartupfailure.
 
 ### Task4: HTTP delivery and initial status/header contract
 
 Files: modify SpaController, SecurityConfig only for needednewrootXML patterns; create `backend/src/test/java/com/selfblog/controller/site/ReadingHtmlControllerTest.java`.
 
-- [ ] Add MockMvc tests (production/api prefix, MockBeanJwtUtils and realrendererfixture) foranonymousGET/HEAD: article200fulltext, custom404, missingpublic404, adminnoindex, index.html308, excludedassets/API notHTML, controlled500/503 noindex/no-store. Assertconfiguredorigin survives spoofedheaders.
+- [x] Add MockMvc tests (production/api prefix, MockBeanJwtUtils and realrendererfixture) foranonymousGET/HEAD: article200fulltext, custom404, missingpublic404, adminnoindex, index.html308, excludedassets/API notHTML, controlled500/503 noindex/no-store. Assertconfiguredorigin survives spoofedheaders.
 
 ```java
 mvc.perform(get("/post/1")).andExpect(status().isOk())
@@ -115,28 +115,28 @@ mvc.perform(get("/post/1")).andExpect(status().isOk())
    .andExpect(header().string("Cache-Control", "no-store"));
 ```
 
-- [ ] Observe forward-to-indexRED; replace forwarding with ResponseEntityHTML, preserve resource/API boundary andsecurity. Implementgeneric safeerrorswithoutstackdetails; no catch converting5xx into404.
-- [ ] Run focused plus security testsGREEN. GETandHEAD return sameheaders/status; HEAD has no body and performs no counters/writes.
+- [x] Observe forward-to-indexRED; replace forwarding with ResponseEntityHTML, preserve resource/API boundary andsecurity. Implementgeneric safeerrorswithoutstackdetails; no catch converting5xx into404.
+- [x] Run focused plus security testsGREEN. GETandHEAD return sameheaders/status; HEAD has no body and performs no counters/writes.
 
 ### Task5: Complete discovery documents
 
 Files: newSitemapService; modifySeoController; tests `SitemapServiceTest.java`, `DiscoveryControllerTest.java`. Readtag/site chains completely if addingpaginationmethods.
 
-- [ ] Create realH2 data with1001+posts andstoredpublishedpage/noindexsettings. Assertindex/shardunion containsallpublishedIDs exactlyonce, no drafts/deleted/search/admin; invalidshards404. Assertfeeds still100 anddynamicrobots changesafteradminPathsave.
-- [ ] RunRED, implementpagedmetadata andstabletag/customorder with1000-item shards, and sharedorigin. SiteXML usesrealpageconfig; parts notadvertisedwhenempty/disabled; XML escapes andactualdatesonly.
+- [x] Create realH2 data with1001+posts andstoredpublishedpage/noindexsettings. Assertindex/shardunion containsallpublishedIDs exactlyonce, no drafts/deleted/search/admin; invalidshards404. Assertfeeds still100 anddynamicrobots changesafteradminPathsave.
+- [x] RunRED, implementpagedmetadata andstabletag/customorder with1000-item shards, and sharedorigin. SiteXML usesrealpageconfig; parts notadvertisedwhenempty/disabled; XML escapes andactualdatesonly.
 
 ```java
 assertEquals(1000, Jsoup.parse(sitemaps.shard("posts", 1, base), "", Parser.xmlParser()).select("url").size());
 assertEquals(1, Jsoup.parse(sitemaps.shard("posts", 2, base), "", Parser.xmlParser()).select("url").size());
 ```
 
-- [ ] RunGREEN, enforce50000/50MiB failures rather than truncating. Keepfeedsoriginalpaths; removeoldprivatebaseUrl/rawforwardedlogic.
+- [x] RunGREEN, enforce50000/50MiB failures rather than truncating. Keepfeedsoriginalpaths; removeoldprivatebaseUrl/rawforwardedlogic.
 
 ### Task6: Client origin, pagination and metadata convergence
 
 Files: modify `frontend/src/composables/{useSeoMeta,usePageSeo}.ts` and affectedviews only if needed; extend `composables/__tests__/useSeoMeta.test.ts` andviewtests.
 
-- [ ] Add RED tests forserveroriginmarker, mountedpagecanonical, page2canonical, missing/errornoindex andduplicateheadcleanup:
+- [x] Add RED tests forserveroriginmarker, mountedpagecanonical, page2canonical, missing/errornoindex andduplicateheadcleanup:
 
 ```ts
 document.head.insertAdjacentHTML('beforeend', '<meta name="selfblog-site-origin" content="https://blog.example.com">')
@@ -144,17 +144,17 @@ applySeoMeta({ title: '文章', url: '/post/1' })
 expect(document.querySelector('link[rel="canonical"]')?.getAttribute('href')).toBe('https://blog.example.com/post/1')
 ```
 
-- [ ] Implementvalidatedoriginread withcurrentoriginfallbackforVite, no mutableglobalSiteStorewrite. Preservepreviewheadisolation. Alignvalidpagequeryclassification/canonical withserverandkeepcurrentdefaultlayout.
-- [ ] Runfocusedtests,typecheckthenfullfrontendgates; localrenderDOMmountsmoke verifiesfallbackdisappearsandoneaudioownerremains.
+- [x] Implementvalidatedoriginread withcurrentoriginfallbackforVite, no mutableglobalSiteStorewrite. Preservepreviewheadisolation. Alignvalidpagequeryclassification/canonical withserverandkeepcurrentdefaultlayout.
+- [x] Runfocusedtests,typecheckthenfullfrontendgates; localrenderDOMmountsmoke verifiesfallbackdisappearsandoneaudioownerremains.
 
 ### Task7: Full integration, evidence and scoped delivery
 
-- [ ] Runfullbackendtest (bothskips), frontend389+ tests/typecheck/lint/build/changedfileformat andpackage latestassets.
-- [ ] ExtendlocaldisposableSQLite/JAR runner: JSdisabledarticle/About/custombody, noindex/404, sitemapfollowallparts, strictdraftisolation, bothpublicationresponseorders; rerunold31flowsand7widthfoundationchecks.
-- [ ] Execute deployment-adapter tests andlocallygeneratedrouteproxy smoke; recordDocker/realVercellimits truthfully. Source review inline; reproduceactualfindingsREDbeforefix, rerunaffected/fullgates.
-- [ ] Update README/CHANGELOG/DEPLOY/spec/ADR and `docs/reviews/2026-10-16-seo-deployment-verification.md` withexactevidence, notpromisedindexing.
+- [x] Runfullbackendtest (bothskips), frontend389+ tests/typecheck/lint/build/changedfileformat andpackage latestassets.
+- [x] ExtendlocaldisposableSQLite/JAR runner: JSdisabledarticle/About/custombody, noindex/404, sitemapfollowallparts, strictdraftisolation, bothpublicationresponseorders; rerunold31flowsand7widthfoundationchecks.
+- [x] Execute deployment-adapter tests andlocallygeneratedrouteproxy smoke; recordDocker/realVercellimits truthfully. Source review inline; reproduceactualfindingsREDbeforefix, rerunaffected/fullgates.
+- [x] Update README/CHANGELOG/DEPLOY/spec/ADR and `docs/reviews/2026-10-16-seo-deployment-verification.md` withexactevidence, notpromisedindexing.
 - [ ] Scopedcommits only, preserveuserCLAUDE/scratch/data, pushperprioruserdeliveryrequest, verifyremoteSHA. Do notdeploytoexistingruntimeorcloudwithoutauthorization.
 
 ## Plan Review
 
-Spec sections1–7 map totasks1–4/6; section8 totask5; sections9–10 tolinkeddeploymentplan; section11 totask7. Interfaces above are the contracts used by downstreamtasks. Core anddeployment adapters can be tested independently; no new feature is inferred from optionalplatformaccess.
+Spec sections1�? map totasks1�?/6; section8 totask5; sections9�?0 tolinkeddeploymentplan; section11 totask7. Interfaces above are the contracts used by downstreamtasks. Core anddeployment adapters can be tested independently; no new feature is inferred from optionalplatformaccess.

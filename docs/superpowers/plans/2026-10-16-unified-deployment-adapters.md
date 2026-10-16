@@ -28,7 +28,7 @@ export function createProxyConfig(env) // returns {version:3,routes:[...]}; no f
 export async function writeProxyOutput(env, outputDirectory) // writes config and empty static dir only within explicit output dir
 ```
 
-- [ ] Write`node:test` REDbeforeimplementation forvalidrouteforwarding, missing/invalidorigins, samedomainandcurrentdeploymentloop, securityheaders/no-store andnonproductionnoindex. Useisolatedtempoutputtoshowthereisnoindex/assets, andsentinelfilesoutsideoutputarenottouched.
+- [x] Write`node:test` REDbeforeimplementation forvalidrouteforwarding, missing/invalidorigins, samedomainandcurrentdeploymentloop, securityheaders/no-store andnonproductionnoindex. Useisolatedtempoutputtoshowthereisnoindex/assets, andsentinelfilesoutsideoutputarenottouched.
 
 ```js
 const config = createProxyConfig({ SELFBLOG_BACKEND_ORIGIN: 'https://origin.example.com', SITE_BASE_URL: 'https://blog.example.com', VERCEL_ENV: 'production' })
@@ -37,16 +37,16 @@ assert.equal(config.routes.at(-1).dest, 'https://origin.example.com/$1')
 assert.throws(() => createProxyConfig({ SELFBLOG_BACKEND_ORIGIN: 'https://same.example', SITE_BASE_URL: 'https://same.example' }))
 ```
 
-- [ ] Runfromfrontend`node --test scripts/__tests__/vercel-proxy.test.mjs`; recordfeaturemissingRED.
-- [ ] ImplementURLvalidation, routesheaderpolicyandbuildwriter usingonlynodebuiltins. Destcatchall`/(.*)` preservespath/queryandhasnomethodfilter. Scriptfailsbeforewritingoninvalidconfiganddoesnotprintenvsecrets. Removeonlyownedoldconfig/staticoutput, neverprojectfiles.
-- [ ] Setvercel.jsonframeworknullanddedicatedbuildcommand; normalVitebuildscriptunchanged. Add`test:deployment`scriptcoveringthistestfileandDockerconfigtest.
-- [ ] RuntestsGREEN; checkscriptformatandsyntax, generatedconfigvalidJSONandnoreferencehost. DocumentnewVercelOtherpreset/envs/backendfirstrollout; noactualclouddeploy.
+- [x] Runfromfrontend`node --test scripts/__tests__/vercel-proxy.test.mjs`; recordfeaturemissingRED.
+- [x] ImplementURLvalidation, routesheaderpolicyandbuildwriter usingonlynodebuiltins. Destcatchall`/(.*)` preservespath/queryandhasnomethodfilter. Scriptfailsbeforewritingoninvalidconfiganddoesnotprintenvsecrets. Removeonlyownedoldconfig/staticoutput, neverprojectfiles.
+- [x] Setvercel.jsonframeworknullanddedicatedbuildcommand; normalVitebuildscriptunchanged. Add`test:deployment`scriptcoveringthistestfileandDockerconfigtest.
+- [x] RuntestsGREEN; checkscriptformatandsyntax, generatedconfigvalidJSONandnoreferencehost. DocumentnewVercelOtherpreset/envs/backendfirstrollout; noactualclouddeploy.
 
 ### Task2: Docker build and persistence
 
 Files: modifybackend/Dockerfile, backend/docker-compose.yml; create .dockerignore, backend/docker-compose.sqlite.yml and `frontend/scripts/__tests__/docker-config.test.mjs`.
 
-- [ ] WriteREDconfigtestsreadingsourcefiles: rootcontext/explicitbackend+frontendCOPY/Mavenimage/JREnonroot/selfblog.jar; no.envCOPY; allthreedatadirectories; sameMySQLvolume namesandnewgalleryvolume; SQLiteDBinthepersistentdatadir; healthtoolactuallyinstalled.
+- [x] WriteREDconfigtestsreadingsourcefiles: rootcontext/explicitbackend+frontendCOPY/Mavenimage/JREnonroot/selfblog.jar; no.envCOPY; allthreedatadirectories; sameMySQLvolume namesandnewgalleryvolume; SQLiteDBinthepersistentdatadir; healthtoolactuallyinstalled.
 
 ```js
 assert.match(dockerfile, /FROM maven:.*temurin-21/)
@@ -55,18 +55,18 @@ assert.match(mysqlCompose, /context: \.\./)
 assert.match(sqliteCompose, /jdbc:sqlite:\/app\/data\//)
 ```
 
-- [ ] Run`node --test scripts/__tests__/docker-config.test.mjs`RED. Implementroot-contextmultistagebuildwithMavenfrontendplugin; copyonlyruntimeJAR; installhealthchecktoolbeforeUSER; writabledata/uploads/gallery-mediaownedbynonroot.
-- [ ] RetainMySQLservice/defaultvolumesandlocalloopbackport; fixcontextandpersistgallery. AddseparateSQLiteComposewithdataandmedia volumes, explicitDB_TYPE/URL. Requiresecretswithoutbaking.env. Nochanginguser'sruntime.env.
-- [ ] RuntestsGREEN and, onlyifavailable,`docker compose -f backend/docker-compose.yml config --quiet`andSQLiteequivalentwiththrowawayenv; neverleaksecretsintooutput. WithoutDockerrecordblocked, notpassed.
-- [ ] UpdateDEPLOYupgradeinstructions: backupentiredatabase/WAL/media, exportoldunmountedgallerydir, existingMySQLmigrationversusnewemptySQL, noautomaticdatamove/volumeremoval. PairconfigcheckswithactualMavenpackaginginmainverification.
+- [x] Run`node --test scripts/__tests__/docker-config.test.mjs`RED. Implementroot-contextmultistagebuildwithMavenfrontendplugin; copyonlyruntimeJAR; installhealthchecktoolbeforeUSER; writabledata/uploads/gallery-mediaownedbynonroot.
+- [x] RetainMySQLservice/defaultvolumesandlocalloopbackport; fixcontextandpersistgallery. AddseparateSQLiteComposewithdataandmedia volumes, explicitDB_TYPE/URL. Requiresecretswithoutbaking.env. Nochanginguser'sruntime.env.
+- [x] RuntestsGREEN and, onlyifavailable,`docker compose -f backend/docker-compose.yml config --quiet`andSQLiteequivalentwiththrowawayenv; neverleaksecretsintooutput. WithoutDockerrecordblocked, notpassed.
+- [x] UpdateDEPLOYupgradeinstructions: backupentiredatabase/WAL/media, exportoldunmountedgallerydir, existingMySQLmigrationversusnewemptySQL, noautomaticdatamove/volumeremoval. PairconfigcheckswithactualMavenpackaginginmainverification.
 
 ### Task3: Local protocol smoke and final review
 
-- [ ] UsegeneratedroutingconfiginlocalproxyoverdisposableJAR toverifyHTML404/head/body, API401/POSTbody/auth, UTF8query, publicmediaRangeandprotectedalbumdenial. ThisisnotrealVercelvalidation.
-- [ ] Full`npm run test:deployment`andcoreplanregressions; inspectactualsource/lockchanges. Includefailedinputandsecret-safeerrors.
-- [ ] RecordDocker/realVercel/SMPTextensionsonlyifactuallyrun; noexistingservices/dataorcloudresourceschanged.
+- [x] UsegeneratedroutingconfiginlocalproxyoverdisposableJAR toverifyHTML404/head/body, API401/POSTbody/auth, UTF8query, publicmediaRangeandprotectedalbumdenial. ThisisnotrealVercelvalidation.
+- [x] Full`npm run test:deployment`andcoreplanregressions; inspectactualsource/lockchanges. Includefailedinputandsecret-safeerrors.
+- [x] RecordDocker/realVercel/SMPTextensionsonlyifactuallyrun; noexistingservices/dataorcloudresourceschanged.
 - [ ] Commit/pushonlyscopewithupdatedREADME/CHANGELOG/DEPLOYandverificationrecord, aspartofapproveddelivery.
 
 ## Plan Review
 
-Approvedspecsections9â€“10arecoveredbytasks1â€“2, section11bytask3andcoreplanTask7. URLsandheaderpolicyarepurefunctionsunderNodebuiltin tests; lifecycle/filesystemtestsusetempdirectories. Runtimecapabilitylimitsandproductiondomainconfigurationareexplicit, notsilentlyassumed.
+Approvedspecsections9â€?0arecoveredbytasks1â€?, section11bytask3andcoreplanTask7. URLsandheaderpolicyarepurefunctionsunderNodebuiltin tests; lifecycle/filesystemtestsusetempdirectories. Runtimecapabilitylimitsandproductiondomainconfigurationareexplicit, notsilentlyassumed.

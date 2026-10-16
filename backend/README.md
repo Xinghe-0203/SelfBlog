@@ -15,7 +15,8 @@ Spring Boot 3 backend for a single-author personal blog. Public visitors can rea
 | JWT | 0.12.6 | JWT |
 | Caffeine | 3.2.0 | Local cache |
 | Knife4j | 4.5.0 | API documentation |
-| Jsoup | 1.18.3 | XSS protection |
+| CommonMark | 0.24.0 | Server-side Markdown for crawlable reading HTML |
+| Jsoup | 1.18.3 | XSS protection and HTML assembly |
 | Hutool | 5.8.40 | Utility library |
 | Lombok | 1.18.42 | Code simplification |
 
@@ -191,7 +192,7 @@ Covering high-frequency queries: user post lists, category filtering, hot/latest
 ## Testing
 
 ```bash
-mvn test "-Dskip.npm=true" "-Dskip.installnodenpm=true"                 # 491 tests, ~1 min
+mvn test "-Dskip.npm=true" "-Dskip.installnodenpm=true"                 # 538 tests, ~1 min
 mvn test "-Dtest=AuthControllerTest" "-Dskip.npm=true" "-Dskip.installnodenpm=true"
 ```
 
@@ -235,9 +236,66 @@ audit passes **31/31**, including direct access to the packaged single-JAR front
 safe authenticated preview while retaining DENY frame headers. See [the verification record](../docs/reviews/2026-10-16-page-management-verification.md)
 for final evidence and limits; this does not verify MySQL or Docker.
 
+## Crawlable reading HTML and discovery documents
+
+History routes (`/`, `/archives`, `/about`, `/gallery`, `/post/{id}`, `/tag/{id}`, `/pages/{slug}`)
+now return server-rendered public reading HTML instead of an empty SPA shell. `SpaController`
+delegates to `ReadingPageService` + `ReadingHtmlRenderer`:
+
+- the built `static/index.html` is cloned per request so Vite's hashed assets, icons and feed
+  links stay intact; `#app` carries a semantic reading DOM that Vue replaces on mount;
+- head metadata (title, description, robots, canonical, Open Graph, Twitter, BlogPosting
+  JSON-LD) is rebuilt per request, with `<` escaped as `\u003c` inside JSON-LD;
+- only published content is exposed: `getPublishedPostDetail`/`getPublishedMetadata` live in
+  the owning `PostQueryService`, drafts stay 404 even for an authenticated admin, and reading
+  requests never increment view counts or visitor events;
+- `/index.html` answers `308` to `/`, unknown paths return a real 404, and data/render
+  failures return safe 5xx + `noindex` (missing build template → 503);
+- admin paths and legacy account routes keep the app shell with `noindex,follow`.
+
+`SiteOrigin` is the single canonical-origin resolver. Set `SITE_BASE_URL` to the public origin
+(e.g. `https://blog.example.com`) in production; once configured, spoofed `Host`/
+`X-Forwarded-*` headers cannot change canonical URLs, feeds or sitemap links. Leave it empty
+only for local development, where the direct request origin is used.
+
+Discovery endpoints (root path, no `/api` prefix):
+
+| Endpoint | Content |
+| --- | --- |
+| `/feed.xml`, `/atom.xml` | Published posts, newest first, capped at 100 items |
+| `/sitemap.xml` | Sitemap index referencing `sitemap-site.xml` and `sitemap-posts-N.xml`, `sitemap-tags-N.xml`, `sitemap-pages-N.xml` |
+| `/sitemap-site.xml` | Home/archives/about/gallery, honoring each published page's `indexable` |
+| `/sitemap-posts-N.xml` etc. | Shards of at most 1000 URLs, published-only, `lastmod` from real timestamps |
+| `/robots.txt` | Dynamic `Disallow` for the configured admin path, `/api/` and `/search`, plus the sitemap URL |
+
+The sitemap no longer shares the feed's 100-item query, so every published post/tag/page is
+discoverable; it never lists drafts, deleted posts, `/search` or index-disabled pages. An
+overflow beyond 50000 shards fails explicitly instead of truncating. Canonical origin and page
+`indexable` semantics remain consistent between the server response and the Vue runtime
+(`selfblog-site-origin` is read by `useSeoMeta`).
+
+### Running behind a reverse proxy or Vercel
+
+The JAR owns HTML, hashed assets, API, uploads and discovery documents; a CDN/proxy should
+forward every path unchanged (including `/uploads/**`) to that single origin. Vercel support in
+this repository only *proxies* to the JAR (no second static frontend), see
+[frontend/vercel.json](../frontend/vercel.json) and `frontend/scripts/vercel-proxy.mjs`.
+
+**Scope note:** returning crawlable HTML establishes the technical conditions for indexing;
+it does not prove that search engines have indexed the site, and no ranking is promised.
+
+The final full suite with this feature passes **538 tests / 0 failures / 0 errors / 0 skipped**.
+See [the verification record](../docs/reviews/2026-10-16-seo-deployment-verification.md) for the
+live evidence and its limits (real MySQL, Docker and a real Vercel deployment are not covered
+by the automated run).
+
 ## Docker status
 
-The container files (`Dockerfile`, `docker-compose.yml`) still target an older multi-module layout and do **not** build the single JAR correctly yet — the expected artifact name and the frontend build context are out of date. Until that setup is reworked, deploy with the single-JAR flow above.
+`Dockerfile` and `docker-compose.yml` now build the real single JAR from a **repository-root**
+build context (Maven + JDK 21 image, non-root JRE runtime, `curl` healthcheck), and
+`docker-compose.sqlite.yml` provides an explicit SQLite alternative. Keep the JAR+`.env` flow
+above when you do not need containers. Container images were not built or run in this
+environment (no Docker daemon); treat image execution as unverified.
 
 ## API Modules
 

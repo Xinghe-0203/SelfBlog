@@ -183,12 +183,32 @@ for tested workflows and untested deployment environments.
 - Navbar measures available width for primary/More links, preserving search/link/tool
   order and44px targets. The mobile menu contains the complete published navigation.
 - Runtime metadata clears old article/JSON-LD state and keeps missing/search/404/admin
-  pages noindex. Initial server HTML SEO remains a separate delivery batch.
+  pages noindex. Since the crawler batch, the server also returns readable HTML for these
+  routes; `useSeoMeta` reads the `selfblog-site-origin` meta to keep canonical/OG URLs on
+  the configured public origin instead of the proxy request host.
 
-Final feature gates: **41 files / 389 tests**, strict type-check, ESLint **0 errors /
-256 warnings**, touched-file format check and production build pass. Real-service **31/31**
-passes, including direct packaged-JAR pages,390px dark preview and both initial About response orders. See [the author guide](../docs/page-management.md)
-and [verification record](../docs/reviews/2026-10-16-page-management-verification.md).
+### Crawlable server HTML and the Vercel proxy (2026-10-16)
+
+- The JAR (not the SPA) now owns the first response for history routes: article/About/custom
+  bodies are readable without JavaScript, `#app` carries a semantic reading DOM that Vue
+  replaces on mount, and head metadata/status codes are rebuilt per request.
+- `useSeoMeta`/`usePageSeo` prefer the server's canonical origin marker; with no marker
+  (Vite dev) they fall back to the browser origin, and malformed markers are ignored.
+- `vercel.json` **no longer deploys a second static frontend**: `framework: null` plus
+  `scripts/build-vercel-proxy.mjs` generate Build Output API v3 routes that forward every
+  path/query/method to one backend origin with `no-store` and security headers. Preview
+  builds add `X-Robots-Tag: noindex,nofollow`, and invalid/self-referencing origins fail the
+  build instead of shipping an empty site.
+- `npm run test:deployment` covers the proxy generator and the Docker/Compose source
+  contracts with `node:test` (27 assertions). Running the Vite build still produces `dist/`
+  for the JAR; nothing about normal development or deployment changed.
+
+Gates for this batch: **41 files / 392 tests**, strict type-check, ESLint **0 errors /
+256 warnings**, touched-file format check and production build pass; `npm run test:deployment`
+passes 27/27. Real-service SQLite/Chrome evidence (JS-disabled reading, sitemap completeness,
+local proxy transport) is recorded in
+[the verification record](../docs/reviews/2026-10-16-seo-deployment-verification.md) — it does
+not cover a real Vercel deployment or Docker daemon.
 
 ### Shared layout conventions
 

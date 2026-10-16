@@ -106,8 +106,17 @@
 - 可新增 `/pages/<slug>` 内容页，保存草稿与发布分离，支持预览、下线、删除及导航名称/顺序管理
 - 内置页可在草稿中恢复默认；公开接口不泄露草稿，冲突版本不会静默覆盖
 - **保持当前全站字号与页面比例，不实施 110% 放大**；未配置页面继续使用原内容与作者主题
-- 操作与限制见[页面管理说明](docs/page-management.md)。服务端 HTML SEO 与部署补齐仍是后续批次，不代表已经收录
-- 本批验证：前端389 / 后端491项测试、类型/Lint/构建通过；[真实SQLite与单JAR浏览器记录及截图](docs/reviews/2026-10-16-page-management-verification.md)
+- 操作与限制见[页面管理说明](docs/page-management.md)
+- 上批验证：前端389 / 后端491项测试；[页面管理验证记录](docs/reviews/2026-10-16-page-management-verification.md)
+
+### 可抓取正文与发现（SEO 基础）
+- 文章、关于、自建内容页的**首次响应即为可读 HTML**（不执行 JavaScript 也能读正文）；Vue 挂载后照常接管交互
+- 每页重建标题/描述、canonical、robots、Open Graph、Twitter 与文章结构化数据；后台、搜索与 404 强制 noindex
+- `/sitemap.xml` 改为 index + 分片，覆盖全部已发布文章/标签/内容页（每片1000条）；RSS/Atom 仍保留最近100篇
+- `robots.txt` 按实际后台路径生成；`SITE_BASE_URL` 统一 canonical/订阅/地图的对外地址
+- 支持 Docker（MySQL 或 SQLite 二选一）与 **Vercel 统一反向代理**；不在 Vercel 单独部署第二份前端
+- 这些是“可被抓取”的技术条件，**不代表搜索引擎已经收录**；部署细节见[部署指南](backend/DEPLOY.md)
+- 本批验证：前端392 / 后端538项测试，部署契约27项；[SEO/部署验证记录](docs/reviews/2026-10-16-seo-deployment-verification.md)
 
 ### 界面与导航音乐
 - 灰白阅读表面、系统字体与紧凑圆角；玻璃效果仅用于导航和临时控件，深色与作者自定义主题保留

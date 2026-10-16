@@ -4,6 +4,34 @@
 
 ---
 
+## 未发布 — 可抓取正文与统一部署 (2026-10-16)
+
+### 说明
+
+- 公开历史路由（`/`、`/about`、`/archives`、`/gallery`、`/post/{id}`、`/tag/{id}`、`/pages/{slug}`）不再返回空壳 SPA：JAR 直接输出可阅读 HTML（禁用 JavaScript 也能读正文），Vue 挂载后照常接管交互。首次响应重建 title/description/robots/canonical/Open Graph/Twitter 与 BlogPosting 结构化数据，`/index.html` 308 到 `/`，未知路径返回真正 404，模板缺失返回 503。
+- 新增共享 `SiteOrigin`：设置 `SITE_BASE_URL` 后，canonical、分享图、订阅源、站点地图与 robots 都使用正式对外地址，伪造的 `Host`/`X-Forwarded-*` 不再影响；前端运行时读取 `selfblog-site-origin` 标记，避免挂载后把地址改回代理域名。
+- `/sitemap.xml` 改为 sitemap index + 分片（`sitemap-site.xml`、`sitemap-posts-N.xml`、`sitemap-tags-N.xml`、`sitemap-pages-N.xml`），每片最多 1000 条，覆盖**全部**已发布文章、标签与自建内容页，并遵循每页 `indexable`；RSS/Atom 保留最近 100 篇的既定上限。robots 按实际后台路径动态生成。
+- 公开 HTML/站点地图只读取已发布内容：管理员身份也不会让草稿出现在响应中；阅读请求不增加阅读量或访客事件。真实联调发现并修复了“内层 404 与外层共享事务导致缺失页面返回 500”的问题（`ReadingPageService` 不再声明类级事务）。
+- Vercel 改为**统一反向代理**：`frontend/vercel.json` 不再部署第二份静态前端，改为在构建期由 `scripts/build-vercel-proxy.mjs` 生成 Build Output API v3 路由，把原路径/方法/查询转发到同一源站，动态响应 `no-store`，Preview 环境附加 `X-Robots-Tag: noindex,nofollow`；非法、环回或自指的 origin 直接构建失败。
+- Docker 修复为可用形态：仓库根上下文、Maven+JDK21 构建阶段、JRE 非 root 运行、`curl` 健康检查、`selfblog.jar` 正确产物、数据/上传/相册三类持久化卷；保留既有 MySQL 方案卷名，另提供 SQLite Compose。本机无 Docker 守护进程，镜像运行未验证。
+- 全量验证：前端 41 文件/392 测试、类型检查、Lint 0 错误/256 警告、构建与部署契约 27/27；后端 540 测试通过。真实单 JAR + SQLite 联调 8/8（无 JS 抓取、站点地图完整性、下线 404、Vue 接管无重复、本地代理传输），见[验证记录](docs/reviews/2026-10-16-seo-deployment-verification.md)。
+- 保持已确认的界面与比例不变；不承诺搜索引擎收录或排名。Docker、真实 Vercel 部署、MySQL 运行仍未验证。
+
+### 影响文件
+
+| 文件 | 改动类型 |
+| --- | --- |
+| `backend/.../service/site/seo/{SiteOrigin,SafeMarkdown,SeoModels,ReadingTemplate,ReadingContent,ReadingHtmlRenderer,ReadingPageService,SitemapService}.java` | 新增：origin 校验、Markdown 净化、阅读模型/文档渲染与分片站点地图 |
+| `backend/.../controller/{SpaController,site/SeoController}.java`、`config/security/SecurityConfig.java`、`service/post/PostQueryService(+Impl).java` | 根路径 HTML 交付、发现文档重写、仅已发布查询、静态资源放行 |
+| `backend/src/main/resources/static/seo-reading.css`、`pom.xml` | 阅读区域局部样式、CommonMark 依赖 |
+| `backend/Dockerfile`、`docker-compose.yml`、`docker-compose.sqlite.yml`、根 `.dockerignore` | 单 JAR 容器构建、持久化卷与安全运行 |
+| `frontend/vercel.json`、`scripts/{vercel-proxy,build-vercel-proxy}.mjs`、`package.json` | 统一代理生成器与部署契约测试入口 |
+| `frontend/src/composables/useSeoMeta.ts` | 优先使用服务端 canonical origin |
+| 对应前后端测试 | origin/Markdown、严格公开查询、阅读文档、HTTP 契约、站点地图边界、部署适配 |
+| `docs/reviews/2026-10-16-seo-deployment-verification.md`、README 分册、DEPLOY、AGENTS/CLAUDE 规则、规格/计划 | 使用与部署说明、验证范围与限制 |
+
+---
+
 ## 未发布 — 逐页配置与独立内容页（第一批） (2026-10-16)
 
 ### 说明

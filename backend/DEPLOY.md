@@ -121,7 +121,55 @@ server {
 
 设置真实 `CORS_ALLOWED_ORIGINS`；如果站点通过同源反代访问，通常不需要开放额外跨域来源。不要直接将数据库端口暴露到公网。
 
-## 7. 页面管理升级与备份
+**生产环境请显式设置 `SITE_BASE_URL`**（例如 `SITE_BASE_URL=https://blog.example.com`）。它现在是 canonical、分享图、RSS/Atom、sitemap 与 robots 的正式对外 origin：设置后，伪造的 `Host`/`X-Forwarded-*` 头不会再把地址改成内网或攻击者域名。未设置时按直连请求推导，仅适合本地开发。
+
+反代需要**原样转发所有路径**到一个 JAR：页面 HTML、`/assets/**`、`/api/**`、`/uploads/**`、`/feed.xml`、`/sitemap*.xml`、`/robots.txt`。不要把 `/uploads` 改写成 `/api/uploads`，也不要让静态服务器自己回退 SPA。
+
+## 7. 抓取与 SEO 行为（本批新增）
+
+- 首次响应即为可阅读 HTML：文章、关于、自建内容页正文无需 JavaScript；Vue 挂载后替换该区域，交互不变。
+- 登录后台、账户类历史路径与搜索页返回 `noindex,follow`；不存在的地址返回真正的 404，`/index.html` 308 到 `/`。
+- `/sitemap.xml` 是 sitemap index，分片覆盖**全部**已发布文章、标签与自建页（每片 1000 条）；订阅源仍保留最近 100 篇的常规上限。
+- 公开 HTML 只读取已发布内容，不增加阅读量；管理员登录也不会让草稿出现在 HTML 或站点地图里。
+- 这些改动建立“可被抓取”的技术条件，**不代表搜索引擎已经收录**，也不承诺排名。建议上线后自行在搜索平台提交 `https://<正式域名>/sitemap.xml`。
+
+## 8. Docker（可选，二选一）
+
+构建上下文是**仓库根目录**，镜像内含 Maven+JDK21 构建阶段与 JRE 运行阶段；运行容器为非 root，健康检查用镜像内真实安装的 `curl`。
+
+MySQL 方案（保留既有卷名，不会清空数据）：
+
+```bash
+docker compose -f backend/docker-compose.yml up -d --build
+```
+
+SQLite 方案（数据库与 WAL/SHM 持久化在 `sqlite_data:/app/data`）：
+
+```bash
+docker compose -f backend/docker-compose.sqlite.yml up -d --build
+```
+
+- 首次启动前把 `backend/.env.example` 复制为 `backend/.env` 并填写真实值；Compose 会把 `.env` 作为 `env_file` 传入。
+- `backend/schema.sql` 的初始化只在**空** MySQL 数据目录首次启动时执行，且脚本内部固定使用 `campus_blog` 库名；自定义库名需要自行调整 SQL。已有数据库改用 `migration-selfblog.sql`。
+- 升级镜像不会自动迁移数据；持久化卷 `mysql_data`/`sqlite_data`、`app_uploads`、`app_gallery_media` 必须保留。**不要执行 `docker compose down -v`**，那会删除全部数据卷。
+- 旧版镜像的 `entrypoint.sh` 已不再使用（新镜像直接 `java -jar`）；环境校验仍由应用启动时执行。
+- 本机没有可用 Docker 守护进程，容器镜像的构建与运行未在本次验证中执行；上述命令与静态配置经过脚本化检查，但不等同于真实容器运行。
+
+## 9. Vercel 统一入口（可选）
+
+Vercel 只作为**反向代理**指向已部署的 JAR，不再单独构建另一份前端；Java 与数据库仍运行在服务器/容器。
+
+1. Vercel 项目 Root Directory 设为 `frontend` 仓库子目录，Framework Preset 选 **Other**（不要选 Vite 自动预案）。
+2. 配置环境变量：
+   - `SELFBLOG_BACKEND_ORIGIN`：可公网访问的源站 HTTPS origin（如 `https://origin.example.com`）。
+   - `SITE_BASE_URL`：访客正式 HTTPS origin（与后端 `SITE_BASE_URL` 保持一致，如 `https://blog.example.com`）。
+   - 两者必须不同，且不能是本 Vercel 部署自身；缺失或非法时构建直接失败（不会生成空站）。
+3. Build Command 使用 `node scripts/build-vercel-proxy.mjs`，它会生成 Build Output API v3 的 `.vercel/output/config.json` 路由：把原路径与查询原样转发给源站，动态响应显式 `no-store`，保留 `DENY`/`nosniff` 等头，Preview 环境附带 `X-Robots-Tag: noindex,nofollow`。
+4. 源站需允许 Vercel 转发过来；如需限制仅 Vercel 访问，请使用平台侧共享密钥并在源站校验。
+
+注意事项：本仓库不做 Vercel 上的静态前端托管；没有公网源站、域名与账号时无法真实验证 CDN/TLS/部署预览，本次交付只包含生成器与其单元测试。
+
+## 10. 页面管理升级与备份
 
 本批页面管理不新增或修改数据库表；替换JAR后，未保存过页面配置的站点保持原有内容、字号和页面比例。后台入口增加「页面管理」，默认 `/admin/pages`；公开自建内容页为 `/pages/<slug>`。
 
