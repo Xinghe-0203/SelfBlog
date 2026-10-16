@@ -6,10 +6,14 @@ import DOMPurify from 'dompurify'
 import { postApi } from '@/api/post'
 import { publicInteractionApi, type AnonymousLike, type GuestComment } from '@/api/public-interactions'
 import { formatDate, getSafeImageUrl } from '@/utils'
+import { estimateReadMinutes } from '@/utils/reading'
 import { useUserStore } from '@/stores/user'
 import { useSiteStore } from '@/stores/site'
 import { applySeoMeta, applyArticleJsonLd, setSeoSiteTitle } from '@/composables/useSeoMeta'
+import { enhanceMarkdown } from '@/composables/useMarkdownEnhance'
 import { toast } from '@/utils/toast'
+import ImagePreview from '@/components/common/ImagePreview.vue'
+import MobileTocSheet from '@/components/post/MobileTocSheet.vue'
 import type { Post } from '@/types'
 
 interface TocItem {
@@ -41,6 +45,10 @@ const commentNickname = ref('访客')
 const commentContent = ref('')
 const submittingComment = ref(false)
 const liking = ref(false)
+/** 正文图片 URL（增强时收集，用于灯箱）与灯箱状态 */
+const contentImages = ref<string[]>([])
+const previewVisible = ref(false)
+const previewIndex = ref(0)
 
 const renderedContent = computed(() => {
   if (!post.value?.content) return ''
@@ -55,9 +63,28 @@ const renderedContent = computed(() => {
     .replace(/<img\s/g, '<img referrerpolicy="no-referrer" loading="lazy" ')
 })
 
-const estimatedReadMinutes = computed(() => {
-  const count = post.value?.content?.length || 0
-  return Math.max(1, Math.ceil(count / 400))
+/**
+ * 预计阅读时长：按"中日韩字符按字 + 西文按词"统计正文后再除以每分钟词数。
+ * 不用 content.length —— 那会把代码块、图片链接和中英混排一起算错。
+ */
+const estimatedReadMinutes = computed(() => estimateReadMinutes(post.value?.content || ''))
+
+/** 最后更新提示的阈值：7 天内的小改动不值得在阅读入口提示。 */
+const UPDATE_NOTICE_THRESHOLD_MS = 7 * 24 * 60 * 60 * 1000
+
+/**
+ * "最后更新于"的日期：仅当 updateTime 比 createTime 晚 7 天以上才展示；
+ * 任一字段缺失或无法解析时不展示（没有可靠的比较基准）。
+ */
+const lastUpdated = computed(() => {
+  const updated = post.value?.updateTime
+  const created = post.value?.createTime || post.value?.createdAt
+  if (!updated || !created) return ''
+  const updatedAt = new Date(updated).getTime()
+  const createdAt = new Date(created).getTime()
+  if (Number.isNaN(updatedAt) || Number.isNaN(createdAt)) return ''
+  if (updatedAt - createdAt <= UPDATE_NOTICE_THRESHOLD_MS) return ''
+  return formatDate(updated, 'YYYY年MM月DD日')
 })
 
 const fetchPost = async () => {
@@ -215,11 +242,44 @@ const setHeadingIds = async () => {
   })
 }
 
+/**
+ * 标题高亮：用 IntersectionObserver 取代"每次 scroll 遍历全部标题"。
+ * 观察区是固定导航栏下沿到视口下半部（上边留 110px，下边砍掉 60%）；
+ * 落在区内、boundingClientRect.top 最小的标题就是"正在读"的那一条。
+ */
+let headingObserver: IntersectionObserver | null = null
+
+function observeHeadings(): void {
+  headingObserver?.disconnect()
+  // 不支持 IntersectionObserver 的环境（如 jsdom）由 scroll 扫描兜底，见 updateReadingProgress
+  if (typeof IntersectionObserver === 'undefined' || !contentRef.value) return
+  const headings = contentRef.value.querySelectorAll('h1, h2, h3')
+  if (!headings.length) return
+  headingObserver = new IntersectionObserver(
+    (entries) => {
+      const visible = entries.filter((entry) => entry.isIntersecting)
+      // 没有标题进入观察区时保持上一个高亮：滚过最后一条标题后不该突然清空目录状态
+      if (!visible.length) return
+      const topmost = visible.reduce((top, entry) =>
+        entry.boundingClientRect.top < top.boundingClientRect.top ? entry : top
+      )
+      if (topmost.target.id) activeHeading.value = topmost.target.id
+    },
+    { rootMargin: '-110px 0px -60% 0px' }
+  )
+  headings.forEach((heading) => headingObserver?.observe(heading))
+}
+
 watch(
   () => post.value?.content,
   async (content) => {
     toc.value = content ? extractToc(content) : []
-    if (content) await setHeadingIds()
+    if (!content) return
+    await setHeadingIds()
+    // 标题 id 必须先落地：锚点 href 指向 #section-N，灯箱索引也依赖增强后的结构。
+    // 增强加工的是真实 DOM，所以放在 v-html 渲染完成（nextTick）之后。
+    if (contentRef.value) contentImages.value = enhanceMarkdown(contentRef.value)
+    observeHeadings()
   }
 )
 
@@ -230,11 +290,29 @@ const scrollToHeading = (item: TocItem) => {
   activeHeading.value = item.id
 }
 
+/**
+ * v-html 里的图片没有事件绑定，只能在正文容器上做事件委托：
+ * 用原始 src（与 enhanceMarkdown 收集时一致）定位点击的是第几张，灯箱从它开始浏览。
+ */
+function onContentClick(event: MouseEvent): void {
+  const target = event.target
+  if (!(target instanceof HTMLImageElement)) return
+  const src = target.getAttribute('src')
+  if (!src) return
+  const index = contentImages.value.indexOf(src)
+  if (index < 0) return
+  previewIndex.value = index
+  previewVisible.value = true
+}
+
 const updateReadingProgress = () => {
   const documentHeight = document.documentElement.scrollHeight - window.innerHeight
   readingProgress.value =
     documentHeight > 0 ? Math.min(100, Math.round((window.scrollY / documentHeight) * 100)) : 0
 
+  // 标题高亮已交给 IntersectionObserver；只有它不可用时才回退到整表扫描，
+  // 避免长文里每次 scroll 都遍历全部标题。
+  if (typeof IntersectionObserver !== 'undefined') return
   const headings = contentRef.value?.querySelectorAll('h1, h2, h3') || []
   let activeId = ''
   headings.forEach((heading) => {
@@ -251,7 +329,10 @@ onMounted(() => {
   window.addEventListener('scroll', updateReadingProgress, { passive: true })
 })
 
-onUnmounted(() => window.removeEventListener('scroll', updateReadingProgress))
+onUnmounted(() => {
+  window.removeEventListener('scroll', updateReadingProgress)
+  headingObserver?.disconnect()
+})
 </script>
 
 <template>
@@ -298,10 +379,19 @@ onUnmounted(() => window.removeEventListener('scroll', updateReadingProgress))
             <span>约 {{ estimatedReadMinutes }} 分钟阅读</span>
             <span class="meta-dot" aria-hidden="true"></span>
             <span>{{ post.viewCount || 0 }} 次阅读</span>
+            <template v-if="lastUpdated">
+              <span class="meta-dot" aria-hidden="true"></span>
+              <span>最后更新于 {{ lastUpdated }}</span>
+            </template>
           </div>
         </header>
 
-        <div ref="contentRef" class="markdown-body" v-html="renderedContent"></div>
+        <div
+          ref="contentRef"
+          class="markdown-body"
+          v-html="renderedContent"
+          @click="onContentClick"
+        ></div>
 
         <nav v-if="adjacent.prev || adjacent.next" class="post-adjacent" aria-label="相邻文章">
           <router-link v-if="adjacent.prev" class="adjacent-link" :to="`/post/${adjacent.prev.id}`">
@@ -364,6 +454,25 @@ onUnmounted(() => window.removeEventListener('scroll', updateReadingProgress))
         </div>
       </aside>
     </article>
+
+    <MobileTocSheet
+      v-if="toc.length"
+      :items="toc"
+      :active-id="activeHeading"
+      @select="scrollToHeading"
+    />
+
+    <!--
+      ImagePreview 的 currentIndex 只在初始化时读一次 initialIndex，
+      所以每次打开都靠 v-if 重新挂载 —— 否则连续点开不同图片会复用上一次的索引。
+    -->
+    <ImagePreview
+      v-if="previewVisible"
+      :images="contentImages"
+      :initial-index="previewIndex"
+      :show="true"
+      @close="previewVisible = false"
+    />
   </div>
 </template>
 
@@ -581,6 +690,104 @@ onUnmounted(() => window.removeEventListener('scroll', updateReadingProgress))
 .markdown-body :deep(pre code) {
   color: inherit;
 }
+/* 代码块增强：头部 / 语言 / 复制 / 折叠由 useMarkdownEnhance 在真实 DOM 上生成，
+   v-html 内容不带 scoped 属性，所以这里全部走 :deep()。 */
+.markdown-body :deep(.code-block) {
+  position: relative;
+  margin: 1.5em 0;
+  border: 1px solid var(--code-border);
+  border-radius: var(--radius);
+  background: var(--code-bg);
+  overflow: hidden;
+}
+.markdown-body :deep(.code-block pre) {
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+.markdown-body :deep(.code-block-head) {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 7px 12px;
+  border-bottom: 1px solid var(--code-border);
+  color: var(--code-text);
+}
+.markdown-body :deep(.code-lang) {
+  color: var(--code-text);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  opacity: 0.6;
+}
+.markdown-body :deep(.code-copy) {
+  padding: 3px 10px;
+  border: 1px solid var(--code-border);
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--code-text);
+  font: inherit;
+  font-size: 0.72rem;
+  opacity: 0.75;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+.markdown-body :deep(.code-copy:hover) {
+  border-color: var(--primary);
+  background: var(--primary);
+  color: var(--text-inverse);
+  opacity: 1;
+}
+.markdown-body :deep(.code-expand) {
+  display: block;
+  width: 100%;
+  padding: 8px;
+  border: 0;
+  border-top: 1px solid var(--code-border);
+  background: transparent;
+  color: var(--code-text);
+  font: inherit;
+  font-size: 0.72rem;
+  opacity: 0.7;
+  cursor: pointer;
+}
+.markdown-body :deep(.code-expand:hover) {
+  color: var(--text-inverse);
+  opacity: 1;
+}
+/* 折叠阈值 320px 必须与 useMarkdownEnhance 的默认 collapseHeight 保持一致 */
+.markdown-body :deep(.code-block.is-collapsed pre) {
+  max-height: 320px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  /* 底部淡出用 mask 而不是伪元素：伪元素会跟着代码内容一起滚动 */
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 64px), transparent);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 64px), transparent);
+}
+
+/* 标题锚点：默认隐形，悬停标题时出现，避免正文里排满 # 干扰阅读 */
+.markdown-body :deep(.heading-anchor) {
+  margin-left: 8px;
+  color: var(--text-muted);
+  font-family: var(--font-sans);
+  font-size: 0.7em;
+  text-decoration: none;
+  opacity: 0;
+  transition: opacity var(--duration-fast) var(--ease-default);
+}
+.markdown-body :deep(h1:hover .heading-anchor),
+.markdown-body :deep(h2:hover .heading-anchor),
+.markdown-body :deep(h3:hover .heading-anchor),
+.markdown-body :deep(.heading-anchor:focus-visible) {
+  opacity: 1;
+}
+/* 触屏没有悬停，锚点保持半透明可见 */
+@media (hover: none) {
+  .markdown-body :deep(.heading-anchor) {
+    opacity: 0.45;
+  }
+}
 .markdown-body :deep(:not(pre) > code) {
   padding: 0.12em 0.35em;
   border-radius: 4px;
@@ -592,6 +799,8 @@ onUnmounted(() => window.removeEventListener('scroll', updateReadingProgress))
   max-width: 100%;
   height: auto;
   border-radius: 9px;
+  /* 正文图片可点开灯箱（onContentClick 事件委托） */
+  cursor: zoom-in;
 }
 .markdown-body :deep(table) {
   display: block;
@@ -716,12 +925,9 @@ onUnmounted(() => window.removeEventListener('scroll', updateReadingProgress))
   .reader-layout {
     grid-template-columns: minmax(0, 760px);
   }
+  /* 窄屏改用 MobileTocSheet（左下浮动胶囊 + 底部抽屉），侧边目录整块隐藏 */
   .article-aside {
-    position: static;
-    order: -1;
-  }
-  .toc-card nav {
-    max-height: 180px;
+    display: none;
   }
 }
 @media (max-width: 600px) {

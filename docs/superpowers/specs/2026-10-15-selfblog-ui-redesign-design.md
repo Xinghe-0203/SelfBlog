@@ -273,7 +273,7 @@ Settings.vue ◀── { url, kind, size, originalName }
 | `frontend/src/views/admin/Settings.vue` | 四个上传字段 + 预览 |
 | `frontend/src/stores/site.ts` | 两个新键 + favicon 运行时注入 |
 | `frontend/src/views/post/PostDetail.vue` | §3.5 全部 + 移动端目录 + 灯箱 |
-| `frontend/src/App.vue` | 挂载 MobileTocSheet（仅文章页） |
+| `frontend/src/App.vue` | 本批无改动；`MobileTocSheet` 由 `PostDetail.vue` 自行挂载——目录数据本来就在那里，避免为了"仅文章页挂载"把 toc 提升成全局状态 |
 | `frontend/index.html` | 静态 favicon 保留作兜底，补注释说明运行时注入 |
 | `backend/.../service/site/impl/SiteSettingsServiceImpl.java` | ALLOWED_KEYS / defaults / validateValue |
 | 其余 `views/**`、`components/common/**`、`styles/components.css` | 裸圆角 → token |

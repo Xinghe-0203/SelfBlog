@@ -4,6 +4,45 @@
 
 ---
 
+## 未发布 — 视觉重设计（三）：文章页阅读体验 (2026-10-16)
+
+把阅读路径上的交互补齐：代码块、目录、锚点、灯箱与阅读时长。
+
+### 新增
+
+- **代码块头部 + 复制**：`pre` 包装为 `.code-block`，头部显示语言标签与「复制」按钮（真实 `<button>`，写入剪贴板，约 1.5s 后复位）
+- **长代码折叠**：超过 320px 的代码块默认折叠，底部渐隐，「展开代码 / 收起代码」切换
+- **标题锚点**：每个 h1–h3 追加 `#` 锚点（悬停/键盘聚焦可见）；依赖既有的 `scroll-padding-top: 96px`，跳转不被浮动导航盖住
+- **移动端目录抽屉**：≤860px 隐藏侧边目录，改为左下浮动胶囊 + 底部抽屉（复用同一份 toc 数据与高亮态）
+- **正文图片灯箱**：点击正文图片打开 `ImagePreview`，多图左右切换、Esc 关闭
+- **按正文估算阅读时长**：新增 `utils/reading.ts`，剔除代码块/图片后按「中日韩按字 + 西文按词」统计，替换原先按字符数除以 400 的粗算
+- **最后更新提示**：`updateTime` 晚于 `createTime` 7 天以上时，meta 行展示「最后更新于 …」
+
+### 修复
+
+- **`ImagePreview.vue` 键盘监听 TDZ**：`watch(..., { immediate: true })` 在 `const handleKeydown` 声明前引用它，初始 `show=true` 时监听挂不上（Esc / 方向键失效）；改为函数声明并补测试
+
+### 说明
+
+- 标题高亮从「每次滚动遍历全部标题」改为 `IntersectionObserver`，仅在不支持的环境回退到扫描
+- `MobileTocSheet` 由 `PostDetail.vue` 挂载（而非设计稿中的 App.vue）——目录数据本来就在 PostDetail，避免提升成全局状态
+
+### 影响文件
+
+| 文件 | 改动类型 |
+|------|----------|
+| `frontend/src/utils/reading.ts` | 新增：正文字数与阅读时长估算 |
+| `frontend/src/composables/useMarkdownEnhance.ts` | 新增：DOM 后处理（代码块 / 锚点 / 图片收集） |
+| `frontend/src/components/post/MobileTocSheet.vue` | 新增：移动端目录抽屉 |
+| `frontend/src/views/post/PostDetail.vue` | 集成增强、灯箱、IO 高亮、时长与更新提示 |
+| `frontend/src/components/common/ImagePreview.vue` | 修复键盘监听 TDZ |
+| `frontend/src/utils/__tests__/reading.test.ts` | 新增：字数统计测试 |
+| `frontend/src/composables/__tests__/useMarkdownEnhance.test.ts` | 新增：DOM 后处理测试 |
+| `frontend/src/components/post/__tests__/MobileTocSheet.test.ts` | 新增：目录抽屉测试 |
+| `frontend/src/components/common/__tests__/ImagePreview.test.ts` | 新增：键盘与滚动锁定测试 |
+
+---
+
 ## 未发布 — 视觉重设计（二）：后台侧边栏 (2026-10-15)
 
 把公开页顶栏的同一套语言（内置图标、胶囊选中、品牌资产）带进后台。
