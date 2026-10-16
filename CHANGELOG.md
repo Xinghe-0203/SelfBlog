@@ -4,6 +4,26 @@
 
 ---
 
+## 未发布 — 视觉重设计（四）：全站圆角收尾 (2026-10-16)
+
+批次一上调了圆角 token，但页面里仍有大量裸圆角值不跟随；本批把它们全部换成 token，让「大 R 角」真正覆盖全站。
+
+### 说明
+
+- **79 处裸圆角（22 个文件）按映射表替换**：3–5px → `--radius-xs`、7–9px → `--radius-sm`、10–14px → `--radius`、15–18px → `--radius-lg`、20px → `--radius-xl`；`50%`（圆形）、`999px`（胶囊）、`0`（直角）与 1–2px 微元素保持不动
+- 复核扫描：排除 `var(--radius*)`、百分比、`inherit`、`0`、`1px`、`2px`、`999px` 后，全仓库不再有裸圆角值；`git diff` 抽查确认只改了 `border-radius` 数值
+- **深色模式收尾**：设置页 `.alert` / `.success` 提示条的浅色硬编码改为 `--error-light` / `--success-light` + 语义文字色（`dark-mode.css` 已有暗色覆盖）
+
+### 影响文件
+
+| 文件 | 改动类型 |
+|------|----------|
+| `frontend/src/views/Home.vue`、`Archives.vue`、`post/PostDetail.vue`、`gallery/Gallery.vue`、`search/Search.vue`、`tag/TagDetail.vue`、`trending/TrendingPage.vue`、`user/Profile.vue`、`user/UserProfile.vue` | 裸圆角 → token |
+| `frontend/src/views/admin/` 下 Albums / Comments / Dashboard / Posts / Reports / Settings / Statistics / TagsManagement / TopicsManagement / Users / Visitors / CircleManagement | 裸圆角 → token；Settings 另修深色提示条 |
+| `frontend/src/styles/skeleton.css` | 裸圆角 → token |
+
+---
+
 ## 未发布 — 视觉重设计（三）：文章页阅读体验 (2026-10-16)
 
 把阅读路径上的交互补齐：代码块、目录、锚点、灯箱与阅读时长。

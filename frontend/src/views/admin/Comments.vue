@@ -68,9 +68,9 @@ onMounted(() => void load())
 .page-heading h1 { margin: 5px 0; font: 700 2rem var(--font-display); }
 .page-heading p:not(.eyebrow) { margin: 0; color: var(--text-muted); font-size: .8rem; }
 .eyebrow { margin: 0; color: var(--primary); font-size: .68rem; font-weight: 700; letter-spacing: .16em; }
-select { padding: 9px 12px; border: 1px solid var(--border-solid); border-radius: 8px; background: var(--surface-primary); color: var(--text-primary); }
+select { padding: 9px 12px; border: 1px solid var(--border-solid); border-radius: var(--radius-sm); background: var(--surface-primary); color: var(--text-primary); }
 .comment-list { display: grid; gap: 12px; }
-.comment-card { padding: 18px; border: 1px solid var(--border-solid); border-radius: 12px; background: var(--surface-primary); }
+.comment-card { padding: 18px; border: 1px solid var(--border-solid); border-radius: var(--radius); background: var(--surface-primary); }
 .comment-top, .comment-footer, .comment-top > div { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .comment-top > div { justify-content: flex-start; flex-wrap: wrap; }
 .comment-top span, .comment-top time { color: var(--text-muted); font-size: .75rem; }
@@ -78,9 +78,9 @@ select { padding: 9px 12px; border: 1px solid var(--border-solid); border-radius
 .comment-content { margin: 15px 0; line-height: 1.75; white-space: pre-wrap; overflow-wrap: anywhere; }
 .comment-footer { padding-top: 12px; border-top: 1px solid var(--border-solid); }
 .status { padding: 4px 8px; border-radius: 999px; font-size: .68rem; }
-.status-1 { background: #e8f8ef; color: #16794c; }.status-0 { background: var(--bg-secondary); color: var(--text-muted); }.status-2 { background: #fff0ed; color: #b94028; }
+.status-1 { background: var(--success-light); color: var(--success); }.status-0 { background: var(--bg-secondary); color: var(--text-muted); }.status-2 { background: var(--error-light); color: var(--error); }
 .actions { display: flex; flex-wrap: wrap; justify-content: end; gap: 7px; }
-.actions button, .pagination button { padding: 6px 9px; border: 1px solid var(--border-solid); border-radius: 7px; background: var(--surface-primary); color: var(--text-secondary); font-size: .72rem; cursor: pointer; }
+.actions button, .pagination button { padding: 6px 9px; border: 1px solid var(--border-solid); border-radius: var(--radius-sm); background: var(--surface-primary); color: var(--text-secondary); font-size: .72rem; cursor: pointer; }
 .actions button:hover { color: var(--primary); border-color: var(--primary); }.actions .danger { color: var(--error); }
 .empty, .error { padding: 30px; color: var(--text-muted); text-align: center; }.error { color: var(--error); }
 .pagination { display: flex; align-items: center; justify-content: center; gap: 14px; color: var(--text-muted); font-size: .75rem; }

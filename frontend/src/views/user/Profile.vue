@@ -1101,7 +1101,7 @@ a.stat-cell[href] {
   left: 0;
   height: 2px;
   background: var(--primary);
-  border-radius: 2px 2px 0 0;
+  border-radius: var(--radius-xs) var(--radius-xs) 0 0;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   z-index: 2;
   opacity: 0;

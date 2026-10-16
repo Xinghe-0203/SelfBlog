@@ -70,10 +70,10 @@ onMounted(() => void load())
 .page-heading h1 { margin: 4px 0 6px; font: 700 2rem var(--font-display); }
 .page-heading p:not(.eyebrow), .section-heading p { margin: 0; color: var(--text-muted); font-size: .8rem; }
 .eyebrow { margin: 0; color: var(--primary); font-size: .68rem; font-weight: 700; letter-spacing: .16em; }
-.refresh, .pagination button { padding: 9px 13px; border: 1px solid var(--border-solid); border-radius: 8px; background: var(--surface-primary); color: var(--text-primary); cursor: pointer; }
+.refresh, .pagination button { padding: 9px 13px; border: 1px solid var(--border-solid); border-radius: var(--radius-sm); background: var(--surface-primary); color: var(--text-primary); cursor: pointer; }
 .refresh:hover, .pagination button:hover:not(:disabled) { border-color: var(--primary); color: var(--primary); }
 .metrics { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; }
-.metrics article, .panel { border: 1px solid var(--border-solid); border-radius: 12px; background: var(--surface-primary); }
+.metrics article, .panel { border: 1px solid var(--border-solid); border-radius: var(--radius); background: var(--surface-primary); }
 .metrics article { display: grid; gap: 8px; padding: 17px; }
 .metrics small { color: var(--text-muted); font-size: .75rem; }
 .metrics strong { font: 700 1.55rem var(--font-display); }
@@ -83,7 +83,7 @@ onMounted(() => void load())
 .chart { display: grid; height: 210px; grid-template-columns: repeat(14, minmax(16px, 1fr)); align-items: end; gap: 8px; padding-top: 12px; }
 .chart-day { display: flex; height: 100%; flex-direction: column; justify-content: end; align-items: center; gap: 7px; color: var(--text-muted); }
 .chart-day strong { font-size: .65rem; font-weight: 500; }
-.bar { width: min(100%, 27px); min-height: 3px; border-radius: 5px 5px 2px 2px; background: linear-gradient(180deg, var(--primary), color-mix(in srgb, var(--primary) 45%, white)); }
+.bar { width: min(100%, 27px); min-height: 3px; border-radius: var(--radius-xs) var(--radius-xs) 2px 2px; background: linear-gradient(180deg, var(--primary), color-mix(in srgb, var(--primary) 45%, white)); }
 .chart-day small { font-size: .62rem; white-space: nowrap; }
 .data-grid { display: grid; grid-template-columns: minmax(230px, .7fr) minmax(0, 1.3fr); gap: 14px; }
 .top-pages { display: grid; gap: 12px; }

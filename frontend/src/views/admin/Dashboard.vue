@@ -75,7 +75,7 @@ onMounted(async () => {
   overflow: hidden;
   padding: clamp(27px, 5vw, 52px);
   border: 1px solid var(--border-solid);
-  border-radius: 16px;
+  border-radius: var(--radius-lg);
   background: var(--surface-solid);
 }
 .eyebrow {
@@ -104,7 +104,7 @@ onMounted(async () => {
   gap: 20px;
   min-height: 40px;
   padding: 0 15px;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   background: var(--primary);
   color: white;
   font-size: 0.82rem;
@@ -134,7 +134,7 @@ onMounted(async () => {
   min-height: 198px;
   padding: 22px;
   border: 1px solid var(--border-solid);
-  border-radius: 12px;
+  border-radius: var(--radius);
   background: var(--surface-solid);
   color: var(--text-primary);
   text-decoration: none;
@@ -161,7 +161,7 @@ onMounted(async () => {
   place-items: center;
   width: 38px;
   height: 38px;
-  border-radius: 10px;
+  border-radius: var(--radius);
   background: var(--primary-light);
   color: var(--primary);
   font-size: 1.2rem;
@@ -190,7 +190,7 @@ onMounted(async () => {
   font-size: 0.77rem;
 }
 .summary-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-top: 16px; }
-.summary-grid article { display: grid; gap: 8px; padding: 18px; border: 1px solid var(--border-solid); border-radius: 12px; background: var(--surface-solid); }
+.summary-grid article { display: grid; gap: 8px; padding: 18px; border: 1px solid var(--border-solid); border-radius: var(--radius); background: var(--surface-solid); }
 .summary-grid small { color: var(--text-muted); font-size: .76rem; }
 .summary-grid strong { font: 700 1.55rem var(--font-display); }
 @media (max-width: 760px) {

@@ -200,7 +200,7 @@ onMounted(fetchPosts)
 .new-post {
   flex: 0 0 auto;
   padding: 10px 13px;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   background: var(--primary);
   color: white;
   font-size: 0.8rem;
@@ -223,7 +223,7 @@ onMounted(fetchPosts)
   min-width: 0;
   padding: 0 11px;
   border: 1px solid var(--border-solid);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   background: var(--surface-solid);
   color: var(--text-muted);
 }
@@ -246,7 +246,7 @@ onMounted(fetchPosts)
   min-height: 42px;
   padding: 0 12px;
   border: 1px solid var(--border-solid);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   background: var(--surface-solid);
   color: var(--text-primary);
   font: inherit;
@@ -260,7 +260,7 @@ onMounted(fetchPosts)
 .state-panel {
   padding: 38px 20px;
   border: 1px dashed var(--border-solid);
-  border-radius: 11px;
+  border-radius: var(--radius);
   color: var(--text-muted);
   text-align: center;
 }
@@ -276,7 +276,7 @@ onMounted(fetchPosts)
   margin-left: 9px;
   padding: 7px 10px;
   border: 1px solid var(--border-solid);
-  border-radius: 7px;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--text-primary);
   cursor: pointer;
@@ -284,7 +284,7 @@ onMounted(fetchPosts)
 .post-table-wrap {
   overflow: auto;
   border: 1px solid var(--border-solid);
-  border-radius: 10px;
+  border-radius: var(--radius);
   background: var(--surface-solid);
 }
 .post-table {
@@ -329,7 +329,7 @@ onMounted(fetchPosts)
 .status {
   display: inline-block;
   padding: 4px 8px;
-  border-radius: 20px;
+  border-radius: var(--radius-xl);
   background: var(--bg-secondary);
   color: var(--text-muted);
   font-size: 0.7rem;

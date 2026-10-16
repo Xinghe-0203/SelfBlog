@@ -187,7 +187,7 @@ onMounted(fetchArchives)
   margin-top: 28px;
   padding: 35px 20px;
   border: 1px dashed var(--border-solid);
-  border-radius: 12px;
+  border-radius: var(--radius);
   color: var(--text-muted);
   text-align: center;
 }
@@ -197,7 +197,7 @@ onMounted(fetchArchives)
 .state-panel button {
   padding: 8px 12px;
   border: 1px solid var(--border-solid);
-  border-radius: 7px;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--text-primary);
   cursor: pointer;

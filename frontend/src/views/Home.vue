@@ -347,7 +347,7 @@ onMounted(() => {
 .featured-article {
   overflow: hidden;
   border: 1px solid var(--border-solid);
-  border-radius: 14px;
+  border-radius: var(--radius);
   background: var(--surface-solid);
 }
 .featured-cover {
@@ -379,7 +379,7 @@ onMounted(() => {
   top: 16px;
   padding: 6px 10px;
   border: 1px solid rgba(255, 255, 255, 0.55);
-  border-radius: 20px;
+  border-radius: var(--radius-xl);
   background: rgba(20, 30, 35, 0.52);
   color: white;
   font-size: 0.7rem;
@@ -462,7 +462,7 @@ onMounted(() => {
   height: 82px;
   flex: 0 0 auto;
   overflow: hidden;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   background: var(--bg-secondary);
 }
 .row-cover img {
@@ -499,7 +499,7 @@ onMounted(() => {
 .sidebar-tags a {
   padding: 5px 9px;
   border: 1px solid var(--border-solid);
-  border-radius: 20px;
+  border-radius: var(--radius-xl);
   color: var(--text-secondary);
   font-size: 0.73rem;
   text-decoration: none;
@@ -513,7 +513,7 @@ onMounted(() => {
   flex-direction: column;
   gap: 5px;
   padding: 15px;
-  border-radius: 10px;
+  border-radius: var(--radius);
   background: var(--bg-secondary);
   color: var(--text-secondary);
   font-size: 0.76rem;
@@ -529,7 +529,7 @@ onMounted(() => {
 .state-panel {
   padding: 38px 20px;
   border: 1px dashed var(--border-solid);
-  border-radius: 12px;
+  border-radius: var(--radius);
   color: var(--text-muted);
   text-align: center;
 }
@@ -542,7 +542,7 @@ onMounted(() => {
   min-height: 36px;
   padding: 0 13px;
   border: 1px solid var(--border-solid);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--text-primary);
   cursor: pointer;

@@ -526,7 +526,7 @@ onUnmounted(() => {
   width: 100%;
   max-height: 410px;
   margin-bottom: 34px;
-  border-radius: 13px;
+  border-radius: var(--radius);
   object-fit: cover;
 }
 .article-header {
@@ -551,7 +551,7 @@ onUnmounted(() => {
   gap: 5px;
   padding: 14px 16px;
   border: 1px solid var(--border-solid);
-  border-radius: 10px;
+  border-radius: var(--radius);
   background: var(--surface-primary);
   text-decoration: none;
   transition: border-color var(--duration-fast) var(--ease-default), transform var(--duration-fast) var(--ease-default);
@@ -578,9 +578,9 @@ onUnmounted(() => {
 }
 .comments-section { margin: 46px 0 30px; }
 .comments-heading { margin-bottom: 18px; }.comments-heading .eyebrow { margin: 0 0 6px; color: var(--primary); font-size: .67rem; font-weight: 700; letter-spacing: .15em; }.comments-heading h2 { margin: 0; font: 700 1.5rem var(--font-display); }.comments-heading h2 span { margin-left: 5px; color: var(--text-muted); font: 500 .85rem var(--font-sans); }
-.comment-form { display: grid; gap: 12px; padding: 17px; border: 1px solid var(--border-solid); border-radius: 12px; background: var(--surface-primary); }.comment-form label { display: grid; gap: 6px; color: var(--text-secondary); font-size: .75rem; }.comment-form input, .comment-form textarea { width: 100%; padding: 10px 12px; border: 1px solid var(--border-solid); border-radius: 8px; background: var(--bg-primary); color: var(--text-primary); font: inherit; font-size: .85rem; }.comment-form textarea { resize: vertical; }.comment-form-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; }.comment-form-footer small { color: var(--text-muted); font-size: .7rem; }.comment-form-footer button { padding: 9px 13px; border: 0; border-radius: 8px; background: var(--primary); color: white; font-size: .76rem; font-weight: 700; cursor: pointer; }.comment-form-footer button:disabled { opacity: .55; }
+.comment-form { display: grid; gap: 12px; padding: 17px; border: 1px solid var(--border-solid); border-radius: var(--radius); background: var(--surface-primary); }.comment-form label { display: grid; gap: 6px; color: var(--text-secondary); font-size: .75rem; }.comment-form input, .comment-form textarea { width: 100%; padding: 10px 12px; border: 1px solid var(--border-solid); border-radius: var(--radius-sm); background: var(--bg-primary); color: var(--text-primary); font: inherit; font-size: .85rem; }.comment-form textarea { resize: vertical; }.comment-form-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; }.comment-form-footer small { color: var(--text-muted); font-size: .7rem; }.comment-form-footer button { padding: 9px 13px; border: 0; border-radius: var(--radius-sm); background: var(--primary); color: white; font-size: .76rem; font-weight: 700; cursor: pointer; }.comment-form-footer button:disabled { opacity: .55; }
 .comment-list { display: grid; gap: 16px; margin-top: 22px; }.reader-comment { display: grid; grid-template-columns: 36px minmax(0, 1fr); gap: 12px; padding-bottom: 15px; border-bottom: 1px solid var(--border-solid); }.comment-avatar { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; background: var(--primary-light); color: var(--primary); font-weight: 700; }.reader-comment header { display: flex; align-items: center; gap: 10px; }.reader-comment header strong { font-size: .82rem; }.reader-comment time { color: var(--text-muted); font-size: .67rem; }.reader-comment p { margin: 7px 0 0; color: var(--text-secondary); font-size: .85rem; line-height: 1.7; white-space: pre-wrap; overflow-wrap: anywhere; }.no-comments { padding: 23px 0; color: var(--text-muted); font-size: .82rem; text-align: center; }
-.load-more-comments { display: block; margin: 16px auto; padding: 9px 13px; border: 1px solid var(--border-solid); border-radius: 8px; background: var(--surface-primary); color: var(--primary); font-size: .78rem; cursor: pointer; }
+.load-more-comments { display: block; margin: 16px auto; padding: 9px 13px; border: 1px solid var(--border-solid); border-radius: var(--radius-sm); background: var(--surface-primary); color: var(--primary); font-size: .78rem; cursor: pointer; }
 .article-tags {
   display: flex;
   flex-wrap: wrap;
@@ -678,7 +678,7 @@ onUnmounted(() => {
   overflow-x: auto;
   margin: 1.5em 0;
   padding: 17px;
-  border-radius: 9px;
+  border-radius: var(--radius-sm);
   /* 用 --code-bg 而非 --gray-900：深色模式下灰度会反转，
      --gray-900 会变成 #EBEBEB，让代码块成为全页最亮的元素。 */
   background: var(--code-bg);
@@ -790,7 +790,7 @@ onUnmounted(() => {
 }
 .markdown-body :deep(:not(pre) > code) {
   padding: 0.12em 0.35em;
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
   background: var(--bg-secondary);
   color: var(--primary);
   font-size: 0.88em;
@@ -798,7 +798,7 @@ onUnmounted(() => {
 .markdown-body :deep(img) {
   max-width: 100%;
   height: auto;
-  border-radius: 9px;
+  border-radius: var(--radius-sm);
   /* 正文图片可点开灯箱（onContentClick 事件委托） */
   cursor: zoom-in;
 }
@@ -895,7 +895,7 @@ onUnmounted(() => {
   margin: 65px auto;
   padding: 36px 22px;
   border: 1px dashed var(--border-solid);
-  border-radius: 12px;
+  border-radius: var(--radius);
   color: var(--text-secondary);
   text-align: center;
 }
@@ -908,7 +908,7 @@ onUnmounted(() => {
   margin: 0 5px;
   padding: 8px 12px;
   border: 1px solid var(--border-solid);
-  border-radius: 7px;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--text-primary);
   cursor: pointer;

@@ -188,7 +188,7 @@ onMounted(() => {
   gap: 9px;
   padding: 8px;
   border: 1px solid var(--border-solid);
-  border-radius: 12px;
+  border-radius: var(--radius);
   background: var(--surface-solid);
   box-shadow: var(--shadow-sm);
 }
@@ -215,7 +215,7 @@ onMounted(() => {
   min-width: 88px;
   padding: 0 15px;
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   background: var(--primary);
   color: white;
   cursor: pointer;
@@ -295,7 +295,7 @@ onMounted(() => {
   margin-top: 20px;
   padding: 35px 20px;
   border: 1px dashed var(--border-solid);
-  border-radius: 12px;
+  border-radius: var(--radius);
   color: var(--text-muted);
   text-align: center;
 }
@@ -310,7 +310,7 @@ onMounted(() => {
   margin-top: 8px;
   padding: 8px 12px;
   border: 1px solid var(--border-solid);
-  border-radius: 7px;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--text-primary);
   cursor: pointer;

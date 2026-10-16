@@ -206,7 +206,7 @@ watch(() => route.params.id, fetchTag, { immediate: true })
   margin-top: 25px;
   padding: 35px 20px;
   border: 1px dashed var(--border-solid);
-  border-radius: 12px;
+  border-radius: var(--radius);
   color: var(--text-muted);
   text-align: center;
 }
@@ -221,7 +221,7 @@ watch(() => route.params.id, fetchTag, { immediate: true })
 .load-more button {
   padding: 9px 15px;
   border: 1px solid var(--border-solid);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--text-primary);
   cursor: pointer;

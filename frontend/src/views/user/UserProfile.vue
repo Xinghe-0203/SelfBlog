@@ -601,7 +601,7 @@ onMounted(() => {
   bottom: 0;
   height: 3px;
   background: linear-gradient(90deg, var(--primary-start), var(--primary-end));
-  border-radius: 3px 3px 0 0;
+  border-radius: var(--radius-xs) var(--radius-xs) 0 0;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   z-index: 2;
 }

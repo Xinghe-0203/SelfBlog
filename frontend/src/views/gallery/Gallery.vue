@@ -134,7 +134,7 @@ onMounted(() => void loadAlbums())
 .gallery-hero h1 { margin: 10px 0; font: 700 clamp(2.5rem, 7vw, 4.4rem)/1 var(--font-display); letter-spacing: -.06em; }
 .gallery-hero > p:last-child { color: var(--text-secondary); }
 .album-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; }
-.album-card { display: flex; min-width: 0; flex-direction: column; gap: 12px; padding: 0 0 16px; overflow: hidden; border: 1px solid var(--border-solid); border-radius: 15px; background: var(--surface-primary); color: inherit; text-align: left; cursor: pointer; transition: transform .2s, box-shadow .2s; }
+.album-card { display: flex; min-width: 0; flex-direction: column; gap: 12px; padding: 0 0 16px; overflow: hidden; border: 1px solid var(--border-solid); border-radius: var(--radius-lg); background: var(--surface-primary); color: inherit; text-align: left; cursor: pointer; transition: transform .2s, box-shadow .2s; }
 .album-card:hover { transform: translateY(-4px); box-shadow: var(--shadow-lg); }
 .album-cover { position: relative; display: grid; place-items: center; aspect-ratio: 1.3; overflow: hidden; background: var(--bg-secondary); }
 .album-cover img { width: 100%; height: 100%; object-fit: cover; transition: transform .35s; }
@@ -149,7 +149,7 @@ onMounted(() => void loadAlbums())
 .gallery-state button { margin-left: 10px; border: 0; background: none; color: var(--primary); cursor: pointer; }
 .error { color: var(--error); }
 .modal-backdrop, .lightbox { position: fixed; z-index: 1000; inset: 0; display: grid; place-items: center; padding: 22px; background: rgb(8 15 25 / 72%); backdrop-filter: blur(7px); }
-.album-modal { width: min(1040px, 100%); max-height: min(88vh, 900px); overflow: auto; padding: 24px; border: 1px solid var(--border-solid); border-radius: 18px; background: var(--surface-primary); color: var(--text-primary); }
+.album-modal { width: min(1040px, 100%); max-height: min(88vh, 900px); overflow: auto; padding: 24px; border: 1px solid var(--border-solid); border-radius: var(--radius-lg); background: var(--surface-primary); color: var(--text-primary); }
 .modal-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 20px; margin-bottom: 22px; }
 .modal-header h2 { margin: 7px 0; font: 700 1.8rem var(--font-display); }
 .modal-header p:last-child { margin: 0; color: var(--text-secondary); }
@@ -158,15 +158,15 @@ onMounted(() => void loadAlbums())
 .lock-icon { color: var(--primary); font-size: 2.2rem; }
 .unlock-form h3, .unlock-form p { margin: 0; }
 .unlock-form p, .unlock-form small { color: var(--text-muted); font-size: .85rem; }
-.unlock-form input { width: 100%; margin-top: 7px; padding: 12px 14px; border: 1px solid var(--border-solid); border-radius: 9px; background: var(--bg-primary); color: var(--text-primary); }
-.unlock-form button { width: 100%; padding: 12px; border: 0; border-radius: 9px; background: var(--primary); color: white; font-weight: 700; cursor: pointer; }
+.unlock-form input { width: 100%; margin-top: 7px; padding: 12px 14px; border: 1px solid var(--border-solid); border-radius: var(--radius-sm); background: var(--bg-primary); color: var(--text-primary); }
+.unlock-form button { width: 100%; padding: 12px; border: 0; border-radius: var(--radius-sm); background: var(--primary); color: white; font-weight: 700; cursor: pointer; }
 .photo-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
-.photo-tile { position: relative; overflow: hidden; aspect-ratio: 1.2; padding: 0; border: 0; border-radius: 10px; background: var(--bg-secondary); cursor: zoom-in; }
+.photo-tile { position: relative; overflow: hidden; aspect-ratio: 1.2; padding: 0; border: 0; border-radius: var(--radius); background: var(--bg-secondary); cursor: zoom-in; }
 .photo-tile img { width: 100%; height: 100%; object-fit: cover; }
 .photo-tile span { position: absolute; inset: auto 0 0; padding: 25px 10px 9px; background: linear-gradient(transparent, rgb(0 0 0 / 65%)); color: white; font-size: .78rem; text-align: left; }
 .lightbox { z-index: 1100; grid-template-columns: 54px minmax(0, 1fr) 54px; }
 .lightbox figure { max-width: 100%; max-height: 88vh; margin: 0; text-align: center; }
-.lightbox figure img { max-width: min(82vw, 1200px); max-height: 80vh; border-radius: 8px; object-fit: contain; }
+.lightbox figure img { max-width: min(82vw, 1200px); max-height: 80vh; border-radius: var(--radius-sm); object-fit: contain; }
 .lightbox figcaption { margin-top: 10px; color: white; }
 .lightbox-close { position: absolute; top: 20px; right: 22px; }
 .lightbox-nav { width: 45px; height: 45px; border: 1px solid rgb(255 255 255 / 35%); border-radius: 50%; background: rgb(0 0 0 / 28%); color: white; font-size: 2.3rem; cursor: pointer; }
