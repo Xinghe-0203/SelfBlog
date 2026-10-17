@@ -56,9 +56,10 @@ public class DataInitializer implements CommandLineRunner {
             // Upgrade the legacy sample credential once without replacing a password the owner changed.
             if (adminPassword != null && adminPassword.length() >= 12
                     && passwordEncoder.matches("Admin123", existingAdmin.getPassword())) {
-                existingAdmin.setPassword(passwordEncoder.encode(adminPassword));
-                sysUserMapper.updateById(existingAdmin);
-                log.warn("已将旧版示例管理员密码替换为 .env 中的 ADMIN_PASSWORD");
+                if (sysUserMapper.updatePasswordIfUnchanged(existingAdmin.getId(), existingAdmin.getPassword(),
+                        passwordEncoder.encode(adminPassword)) == 1) {
+                    log.warn("已将旧版示例管理员密码替换为 .env 中的 ADMIN_PASSWORD");
+                }
             }
             log.info("作者管理员账户已存在，跳过初始化");
         }

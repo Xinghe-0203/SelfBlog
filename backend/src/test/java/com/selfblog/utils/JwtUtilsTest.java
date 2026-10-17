@@ -1,5 +1,7 @@
 package com.selfblog.utils;
 
+import com.selfblog.entity.SysUser;
+import com.selfblog.mapper.SysUserMapper;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.JwtException;
@@ -12,6 +14,8 @@ import java.util.Map;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.*;
 
 @DisplayName("JwtUtils 单元测试")
 class JwtUtilsTest {
@@ -31,6 +35,15 @@ class JwtUtilsTest {
         ReflectionTestUtils.setField(jwtUtils, "secret", TEST_SECRET);
         ReflectionTestUtils.setField(jwtUtils, "expiration", TEST_EXPIRATION);
         ReflectionTestUtils.setField(jwtUtils, "refreshExpiration", TEST_REFRESH_EXPIRATION);
+        SysUserMapper mapper = mock(SysUserMapper.class);
+        when(mapper.selectById(anyLong())).thenAnswer(invocation -> {
+            SysUser user = new SysUser();
+            user.setId(invocation.getArgument(0));
+            user.setPassword("stored-bcrypt-hash");
+            user.setStatus(1);
+            return user;
+        });
+        ReflectionTestUtils.setField(jwtUtils, "sysUserMapper", mapper);
         Map<String, Long> blacklist = (Map<String, Long>) ReflectionTestUtils.getField(jwtUtils, "tokenBlacklist");
         if (blacklist != null) blacklist.clear();
         Map<Long, Set<String>> devices = (Map<Long, Set<String>>) ReflectionTestUtils.getField(jwtUtils, "userDeviceTokens");

@@ -1,18 +1,26 @@
 package com.selfblog.utils;
 
 import com.selfblog.common.exception.BusinessException;
+import com.selfblog.entity.SysUser;
+import com.selfblog.mapper.SysUserMapper;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import jakarta.annotation.PostConstruct;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
+import javax.crypto.Mac;
 import javax.crypto.SecretKey;
+import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
+import java.security.GeneralSecurityException;
+import java.security.MessageDigest;
+import java.util.Base64;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
@@ -37,6 +45,37 @@ public class JwtUtils {
 
     private static final String AUTHORIZATION_HEADER = "Authorization";
     private static final String BEARER_PREFIX = "Bearer ";
+    private static final String CREDENTIAL_VERSION = "credentialVersion";
+
+    @Autowired
+    private SysUserMapper sysUserMapper;
+
+    /**
+     * 使用持久密码哈希作为凭据版本；只将域分离的 HMAC 放入 JWT，不暴露 BCrypt 哈希。
+     * 登录必须传入实际通过密码验证的快照，不能在验证后重新读取新版密码来签发令牌。
+     */
+    public String credentialVersionFor(SysUser user) {
+        if (user == null || user.getId() == null || !StringUtils.hasText(user.getPassword())) {
+            throw new BusinessException(401, "用户凭据不可用，请重新登录");
+        }
+        try {
+            Mac mac = Mac.getInstance("HmacSHA256");
+            mac.init(new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
+            String input = "selfblog:credential-version:v1\n" + user.getId() + "\n" + user.getPassword();
+            return Base64.getUrlEncoder().withoutPadding()
+                    .encodeToString(mac.doFinal(input.getBytes(StandardCharsets.UTF_8)));
+        } catch (GeneralSecurityException e) {
+            throw new IllegalStateException("无法计算凭据版本", e);
+        }
+    }
+
+    public String getCredentialVersionFromToken(String token) {
+        String version = parseToken(token).get(CREDENTIAL_VERSION, String.class);
+        if (!StringUtils.hasText(version)) {
+            throw new BusinessException(401, "登录凭据已升级，请重新登录");
+        }
+        return version;
+    }
 
     /**
      * Token黑名单：存储已撤销的Token
@@ -69,10 +108,15 @@ public class JwtUtils {
      * 生成 Token（包含角色）
      */
     public String generateToken(Long userId, String username, String role) {
+        return generateToken(userId, username, role, credentialVersionFor(sysUserMapper.selectById(userId)));
+    }
+
+    public String generateToken(Long userId, String username, String role, String credentialVersion) {
         Map<String, Object> claims = new HashMap<>();
         claims.put("userId", userId);
         claims.put("username", username);
         claims.put("role", role);
+        claims.put(CREDENTIAL_VERSION, credentialVersion);
         return createToken(claims, username, expiration);
     }
 
@@ -80,10 +124,15 @@ public class JwtUtils {
      * 生成刷新Token（用于获取新的访问Token）
      */
     public String generateRefreshToken(Long userId, String username, String role) {
+        return generateRefreshToken(userId, username, role, credentialVersionFor(sysUserMapper.selectById(userId)));
+    }
+
+    public String generateRefreshToken(Long userId, String username, String role, String credentialVersion) {
         Map<String, Object> claims = new HashMap<>();
         claims.put("userId", userId);
         claims.put("username", username);
         claims.put("role", role);
+        claims.put(CREDENTIAL_VERSION, credentialVersion);
         claims.put("type", "refresh");
         claims.put("jti", java.util.UUID.randomUUID().toString());
         return createToken(claims, username, refreshExpiration);
@@ -224,16 +273,34 @@ public class JwtUtils {
      * 检查Token是否已被撤销
      */
     public boolean isTokenRevoked(String token) {
-        if (!tokenBlacklist.containsKey(token)) {
-            return false;
+        Long blacklistedUntil = token == null ? null : tokenBlacklist.get(token);
+        if (blacklistedUntil != null) {
+            if (blacklistedUntil <= 0 || blacklistedUntil >= System.currentTimeMillis()) {
+                return true;
+            }
+            tokenBlacklist.remove(token, blacklistedUntil);
         }
-        // 检查黑名单中的token是否已过期（过期则移除）
-        Long expiration = tokenBlacklist.get(token);
-        if (expiration != null && expiration > 0 && expiration < System.currentTimeMillis()) {
-            tokenBlacklist.remove(token);
-            return false;
+        try {
+            Claims claims = parseToken(token);
+            String version = claims.get(CREDENTIAL_VERSION, String.class);
+            Long userId = claims.get("userId", Long.class);
+            // 无版本的升级前令牌必须重新登录，不能自动赋予当前密码版本。
+            if (!StringUtils.hasText(version) || userId == null) {
+                return true;
+            }
+            // 不缓存：撤销以数据库密码提交为界，进程重启/另一实例也能识别旧令牌。
+            SysUser user = sysUserMapper.selectById(userId);
+            if (user == null || !StringUtils.hasText(user.getPassword())
+                    || Integer.valueOf(1).equals(user.getIsDeleted())
+                    || Integer.valueOf(0).equals(user.getStatus())) {
+                return true;
+            }
+            String currentVersion = credentialVersionFor(user);
+            return !MessageDigest.isEqual(version.getBytes(StandardCharsets.UTF_8),
+                    currentVersion.getBytes(StandardCharsets.UTF_8));
+        } catch (io.jsonwebtoken.JwtException | IllegalArgumentException e) {
+            return true;
         }
-        return true;
     }
 
     /**
@@ -249,15 +316,16 @@ public class JwtUtils {
             if (!"refresh".equals(claims.get("type", String.class))) {
                 throw new BusinessException(401, "无效的refresh token类型");
             }
-            String tokenId = claims.getId();
-            if (tokenId != null) {
-                // 无Redis时的兜底：将旧refresh token加入黑名单
-                revokeToken(oldRefreshToken);
+            if (isTokenRevoked(oldRefreshToken)) {
+                throw new BusinessException(401, "刷新Token已过期或已撤销");
             }
+            String version = getCredentialVersionFromToken(oldRefreshToken);
+            revokeToken(oldRefreshToken);
             Long userId = claims.get("userId", Long.class);
             String username = claims.getSubject();
             String role = claims.get("role", String.class);
-            return generateRefreshToken(userId, username, role);
+            // 保留旧凭据版本；并发改密不能把旧刷新令牌升级成新会话。
+            return generateRefreshToken(userId, username, role, version);
         } catch (BusinessException e) {
             throw e;
         } catch (Exception e) {
@@ -267,7 +335,9 @@ public class JwtUtils {
     }
 
     /**
-     * 撤销用户的所有Token（踢出所有设备）
+     * 密码更新后清理当前进程登记的设备。
+     * 所有访问/刷新令牌的持久撤销由 credentialVersion 与数据库密码不一致保证，
+     * 调用方必须先在同一事务中更新密码；此内存映射不承担跨重启的撤销职责。
      * @param userId 用户ID
      */
     public void revokeAllUserTokens(Long userId) {

@@ -2,11 +2,20 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.selfblog.mapper.SysUserMapper">
 
+    <!-- 跨 MySQL/SQLite/H2 的密码条件更新；实体更新永不隐式写密码。 -->
+    <update id="updatePasswordIfUnchanged">
+        UPDATE sys_user SET password = #{newPassword}, update_time = CURRENT_TIMESTAMP
+        WHERE id = #{userId} AND password = #{oldPassword} AND is_deleted = 0
+    </update>
+
     <!-- MySQL: 原子性增加登录失败计数并检查是否需要锁定 -->
     <update id="incrementLoginFailCount" databaseId="mysql">
-        UPDATE sys_user SET login_fail_count = LEAST(login_fail_count + 1, 2147483647),
-            lock_until = CASE WHEN login_fail_count + 1 &gt;= #{maxFailCount}
-            THEN TIMESTAMPADD(MINUTE, #{lockMinutes}, NOW()) ELSE lock_until END
+        <!-- MySQL 单表 UPDATE 的赋值从左到右求值，后面的表达式会看到前面刚写入的新值：
+             lock_until 必须在 login_fail_count 之前赋值，否则 CASE 里的 +1 会把新计数再加一次，
+             导致提前一次锁定（第 4 次失败即锁定，而不是第 5 次）。H2/SQLite/SQL 标准语义用旧值，无此问题。 -->
+        UPDATE sys_user SET lock_until = CASE WHEN login_fail_count + 1 &gt;= #{maxFailCount}
+            THEN TIMESTAMPADD(MINUTE, #{lockMinutes}, NOW()) ELSE lock_until END,
+            login_fail_count = LEAST(login_fail_count + 1, 2147483647)
             WHERE id = #{userId} AND (lock_until IS NULL OR lock_until &lt;= NOW())
     </update>
 

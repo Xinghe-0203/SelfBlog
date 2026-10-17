@@ -1,6 +1,7 @@
 package com.selfblog.service.auth.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
@@ -226,15 +227,16 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
 
         // 登录成功，重置失败计数和锁定
         if (user.getLoginFailCount() == null || user.getLoginFailCount() > 0) {
-            user.setLoginFailCount(0);
-            user.setLockUntil(null);
-            this.updateById(user);
+            this.update(new LambdaUpdateWrapper<SysUser>()
+                    .eq(SysUser::getId, user.getId())
+                    .set(SysUser::getLoginFailCount, 0)
+                    .set(SysUser::getLockUntil, null));
         }
 
-        // 生成 Token（包含角色）
-        String token = jwtUtils.generateToken(user.getId(), user.getUsername(), user.getRole());
-        // 生成刷新Token（7天有效期）
-        String refreshToken = jwtUtils.generateRefreshToken(user.getId(), user.getUsername(), user.getRole());
+        // 令牌对绑定实际通过密码验证的快照，并发改密时不能升级旧凭据。
+        String credentialVersion = jwtUtils.credentialVersionFor(user);
+        String token = jwtUtils.generateToken(user.getId(), user.getUsername(), user.getRole(), credentialVersion);
+        String refreshToken = jwtUtils.generateRefreshToken(user.getId(), user.getUsername(), user.getRole(), credentialVersion);
 
         // 注册设备Token
         jwtUtils.registerDeviceToken(user.getId(), token);
@@ -303,8 +305,10 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
         validatePasswordStrength(newPassword);
 
         // 更新密码
-        user.setPassword(passwordEncoder.encode(newPassword));
-        this.updateById(user);
+        if (baseMapper.updatePasswordIfUnchanged(user.getId(), user.getPassword(),
+                passwordEncoder.encode(newPassword)) != 1) {
+            throw new BusinessException(409, "密码已发生变化，请重新登录后重试");
+        }
 
         // 密码修改后使当前用户所有 Token 失效
         jwtUtils.revokeAllUserTokens(userId);
@@ -550,8 +554,10 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
         }
 
         String newPassword = generateRandomPassword(12);
-        user.setPassword(passwordEncoder.encode(newPassword));
-        this.updateById(user);
+        if (baseMapper.updatePasswordIfUnchanged(user.getId(), user.getPassword(),
+                passwordEncoder.encode(newPassword)) != 1) {
+            throw new BusinessException(409, "密码已发生变化，请重新登录后重试");
+        }
         jwtUtils.revokeAllUserTokens(userId);
 
         log.info("管理员重置用户密码: adminId={}, targetUserId={}, targetUsername={}",
@@ -610,8 +616,10 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
         }
 
         // 更新密码
-        user.setPassword(passwordEncoder.encode(newPassword));
-        this.updateById(user);
+        if (baseMapper.updatePasswordIfUnchanged(user.getId(), user.getPassword(),
+                passwordEncoder.encode(newPassword)) != 1) {
+            throw new BusinessException(409, "密码已发生变化，请重新登录后重试");
+        }
         jwtUtils.revokeAllUserTokens(user.getId());
         log.info("用户密码重置成功: userId={}, email={}", user.getId(), StringMaskUtils.maskEmail(email));
     }

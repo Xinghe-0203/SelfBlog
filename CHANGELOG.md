@@ -26,7 +26,7 @@
 - 本地实测：后端 `./mvnw.cmd test -Dskip.npm=true -Dskip.installnodenpm=true` = **564 tests, 0 failures**；前端 43 文件 / 400 tests，`lint:check`（0 错误 / 43 警告）、`format:check`、`type-check`、`build`、`test:deployment` 27/27 全绿。
 - CI：`mysql` 与 `docker` 任务是本仓库对真实 MySQL 与容器运行的唯一验证通道。
 - 仍未验证（不当作已验证）：真实 Vercel 部署、搜索引擎实际收录。
-- CI 首轮运行即抓到 4 类本地 H2 看不到的真实缺陷，已修复：MySQL 的 `TIMESTAMPADD('MINUTE', …)` 引号单位（`SysUserMapper`）、趋势 upsert 绑定 null 计数（`TrendingServiceImpl` 显式落 0，H2 测试 schema 同步补齐 NOT NULL 约束）、测试 SQL 字符串里的下划线数字字面量（MySQL 当列名）、CI 裸 `docker run` 漏传 `JWT_EXPIRATION`/`JWT_REFRESH_EXPIRATION` 导致启动校验拒启。详见 `docs/agents/backend.md` 的 “Database portability” 一节。
+- CI 首轮运行即抓到 4 类本地 H2 看不到的真实缺陷，已修复：MySQL 的 `TIMESTAMPADD('MINUTE', …)` 引号单位（`SysUserMapper`）、趋势 upsert 绑定 null 计数（`TrendingServiceImpl` 显式落 0，H2 测试 schema 同步补齐 NOT NULL 约束）、测试 SQL 字符串里的下划线数字字面量（MySQL 当列名）、CI 裸 `docker run` 漏传 `JWT_EXPIRATION`/`JWT_REFRESH_EXPIRATION` 导致启动校验拒启；第二轮又抓到第 5 类：MySQL 单表 UPDATE 赋值从左到右求值导致登录锁定提前一次（`SysUserMapper.incrementLoginFailCount` 调整赋值顺序）。详见 `docs/agents/backend.md` 的 “Database portability” 一节。
 
 ### 影响文件
 

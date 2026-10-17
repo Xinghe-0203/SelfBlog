@@ -67,7 +67,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                         log.debug("Refresh token allowed on /user/refresh endpoint");
                     }
 
-                    // 必须先验证 Token 签名，再检查黑名单
+                    // 验证签名、过期、黑名单及当前数据库凭据版本（改密后跨重启失效）。
                     if (!jwtUtils.isTokenExpired(token) && !jwtUtils.isTokenRevoked(token)) {
                         Long userId = jwtUtils.getUserIdFromToken(token);
                         String username = jwtUtils.getUsernameFromToken(token);

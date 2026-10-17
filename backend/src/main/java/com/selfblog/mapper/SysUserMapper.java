@@ -17,6 +17,11 @@ import java.util.Map;
 @Mapper
 public interface SysUserMapper extends BaseMapper<SysUser> {
 
+    /** 只在密码快照仍有效时更新，防止并发改密覆盖另一笔已提交的密码。 */
+    int updatePasswordIfUnchanged(@Param("userId") Long userId,
+                                  @Param("oldPassword") String oldPassword,
+                                  @Param("newPassword") String newPassword);
+
     /**
      * 原子性增加登录失败计数并检查是否需要锁定
      */

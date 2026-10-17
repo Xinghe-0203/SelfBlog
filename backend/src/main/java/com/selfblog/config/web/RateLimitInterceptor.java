@@ -39,11 +39,15 @@ public class RateLimitInterceptor implements HandlerInterceptor {
         int maxRequests = 0;
         boolean matched = false;
 
+        int longestMatch = -1;
         for (Map.Entry<String, Integer> entry : allLimits.entrySet()) {
-            if (path.startsWith(entry.getKey())) {
+            String prefix = entry.getKey();
+            String base = prefix.endsWith("/") ? prefix.substring(0, prefix.length() - 1) : prefix;
+            // 根路径和子路径均受保护，但不能把同名开头的另一个路径当作子路径。
+            if ((path.equals(base) || path.startsWith(base + "/")) && base.length() > longestMatch) {
                 maxRequests = entry.getValue();
                 matched = true;
-                break;
+                longestMatch = base.length();
             }
         }
 

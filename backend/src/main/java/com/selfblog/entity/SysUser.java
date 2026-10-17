@@ -41,6 +41,8 @@ public class SysUser implements Serializable {
     @JsonIgnore
     @ToString.Exclude
     @Schema(description = "密码")
+    // 通用实体更新不得把旧密码快照写回；改密只能走专用的条件更新 SQL。
+    @TableField(updateStrategy = FieldStrategy.NEVER)
     private String password;
 
     /**

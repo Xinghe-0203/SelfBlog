@@ -191,10 +191,13 @@ public class SysUserController {
                 throw new BusinessException(403, "账号已被锁定");
             }
 
+            // 必须继承已验证的旧版本，不能因检查后的并发改密而签发新密码版本的令牌。
+            String credentialVersion = jwtUtils.getCredentialVersionFromToken(refreshToken);
             jwtUtils.revokeToken(refreshToken);
 
-            String newToken = jwtUtils.generateToken(userId, username, role);
-            String newRefreshToken = jwtUtils.generateRefreshToken(userId, username, role);
+            String newToken = jwtUtils.generateToken(userId, username, role, credentialVersion);
+            String newRefreshToken = jwtUtils.generateRefreshToken(userId, username, role, credentialVersion);
+            jwtUtils.registerDeviceToken(userId, newToken);
 
             UserLoginResponse response = new UserLoginResponse();
             response.setToken(newToken);

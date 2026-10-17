@@ -365,7 +365,7 @@ Controller（控制器）→ Service（服务）→ Mapper（数据访问）→ 
 - 公开阅读 HTML（200）使用 ETag + `must-revalidate`，未变更请求返回 304；深色模式首屏不再闪烁（内联引导脚本先于首帧生效）
 - 前端清理 25 个零引用遗留社区文件（保留 `/password-change`，并在后台设置中新增入口）；`format:check` 修复为真实可用的仓库级闸门
 - `AGENTS.md` 拆分为入口页 + `docs/agents/backend.md` / `docs/agents/frontend.md`；`backend/schema.sql` 改名 `schema-fresh-install.sql`，删除无用的 `entrypoint.sh` 与 `backend/.dockerignore`
-- 门禁：前端 43 文件 / 400 测试（lint/format/type/build/部署契约 27/27 全绿），后端 564 测试（本地 H2 与 CI 真实 MySQL）；CI 首轮运行抓出并修复 4 类 H2 看不到的真实环境缺陷（MySQL `TIMESTAMPADD` 单位引号、趋势 upsert 绑定 null、SQL 中的下划线数字字面量、Docker 启动缺少 JWT 过期配置）
+- 门禁：前端 43 文件 / 400 测试（lint/format/type/build/部署契约 27/27 全绿），后端 564 测试（本地 H2 与 CI 真实 MySQL）；CI 前两轮运行抓出并修复 5 类 H2 看不到的真实环境缺陷（MySQL `TIMESTAMPADD` 单位引号、趋势 upsert 绑定 null、SQL 中的下划线数字字面量、Docker 启动缺少 JWT 过期配置、MySQL 单表 UPDATE 赋值顺序导致锁定提前一次）
 
 ### v2.0.25 (2026-10-14)
 

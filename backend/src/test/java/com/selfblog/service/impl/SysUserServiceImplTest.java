@@ -53,8 +53,9 @@ public class SysUserServiceImplTest {
         // 重置Mock
         reset(jwtUtils);
         // 设置Mock JWT返回值
-        when(jwtUtils.generateToken(anyLong(), anyString(), anyString())).thenReturn("mock.jwt.token");
-        when(jwtUtils.generateRefreshToken(anyLong(), anyString(), anyString())).thenReturn("mock.refresh.token");
+        when(jwtUtils.credentialVersionFor(any(SysUser.class))).thenReturn("mock.credential.version");
+        when(jwtUtils.generateToken(anyLong(), anyString(), anyString(), anyString())).thenReturn("mock.jwt.token");
+        when(jwtUtils.generateRefreshToken(anyLong(), anyString(), anyString(), anyString())).thenReturn("mock.refresh.token");
     }
 
     private SysUser createTestUser(String username, String role) {
