@@ -123,6 +123,8 @@ jobs:
           docker run -d --name selfblog-ci -p 8825:8825 \
             -e DB_TYPE=sqlite \
             -e JWT_SECRET=ci-only-jwt-secret-0123456789abcdefghijklmn \
+            -e JWT_EXPIRATION=86400000 \
+            -e JWT_REFRESH_EXPIRATION=604800000 \
             -e ADMIN_PASSWORD=ci-only-admin-password \
             selfblog:ci
           ready=0

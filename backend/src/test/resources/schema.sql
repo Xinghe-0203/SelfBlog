@@ -180,11 +180,12 @@ CREATE TABLE IF NOT EXISTS blog_notification (
 CREATE TABLE IF NOT EXISTS blog_trending (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     post_id BIGINT NOT NULL,
-    score DOUBLE DEFAULT 0,
-    view_count INT DEFAULT 0,
-    like_count INT DEFAULT 0,
-    comment_count INT DEFAULT 0,
-    date DATE,
+    -- 与 MySQL/SQLite 一致：计数列与统计日期均为 NOT NULL（趋势 upsert 必须显式落 0）
+    score DOUBLE NOT NULL DEFAULT 0,
+    view_count INT NOT NULL DEFAULT 0,
+    like_count INT NOT NULL DEFAULT 0,
+    comment_count INT NOT NULL DEFAULT 0,
+    date DATE NOT NULL,
     create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     is_deleted INT DEFAULT 0,

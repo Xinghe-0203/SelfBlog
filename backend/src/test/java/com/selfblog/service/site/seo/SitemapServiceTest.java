@@ -45,8 +45,8 @@ class SitemapServiceTest {
         for (long index = 0; index < 1001; index++) rows.add(new Object[] { 2_000_000L + index, "批量文章" + index });
         jdbc.batchUpdate("INSERT INTO blog_post(id,user_id,title,content,status,is_deleted,create_time) "
                 + "VALUES(?,1,?,'正文',1,0,TIMESTAMP '2026-10-01 08:00:00')", rows);
-        jdbc.update("INSERT INTO blog_post(id,user_id,title,content,status,is_deleted,create_time) VALUES(2_999_999,1,'待审草稿','x',0,0,TIMESTAMP '2026-10-01 08:00:00')");
-        jdbc.update("INSERT INTO blog_post(id,user_id,title,content,status,is_deleted,create_time) VALUES(2_999_998,1,'已删除','x',1,1,TIMESTAMP '2026-10-01 08:00:00')");
+        jdbc.update("INSERT INTO blog_post(id,user_id,title,content,status,is_deleted,create_time) VALUES(2999999,1,'待审草稿','x',0,0,TIMESTAMP '2026-10-01 08:00:00')");
+        jdbc.update("INSERT INTO blog_post(id,user_id,title,content,status,is_deleted,create_time) VALUES(2999998,1,'已删除','x',1,1,TIMESTAMP '2026-10-01 08:00:00')");
 
         String shardOne = sitemaps.shard("posts", 1, BASE);
         String shardTwo = sitemaps.shard("posts", 2, BASE);

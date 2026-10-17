@@ -6,7 +6,7 @@
     <update id="incrementLoginFailCount" databaseId="mysql">
         UPDATE sys_user SET login_fail_count = LEAST(login_fail_count + 1, 2147483647),
             lock_until = CASE WHEN login_fail_count + 1 &gt;= #{maxFailCount}
-            THEN TIMESTAMPADD('MINUTE', #{lockMinutes}, NOW()) ELSE lock_until END
+            THEN TIMESTAMPADD(MINUTE, #{lockMinutes}, NOW()) ELSE lock_until END
             WHERE id = #{userId} AND (lock_until IS NULL OR lock_until &lt;= NOW())
     </update>
 

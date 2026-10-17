@@ -399,8 +399,9 @@ public class TrendingServiceImpl extends ServiceImpl<BlogTrendingMapper, BlogTre
         trending.setPostId(postId);
         trending.setScore((double)score);
         trending.setViewCount(post.getViewCount() != null ? post.getViewCount().intValue() : 0);
-        trending.setLikeCount(post.getLikeCount());
-        trending.setCommentCount(post.getCommentCount());
+        // MySQL/SQLite 的 like_count/comment_count 是 NOT NULL：这里必须显式落 0，不能绑定 null
+        trending.setLikeCount(post.getLikeCount() != null ? post.getLikeCount() : 0);
+        trending.setCommentCount(post.getCommentCount() != null ? post.getCommentCount() : 0);
         trending.setStatDate(todayStart.toLocalDate());
 
         baseMapper.upsert(trending);
@@ -466,8 +467,9 @@ public class TrendingServiceImpl extends ServiceImpl<BlogTrendingMapper, BlogTre
         trending.setPostId(post.getId());
         trending.setScore((double)score);
         trending.setViewCount(post.getViewCount() != null ? post.getViewCount().intValue() : 0);
-        trending.setLikeCount(post.getLikeCount());
-        trending.setCommentCount(post.getCommentCount());
+        // MySQL/SQLite 的 like_count/comment_count 是 NOT NULL：这里必须显式落 0，不能绑定 null
+        trending.setLikeCount(post.getLikeCount() != null ? post.getLikeCount() : 0);
+        trending.setCommentCount(post.getCommentCount() != null ? post.getCommentCount() : 0);
         trending.setStatDate(todayStart.toLocalDate());
 
         baseMapper.upsert(trending);
