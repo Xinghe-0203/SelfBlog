@@ -14,7 +14,7 @@ $env:JAVA_HOME = 'C:\Program Files\Java\jdk-21'
 - **Quote the `-D…` arguments in PowerShell.** An unquoted `-Dskip.npm=true` can be split by PowerShell's argument parsing and Maven fails with `Unknown lifecycle phase ".npm=true"` (observed).
 - **Always pass `-Dskip.npm=true -Dskip.installnodenpm=true` for backend test runs.** `pom.xml` wires `frontend-maven-plugin`, which otherwise runs `npm ci` + `npm run build` in `../frontend` on every build (bound to `initialize`/`generate-resources`). With the skips a single test class finishes in ~8s; without them the whole frontend is rebuilt first.
 - **Consequence: a plain `mvn test` mutates frontend build output.** Never run it while frontend files are mid-edit.
-- Baseline as of 2026-10-17: full suite = **588 tests, 0 failures, BUILD SUCCESS** (grew from 564 with the comment rate-limiting / session-security regression set). Never leave the suite below that.
+- Baseline as of 2026-10-17: full suite = **589 tests, 0 failures, BUILD SUCCESS** (grew from 564 with the comment rate-limiting / session-security regression set, plus the post-list cache-key tests; one dead `evictStatsCache` test was removed the same day). Never leave the suite below that.
 - The plugin provisions its own Node **v24.15.0** at `backend/target/frontend/node/` (`node.exe`, `npm.cmd`, `npx.cmd`, npm 11.12.1). This is the Node that satisfies `engine-strict`; see `docs/agents/frontend.md`. It lives under `target/`, so a `mvn clean` (or manual target cleanup) removes it — the next full Maven build re-provisions it.
 
 ```sh

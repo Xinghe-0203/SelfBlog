@@ -165,7 +165,7 @@ public class BlogPostServiceImpl extends ServiceImpl<BlogPostMapper, BlogPost> i
     }
 
     @Override
-    @CacheEvict(value = {CaffeineCacheConfig.TRENDING_CACHE, CaffeineCacheConfig.STATS_CACHE}, allEntries = true)
+    @CacheEvict(value = {CaffeineCacheConfig.TRENDING_CACHE, CaffeineCacheConfig.STATS_CACHE, CaffeineCacheConfig.CATEGORY_CACHE}, allEntries = true)
     @Transactional(rollbackFor = Exception.class)
     public void updatePost(PostCreateRequest request, Long userId, boolean isAdmin) {
         if (request.getId() == null) {

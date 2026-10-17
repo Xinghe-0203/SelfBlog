@@ -63,13 +63,6 @@ export const postApi = {
   },
 
   /**
-   * 增加浏览量
-   */
-  incrementViewCount(id: number | string): Promise<ApiResponse> {
-    return api.put(`/post/${id}/view`)
-  },
-
-  /**
    * 保存草稿
    */
   saveDraft(data: CreatePostRequest): Promise<ApiResponse<Draft>> {
@@ -102,26 +95,5 @@ export const postApi = {
    */
   advancedSearch(params: PostSearchParams): Promise<PaginatedResponse<Post>> {
     return api.get('/post/search/advanced', { params })
-  },
-
-  /**
-   * 搜索建议
-   */
-  searchSuggest(keyword: string): Promise<ApiResponse<string[]>> {
-    return api.get('/post/search/suggest', { params: { keyword } })
-  },
-
-  /**
-   * 获取我的文章
-   */
-  getMyPosts(params: { pageNum?: number; pageSize?: number }): Promise<PaginatedResponse<Post>> {
-    return api.get('/post/my', { params })
-  },
-
-  /**
-   * 获取我的草稿
-   */
-  getMyDrafts(params: { pageNum?: number; pageSize?: number }): Promise<PaginatedResponse<Draft>> {
-    return api.get('/post/draft/my', { params })
   }
 }

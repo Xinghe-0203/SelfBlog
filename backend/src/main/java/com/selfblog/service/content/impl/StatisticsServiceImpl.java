@@ -7,7 +7,6 @@ import com.selfblog.mapper.*;
 import com.selfblog.service.content.StatisticsService;
 import com.selfblog.vo.content.StatisticsVO;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -146,21 +145,6 @@ public class StatisticsServiceImpl implements StatisticsService {
         stats.setMonthNewUsers(sysUserMapper.selectCount(monthWrapper));
         stats.setActiveUsers(getActiveUsersThisWeek());
         return stats;
-    }
-
-    /**
-     * Evict all stats cache entries. Call this after any admin write operations
-     * that change statistics (create/delete posts, users, comments, etc.).
-     * 
-     * Usage in other services:
-     *   @Autowired private StatisticsService statisticsService;
-     *   
-     *   @CacheEvict(value = CaffeineCacheConfig.STATS_CACHE, allEntries = true)
-     *   public void createPost(...) { ... }
-     */
-    @CacheEvict(value = CaffeineCacheConfig.STATS_CACHE, allEntries = true)
-    public void evictStatsCache() {
-        // Intentionally empty - annotation handles cache eviction
     }
 
     private Long getActiveUsersThisWeek() {

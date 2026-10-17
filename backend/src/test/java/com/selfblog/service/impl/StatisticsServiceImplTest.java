@@ -29,10 +29,4 @@ class StatisticsServiceImplTest {
         StatisticsVO stats = statisticsService.getCommunityStats();
         assertNotNull(stats);
     }
-
-    @Test
-    @DisplayName("清空统计缓存不抛异常")
-    void evictStatsCache_NoException() {
-        assertDoesNotThrow(() -> statisticsService.evictStatsCache());
-    }
 }

@@ -4,6 +4,36 @@
 
 ---
 
+## 未发布 — 缓存正确性与无用代码清理 (2026-10-17)
+
+### 修复
+
+- **文章列表缓存串号（F1）**：`getPostList` 的缓存 key 缺少 `keyword`/`userId`/`tagId`，同一分页/分类/排序下不同关键字、不同作者、不同标签的查询会互相返回对方的结果。key 现补齐三个过滤维度。
+- **编辑文章后标签/分类缓存陈旧（F6）**：`updatePost` 的 `@CacheEvict` 漏掉 `categoryCache`，改分类或标签后 `postTags:*`/`tagsByPost:*` 缓存最长 30 分钟不失效。现与 `createPost`/`deletePost` 对齐，三个缓存一起清。
+- 前端 `src/api/post.ts` 删除四个无任何调用方的封装（`incrementViewCount`/`searchSuggest`/`getMyPosts`/`getMyDrafts`）；后端公开 API 均保留，浏览计数由详情页内部逻辑处理，不受影响。
+- 后端删除无调用方的 `evictStatsCache`（接口 + 实现），统计缓存失效由写操作的 `@CacheEvict` 承担。
+- 删除上一次会话遗留的临时笔记文件 `findings.md`/`progress.md`/`task_plan.md`（未入过 git）。
+
+### 验证
+
+- 后端全量（H2）：589 项测试（588 基线 + 新增 2 - 删除 1），0 失败、0 错误、0 跳过，`BUILD SUCCESS`；新增 `PostListCacheKeyTest` 证明不同 keyword/tagId 不共享缓存条目。
+- 前端全闸门实测：type-check 0 错误、eslint 0 errors、prettier 全过、vitest 43 文件/400 tests 全过、vite build 成功、部署契约 27/27 通过。
+- 未在本机验证真实 MySQL 或部署运行。
+
+### 影响文件
+
+| 文件 | 改动类型 |
+| --- | --- |
+| `backend/src/main/java/com/selfblog/service/post/impl/PostQueryServiceImpl.java` | 列表缓存 key 补齐过滤维度 |
+| `backend/src/main/java/com/selfblog/service/post/impl/BlogPostServiceImpl.java` | updatePost 清除 categoryCache |
+| `backend/src/main/java/com/selfblog/service/content/StatisticsService.java`、`backend/src/main/java/com/selfblog/service/content/impl/StatisticsServiceImpl.java` | 删除无调用方的 evictStatsCache |
+| `backend/src/test/java/com/selfblog/service/impl/StatisticsServiceImplTest.java` | 移除对应死代码测试 |
+| `backend/src/test/java/com/selfblog/service/post/PostListCacheKeyTest.java` | 新增缓存 key 回归 |
+| `frontend/src/api/post.ts` | 删除四个无调用方封装 |
+| `findings.md`、`progress.md`、`task_plan.md` | 删除会话遗留临时文件 |
+
+---
+
 ## v2.0.26 — 评论限流与改密会话安全 (2026-10-17)
 
 ### 修复

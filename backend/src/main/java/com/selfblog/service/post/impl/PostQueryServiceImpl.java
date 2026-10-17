@@ -148,7 +148,7 @@ public class PostQueryServiceImpl extends ServiceImpl<BlogPostMapper, BlogPost> 
 
     @Override
     @Cacheable(value = CaffeineCacheConfig.TRENDING_CACHE,
-            key = "'postList:' + #request.pageNum + ':' + #request.pageSize + ':' + #request.category + ':' + #request.sort")
+            key = "'postList:' + #request.pageNum + ':' + #request.pageSize + ':' + #request.category + ':' + #request.sort + ':' + (#request.keyword ?: '') + ':' + (#request.userId ?: '') + ':' + (#request.tagId ?: '')")
     @Transactional(readOnly = true)
     public IPage<PostListResponse> getPostList(PostQueryRequest request) {
         Page<BlogPost> page = new Page<>(request.getPageNum(), request.getPageSize());
