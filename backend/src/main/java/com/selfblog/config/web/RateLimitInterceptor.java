@@ -7,6 +7,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.HandlerInterceptor;
+import org.springframework.web.util.UrlPathHelper;
 
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -31,7 +32,8 @@ public class RateLimitInterceptor implements HandlerInterceptor {
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response,
                              Object handler) throws Exception {
-        String path = request.getRequestURI();
+        // 与 MVC 查找路径保持一致：解码 URI、去掉应用上下文，编码同一路径不能绕过计数。
+        String path = UrlPathHelper.defaultInstance.getLookupPathForRequest(request);
         String ip = getClientIp(request);
 
         // 使用配置的限流阈值

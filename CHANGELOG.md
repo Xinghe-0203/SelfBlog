@@ -4,6 +4,38 @@
 
 ---
 
+## v2.0.26 — 评论限流与改密会话安全 (2026-10-17)
+
+### 修复
+
+- 匿名评论创建 `POST /api/guest-comments` 不再因配置的尾斜杠而跳过限流：使用 MVC 解码后的查找路径（去除应用上下文），路径段边界匹配同时覆盖根路径与子路径，最长规则优先；编码同一路径共用计数，保留每 IP 每路径计数和现有窗口，第 6 次创建返回 429。
+- 访问与刷新 JWT 增加密码绑定的 `credentialVersion`（域分离 HMAC，不暴露 BCrypt 哈希），每次鉴权/刷新读取当前用户凭据。改密、管理员重置、邮箱重置提交后全部旧令牌失效，包括未登记设备的令牌及服务重启后的令牌；缺失版本、不可用用户、数据库错误均拒绝认证。
+- 登录令牌对绑定实际验证的密码快照；刷新与轮换继承旧版本，避免并发改密把旧刷新令牌升级为新凭据。实体更新不再隐式写回密码，三种改密及旧样例密码初始化使用条件更新，防止旧实体覆盖新密码、复活旧会话。
+- 升级无需 schema 迁移，升级前令牌需重新登录；多实例必须同时升级。普通登出/轮换的黑名单和限流计数仍是进程内状态，本次不扩展为持久分布式会话。
+
+### 验证
+
+- 最终后端全量（H2）：588 项测试，0 失败、0 错误、0 跳过，`BUILD SUCCESS`；包含限流、JWT、真实 MockMvc 评论请求、改密/两种重置、新鉴权实例、独立 SQL 会话读取已提交密码及旧实体写回回归。
+- 最终独立 SQLite 专项：限流与评论/会话集成共 14 项，0 失败、0 错误、0 跳过，`BUILD SUCCESS`。未在本机验证真实 MySQL 或部署运行；本次不涉及前端改动。
+
+### 影响文件
+
+| 文件 | 改动类型 |
+| --- | --- |
+| `backend/src/main/java/com/selfblog/config/web/RateLimitInterceptor.java` | 路径段匹配与最长规则优先 |
+| `backend/src/main/java/com/selfblog/utils/JwtUtils.java`、`backend/src/main/java/com/selfblog/config/security/JwtAuthenticationFilter.java` | 凭据版本、撤销与轮换验证，以及过滤器说明 |
+| `backend/src/main/java/com/selfblog/controller/user/SysUserController.java` | 刷新继承已验证版本 |
+| `backend/src/main/java/com/selfblog/service/auth/impl/SysUserServiceImpl.java` | 登录快照与三种密码条件更新 |
+| `backend/src/main/java/com/selfblog/entity/SysUser.java` | 禁止通用更新写密码 |
+| `backend/src/main/java/com/selfblog/mapper/SysUserMapper.java`、`backend/src/main/resources/mapper/SysUserMapper.xml` | 密码比较并更新 SQL |
+| `backend/src/main/java/com/selfblog/config/db/DataInitializer.java` | 旧样例密码条件更新 |
+| `backend/src/test/java/com/selfblog/config/web/RateLimitInterceptorTest.java`、`backend/src/test/java/com/selfblog/utils/JwtCredentialVersionTest.java`、`backend/src/test/java/com/selfblog/controller/CommentSessionSecurityTest.java` | 新增安全回归 |
+| `backend/src/test/java/com/selfblog/utils/JwtUtilsTest.java`、`backend/src/test/java/com/selfblog/service/impl/SysUserServiceImplTest.java` | 按新签发接口调整测试桩和验证 |
+| `README.md`、`backend/README.md`、`backend/DEPLOY.md` | 安全行为与升级边界 |
+| `docs/superpowers/specs/2026-10-17-comment-session-security.md`、`docs/superpowers/plans/2026-10-17-comment-session-security.md` | 设计证据与实施计划 |
+
+---
+
 ## v2.0.26 — P0–P3 加固批次：CI、Maven Wrapper、GFM 一致性与清理 (2026-10-17)
 
 ### 说明

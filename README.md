@@ -301,11 +301,12 @@ Controller（控制器）→ Service（服务）→ Mapper（数据访问）→ 
 | 特性 | 实现方式 |
 |------|----------|
 | 密码加密 | BCrypt（强度 12），API 不返回密码字段 |
-| JWT 认证 | Access Token（24h）+ Refresh Token（7d），支持令牌轮换 |
-| 令牌黑名单 | 登出时加入黑名单，防止重放攻击 |
+| JWT 认证 | Access Token（24h）+ Refresh Token（7d），支持令牌轮换；两种令牌均绑定持久密码凭据版本 |
+| 改密撤销 | 修改/重置密码提交后，全部旧访问和刷新令牌失效，服务重启后仍有效；升级前无版本令牌需重新登录 |
+| 令牌黑名单 | 单次登出/刷新轮换的黑名单在进程内维护；不替代改密后的持久撤销 |
 | 登录锁定 | 5 次失败锁定 15 分钟（原子操作） |
 | XSS 防护 | 服务端 Jsoup HTML 净化 + 前端 DOMPurify |
-| 限流 | 路径前缀限流（RateLimitInterceptor）；站点资源上传 30 次/分钟 |
+| 限流 | 按路径段匹配、最长规则优先（RateLimitInterceptor）；匿名评论创建每 IP 5 次/分钟，站点资源上传 30 次/分钟 |
 | SQL 注入 | MyBatis Plus 参数化查询 |
 | CORS | 可配置白名单，生产环境禁止 `*` |
 | 数据校验 | Spring Validation（@Valid、@NotBlank） |

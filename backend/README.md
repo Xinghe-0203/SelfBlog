@@ -131,11 +131,12 @@ The site runs in single-author mode: registration is disabled and password authe
 | Feature | Implementation |
 |---------|---------------|
 | Password | BCrypt (strength 12), never returned in API |
-| JWT | Access Token (24h) + Refresh Token (7d) with rotation |
-| Token blacklist | Added on logout, prevents replay |
+| JWT | Access Token (24h) + Refresh Token (7d) with rotation; both bind to a persistent password-derived credential version |
+| Password changes | Changing/resetting a password invalidates all older access/refresh tokens after commit, including after restart; pre-upgrade tokens require login |
+| Token blacklist | Process-local for logout/rotation; separate from persistent password-change invalidation |
 | Login lock | 5 failures → 15 min lock (atomic update) |
 | XSS | HtmlSanitizer (Jsoup) for server-side purification |
-| Rate limiting | Path-prefix limits via `RateLimitInterceptor`; site-asset uploads: 30 requests/min |
+| Rate limiting | Segment-boundary matching, longest rule wins; guest-comment creation: 5 requests/min per IP; site-asset uploads: 30 requests/min |
 | IP protection | Format validation against IP spoofing |
 | Validation | Spring Validation (`@Valid`, `@NotBlank`) |
 | CORS | Configurable whitelist, `*` forbidden in production |

@@ -68,6 +68,18 @@ class RateLimitInterceptorTest {
     }
 
     @Test
+    void encodedAndContextPrefixedUrisShareTheActualRouteQuota() throws Exception {
+        for (int i = 0; i < 5; i++) {
+            assertTrue(call("/api/guest-comments", "203.0.113.7", new MockHttpServletResponse()));
+        }
+        assertFalse(call("/api/%67uest-comments", "203.0.113.7", new MockHttpServletResponse()));
+        var contextRequest = new MockHttpServletRequest("POST", "/blog/api/guest-comments");
+        contextRequest.setContextPath("/blog");
+        contextRequest.setRemoteAddr("203.0.113.7");
+        assertFalse(interceptor.preHandle(contextRequest, new MockHttpServletResponse(), new Object()));
+    }
+
+    @Test
     void readingCommentsDoesNotConsumeCreationQuota() throws Exception {
         for (int i = 0; i < 5; i++) {
             assertTrue(call("/api/guest-comments/post/1", "203.0.113.6", new MockHttpServletResponse()));

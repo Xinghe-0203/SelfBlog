@@ -258,8 +258,8 @@ public class SysUserServiceImplTest {
         assertEquals(username, response.getUsername());
 
         // 验证JWT生成被调用
-        verify(jwtUtils, times(1)).generateToken(anyLong(), eq(username), eq("admin"));
-        verify(jwtUtils, times(1)).generateRefreshToken(anyLong(), eq(username), eq("admin"));
+        verify(jwtUtils, times(1)).generateToken(anyLong(), eq(username), eq("admin"), eq("mock.credential.version"));
+        verify(jwtUtils, times(1)).generateRefreshToken(anyLong(), eq(username), eq("admin"), eq("mock.credential.version"));
     }
 
     @Test
@@ -279,7 +279,7 @@ public class SysUserServiceImplTest {
 
         assertEquals(403, exception.getCode());
         assertEquals("此博客仅开放作者后台登录", exception.getMessage());
-        verify(jwtUtils, never()).generateToken(anyLong(), anyString(), anyString());
+        verify(jwtUtils, never()).generateToken(anyLong(), anyString(), anyString(), anyString());
     }
 
     @Test
