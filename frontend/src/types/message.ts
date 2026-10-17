@@ -6,13 +6,7 @@ import type { ID } from './common'
 import type { User } from './user'
 
 /** 通知类型 */
-export type NotificationType =
-  | 'like'
-  | 'comment'
-  | 'follow'
-  | 'collect'
-  | 'system'
-  | 'mention'
+export type NotificationType = 'like' | 'comment' | 'follow' | 'collect' | 'system' | 'mention'
 
 /** 通知信息 */
 export interface Notification {

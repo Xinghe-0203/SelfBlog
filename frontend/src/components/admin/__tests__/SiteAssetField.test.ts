@@ -92,9 +92,7 @@ describe('SiteAssetField', () => {
     expect(call?.[0]).toBe('logo')
     expect(call?.[1]).toBe(file)
     expect(typeof call?.[2]).toBe('function')
-    expect(wrapper.emitted('update:modelValue')).toEqual([
-      ['/uploads/site-assets/logo/mock.png']
-    ])
+    expect(wrapper.emitted('update:modelValue')).toEqual([['/uploads/site-assets/logo/mock.png']])
     expect(wrapper.emitted('uploaded')).toEqual([['/uploads/site-assets/logo/mock.png']])
   })
 

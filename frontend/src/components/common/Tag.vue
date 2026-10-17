@@ -14,7 +14,17 @@
 import { computed } from 'vue'
 
 export interface TagProps {
-  variant?: 'default' | 'primary' | 'accent' | 'success' | 'warning' | 'danger' | 'info' | 'blue' | 'purple' | 'pink'
+  variant?:
+    | 'default'
+    | 'primary'
+    | 'accent'
+    | 'success'
+    | 'warning'
+    | 'danger'
+    | 'info'
+    | 'blue'
+    | 'purple'
+    | 'pink'
   size?: 'sm' | 'md'
   shape?: 'pill' | 'square'
   closable?: boolean
@@ -26,7 +36,7 @@ const props = withDefaults(defineProps<TagProps>(), {
   size: 'sm',
   shape: 'pill',
   closable: false,
-  disabled: false,
+  disabled: false
 })
 
 const emit = defineEmits<{
@@ -41,8 +51,8 @@ const classes = computed(() => [
   `tag--${props.shape}`,
   {
     'tag--closable': props.closable,
-    'tag--disabled': props.disabled,
-  },
+    'tag--disabled': props.disabled
+  }
 ])
 
 const handleClose = (e: MouseEvent) => {
@@ -60,11 +70,7 @@ const handleClick = (e: MouseEvent) => {
 </script>
 
 <template>
-  <span
-    :class="classes"
-    role="status"
-    @click="handleClick"
-  >
+  <span :class="classes" role="status" @click="handleClick">
     <span class="tag__content">
       <slot />
     </span>
@@ -77,7 +83,15 @@ const handleClick = (e: MouseEvent) => {
       :disabled="disabled"
       @click="handleClose"
     >
-      <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+      <svg
+        width="10"
+        height="10"
+        viewBox="0 0 10 10"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.5"
+        stroke-linecap="round"
+      >
         <path d="M2 2l6 6M8 2l-6 6" />
       </svg>
     </button>
@@ -144,7 +158,9 @@ const handleClick = (e: MouseEvent) => {
   cursor: pointer;
   border-radius: var(--radius-full, 9999px);
   flex-shrink: 0;
-  transition: opacity var(--duration-fast, 100ms), background var(--duration-fast, 100ms);
+  transition:
+    opacity var(--duration-fast, 100ms),
+    background var(--duration-fast, 100ms);
 }
 
 .tag__close:hover {
@@ -165,15 +181,15 @@ const handleClick = (e: MouseEvent) => {
 
 /* ==================== DEFAULT — Neutral warm gray ==================== */
 .tag--default {
-  background: var(--bg-secondary, #F5F5F4);
-  color: var(--text-secondary, #57534E);
+  background: var(--bg-secondary, #f5f5f4);
+  color: var(--text-secondary, #57534e);
   border: 1px solid var(--border, rgba(0, 0, 0, 0.06));
 }
 
 /* ==================== PRIMARY — Teal pastel ==================== */
 .tag--primary {
   background: rgba(22, 93, 255, 0.08);
-  color: #0E42D2;
+  color: #0e42d2;
   border: 1px solid rgba(22, 93, 255, 0.15);
 }
 
@@ -184,7 +200,7 @@ const handleClick = (e: MouseEvent) => {
 /* ==================== ACCENT — Coral pastel ==================== */
 .tag--accent {
   background: rgba(249, 115, 22, 0.08);
-  color: #C2410C;
+  color: #c2410c;
   border: 1px solid rgba(249, 115, 22, 0.15);
 }
 
@@ -195,7 +211,7 @@ const handleClick = (e: MouseEvent) => {
 /* ==================== SUCCESS — Emerald pastel ==================== */
 .tag--success {
   background: rgba(0, 180, 42, 0.08);
-  color: #009A29;
+  color: #009a29;
   border: 1px solid rgba(0, 180, 42, 0.15);
 }
 
@@ -206,7 +222,7 @@ const handleClick = (e: MouseEvent) => {
 /* ==================== WARNING — Amber pastel ==================== */
 .tag--warning {
   background: rgba(217, 119, 6, 0.08);
-  color: #B45309;
+  color: #b45309;
   border: 1px solid rgba(217, 119, 6, 0.15);
 }
 
@@ -217,7 +233,7 @@ const handleClick = (e: MouseEvent) => {
 /* ==================== DANGER — Red pastel ==================== */
 .tag--danger {
   background: rgba(220, 38, 38, 0.08);
-  color: #B91C1C;
+  color: #b91c1c;
   border: 1px solid rgba(220, 38, 38, 0.15);
 }
 
@@ -228,7 +244,7 @@ const handleClick = (e: MouseEvent) => {
 /* ==================== INFO — Blue pastel ==================== */
 .tag--info {
   background: rgba(37, 99, 235, 0.08);
-  color: #1D4ED8;
+  color: #1d4ed8;
   border: 1px solid rgba(37, 99, 235, 0.15);
 }
 
@@ -239,7 +255,7 @@ const handleClick = (e: MouseEvent) => {
 /* ==================== BLUE — Sky pastel ==================== */
 .tag--blue {
   background: rgba(59, 130, 246, 0.08);
-  color: #2563EB;
+  color: #2563eb;
   border: 1px solid rgba(59, 130, 246, 0.15);
 }
 
@@ -250,7 +266,7 @@ const handleClick = (e: MouseEvent) => {
 /* ==================== PURPLE — Violet pastel ==================== */
 .tag--purple {
   background: rgba(139, 92, 246, 0.08);
-  color: #7C3AED;
+  color: #7c3aed;
   border: 1px solid rgba(139, 92, 246, 0.15);
 }
 
@@ -261,7 +277,7 @@ const handleClick = (e: MouseEvent) => {
 /* ==================== PINK — Rose pastel ==================== */
 .tag--pink {
   background: rgba(236, 72, 153, 0.08);
-  color: #DB2777;
+  color: #db2777;
   border: 1px solid rgba(236, 72, 153, 0.15);
 }
 

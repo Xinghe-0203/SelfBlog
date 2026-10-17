@@ -44,7 +44,7 @@ const props = withDefaults(defineProps<InputProps>(), {
   readonly: false,
   required: false,
   size: 'md',
-  autocomplete: 'off',
+  autocomplete: 'off'
 })
 
 const emit = defineEmits<{
@@ -67,8 +67,8 @@ const wrapperClasses = computed(() => [
     'input-wrap--success': !!props.success && !props.error,
     'input-wrap--disabled': props.disabled,
     'input-wrap--readonly': props.readonly,
-    'input-wrap--has-value': props.modelValue !== '' && props.modelValue !== undefined,
-  },
+    'input-wrap--has-value': props.modelValue !== '' && props.modelValue !== undefined
+  }
 ])
 
 const handleInput = (e: Event) => {
@@ -94,11 +94,7 @@ const handleKeydown = (e: KeyboardEvent) => {
 <template>
   <div :class="wrapperClasses">
     <!-- Label -->
-    <label
-      v-if="label"
-      :for="inputId"
-      class="input-label"
-    >
+    <label v-if="label" :for="inputId" class="input-label">
       {{ label }}
       <span v-if="required" class="input-label__required" aria-hidden="true">*</span>
     </label>
@@ -146,17 +142,10 @@ const handleKeydown = (e: KeyboardEvent) => {
       >
         {{ error }}
       </p>
-      <p
-        v-else-if="success"
-        class="input-message input-message--success"
-      >
+      <p v-else-if="success" class="input-message input-message--success">
         {{ success }}
       </p>
-      <p
-        v-else-if="hint"
-        :id="`${inputId}-hint`"
-        class="input-message input-message--hint"
-      >
+      <p v-else-if="hint" :id="`${inputId}-hint`" class="input-message input-message--hint">
         {{ hint }}
       </p>
     </div>
@@ -182,23 +171,23 @@ const handleKeydown = (e: KeyboardEvent) => {
   font-weight: var(--font-medium, 500);
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--text-secondary, #57534E);
+  color: var(--text-secondary, #57534e);
   transition: color var(--duration-normal, 200ms) var(--ease-default, cubic-bezier(0.4, 0, 0.2, 1));
   cursor: default;
 }
 
 .input-label__required {
-  color: var(--error, #DC2626);
+  color: var(--error, #dc2626);
   font-size: 0.75rem;
   line-height: 1;
 }
 
 .input-wrap--focused .input-label {
-  color: var(--primary, #165DFF);
+  color: var(--primary, #165dff);
 }
 
 .input-wrap--error .input-label {
-  color: var(--error, #DC2626);
+  color: var(--error, #dc2626);
 }
 
 /* ==================== Container ==================== */
@@ -215,8 +204,8 @@ const handleKeydown = (e: KeyboardEvent) => {
   font-size: var(--text-sm, 0.8125rem);
   line-height: var(--leading-normal, 1.6);
   color: var(--text-primary, #292524);
-  background: var(--surface-solid, #FFFFFF);
-  border: 1px solid #EAEAEA;
+  background: var(--surface-solid, #ffffff);
+  border: 1px solid #eaeaea;
   border-radius: var(--radius, 8px);
   outline: none;
   transition:
@@ -226,7 +215,7 @@ const handleKeydown = (e: KeyboardEvent) => {
 }
 
 .input-field::placeholder {
-  color: var(--text-muted, #A8A29E);
+  color: var(--text-muted, #a8a29e);
 }
 
 /* Sizes */
@@ -247,7 +236,10 @@ const handleKeydown = (e: KeyboardEvent) => {
 }
 
 /* With adornments */
-.input-wrap--sm .input-field { padding-left: 12px; padding-right: 12px; }
+.input-wrap--sm .input-field {
+  padding-left: 12px;
+  padding-right: 12px;
+}
 
 .input-container:has(.input-adornment--prefix) .input-field {
   padding-left: 38px;
@@ -259,11 +251,11 @@ const handleKeydown = (e: KeyboardEvent) => {
 
 /* ==================== Focus — Lit island glow ==================== */
 .input-field:hover:not(:disabled):not(:focus) {
-  border-color: #D4D4D4;
+  border-color: #d4d4d4;
 }
 
 .input-field:focus {
-  border-color: var(--primary, #165DFF);
+  border-color: var(--primary, #165dff);
   box-shadow:
     0 0 0 3px rgba(22, 93, 255, 0.08),
     0 0 0 1px rgba(22, 93, 255, 0.12);
@@ -271,7 +263,7 @@ const handleKeydown = (e: KeyboardEvent) => {
 
 /* ==================== Error state ==================== */
 .input-wrap--error .input-field {
-  border-color: var(--error, #DC2626);
+  border-color: var(--error, #dc2626);
 }
 
 .input-wrap--error .input-field:focus {
@@ -282,7 +274,7 @@ const handleKeydown = (e: KeyboardEvent) => {
 
 /* ==================== Success state ==================== */
 .input-wrap--success .input-field {
-  border-color: var(--success, #00B42A);
+  border-color: var(--success, #00b42a);
 }
 
 .input-wrap--success .input-field:focus {
@@ -295,11 +287,11 @@ const handleKeydown = (e: KeyboardEvent) => {
 .input-wrap--disabled .input-field {
   opacity: 0.5;
   cursor: not-allowed;
-  background: var(--bg-secondary, #F5F5F4);
+  background: var(--bg-secondary, #f5f5f4);
 }
 
 .input-wrap--readonly .input-field {
-  background: var(--bg-secondary, #F5F5F4);
+  background: var(--bg-secondary, #f5f5f4);
   cursor: default;
 }
 
@@ -311,7 +303,7 @@ const handleKeydown = (e: KeyboardEvent) => {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--text-muted, #A8A29E);
+  color: var(--text-muted, #a8a29e);
   pointer-events: none;
   z-index: 1;
 }
@@ -344,15 +336,15 @@ const handleKeydown = (e: KeyboardEvent) => {
 }
 
 .input-message--error {
-  color: var(--error, #DC2626);
+  color: var(--error, #dc2626);
 }
 
 .input-message--success {
-  color: var(--success, #00B42A);
+  color: var(--success, #00b42a);
 }
 
 .input-message--hint {
-  color: var(--text-muted, #A8A29E);
+  color: var(--text-muted, #a8a29e);
 }
 
 @keyframes input-msg-enter {

@@ -6,6 +6,17 @@
   <meta name="description" content="旧的通用描述">
   <meta property="og:title" content="旧分享标题">
   <link rel="canonical" href="/">
+  <script>
+    ;(function () {
+      try {
+        var mode = localStorage.getItem('edu_theme') || 'light'
+        var dark =
+          mode === 'dark' ||
+          (mode === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)
+        if (dark) document.documentElement.classList.add('dark-mode')
+      } catch (e) {}
+    })()
+  </script>
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
   <link rel="alternate" type="application/rss+xml" title="RSS 订阅" href="/feed.xml">
   <link rel="stylesheet" href="/assets/index-abc123.css">

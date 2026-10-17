@@ -42,7 +42,8 @@ export function setupGuards(router: Router): void {
     }
 
     if (to.meta.requiresAdmin) {
-      if (!userStore.isLoggedIn) return { path: siteStore.adminRoot, query: { redirect: to.fullPath } }
+      if (!userStore.isLoggedIn)
+        return { path: siteStore.adminRoot, query: { redirect: to.fullPath } }
       if (!userStore.isAdmin) {
         logger.warn('Admin access denied', { userId: userStore.user?.id })
         toast.error('无管理员权限')

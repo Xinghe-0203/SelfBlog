@@ -81,12 +81,12 @@ img {
   transition: opacity 0.3s ease;
 }
 
-img[loading="lazy"] {
+img[loading='lazy'] {
   opacity: 0;
 }
 
-img[loading="lazy"].loaded,
-img[loading="lazy"]:not([src=""]) {
+img[loading='lazy'].loaded,
+img[loading='lazy']:not([src='']) {
   opacity: 1;
 }
 

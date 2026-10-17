@@ -6,7 +6,9 @@
 .functional-glass {
   background: var(--surface-primary);
   border: 1px solid var(--border-light);
-  box-shadow: var(--functional-glass-shadow), inset 0 1px 0 var(--functional-glass-edge);
+  box-shadow:
+    var(--functional-glass-shadow),
+    inset 0 1px 0 var(--functional-glass-edge);
 }
 
 @supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
@@ -89,9 +91,11 @@
     135deg,
     rgba(31, 108, 159, 0.15),
     rgba(255, 255, 255, 0.5),
-    rgba(31, 108, 159, 0.10)
+    rgba(31, 108, 159, 0.1)
   );
-  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
   -webkit-mask-composite: xor;
   mask-composite: exclude;
   pointer-events: none;
@@ -132,11 +136,19 @@
 }
 
 /* Backward-compat stubs — effects removed */
-.rain-bg { display: none; }
-.rain-drop { display: none; }
+.rain-bg {
+  display: none;
+}
+.rain-drop {
+  display: none;
+}
 .water-drops::before,
-.water-drops::after { display: none; }
-.water-ripple::before { display: none; }
+.water-drops::after {
+  display: none;
+}
+.water-ripple::before {
+  display: none;
+}
 
 /* Backward-compat: .wet-border */
 .wet-border {
@@ -153,9 +165,11 @@
     135deg,
     rgba(31, 108, 159, 0.15),
     rgba(255, 255, 255, 0.5),
-    rgba(31, 108, 159, 0.10)
+    rgba(31, 108, 159, 0.1)
   );
-  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
   -webkit-mask-composite: xor;
   mask-composite: exclude;
   pointer-events: none;

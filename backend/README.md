@@ -2,7 +2,7 @@
 
 Spring Boot 3 backend for a single-author personal blog. Public visitors can read and search published posts; author operations require an administrator account.
 
-**Version**: v2.0.25 | **Java**: 21 | **Spring Boot**: 3.3.13
+**Version**: v2.0.26 | **Java**: 21 | **Spring Boot**: 3.3.13
 
 ## Tech Stack
 
@@ -36,7 +36,7 @@ SQLite defaults to `./campus_blog.db` in the working directory, matching the leg
 
 ### Existing MySQL deployments
 
-Set `DB_TYPE=mysql` and configure all `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USERNAME`, and `DB_PASSWORD` values in `.env`. For an **existing** database, select it and run only `migration-selfblog.sql`; do not run `schema.sql`, which is a legacy fresh-install script containing `DROP TABLE` statements. `schema.sql` is only for a new, empty database.
+Set `DB_TYPE=mysql` and configure all `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USERNAME`, and `DB_PASSWORD` values in `.env`. For an **existing** database, select it and run only `migration-selfblog.sql`; do not run `schema-fresh-install.sql` (formerly `schema.sql`), which is a fresh-install script containing `DROP TABLE` statements. It is only for a new, empty database. CI (`.github/workflows/ci.yml`) initializes a real MySQL 8 with this script and runs the backend test suite against it.
 
 ### Local development
 

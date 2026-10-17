@@ -9,7 +9,11 @@ describe('notification host', () => {
     host.id = 'overlay-root'
     document.body.append(host)
     const wrapper = mount(Toast)
-    try { expect(host.querySelector('.toast-container')).not.toBeNull() }
-    finally { wrapper.unmount(); host.remove() }
+    try {
+      expect(host.querySelector('.toast-container')).not.toBeNull()
+    } finally {
+      wrapper.unmount()
+      host.remove()
+    }
   })
 })

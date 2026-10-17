@@ -308,7 +308,9 @@ api.interceptors.response.use(
           headers: { Authorization: `Bearer ${refreshTokenValue}` }
         })
 
-        const refreshData = (response as unknown as ApiResponse<{ token: string; refreshToken: string }>)?.data
+        const refreshData = (
+          response as unknown as ApiResponse<{ token: string; refreshToken: string }>
+        )?.data
         if (!refreshData?.token || !refreshData?.refreshToken) {
           throw new Error('Invalid refresh response')
         }
@@ -380,7 +382,10 @@ async function handleAuthError(): Promise<void> {
     try {
       const { default: router } = await import('@/router')
       const redirectPath = window.location.pathname + window.location.search
-      router.push({ path: adminRoot, query: { redirect: redirectPath !== adminRoot ? redirectPath : undefined } })
+      router.push({
+        path: adminRoot,
+        query: { redirect: redirectPath !== adminRoot ? redirectPath : undefined }
+      })
     } catch {
       window.location.href = adminRoot
     }

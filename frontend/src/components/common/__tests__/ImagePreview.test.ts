@@ -8,7 +8,10 @@ enableAutoUnmount(afterEach)
 
 describe('ImagePreview keyboard handling', () => {
   it('preserves optional photo captions and accessible image descriptions', () => {
-    const wrapper = mount(ImagePreview, { props: { images: ['/a.png'], captions: ['沿途的光影'], show: true }, global: { stubs: { teleport: true } } })
+    const wrapper = mount(ImagePreview, {
+      props: { images: ['/a.png'], captions: ['沿途的光影'], show: true },
+      global: { stubs: { teleport: true } }
+    })
     expect(wrapper.get('img').attributes('alt')).toBe('沿途的光影')
     expect(wrapper.get('.preview-caption').text()).toBe('沿途的光影')
   })
@@ -18,7 +21,10 @@ describe('ImagePreview keyboard handling', () => {
   })
 
   it('resets the selected photo when reopened with a new initial index', async () => {
-    const wrapper = mount(ImagePreview, { props: { images: ['/a.png', '/b.png'], show: false }, global: { stubs: { teleport: true, transition: true } } })
+    const wrapper = mount(ImagePreview, {
+      props: { images: ['/a.png', '/b.png'], show: false },
+      global: { stubs: { teleport: true, transition: true } }
+    })
     await wrapper.setProps({ show: true, initialIndex: 1 })
     expect(wrapper.get('img').attributes('src')).toBe('/b.png')
   })

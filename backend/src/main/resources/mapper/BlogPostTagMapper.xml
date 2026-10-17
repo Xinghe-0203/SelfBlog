@@ -36,4 +36,24 @@
         </foreach>
     </insert>
 
+    <!--
+      站点地图标签分片的 lastmod：取该标签下最新一篇已发布文章的时间。
+      可移植 SELECT（无方言语法）：软删除的文章、关联与未发布文章都不计入；
+      没有任何已发布文章的标签不会出现在结果里（分片仍列出该标签，只是没有 lastmod）。
+    -->
+    <select id="selectTagLastModified" resultType="com.selfblog.dto.site.TagLastModified">
+        SELECT pt.tag_id AS tagId,
+               MAX(COALESCE(p.update_time, p.create_time)) AS lastModified
+        FROM blog_post_tag pt
+        INNER JOIN blog_post p ON p.id = pt.post_id
+        WHERE pt.is_deleted = 0
+          AND p.is_deleted = 0
+          AND p.status = 1
+          AND pt.tag_id IN
+        <foreach collection="tagIds" item="tagId" open="(" separator="," close=")">
+            #{tagId}
+        </foreach>
+        GROUP BY pt.tag_id
+    </select>
+
 </mapper>

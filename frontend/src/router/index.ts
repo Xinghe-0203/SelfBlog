@@ -18,8 +18,7 @@ const routes: RouteRecordRaw[] = [
   ...authRoutes,
   ...postRoutes,
   ...discoverRoutes,
-  // userRoutes 此前已定义但从未注册，导致 /profile、/drafts、/collections、
-  // /messages、/notifications、/my-reports 等十多个页面全部落到 404。
+  // 用户路由仅保留修改密码页；其余社区页面已随单人博客精简移除。
   ...userRoutes,
   {
     path: '/:pathMatch(.*)*',

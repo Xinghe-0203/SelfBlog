@@ -17,6 +17,24 @@
   <meta name="theme-color" content="#191919" media="(prefers-color-scheme: dark)">
   <meta name="color-scheme" content="light dark">
 
+  <!--
+    首屏主题：在样式表生效前按本地主题设置给 <html> 加上 dark-mode，
+    避免“系统深色 + 站内浅色”的读者先看到深色再翻白（或反向闪烁）。
+    取值语义必须与 src/stores/theme.ts 保持一致（默认 light），
+    存储键也与 src/constants 的 STORAGE_KEY_PREFIX 保持一致（有测试固定）。
+  -->
+  <script>
+    ;(function () {
+      try {
+        var mode = localStorage.getItem('edu_theme') || 'light'
+        var dark =
+          mode === 'dark' ||
+          (mode === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)
+        if (dark) document.documentElement.classList.add('dark-mode')
+      } catch (e) {}
+    })()
+  </script>
+
   <!-- 订阅源自动发现：阅读器（Feedly / Inoreader / NetNewsWire 等）靠这三行找到订阅地址 -->
   <link rel="alternate" type="application/rss+xml" title="RSS 订阅" href="/feed.xml">
   <link rel="alternate" type="application/atom+xml" title="Atom 订阅" href="/atom.xml">

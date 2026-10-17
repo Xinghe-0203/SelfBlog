@@ -35,7 +35,11 @@ CREATE TABLE IF NOT EXISTS sys_user (
     lock_until TIMESTAMP NULL,
     create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    is_deleted INT DEFAULT 0
+    is_deleted INT DEFAULT 0,
+    -- 与 MySQL/SQLite 一致：用户名唯一，注册冲突依赖该约束而不是应用层查询
+    UNIQUE(username),
+    -- 与 MySQL/SQLite 一致：邮箱唯一索引，一个邮箱只能注册一个账户（NULL 可重复）
+    UNIQUE(email)
 );
 
 -- ============================================================================
@@ -277,7 +281,9 @@ CREATE TABLE IF NOT EXISTS blog_circle_like (
     user_id BIGINT NOT NULL,
     post_id BIGINT NOT NULL,
     create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    is_deleted INT DEFAULT 0
+    is_deleted INT DEFAULT 0,
+    -- 与 MySQL/SQLite 一致：同一用户对同一条动态只有一行，取消后重新点赞依赖恢复标记
+    UNIQUE(user_id, post_id)
 );
 
 -- ============================================================================
@@ -353,7 +359,9 @@ CREATE TABLE IF NOT EXISTS blog_topic (
     status INT DEFAULT 1,
     create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    is_deleted INT DEFAULT 0
+    is_deleted INT DEFAULT 0,
+    -- 与 MySQL/SQLite 一致：话题名唯一，删除后重建依赖恢复而不是新插一行
+    UNIQUE(name)
 );
 
 -- ============================================================================

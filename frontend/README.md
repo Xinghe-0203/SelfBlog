@@ -2,7 +2,7 @@
 
 Vue 3 frontend for a single-author personal blog. Public pages focus on reading, search, archives, about, and tags; writing and content management are protected by administrator-only routes.
 
-**Version**: v2.0.25 | **Vue**: 3.5.44 | **Vite**: 6.4.4
+**Version**: v2.0.26 | **Vue**: 3.5.44 | **Vite**: 6.4.4
 
 ## Tech Stack
 

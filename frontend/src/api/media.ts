@@ -76,7 +76,10 @@ export const mediaApi = {
   /**
    * 获取用户媒体列表（分页）
    */
-  getUserMediaList(params: { pageNum?: number; pageSize?: number }): Promise<PaginatedResponse<Media>> {
+  getUserMediaList(params: {
+    pageNum?: number
+    pageSize?: number
+  }): Promise<PaginatedResponse<Media>> {
     return api.get('/media/list', { params })
   }
 }

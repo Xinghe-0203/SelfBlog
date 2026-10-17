@@ -57,6 +57,7 @@ public class ReadingHtmlRenderer {
         if (image != null) meta(head, "name", "twitter:image", image);
 
         if (page.kind() == SeoModels.Kind.POST) appendJsonLd(head, page, canonical, image);
+        if (page.kind() == SeoModels.Kind.HOME) appendWebsiteJsonLd(head, page, origin);
 
         Element app = doc.getElementById("app");
         if (app != null && page.kind() != SeoModels.Kind.SHELL) {
@@ -89,13 +90,41 @@ public class ReadingHtmlRenderer {
         if (page.site() != null && page.site().title() != null && !page.site().title().isBlank()) {
             payload.put("publisher", Map.of("@type", "Organization", "name", page.site().title()));
         }
+        writeJsonLd(head, payload, "selfblog-article-jsonld");
+    }
+
+    /**
+     * 首页声明 WebSite + SearchAction：搜索引擎据此识别站点与站内搜索入口。
+     * /search 本身保持 noindex，只把它作为可执行的搜索动作暴露。
+     */
+    private void appendWebsiteJsonLd(Element head, SeoModels.ReadingPage page, String origin) {
+        if (origin == null || origin.isBlank()) return;
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("@context", "https://schema.org");
+        payload.put("@type", "WebSite");
+        if (page.site() != null && page.site().title() != null && !page.site().title().isBlank()) {
+            payload.put("name", page.site().title());
+        }
+        payload.put("url", origin + "/");
+        Map<String, Object> target = new LinkedHashMap<>();
+        target.put("@type", "EntryPoint");
+        target.put("urlTemplate", origin + "/search?q={search_term_string}");
+        Map<String, Object> action = new LinkedHashMap<>();
+        action.put("@type", "SearchAction");
+        action.put("target", target);
+        action.put("query-input", "required name=search_term_string");
+        payload.put("potentialAction", action);
+        writeJsonLd(head, payload, "selfblog-site-jsonld");
+    }
+
+    private void writeJsonLd(Element head, Map<String, Object> payload, String id) {
         try {
             String jsonText = json.writeValueAsString(payload)
                     .replace("<", "\\u003c")
                     .replace("\u2028", "\\u2028")
                     .replace("\u2029", "\\u2029");
             Element script = head.appendElement("script").attr("type", "application/ld+json")
-                    .attr("id", "selfblog-article-jsonld");
+                    .attr("id", id);
             script.appendChild(new org.jsoup.nodes.DataNode(jsonText));
         } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
             throw new BusinessException(500, "页面元数据生成失败");

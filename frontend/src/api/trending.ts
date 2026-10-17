@@ -3,7 +3,14 @@
  */
 
 import api from './index'
-import type { ApiResponse, PaginatedResponse, Post, Tag, TrendingContent, TrendingParams } from '@/types'
+import type {
+  ApiResponse,
+  PaginatedResponse,
+  Post,
+  Tag,
+  TrendingContent,
+  TrendingParams
+} from '@/types'
 
 export const trendingApi = {
   /**

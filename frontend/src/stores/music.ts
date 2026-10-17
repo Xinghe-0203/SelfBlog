@@ -12,7 +12,7 @@ export const useMusicStore = defineStore('music', () => {
   const error = ref('')
   const currentTime = ref(0)
   const duration = ref(0)
-  const volume = ref(.65)
+  const volume = ref(0.65)
   const loop = ref(true)
   const volumeSupported = ref(true)
   const available = computed(() => !!source.value)
@@ -32,11 +32,19 @@ export const useMusicStore = defineStore('music', () => {
       }
       if (typeof preferences.loop === 'boolean') loop.value = preferences.loop
     }
-  } catch { /* Preferences must never prevent reading or playback. */ }
+  } catch {
+    /* Preferences must never prevent reading or playback. */
+  }
 
   function persist(): void {
-    try { localStorage.setItem(PREFERENCES_KEY, JSON.stringify({ volume: volume.value, loop: loop.value })) }
-    catch { /* Private browsing and blocked storage are supported. */ }
+    try {
+      localStorage.setItem(
+        PREFERENCES_KEY,
+        JSON.stringify({ volume: volume.value, loop: loop.value })
+      )
+    } catch {
+      /* Private browsing and blocked storage are supported. */
+    }
   }
 
   function pause(): void {
@@ -63,8 +71,10 @@ export const useMusicStore = defineStore('music', () => {
     const target = volume.value
     try {
       element.volume = target
-      volumeSupported.value = Math.abs(element.volume - target) < .01
-    } catch { volumeSupported.value = false }
+      volumeSupported.value = Math.abs(element.volume - target) < 0.01
+    } catch {
+      volumeSupported.value = false
+    }
   }
 
   function attach(element: HTMLAudioElement | null): void {
@@ -81,32 +91,50 @@ export const useMusicStore = defineStore('music', () => {
     const active = () => audio === element && available.value && !suspended
     const listeners: Array<[string, EventListener]> = []
     const listen = (name: string, handler: () => void) => {
-      const guarded = () => { if (audio === element) handler() }
+      const guarded = () => {
+        if (audio === element) handler()
+      }
       element.addEventListener(name, guarded)
       listeners.push([name, guarded])
     }
     listen('playing', () => {
-      if (!active() || !requested) { element.pause(); return }
+      if (!active() || !requested) {
+        element.pause()
+        return
+      }
       playing.value = true
       loading.value = false
       error.value = ''
     })
-    listen('pause', () => { playing.value = false; loading.value = false })
-    listen('ended', () => { requested = false; playing.value = false; loading.value = false })
-    listen('waiting', () => { if (requested) loading.value = true })
+    listen('pause', () => {
+      playing.value = false
+      loading.value = false
+    })
+    listen('ended', () => {
+      requested = false
+      playing.value = false
+      loading.value = false
+    })
+    listen('waiting', () => {
+      if (requested) loading.value = true
+    })
     const metadata = () => {
-      duration.value = Number.isFinite(element.duration) && element.duration > 0 ? element.duration : 0
+      duration.value =
+        Number.isFinite(element.duration) && element.duration > 0 ? element.duration : 0
     }
     listen('loadedmetadata', metadata)
     listen('durationchange', metadata)
     listen('timeupdate', () => {
-      currentTime.value = Number.isFinite(element.currentTime) ? Math.max(0, element.currentTime) : 0
+      currentTime.value = Number.isFinite(element.currentTime)
+        ? Math.max(0, element.currentTime)
+        : 0
     })
     listen('error', () => {
       pause()
       error.value = '音乐暂时无法播放，请检查音频地址后重试。'
     })
-    cleanup = () => listeners.forEach(([name, handler]) => element.removeEventListener(name, handler))
+    cleanup = () =>
+      listeners.forEach(([name, handler]) => element.removeEventListener(name, handler))
   }
 
   function startPlay(): Promise<void> {
@@ -122,7 +150,13 @@ export const useMusicStore = defineStore('music', () => {
         if (retry) element.load()
         await element.play()
         // A stale continuation can stop only its captured element, never a new source.
-        if (attempt !== revision || audio !== element || !requested || suspended || !available.value) {
+        if (
+          attempt !== revision ||
+          audio !== element ||
+          !requested ||
+          suspended ||
+          !available.value
+        ) {
           element.pause()
         }
       } catch (reason) {
@@ -131,15 +165,18 @@ export const useMusicStore = defineStore('music', () => {
         playing.value = false
         // DOMException can come from another browser realm and fail instanceof Error.
         const name = reason && typeof reason === 'object' && 'name' in reason ? reason.name : ''
-        error.value = name === 'NotAllowedError'
-          ? '浏览器限制了播放，请点击播放按钮重试。'
-          : '音乐暂时无法播放，请检查音频地址后重试。'
+        error.value =
+          name === 'NotAllowedError'
+            ? '浏览器限制了播放，请点击播放按钮重试。'
+            : '音乐暂时无法播放，请检查音频地址后重试。'
       } finally {
         if (attempt === revision && audio === element) loading.value = false
       }
     })()
     pending = operation
-    void operation.finally(() => { if (pending === operation) pending = null })
+    void operation.finally(() => {
+      if (pending === operation) pending = null
+    })
     return operation
   }
 
@@ -170,7 +207,9 @@ export const useMusicStore = defineStore('music', () => {
     try {
       audio.currentTime = Math.max(0, Math.min(duration.value, value))
       currentTime.value = audio.currentTime
-    } catch { /* A media source may become unseekable while buffering. */ }
+    } catch {
+      /* A media source may become unseekable while buffering. */
+    }
   }
 
   function setVolume(value: number): void {
@@ -186,6 +225,25 @@ export const useMusicStore = defineStore('music', () => {
     persist()
   }
 
-  return { source, title, available, playing, loading, error, currentTime, duration,
-    volume, loop, volumeSupported, configure, attach, play, pause, setSuspended, seek, setVolume, setLoop }
+  return {
+    source,
+    title,
+    available,
+    playing,
+    loading,
+    error,
+    currentTime,
+    duration,
+    volume,
+    loop,
+    volumeSupported,
+    configure,
+    attach,
+    play,
+    pause,
+    setSuspended,
+    seek,
+    setVolume,
+    setLoop
+  }
 })

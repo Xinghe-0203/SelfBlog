@@ -4,8 +4,10 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.selfblog.common.exception.BusinessException;
 import com.selfblog.dto.site.PageModels.PublicPage;
+import com.selfblog.dto.site.TagLastModified;
 import com.selfblog.entity.BlogPost;
 import com.selfblog.entity.BlogTag;
+import com.selfblog.mapper.BlogPostTagMapper;
 import com.selfblog.service.post.BlogTagService;
 import com.selfblog.service.post.PostQueryService;
 import com.selfblog.service.site.PageService;
@@ -15,7 +17,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 完整而有界的站点地图：index + 分片，不再复用订阅源的 100 篇上限。
@@ -32,11 +36,13 @@ public class SitemapService {
     private final PostQueryService posts;
     private final BlogTagService tags;
     private final PageService pages;
+    private final BlogPostTagMapper postTags;
 
-    public SitemapService(PostQueryService posts, BlogTagService tags, PageService pages) {
+    public SitemapService(PostQueryService posts, BlogTagService tags, PageService pages, BlogPostTagMapper postTags) {
         this.posts = posts;
         this.tags = tags;
         this.pages = pages;
+        this.postTags = postTags;
     }
 
     /** /sitemap.xml：标准 sitemap index，只列出真正存在分片的类型。 */
@@ -81,10 +87,12 @@ public class SitemapService {
             case "tags" -> {
                 long count = tags.count(null);
                 if (part < 1 || part > shardCount(count)) yield null;
+                List<BlogTag> records = tags.page(new Page<>(part, SHARD_SIZE),
+                        new LambdaQueryWrapper<BlogTag>().orderByAsc(BlogTag::getId)).getRecords();
+                Map<Long, String> lastModified = tagLastModified(records);
                 List<Url> list = new ArrayList<>();
-                for (BlogTag tag : tags.page(new Page<>(part, SHARD_SIZE),
-                        new LambdaQueryWrapper<BlogTag>().orderByAsc(BlogTag::getId)).getRecords()) {
-                    list.add(new Url("/tag/" + tag.getId(), null));
+                for (BlogTag tag : records) {
+                    list.add(new Url("/tag/" + tag.getId(), lastModified.get(tag.getId())));
                 }
                 yield list;
             }
@@ -102,6 +110,38 @@ public class SitemapService {
         }
         sb.append("</urlset>\n");
         return sb.toString();
+    }
+
+    /**
+     * 每个标签下最新一篇已发布文章的时间 → lastmod。
+     * 没有已发布文章的标签没有 lastmod（分片仍列出该标签，页面本身可访问）。
+     * 时间类型随数据库不同（H2/MySQL 为 LocalDateTime，SQLite 驱动给字符串），统一归一为 yyyy-MM-dd。
+     */
+    private Map<Long, String> tagLastModified(List<BlogTag> records) {
+        if (records.isEmpty()) return Map.of();
+        List<Long> ids = records.stream().map(BlogTag::getId).toList();
+        Map<Long, String> values = new HashMap<>();
+        for (TagLastModified row : postTags.selectTagLastModified(ids)) {
+            if (row.getTagId() == null) continue;
+            String date = normalizeTagDate(row.getLastModified());
+            if (date != null) values.put(row.getTagId(), date);
+        }
+        return values;
+    }
+
+    private static String normalizeTagDate(Object value) {
+        if (value == null) return null;
+        String text = switch (value) {
+            case LocalDateTime dt -> dt.toLocalDate().toString();
+            case java.sql.Timestamp ts -> ts.toLocalDateTime().toLocalDate().toString();
+            case java.sql.Date d -> d.toLocalDate().toString();
+            case java.time.LocalDate d -> d.toString();
+            case String s -> s;
+            default -> value.toString();
+        };
+        text = text.trim();
+        if (text.length() > 10) text = text.substring(0, 10);
+        return text.matches("\\d{4}-\\d{2}-\\d{2}") ? text : null;
     }
 
     // ------------------------------------------------------------------

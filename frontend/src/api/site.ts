@@ -75,7 +75,10 @@ export const siteApi = {
   getVisitorSummary(): Promise<ApiResponse<VisitorSummary>> {
     return api.get('/admin/visitors/summary')
   },
-  getVisitorRecords(params: { pageNum?: number; pageSize?: number }): Promise<ApiResponse<PageResult<VisitorRecord>>> {
+  getVisitorRecords(params: {
+    pageNum?: number
+    pageSize?: number
+  }): Promise<ApiResponse<PageResult<VisitorRecord>>> {
     return api.get('/admin/visitors', { params })
   }
 }

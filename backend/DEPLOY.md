@@ -79,7 +79,7 @@ DB_PASSWORD=<至少8位>
 mysql -u campus_blog -p campus_blog < migration-selfblog.sql
 ```
 
-`migration-selfblog.sql` 可重复执行，不会删除或修改文章表。`schema.sql` 是历史全量初始化脚本，包含 `DROP TABLE`；**仅用于新建的空数据库，禁止对现有数据库执行**。
+`migration-selfblog.sql` 可重复执行，不会删除或修改文章表。`schema-fresh-install.sql` 是全新安装脚本（原名 `schema.sql`，改名就是为了避免误执行），包含 `DROP TABLE`；**仅用于新建的空数据库，禁止对现有数据库执行**。
 
 ## 5. 本地开发
 
@@ -157,10 +157,10 @@ docker compose -f backend/docker-compose.sqlite.yml up -d --build
 ```
 
 - 首次启动前把 `backend/.env.example` 复制为 `backend/.env` 并填写真实值；Compose 会把 `.env` 作为 `env_file` 传入。
-- `backend/schema.sql` 的初始化只在**空** MySQL 数据目录首次启动时执行，且脚本内部固定使用 `campus_blog` 库名；自定义库名需要自行调整 SQL。已有数据库改用 `migration-selfblog.sql`。
+- `backend/schema-fresh-install.sql`（原名 `schema.sql`）的初始化只在**空** MySQL 数据目录首次启动时执行，且脚本内部固定使用 `campus_blog` 库名；自定义库名需要自行调整 SQL。已有数据库改用 `migration-selfblog.sql`。
 - 升级镜像不会自动迁移数据；持久化卷 `mysql_data`/`sqlite_data`、`app_uploads`、`app_gallery_media` 必须保留。**不要执行 `docker compose down -v`**，那会删除全部数据卷。
-- 旧版镜像的 `entrypoint.sh` 已不再使用（新镜像直接 `java -jar`）；环境校验仍由应用启动时执行。
-- 本机没有可用 Docker 守护进程，容器镜像的构建与运行未在本次验证中执行；上述命令与静态配置经过脚本化检查，但不等同于真实容器运行。
+- 旧版镜像的 `entrypoint.sh` 与无用的 `backend/.dockerignore` 已删除（新镜像直接 `java -jar`，构建上下文本来就是仓库根目录）；环境校验仍由应用启动时执行。
+- 本机没有可用 Docker 守护进程，容器镜像的构建与运行未在本地执行；已改由 `.github/workflows/ci.yml` 的 `docker` 任务在 GitHub Actions 上真实构建镜像、起容器、等健康检查并抓取服务端渲染首页。
 
 ## 9. Vercel 统一入口（可选）
 

@@ -12,12 +12,19 @@ const items = [
 ]
 
 function mountSheet(activeId = '') {
-  return mount(MobileTocSheet, { props: { items, activeId }, global: { stubs: { teleport: true, transition: true } } })
+  return mount(MobileTocSheet, {
+    props: { items, activeId },
+    global: { stubs: { teleport: true, transition: true } }
+  })
 }
 
 describe('MobileTocSheet', () => {
   it('moves focus inside a sheet opened from its initially closed trigger', async () => {
-    const wrapper = mount(MobileTocSheet, { props: { items }, attachTo: document.body, global: { stubs: { teleport: true } } })
+    const wrapper = mount(MobileTocSheet, {
+      props: { items },
+      attachTo: document.body,
+      global: { stubs: { teleport: true } }
+    })
     await wrapper.get('.toc-fab').trigger('click')
     await nextTick()
     expect(document.activeElement).toBe(wrapper.get('.toc-close').element)

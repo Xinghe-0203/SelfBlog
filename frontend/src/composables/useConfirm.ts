@@ -45,7 +45,7 @@ export function useConfirm() {
         r?.(false)
       }
       return () =>
-          h(
+        h(
           Modal,
           {
             show: isOpen.value,

@@ -99,6 +99,13 @@
             true-value="true"
             false-value="false"
         /></label>
+        <div class="security-row">
+          <span
+            ><strong>登录密码</strong
+            ><small>修改成功后会退出登录，请用新密码重新进入后台。</small></span
+          >
+          <RouterLink to="/password-change" class="btn btn-ghost btn-sm">修改密码</RouterLink>
+        </div>
       </section>
 
       <section class="settings-panel">
@@ -339,6 +346,28 @@ label small {
   width: 20px;
   height: 20px;
   accent-color: var(--accent);
+}
+.security-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 14px;
+  padding: 13px;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius);
+}
+.security-row span {
+  display: grid;
+  gap: 4px;
+}
+.security-row strong {
+  font-size: 13px;
+}
+.security-row small {
+  max-width: 400px;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.6;
 }
 .path-input {
   display: flex;

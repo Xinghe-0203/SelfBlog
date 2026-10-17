@@ -1,0 +1,76 @@
+# Backend agent notes
+
+Applies to `backend/` (Spring Boot 3.3 + MyBatis Plus + Java 21). `AGENTS.md` is the entrypoint; this file holds the verified commands and backend-specific rules.
+
+## Run and verify
+
+Requires JDK 21. `mvn` is **not on `PATH`** on this machine (`MAVEN_HOME` points at an empty `D:\Javawebexe`, and `JAVA_HOME` points at a JDK 25 the project does not target). The repository has a Maven Wrapper (`backend/mvnw`, `backend/mvnw.cmd`, wrapper 3.3.4, Maven 3.9.12, canonical `repo.maven.apache.org` distribution URL) — use it. All commands run from `backend/`. Verified working invocation:
+
+```powershell
+$env:JAVA_HOME = 'C:\Program Files\Java\jdk-21'
+.\mvnw.cmd test "-Dskip.npm=true" "-Dskip.installnodenpm=true"
+```
+
+- **Quote the `-D…` arguments in PowerShell.** An unquoted `-Dskip.npm=true` can be split by PowerShell's argument parsing and Maven fails with `Unknown lifecycle phase ".npm=true"` (observed).
+- **Always pass `-Dskip.npm=true -Dskip.installnodenpm=true` for backend test runs.** `pom.xml` wires `frontend-maven-plugin`, which otherwise runs `npm ci` + `npm run build` in `../frontend` on every build (bound to `initialize`/`generate-resources`). With the skips a single test class finishes in ~8s; without them the whole frontend is rebuilt first.
+- **Consequence: a plain `mvn test` mutates frontend build output.** Never run it while frontend files are mid-edit.
+- Baseline as of 2026-10-17: full suite = **564 tests, 0 failures, BUILD SUCCESS**. Never leave the suite below that.
+- The plugin provisions its own Node **v24.15.0** at `backend/target/frontend/node/` (`node.exe`, `npm.cmd`, `npx.cmd`, npm 11.12.1). This is the Node that satisfies `engine-strict`; see `docs/agents/frontend.md`. It lives under `target/`, so a `mvn clean` (or manual target cleanup) removes it — the next full Maven build re-provisions it.
+
+```sh
+./mvnw spring-boot:run
+./mvnw test -Dskip.npm=true -Dskip.installnodenpm=true
+./mvnw test "-Dtest=AuthControllerTest" -Dskip.npm=true -Dskip.installnodenpm=true
+./mvnw clean package -DskipTests
+```
+
+- For local runtime, copy `.env.example` to `.env`, set `JWT_SECRET` (at least 32 characters) and `ADMIN_PASSWORD` (at least 12 characters), and retain the supplied JWT expiration values. The template selects `DB_TYPE=sqlite`, not MySQL. SQLite initializes from `src/main/resources/schema-sqlite.sql` and defaults to `campus_blog.db` in the working directory.
+- `config/DotenvConfig.java` parses `.env` with Java `Properties`, not shell dotenv: use unquoted values. It searches the working directory, then the user's home directory. File values become JVM properties, outranking OS environment variables; existing JVM `-D` properties win.
+- MySQL requires `DB_TYPE=mysql`, all `DB_HOST/DB_PORT/DB_NAME/DB_USERNAME/DB_PASSWORD` values, and startup validation requires a password of at least 8 characters. Use `schema-fresh-install.sql` only for a new empty database; migrate an existing database with `backend/migration-selfblog.sql`. Docker Compose explicitly sets `DB_TYPE=mysql`.
+- Tests use H2 via `src/test/resources/application.yml`, optional `application-test.yml`, and test `schema.sql`; test request paths omit `/api`. Keep `DB_TYPE` unset for H2: a runtime database selection activates `DatabaseConfig` and replaces the test datasource, even with the `test` profile. CI runs the same suite against real MySQL 8 with `SPRING_SQL_INIT_MODE=never` (`schema-fresh-install.sql` initializes that database instead).
+- Runtime API controllers are prefixed with `/api` by MVC; the SPA is served at `/`, Knife4j is `/doc.html`, and Actuator health is `/actuator/health` (API docs disabled under `prod`). Tests clear the MVC API prefix and use unprefixed request paths.
+- **Testing an admin controller with `@WebMvcTest` needs `@MockBean JwtUtils` plus an authenticated user** (both verified empirically). The slice pulls in `SecurityConfig`, whose `jwtAuthenticationFilter` requires `JwtUtils` — without the mock the context fails with `NoSuchBeanDefinitionException`. Method-level `@PreAuthorize` *is* enforced in the slice: role `admin` → 200, any other user → 403, anonymous → 403. The working recipe is `@MockBean JwtUtils` + a per-test `@WithMockUser(roles = "admin")`; do **not** reach for `@AutoConfigureMockMvc(addFilters = false)`, which was measured to return 401 rather than bypassing authorization.
+- **MyBatis local session cache inside `@Transactional` tests**: a write made with `JdbcTemplate` does not invalidate MyBatis's local session cache, so a re-read through a mapper can still return the pre-update row. Regression tests for "content changed → cache invalidated" must perform the write through a MyBatis mapper (`updateById`), as the real service path does (`ReadingHtmlControllerTest`).
+
+## Change boundaries
+
+Java source root: `backend/src/main/java/com/selfblog/`.
+
+- Post/circle CRUD services delegate queries and interactions to `PostQueryService`/`PostInteractionService` and `CircleQueryService`/`CircleInteractionService`; modify the owning service rather than duplicating logic in the facade.
+- Use `common.result.Result<T>` and `common.exception.BusinessException`; obtain identity through `utils.SecurityUtils` (`getCurrentUserId()` requires login; `getCurrentUserIdOrNull()` allows guests). Public endpoints also need an explicit rule in `config/security/SecurityConfig.java`.
+- Site brand assets (logo / favicon / avatar / music) go through `SiteAssetService` + `AdminSiteAssetController` (`POST /api/admin/site-assets`): per-kind extension whitelist, magic-number sniffing and SVG sanitization, stored under `uploads/site-assets/<kind>/` and served from `/uploads/**`. Do not reuse `MediaService` — it re-encodes every image to JPG.
+- User articles and circle posts publish directly with `status=1`; do not introduce a pending-review gate despite the existing moderation APIs/status fields.
+- Preserve service transaction conventions: writes use `@Transactional(rollbackFor = Exception.class)`, reads use `@Transactional(readOnly = true)`.
+- Database changes must account for MySQL `backend/schema-fresh-install.sql`, SQLite `src/main/resources/schema-sqlite.sql`, and H2 `src/test/resources/schema.sql`. SQLite initialization uses `CREATE TABLE IF NOT EXISTS`, so schema edits do not migrate existing files.
+- Mapper XML supports `databaseId="mysql"`/`"sqlite"`; H2 has no mapped database ID and uses untagged fallback statements. Do not put MySQL-only SQL in shared statements. Custom SQL must handle soft deletion explicitly (`is_deleted=0`); generated MyBatis Plus queries use `isDeleted`/`@TableLogic`.
+
+## Reader HTML, discovery and JSON-LD
+
+- `SpaController` returns server-rendered reading HTML for public history routes; `ReadingPageService` + `ReadingHtmlRenderer` + `ReadingContent` + `SafeMarkdown` build it from published data only. `ReadingPageService` deliberately has **no class-level `@Transactional`**: sharing a transaction with inner "not found" exceptions marks it rollback-only and turns real 404s into 500s (live-audit finding). Use `@Transactional(propagation = NOT_SUPPORTED)` when regression-testing 404 paths.
+- Public HTML must use `PostQueryService.getPublishedPostDetail`/`getPublishedMetadata`, never the author-permissive `getPostDetail`; GET/HEAD must not touch view counters or visitor events. Templates come from the built `static/index.html`; a missing template is 503, not an empty page.
+- Successful reader HTML (200) is served with `ETag` + `Cache-Control: public, max-age=0, must-revalidate`; error pages and the SPA shell stay `no-store`. Recompute the ETag from the rendered bytes; don't cache page HTML in process memory.
+- `SafeMarkdown` must match the browser's GFM output (`marked` + DOMPurify): tables, strikethrough and task lists are enabled via commonmark extensions; task-list checkboxes are stripped on both sides (Jsoup safelist / DOMPurify `FORBID_TAGS`) while the item text stays. The shared fixture is `docs/fixtures/gfm-sample.md`, asserted by both `SafeMarkdownTest` and the frontend `markdownGfm.test.ts` — update both when changing markdown features.
+- `SiteOrigin` owns the canonical origin (`SITE_BASE_URL`, validated http(s) origin). Once configured, `Host`/`X-Forwarded-*` cannot change canonical/feeds/sitemap. The rendered HTML carries `meta[name=selfblog-site-origin]`, which `frontend/src/composables/useSeoMeta.ts` prefers over `window.location.origin`.
+- Discovery: `/sitemap.xml` is an index over `sitemap-site.xml`, `sitemap-posts-N.xml`, `sitemap-tags-N.xml`, `sitemap-pages-N.xml` (1000 URLs/shard; empty collections have no shard and their shard request is 404 — index and shard must agree). Feeds keep the 100-item limit. robots is generated from the live `adminPath`. `/search`, `/admin`, drafts and index-disabled pages stay out of the sitemap. Tag shards use `MAX(COALESCE(update_time, create_time))` of published posts as `lastmod`; tags without published posts are listed without `lastmod` (typed DTO `TagLastModified`; H2 uppercases unquoted aliases, so don't read these as `Map`).
+- Home reading HTML carries `WebSite` + `SearchAction` JSON-LD in addition to the page-level graph; `ReadingHtmlRenderer` rebuilds only its own `ld+json` block and must leave other inline scripts (including the first-paint theme bootstrap) untouched.
+- The canonical origin can also be set in the admin UI (`siteBaseUrl` setting). Priority: admin setting → `SITE_BASE_URL` env → direct request origin; clearing falls back, invalid stored values log + fall back (never 500). Saving evicts the settings cache so it applies to the next request. Do not add request-time writes or a second origin source.
+
+## Configurable pages (2026-10-16)
+
+- Page management is `/api/admin/pages` plus `/api/admin/page-navigation`; published-only reads are `/api/site/pages`. Runtime adds `/api` automatically. Keep `page.draft.*` out of the global settings whitelist/public response.
+- PageService reuses `site_setting` without schema changes: separate draft/published documents, slug reservations and navigation revisions. Conditional database updates claim the expected revision; do not replace with process-local locks. Body ≤10000 characters, one JSON document ≤48KiB UTF-8.
+- Builtins cannot be deleted/unpublished. Custom slugs may change only before first publication. Keep existing `adminPath=pages` intact and require changing that path before custom content-page creation.
+- The user canceled whole-site enlargement: preserve default fonts/scale. PageFrame appearance variables stay local. Preview uses blank same-origin srcdoc plus the same components in an actual viewport, with no public draft route or relaxed security headers.
+- Live evidence and remaining SEO/deployment scope are in `docs/reviews/2026-10-16-page-management-verification.md`; don't treat runtime metadata as initial-HTML SEO or proof of search-engine indexing.
+
+## Post publishing fixes (2026-10-17)
+
+- Join tables combine UNIQUE keys with logical deletion (`blog_post_tag` UNIQUE(post_id, tag_id)): re-inserting after a logical delete must **upsert and reset `is_deleted = 0`** (MySQL `ON DUPLICATE KEY UPDATE`, SQLite `ON CONFLICT … DO UPDATE`, H2 `MERGE … KEY`). `INSERT IGNORE`/`INSERT OR IGNORE` is silently blocked by the soft-deleted row and permanently loses the relation. Keep the H2 test schema's UNIQUE keys identical to MySQL/SQLite, otherwise tests cannot reproduce this class of bug.
+- Hand-written SELECTs must add `is_deleted = 0` themselves; `BlogPostMediaMapper.selectByPostId` was returning removed images. Every mapper XML needs a fallback statement without `databaseId` (H2 relies on it).
+- `BlogPostServiceImpl.resolveTagIds` treats `tagIds` and `tagNames` as a **union**: the editor sends existing tag ids plus free-typed names, so "ids win" drops new tags. Do not restore that shortcut.
+- Editor inputs must match backend validation: article-editor tag input is 20 characters, same as the backend rule and the admin tag page.
+- Recreating a logically deleted row that has a UNIQUE key (tag names, daily trending rows) must **find the raw row and restore `is_deleted`**, not just catch the duplicate-key error and query with the logical-delete filter (that returns null → 500 on tag create, lost tag on publish). `BlogTagMapper.selectRawByName` + `restoreById` is the reference pattern.
+- DTO bounds must match column widths (`category` VARCHAR(50), `cover_image` VARCHAR(500)) so oversized input returns 400 instead of a database-level 500.
+- The H2 test schema mirrors production UNIQUE keys (username, user email, tag name, like, collect, follow, post_tag, trending, draft_tag, circle like, topic name, anonymous post like). Keep that parity when adding tables — missing constraints hide this whole class of bugs.
+- Known unused/legacy SQL without an H2 fallback (kept as-is, documented not fixed): `BlogPostMapper.fullTextSearch*`/`countFullTextSearch`, `CirclePostMapper.countByTopicId*`, `TopicMapper.recalculateAll*`, and the uncalled `BlogDraftTagMapper.batchInsertDraftTags`.
+- **Unique-constraint exceptions are not portable**: Spring translates H2/MySQL violations into `DuplicateKeyException`, but SQLite (SQLState null, error code 19) produces `UncategorizedSQLException`. Recovery paths must catch the portable parent **`DataAccessException`** and only convert when the conflicting row is actually found; otherwise rethrow the original error. Applied to tags (`BlogTagMapper.selectRawByName` + `restoreById`), page-slug reservation, follow, circle likes, user creation and topics. `BlogTagConflictTest`/`PageSlugConflictTest` pin the contract with the real SQLite exception shape.

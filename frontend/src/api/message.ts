@@ -3,7 +3,13 @@
  */
 
 import api from './index'
-import type { ApiResponse, PaginatedResponse, Message, Conversation, SendMessageRequest } from '@/types'
+import type {
+  ApiResponse,
+  PaginatedResponse,
+  Message,
+  Conversation,
+  SendMessageRequest
+} from '@/types'
 
 export const messageApi = {
   /**

@@ -23,4 +23,24 @@ class SafeMarkdownTest {
         assertEquals("/uploads/a.jpg", doc.selectFirst("img").attr("src"));
         assertEquals("说明", doc.selectFirst("img").attr("alt"));
     }
+
+    /**
+     * 与前端共享同一篇 fixture（docs/fixtures/gfm-sample.md）：表格/删除线/任务列表
+     * 在服务端 HTML 里必须与浏览器里一致，不能退化成纯文本。
+     */
+    @Test void rendersGfmTablesStrikethroughAndTaskListsLikeTheClient() throws Exception {
+        String source = java.nio.file.Files.readString(java.nio.file.Path.of("..", "docs", "fixtures", "gfm-sample.md"));
+        var doc = Jsoup.parse(markdown.render(source));
+        assertEquals(1, doc.select("table").size());
+        assertEquals(2, doc.select("thead th").size());
+        assertEquals(2, doc.select("tbody tr").size());
+        assertEquals("删除线", doc.selectFirst("del").text());
+        assertEquals(2, doc.select("li").size());
+        assertEquals("已完成的任务", doc.select("li").first().text());
+        assertEquals("待办任务", doc.select("li").last().text());
+        // 复选框被 Jsoup 清掉：与前端 DOMPurify 的 FORBID_TAGS 一致，只保留条目文字
+        assertTrue(doc.select("input").isEmpty());
+        assertEquals("引用块也必须保留。", doc.selectFirst("blockquote p").text());
+        assertTrue(doc.selectFirst("pre code").text().contains("safe"));
+    }
 }

@@ -21,9 +21,10 @@ watch(
   ([path, isAdmin]) => {
     if (isAdmin && path === siteStore.adminRoot) {
       const redirect = route.query.redirect
-      const destination = typeof redirect === 'string' && redirect.startsWith(siteStore.adminRoot)
-        ? redirect
-        : `${siteStore.adminRoot}/dashboard`
+      const destination =
+        typeof redirect === 'string' && redirect.startsWith(siteStore.adminRoot)
+          ? redirect
+          : `${siteStore.adminRoot}/dashboard`
       void router.replace(destination)
     }
   },

@@ -97,6 +97,28 @@ class SitemapServiceTest {
         assertEquals(404, assertThrows(BusinessException.class, () -> sitemaps.shard("pages", 1, BASE)).getCode());
     }
 
+    /** 标签分片带 lastmod：取该标签下最新一篇已发布文章的时间；草稿与空标签不产生 lastmod。 */
+    @Test void tagShardsCarryLastModifiedFromTheirNewestPublishedPost() {
+        jdbc.update("INSERT INTO blog_tag(id,name,is_deleted) VALUES(880001,'服务端渲染',0)");
+        jdbc.update("INSERT INTO blog_tag(id,name,is_deleted) VALUES(880002,'空标签',0)");
+        jdbc.update("INSERT INTO blog_post(id,user_id,title,content,status,is_deleted,create_time,update_time) "
+                + "VALUES(880011,1,'旧文','x',1,0,TIMESTAMP '2026-10-01 08:00:00',TIMESTAMP '2026-10-02 08:00:00')");
+        jdbc.update("INSERT INTO blog_post(id,user_id,title,content,status,is_deleted,create_time,update_time) "
+                + "VALUES(880012,1,'新文','x',1,0,TIMESTAMP '2026-10-05 08:00:00',TIMESTAMP '2026-10-09 12:30:00')");
+        jdbc.update("INSERT INTO blog_post(id,user_id,title,content,status,is_deleted,create_time,update_time) "
+                + "VALUES(880013,1,'草稿','x',0,0,TIMESTAMP '2026-12-01 08:00:00',TIMESTAMP '2026-12-01 08:00:00')");
+        jdbc.update("INSERT INTO blog_post_tag(post_id,tag_id,is_deleted) VALUES(880011,880001,0)");
+        jdbc.update("INSERT INTO blog_post_tag(post_id,tag_id,is_deleted) VALUES(880012,880001,0)");
+        jdbc.update("INSERT INTO blog_post_tag(post_id,tag_id,is_deleted) VALUES(880013,880002,0)");
+
+        String shard = sitemaps.shard("tags", 1, BASE);
+        assertTrue(shard.contains("<url><loc>" + BASE + "/tag/880001</loc><lastmod>2026-10-09</lastmod></url>"),
+                "标签 lastmod 必须取最新已发布文章的时间");
+        assertTrue(shard.contains("<url><loc>" + BASE + "/tag/880002</loc></url>"),
+                "没有已发布文章的标签仍然可访问，只是没有 lastmod");
+        assertTrue(sitemaps.index(BASE).contains("sitemap-tags-1.xml"));
+    }
+
     private static int occurrences(String xml) {
         return xml.split("<url>", -1).length - 1;
     }

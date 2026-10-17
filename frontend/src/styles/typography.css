@@ -10,7 +10,12 @@ a:hover {
 }
 
 /* ==================== Heading System — System Sans ==================== */
-h1, h2, h3, h4, h5, h6 {
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
   font-family: var(--font-display);
   color: var(--text-primary);
   line-height: var(--leading-tight);
@@ -63,7 +68,8 @@ small {
   font-size: var(--text-xs);
 }
 
-strong, b {
+strong,
+b {
   font-weight: var(--font-semibold);
 }
 
@@ -86,10 +92,18 @@ strong, b {
   line-height: var(--leading-snug);
 }
 
-.markdown-body h1 { font-size: var(--text-3xl); }
-.markdown-body h2 { font-size: var(--text-2xl); }
-.markdown-body h3 { font-size: var(--text-xl); }
-.markdown-body h4 { font-size: var(--text-lg); }
+.markdown-body h1 {
+  font-size: var(--text-3xl);
+}
+.markdown-body h2 {
+  font-size: var(--text-2xl);
+}
+.markdown-body h3 {
+  font-size: var(--text-xl);
+}
+.markdown-body h4 {
+  font-size: var(--text-lg);
+}
 
 .markdown-body p {
   margin-bottom: 1em;

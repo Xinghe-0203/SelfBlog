@@ -15,7 +15,7 @@
     <!-- 项目基本信息 -->
     <groupId>com.selfblog</groupId>
     <artifactId>selfblog</artifactId>
-    <version>0.0.1-SNAPSHOT</version>
+    <version>2.0.26</version>
     <name>SelfBlog</name>
     <description>SelfBlog - 后端</description>
 
@@ -115,6 +115,23 @@
         <dependency>
             <groupId>org.commonmark</groupId>
             <artifactId>commonmark</artifactId>
+            <version>${commonmark.version}</version>
+        </dependency>
+        <!-- GFM 扩展：与前端 marked（gfm: true）保持一致；缺失时同一篇文章
+             在浏览器里是表格/删除线/任务列表，在服务端 HTML 里退化成纯文本 -->
+        <dependency>
+            <groupId>org.commonmark</groupId>
+            <artifactId>commonmark-ext-gfm-tables</artifactId>
+            <version>${commonmark.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.commonmark</groupId>
+            <artifactId>commonmark-ext-gfm-strikethrough</artifactId>
+            <version>${commonmark.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.commonmark</groupId>
+            <artifactId>commonmark-ext-task-list-items</artifactId>
             <version>${commonmark.version}</version>
         </dependency>
         <dependency>

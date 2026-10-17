@@ -26,8 +26,12 @@ const emit = defineEmits<{
 
 const open = ref(false)
 const panel = ref<HTMLElement | null>(null)
-const { layer } = useDialog(open, panel, () => { open.value = false })
-const onResize = () => { if (window.innerWidth >= 1021) open.value = false }
+const { layer } = useDialog(open, panel, () => {
+  open.value = false
+})
+const onResize = () => {
+  if (window.innerWidth >= 1021) open.value = false
+}
 onMounted(() => window.addEventListener('resize', onResize))
 onBeforeUnmount(() => window.removeEventListener('resize', onResize))
 
@@ -39,34 +43,52 @@ function selectItem(item: TocItem): void {
 
 <template>
   <div class="toc-sheet">
-    <button type="button" class="toc-fab functional-glass" aria-label="打开文章目录" :aria-expanded="open" @click="open = true">
+    <button
+      type="button"
+      class="toc-fab functional-glass"
+      aria-label="打开文章目录"
+      :aria-expanded="open"
+      @click="open = true"
+    >
       <Icon name="file-text" :size="18" />
       <span>目录</span>
     </button>
 
     <Teleport :to="overlayTarget()">
-    <template v-if="open">
-      <div class="toc-backdrop" :style="{ zIndex: `calc(var(--z-modal) + ${layer})` }" @click="open = false"></div>
-      <div ref="panel" class="toc-panel functional-glass" :style="{ zIndex: `calc(var(--z-modal) + ${layer} + 1)` }" role="dialog" aria-modal="true" aria-label="文章目录" tabindex="-1">
-        <header class="toc-panel-head">
-          <span class="toc-panel-title">文章目录</span>
-          <button type="button" class="toc-close" aria-label="关闭目录" @click="open = false">
-            <Icon name="close" :size="16" />
-          </button>
-        </header>
-        <nav class="toc-nav" aria-label="目录条目">
-          <button
-            v-for="item in items"
-            :key="item.id"
-            type="button"
-            :class="[`level-${item.level}`, { active: item.id === activeId }]"
-            @click="selectItem(item)"
-          >
-            {{ item.text }}
-          </button>
-        </nav>
-      </div>
-    </template>
+      <template v-if="open">
+        <div
+          class="toc-backdrop"
+          :style="{ zIndex: `calc(var(--z-modal) + ${layer})` }"
+          @click="open = false"
+        ></div>
+        <div
+          ref="panel"
+          class="toc-panel functional-glass"
+          :style="{ zIndex: `calc(var(--z-modal) + ${layer} + 1)` }"
+          role="dialog"
+          aria-modal="true"
+          aria-label="文章目录"
+          tabindex="-1"
+        >
+          <header class="toc-panel-head">
+            <span class="toc-panel-title">文章目录</span>
+            <button type="button" class="toc-close" aria-label="关闭目录" @click="open = false">
+              <Icon name="close" :size="16" />
+            </button>
+          </header>
+          <nav class="toc-nav" aria-label="目录条目">
+            <button
+              v-for="item in items"
+              :key="item.id"
+              type="button"
+              :class="[`level-${item.level}`, { active: item.id === activeId }]"
+              @click="selectItem(item)"
+            >
+              {{ item.text }}
+            </button>
+          </nav>
+        </div>
+      </template>
     </Teleport>
   </div>
 </template>
@@ -181,6 +203,9 @@ function selectItem(item: TocItem): void {
   .toc-sheet {
     display: none;
   }
-  .toc-panel, .toc-backdrop { display: none; }
+  .toc-panel,
+  .toc-backdrop {
+    display: none;
+  }
 }
 </style>

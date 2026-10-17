@@ -12,7 +12,9 @@
   border: none;
   border-radius: var(--radius-md);
   cursor: pointer;
-  transition: transform var(--transition-fast), opacity var(--transition-fast);
+  transition:
+    transform var(--transition-fast),
+    opacity var(--transition-fast);
   white-space: nowrap;
   user-select: none;
   position: relative;
@@ -332,12 +334,30 @@ textarea.form-input {
   box-shadow: var(--shadow-sm);
 }
 
-.avatar-xs   { width: 24px;  height: 24px; }
-.avatar-sm   { width: 32px;  height: 32px; }
-.avatar-md   { width: 48px;  height: 48px; }
-.avatar-lg   { width: 64px;  height: 64px; }
-.avatar-xl   { width: 96px;  height: 96px; }
-.avatar-2xl  { width: 128px; height: 128px; }
+.avatar-xs {
+  width: 24px;
+  height: 24px;
+}
+.avatar-sm {
+  width: 32px;
+  height: 32px;
+}
+.avatar-md {
+  width: 48px;
+  height: 48px;
+}
+.avatar-lg {
+  width: 64px;
+  height: 64px;
+}
+.avatar-xl {
+  width: 96px;
+  height: 96px;
+}
+.avatar-2xl {
+  width: 128px;
+  height: 128px;
+}
 
 /* Avatar Group */
 .avatar-group {
@@ -368,11 +388,26 @@ textarea.form-input {
   line-height: var(--leading-normal);
 }
 
-.badge-success { background: var(--success-light); color: var(--success); }
-.badge-warning { background: var(--warning-light); color: var(--warning); }
-.badge-error   { background: var(--error-light);   color: var(--error); }
-.badge-info    { background: var(--info-light);    color: var(--info); }
-.badge-accent  { background: var(--accent-light);  color: var(--accent); }
+.badge-success {
+  background: var(--success-light);
+  color: var(--success);
+}
+.badge-warning {
+  background: var(--warning-light);
+  color: var(--warning);
+}
+.badge-error {
+  background: var(--error-light);
+  color: var(--error);
+}
+.badge-info {
+  background: var(--info-light);
+  color: var(--info);
+}
+.badge-accent {
+  background: var(--accent-light);
+  color: var(--accent);
+}
 
 .badge-ghost {
   background: var(--bg-secondary);
@@ -451,7 +486,9 @@ textarea.form-input {
 }
 
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .loading-overlay {
@@ -484,28 +521,46 @@ textarea.form-input {
   animation: dot-pulse 1.4s ease-in-out infinite;
 }
 
-.loading-pulse span:nth-child(2) { animation-delay: 0.2s; }
-.loading-pulse span:nth-child(3) { animation-delay: 0.4s; }
+.loading-pulse span:nth-child(2) {
+  animation-delay: 0.2s;
+}
+.loading-pulse span:nth-child(3) {
+  animation-delay: 0.4s;
+}
 
 @keyframes dot-pulse {
-  0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
-  40%            { transform: scale(1);   opacity: 1; }
+  0%,
+  80%,
+  100% {
+    transform: scale(0.6);
+    opacity: 0.4;
+  }
+  40% {
+    transform: scale(1);
+    opacity: 1;
+  }
 }
 
 /* ==================== Skeleton Loading ==================== */
 .skeleton {
-  background: linear-gradient(90deg,
+  background: linear-gradient(
+    90deg,
     var(--skeleton-base) 0%,
     var(--skeleton-highlight) 50%,
-    var(--skeleton-base) 100%);
+    var(--skeleton-base) 100%
+  );
   background-size: 200% 100%;
   animation: skeleton-loading 1.5s ease-in-out infinite;
   border-radius: var(--radius);
 }
 
 @keyframes skeleton-loading {
-  0%   { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
 }
 
 /* ==================== Toast Notification ==================== */
@@ -533,10 +588,18 @@ textarea.form-input {
   font-size: var(--text-sm);
 }
 
-.toast-success { border-left: 3px solid var(--success); }
-.toast-error   { border-left: 3px solid var(--error); }
-.toast-warning { border-left: 3px solid var(--warning); }
-.toast-info    { border-left: 3px solid var(--info); }
+.toast-success {
+  border-left: 3px solid var(--success);
+}
+.toast-error {
+  border-left: 3px solid var(--error);
+}
+.toast-warning {
+  border-left: 3px solid var(--warning);
+}
+.toast-info {
+  border-left: 3px solid var(--info);
+}
 
 /* ==================== Back to Top ==================== */
 .back-to-top {
@@ -622,12 +685,21 @@ textarea.form-input {
 }
 
 @keyframes toastSlideIn {
-  from { opacity: 0; transform: translateX(100%) scale(0.8); }
-  to   { opacity: 1; transform: translateX(0)    scale(1); }
+  from {
+    opacity: 0;
+    transform: translateX(100%) scale(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
 }
 
 @keyframes toastSlideOut {
-  to { opacity: 0; transform: translateX(100%) scale(0.8); }
+  to {
+    opacity: 0;
+    transform: translateX(100%) scale(0.8);
+  }
 }
 
 /* ==================== Empty State ==================== */
@@ -663,8 +735,13 @@ textarea.form-input {
 }
 
 @keyframes float-up {
-  0%, 100% { transform: translateY(0); }
-  50%      { transform: translateY(-8px); }
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
 }
 
 /* ==================== Divider ==================== */

@@ -33,7 +33,10 @@ export function formatRelativeTime(date: string | Date | null | undefined): stri
 /**
  * 格式化日期
  */
-export function formatDate(date: string | Date | null | undefined, format = 'YYYY-MM-DD HH:mm:ss'): string {
+export function formatDate(
+  date: string | Date | null | undefined,
+  format = 'YYYY-MM-DD HH:mm:ss'
+): string {
   if (!date) return ''
   const target = new Date(date)
   if (isNaN(target.getTime())) return ''
@@ -84,7 +87,10 @@ export function truncateText(text: string | null | undefined, maxLength = 100): 
  * 获取安全的图片URL
  * 处理后端返回的相对路径（如 /uploads/xxx.jpg），确保在任何环境下都能正确访问
  */
-export function getSafeImageUrl(url: string | null | undefined, fallback = '/default-image.png'): string {
+export function getSafeImageUrl(
+  url: string | null | undefined,
+  fallback = '/default-image.png'
+): string {
   if (!url) return fallback
 
   // 完整的 http/https URL，直接返回

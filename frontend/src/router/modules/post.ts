@@ -10,7 +10,7 @@ const postRoutes: RouteRecordRaw[] = [
     name: 'PostDetail',
     component: lazyLoad(() => import('@/views/post/PostDetail.vue')),
     meta: { title: '文章详情' }
-  },
+  }
 ]
 
 export default postRoutes

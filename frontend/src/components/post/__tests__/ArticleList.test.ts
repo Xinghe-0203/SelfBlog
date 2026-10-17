@@ -6,14 +6,26 @@ import type { Post } from '@/types'
 
 enableAutoUnmount(afterEach)
 const post: Post = {
-  id: 1, title: '一篇真实的笔记', content: '正文'.repeat(300), summary: '文章摘要', authorId: 1,
-  authorName: '作者', viewCount: 1, likeCount: 0, commentCount: 0, collectCount: 0, shareCount: 0,
-  status: 1, createdAt: '2026-10-16T10:00:00', tags: [{ id: 2, name: '技术' }]
+  id: 1,
+  title: '一篇真实的笔记',
+  content: '正文'.repeat(300),
+  summary: '文章摘要',
+  authorId: 1,
+  authorName: '作者',
+  viewCount: 1,
+  likeCount: 0,
+  commentCount: 0,
+  collectCount: 0,
+  shareCount: 0,
+  status: 1,
+  createdAt: '2026-10-16T10:00:00',
+  tags: [{ id: 2, name: '技术' }]
 }
 async function setup(posts = [post]) {
-  const router = createRouter({ history: createMemoryHistory(), routes: [
-    { path: '/:pathMatch(.*)*', component: { template: '<div />' } }
-  ] })
+  const router = createRouter({
+    history: createMemoryHistory(),
+    routes: [{ path: '/:pathMatch(.*)*', component: { template: '<div />' } }]
+  })
   await router.push('/')
   return mount(ArticleList, { props: { posts }, global: { plugins: [router] } })
 }

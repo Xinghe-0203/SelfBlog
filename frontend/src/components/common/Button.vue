@@ -33,7 +33,7 @@ const props = withDefaults(defineProps<ButtonProps>(), {
   block: false,
   icon: false,
   tag: 'button',
-  type: 'button',
+  type: 'button'
 })
 
 const emit = defineEmits<{
@@ -48,8 +48,8 @@ const classes = computed(() => [
     'btn--block': props.block,
     'btn--icon': props.icon,
     'btn--loading': props.loading,
-    'btn--disabled': props.disabled,
-  },
+    'btn--disabled': props.disabled
+  }
 ])
 
 const is = computed(() => {
@@ -81,7 +81,16 @@ const handleClick = (e: MouseEvent) => {
     <!-- Loading spinner -->
     <span v-if="loading" class="btn__spinner" aria-hidden="true">
       <svg class="btn__spinner-svg" viewBox="0 0 24 24" fill="none">
-        <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="56.5" stroke-dashoffset="16" />
+        <circle
+          cx="12"
+          cy="12"
+          r="10"
+          stroke="currentColor"
+          stroke-width="2.5"
+          stroke-linecap="round"
+          stroke-dasharray="56.5"
+          stroke-dashoffset="16"
+        />
       </svg>
     </span>
 
@@ -124,7 +133,7 @@ const handleClick = (e: MouseEvent) => {
 }
 
 .btn:focus-visible {
-  outline: 2px solid var(--primary, #165DFF);
+  outline: 2px solid var(--primary, #165dff);
   outline-offset: 2px;
 }
 
@@ -150,9 +159,15 @@ const handleClick = (e: MouseEvent) => {
 }
 
 /* ==================== Icon-only button ==================== */
-.btn--icon.btn--sm { padding: 7px; }
-.btn--icon.btn--md { padding: 10px; }
-.btn--icon.btn--lg { padding: 13px; }
+.btn--icon.btn--sm {
+  padding: 7px;
+}
+.btn--icon.btn--md {
+  padding: 10px;
+}
+.btn--icon.btn--lg {
+  padding: 13px;
+}
 
 /* ==================== Block ==================== */
 .btn--block {
@@ -189,7 +204,9 @@ const handleClick = (e: MouseEvent) => {
 }
 
 @keyframes btn-spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .btn__content--hidden {
@@ -220,7 +237,7 @@ const handleClick = (e: MouseEvent) => {
   color: var(--contrast-fg);
   border-color: var(--contrast-bg);
   box-shadow:
-    0 1px 2px rgba(0, 0, 0, 0.20),
+    0 1px 2px rgba(0, 0, 0, 0.2),
     0 4px 8px rgba(0, 0, 0, 0.08),
     inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
@@ -229,8 +246,8 @@ const handleClick = (e: MouseEvent) => {
   background: var(--contrast-bg-hover);
   border-color: var(--contrast-bg-hover);
   box-shadow:
-    0 2px 4px rgba(0, 0, 0, 0.20),
-    0 8px 16px rgba(0, 0, 0, 0.10),
+    0 2px 4px rgba(0, 0, 0, 0.2),
+    0 8px 16px rgba(0, 0, 0, 0.1),
     inset 0 1px 0 rgba(255, 255, 255, 0.08);
   transform: translateY(-1px);
 }
@@ -239,7 +256,7 @@ const handleClick = (e: MouseEvent) => {
   background: var(--contrast-bg-active);
   border-color: var(--contrast-bg-active);
   box-shadow:
-    0 1px 2px rgba(0, 0, 0, 0.30),
+    0 1px 2px rgba(0, 0, 0, 0.3),
     inset 0 1px 3px rgba(0, 0, 0, 0.15);
   transform: scale(0.98) translateY(0);
 }
@@ -250,7 +267,7 @@ const handleClick = (e: MouseEvent) => {
   backdrop-filter: var(--glass-blur, blur(12px));
   -webkit-backdrop-filter: var(--glass-blur, blur(12px));
   color: var(--text-primary, #292524);
-  border-color: var(--glass-border-frost, rgba(200, 200, 210, 0.30));
+  border-color: var(--glass-border-frost, rgba(200, 200, 210, 0.3));
   box-shadow:
     0 1px 3px rgba(0, 0, 0, 0.04),
     0 4px 12px rgba(0, 0, 0, 0.03),
@@ -259,8 +276,8 @@ const handleClick = (e: MouseEvent) => {
 
 .btn--secondary:hover:not(:disabled) {
   background: var(--glass-hover, rgba(255, 255, 255, 0.92));
-  border-color: var(--primary, #165DFF);
-  color: var(--primary, #165DFF);
+  border-color: var(--primary, #165dff);
+  color: var(--primary, #165dff);
   box-shadow:
     0 2px 6px rgba(0, 0, 0, 0.06),
     0 8px 20px rgba(0, 0, 0, 0.04),
@@ -270,7 +287,7 @@ const handleClick = (e: MouseEvent) => {
 }
 
 .btn--secondary:active:not(:disabled) {
-  background: var(--glass-bg-heavy, rgba(255, 255, 255, 0.90));
+  background: var(--glass-bg-heavy, rgba(255, 255, 255, 0.9));
   box-shadow: var(--shadow-inner, inset 0 2px 4px rgba(0, 0, 0, 0.04));
   transform: scale(0.98) translateY(0);
 }
@@ -278,13 +295,13 @@ const handleClick = (e: MouseEvent) => {
 /* ==================== GHOST — Transparent surface ==================== */
 .btn--ghost {
   background: transparent;
-  color: var(--text-secondary, #57534E);
+  color: var(--text-secondary, #57534e);
   border-color: transparent;
 }
 
 .btn--ghost:hover:not(:disabled) {
   background: var(--primary-light, rgba(22, 93, 255, 0.08));
-  color: var(--primary, #165DFF);
+  color: var(--primary, #165dff);
 }
 
 .btn--ghost:active:not(:disabled) {
@@ -295,41 +312,41 @@ const handleClick = (e: MouseEvent) => {
 /* ==================== OUTLINE — Border only, fill on hover ==================== */
 .btn--outline {
   background: transparent;
-  color: var(--primary, #165DFF);
-  border-color: var(--primary, #165DFF);
+  color: var(--primary, #165dff);
+  border-color: var(--primary, #165dff);
 }
 
 .btn--outline:hover:not(:disabled) {
-  background: var(--primary, #165DFF);
-  color: #FFFFFF;
+  background: var(--primary, #165dff);
+  color: #ffffff;
   box-shadow:
-    0 2px 6px rgba(22, 93, 255, 0.20),
-    0 8px 20px rgba(22, 93, 255, 0.10);
+    0 2px 6px rgba(22, 93, 255, 0.2),
+    0 8px 20px rgba(22, 93, 255, 0.1);
   transform: translateY(-1px);
 }
 
 .btn--outline:active:not(:disabled) {
-  background: var(--primary-active, #115E59);
-  border-color: var(--primary-active, #115E59);
+  background: var(--primary-active, #115e59);
+  border-color: var(--primary-active, #115e59);
   box-shadow: none;
   transform: scale(0.98) translateY(0);
 }
 
 /* ==================== DANGER ==================== */
 .btn--danger {
-  background: var(--error, #DC2626);
-  color: #FFFFFF;
-  border-color: var(--error, #DC2626);
+  background: var(--error, #dc2626);
+  color: #ffffff;
+  border-color: var(--error, #dc2626);
   box-shadow:
     0 1px 2px rgba(220, 38, 38, 0.15),
     0 4px 8px rgba(220, 38, 38, 0.08);
 }
 
 .btn--danger:hover:not(:disabled) {
-  background: var(--error-hover, #B91C1C);
-  border-color: var(--error-hover, #B91C1C);
+  background: var(--error-hover, #b91c1c);
+  border-color: var(--error-hover, #b91c1c);
   box-shadow:
-    0 2px 6px rgba(220, 38, 38, 0.20),
+    0 2px 6px rgba(220, 38, 38, 0.2),
     0 8px 20px rgba(220, 38, 38, 0.12);
   transform: translateY(-1px);
 }
@@ -340,19 +357,19 @@ const handleClick = (e: MouseEvent) => {
 
 /* ==================== SUCCESS ==================== */
 .btn--success {
-  background: var(--success, #00B42A);
-  color: #FFFFFF;
-  border-color: var(--success, #00B42A);
+  background: var(--success, #00b42a);
+  color: #ffffff;
+  border-color: var(--success, #00b42a);
   box-shadow:
     0 1px 2px rgba(0, 180, 42, 0.15),
     0 4px 8px rgba(0, 180, 42, 0.08);
 }
 
 .btn--success:hover:not(:disabled) {
-  background: var(--success-hover, #009A29);
-  border-color: var(--success-hover, #009A29);
+  background: var(--success-hover, #009a29);
+  border-color: var(--success-hover, #009a29);
   box-shadow:
-    0 2px 6px rgba(0, 180, 42, 0.20),
+    0 2px 6px rgba(0, 180, 42, 0.2),
     0 8px 20px rgba(0, 180, 42, 0.12);
   transform: translateY(-1px);
 }
@@ -363,19 +380,19 @@ const handleClick = (e: MouseEvent) => {
 
 /* ==================== ACCENT — Coral island ==================== */
 .btn--accent {
-  background: var(--accent, #F97316);
-  color: #FFFFFF;
-  border-color: var(--accent, #F97316);
+  background: var(--accent, #f97316);
+  color: #ffffff;
+  border-color: var(--accent, #f97316);
   box-shadow:
     0 1px 2px rgba(249, 115, 22, 0.15),
     0 4px 8px rgba(249, 115, 22, 0.08);
 }
 
 .btn--accent:hover:not(:disabled) {
-  background: var(--accent-hover, #EA580C);
-  border-color: var(--accent-hover, #EA580C);
+  background: var(--accent-hover, #ea580c);
+  border-color: var(--accent-hover, #ea580c);
   box-shadow:
-    0 2px 6px rgba(249, 115, 22, 0.20),
+    0 2px 6px rgba(249, 115, 22, 0.2),
     0 8px 20px rgba(249, 115, 22, 0.12);
   transform: translateY(-1px);
 }

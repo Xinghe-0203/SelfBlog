@@ -3,7 +3,12 @@
     <div class="auth-card">
       <header class="auth-brand">
         <span class="brand-mark" aria-hidden="true">
-          <img v-if="siteStore.settings.siteLogoUrl" class="brand-mark--image" :src="siteStore.settings.siteLogoUrl" alt="" />
+          <img
+            v-if="siteStore.settings.siteLogoUrl"
+            class="brand-mark--image"
+            :src="siteStore.settings.siteLogoUrl"
+            alt=""
+          />
           <Icon v-else name="logo" :size="20" />
         </span>
         <span class="brand-text">
@@ -66,7 +71,9 @@
         </div>
 
         <button type="submit" class="btn-primary" :disabled="loading" :aria-busy="loading">
-          <span v-if="loading" class="btn-loading"><span class="spinner" aria-hidden="true"></span>登录中…</span>
+          <span v-if="loading" class="btn-loading"
+            ><span class="spinner" aria-hidden="true"></span>登录中…</span
+          >
           <span v-else>登录</span>
         </button>
       </form>
@@ -142,9 +149,10 @@ const handleLogin = async () => {
     if (result.success) {
       logger.info('Login successful')
       const redirect = (route.query.redirect as string) || `${siteStore.adminRoot}/dashboard`
-      const safeRedirect = redirect.startsWith(siteStore.adminRoot) && !redirect.startsWith('//')
-        ? redirect
-        : `${siteStore.adminRoot}/dashboard`
+      const safeRedirect =
+        redirect.startsWith(siteStore.adminRoot) && !redirect.startsWith('//')
+          ? redirect
+          : `${siteStore.adminRoot}/dashboard`
       router.push(safeRedirect)
     } else {
       logger.warn('Login failed', { message: result.message })

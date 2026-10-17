@@ -1,11 +1,15 @@
 /* Theme colors change together; don't interpolate dark foreground against light paper. */
-.theme-changing *, .theme-changing *::before, .theme-changing *::after {
+.theme-changing *,
+.theme-changing *::before,
+.theme-changing *::after {
   transition-property: none !important;
 }
 
 /* ==================== Accessibility — Reduced Motion ==================== */
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
+  *,
+  *::before,
+  *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;

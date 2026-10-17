@@ -13,19 +13,29 @@ beforeAll(() => {
   vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(() => {})
   vi.spyOn(HTMLMediaElement.prototype, 'load').mockImplementation(() => {})
 })
-beforeEach(() => { vi.clearAllMocks(); localStorage.clear() })
+beforeEach(() => {
+  vi.clearAllMocks()
+  localStorage.clear()
+})
 afterAll(() => vi.restoreAllMocks())
 
 async function setup() {
   const pinia = createPinia()
   setActivePinia(pinia)
-  const router = createRouter({ history: createMemoryHistory(), routes: [
-    { path: '/', component: { template: '<div />' } },
-    { path: '/archives', component: { template: '<div />' } },
-    { path: '/writer', component: { template: '<div />' }, meta: { adminArea: true } },
-  ] })
+  const router = createRouter({
+    history: createMemoryHistory(),
+    routes: [
+      { path: '/', component: { template: '<div />' } },
+      { path: '/archives', component: { template: '<div />' } },
+      { path: '/writer', component: { template: '<div />' }, meta: { adminArea: true } }
+    ]
+  })
   await router.push('/')
-  useSiteStore().applySettings({ musicEnabled: 'true', musicUrl: '/uploads/song.mp3', musicTitle: 'Song' })
+  useSiteStore().applySettings({
+    musicEnabled: 'true',
+    musicUrl: '/uploads/song.mp3',
+    musicTitle: 'Song'
+  })
   const wrapper = mount(MusicPlayer, { global: { plugins: [pinia, router] } })
   await nextTick()
   return { wrapper, router, music: useMusicStore(), site: useSiteStore() }

@@ -181,21 +181,98 @@ async function handleFileChange(event: Event): Promise<void> {
 </template>
 
 <style scoped>
-.asset-field { display: grid; gap: 7px; }
-.asset-label { color: var(--text-secondary); font-size: .78rem; }
-.asset-row { display: flex; gap: 10px; align-items: stretch; }
-.asset-thumb { display: grid; place-items: center; flex: 0 0 auto; width: 74px; min-height: 74px; overflow: hidden; border: 1px solid var(--border-solid); border-radius: var(--radius-sm); background: var(--bg-secondary); }
-.asset-thumb-image { width: 100%; height: 100%; object-fit: cover; }
-.asset-thumb-empty { color: var(--text-muted); font-size: .68rem; }
-.asset-controls { display: flex; flex: 1; min-width: 0; flex-direction: column; gap: 8px; }
-.asset-input { width: 100%; padding: 10px 11px; border: 1px solid var(--border-solid); border-radius: var(--radius-sm); background: var(--bg-primary); color: var(--text-primary); font: inherit; font-size: .84rem; }
-.asset-input:disabled { opacity: .6; cursor: wait; }
-.asset-upload-button { align-self: flex-start; padding: 8px 13px; border: 0; border-radius: var(--radius-sm); background: var(--primary); color: white; font-size: .78rem; font-weight: 700; cursor: pointer; }
-.asset-upload-button:disabled { opacity: .6; cursor: wait; }
-.asset-file-input { display: none; }
-.asset-audio { display: grid; gap: 6px; }
-.asset-audio-player { width: 100%; }
-.asset-audio-meta { color: var(--text-muted); font-size: .72rem; }
-.asset-error { margin: 0; color: var(--error); font-size: .72rem; }
-.asset-hint { margin: 0; color: var(--text-muted); font-size: .7rem; line-height: 1.5; }
+.asset-field {
+  display: grid;
+  gap: 7px;
+}
+.asset-label {
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+}
+.asset-row {
+  display: flex;
+  gap: 10px;
+  align-items: stretch;
+}
+.asset-thumb {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 74px;
+  min-height: 74px;
+  overflow: hidden;
+  border: 1px solid var(--border-solid);
+  border-radius: var(--radius-sm);
+  background: var(--bg-secondary);
+}
+.asset-thumb-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.asset-thumb-empty {
+  color: var(--text-muted);
+  font-size: 0.68rem;
+}
+.asset-controls {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 8px;
+}
+.asset-input {
+  width: 100%;
+  padding: 10px 11px;
+  border: 1px solid var(--border-solid);
+  border-radius: var(--radius-sm);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 0.84rem;
+}
+.asset-input:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+.asset-upload-button {
+  align-self: flex-start;
+  padding: 8px 13px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: var(--primary);
+  color: white;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.asset-upload-button:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+.asset-file-input {
+  display: none;
+}
+.asset-audio {
+  display: grid;
+  gap: 6px;
+}
+.asset-audio-player {
+  width: 100%;
+}
+.asset-audio-meta {
+  color: var(--text-muted);
+  font-size: 0.72rem;
+}
+.asset-error {
+  margin: 0;
+  color: var(--error);
+  font-size: 0.72rem;
+}
+.asset-hint {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  line-height: 1.5;
+}
 </style>

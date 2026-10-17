@@ -8,10 +8,34 @@ import type { IconName } from '@/components/common/icons'
 const siteStore = useSiteStore()
 const stats = ref<VisitorSummary | null>(null)
 const statsError = ref(false)
-const workspaceLinks: Array<{ segment: string; label: string; description: string; action: string; icon: IconName }> = [
-  { segment: 'posts', label: '文章管理', description: '查看、编辑和整理已发布的文章。', action: '管理文章', icon: 'file-text' },
-  { segment: 'visitors', label: '访客记录', description: '了解访问量、访客趋势和大家正在阅读的页面。', action: '查看访客', icon: 'users' },
-  { segment: 'settings', label: '网站设置', description: '调整网站资料、评论开关、皮肤、相册和背景音乐。', action: '配置网站', icon: 'settings' }
+const workspaceLinks: Array<{
+  segment: string
+  label: string
+  description: string
+  action: string
+  icon: IconName
+}> = [
+  {
+    segment: 'posts',
+    label: '文章管理',
+    description: '查看、编辑和整理已发布的文章。',
+    action: '管理文章',
+    icon: 'file-text'
+  },
+  {
+    segment: 'visitors',
+    label: '访客记录',
+    description: '了解访问量、访客趋势和大家正在阅读的页面。',
+    action: '查看访客',
+    icon: 'users'
+  },
+  {
+    segment: 'settings',
+    label: '网站设置',
+    description: '调整网站资料、评论开关、皮肤、相册和背景音乐。',
+    action: '配置网站',
+    icon: 'settings'
+  }
 ]
 
 onMounted(async () => {
@@ -31,11 +55,18 @@ onMounted(async () => {
         <h1>欢迎回来</h1>
         <p>在这里发布文章、查看访客动态，管理 {{ siteStore.settings.siteTitle }} 的外观与内容。</p>
       </div>
-      <router-link :to="`${siteStore.adminRoot}/write`" class="primary-link"><Icon name="plus" :size="16" />开始写作</router-link>
+      <router-link :to="`${siteStore.adminRoot}/write`" class="primary-link"
+        ><Icon name="plus" :size="16" />开始写作</router-link
+      >
     </header>
 
     <section class="workspace-grid" aria-label="管理入口">
-      <router-link v-for="link in workspaceLinks" :key="link.segment" :to="`${siteStore.adminRoot}/${link.segment}`" class="workspace-card">
+      <router-link
+        v-for="link in workspaceLinks"
+        :key="link.segment"
+        :to="`${siteStore.adminRoot}/${link.segment}`"
+        class="workspace-card"
+      >
         <span class="card-icon" aria-hidden="true"><Icon :name="link.icon" :size="19" /></span>
         <h2>{{ link.label }}</h2>
         <p>{{ link.description }}</p>
@@ -44,12 +75,22 @@ onMounted(async () => {
     </section>
 
     <section v-if="stats" class="summary-grid" aria-label="网站访问概况">
-      <article><small>累计访客</small><strong>{{ stats.totalVisitors.toLocaleString() }}</strong></article>
-      <article><small>今日访客</small><strong>{{ stats.todayVisitors.toLocaleString() }}</strong></article>
-      <article><small>页面浏览</small><strong>{{ stats.totalPageViews.toLocaleString() }}</strong></article>
-      <article><small>文章阅读</small><strong>{{ stats.articleViews.toLocaleString() }}</strong></article>
+      <article>
+        <small>累计访客</small><strong>{{ stats.totalVisitors.toLocaleString() }}</strong>
+      </article>
+      <article>
+        <small>今日访客</small><strong>{{ stats.todayVisitors.toLocaleString() }}</strong>
+      </article>
+      <article>
+        <small>页面浏览</small><strong>{{ stats.totalPageViews.toLocaleString() }}</strong>
+      </article>
+      <article>
+        <small>文章阅读</small><strong>{{ stats.articleViews.toLocaleString() }}</strong>
+      </article>
     </section>
-    <p v-else-if="statsError" class="dashboard-note">访客统计暂时无法加载，可在“访客记录”页面重试。</p>
+    <p v-else-if="statsError" class="dashboard-note">
+      访客统计暂时无法加载，可在“访客记录”页面重试。
+    </p>
 
     <p class="dashboard-note">访客可以阅读和搜索公开文章；写作与内容管理仅对作者开放。</p>
   </div>

@@ -26,15 +26,15 @@ export const TOAST_ERROR_DURATION = 5000
 
 /** 缓存时间 (ms) */
 export const CACHE_TIME = {
-  SHORT: 5 * 60 * 1000,      // 5分钟
-  MEDIUM: 30 * 60 * 1000,    // 30分钟
-  LONG: 24 * 60 * 60 * 1000  // 24小时
+  SHORT: 5 * 60 * 1000, // 5分钟
+  MEDIUM: 30 * 60 * 1000, // 30分钟
+  LONG: 24 * 60 * 60 * 1000 // 24小时
 } as const
 
 /** 文件上传限制 */
 export const FILE_LIMITS = {
-  MAX_IMAGE_SIZE: 10 * 1024 * 1024,   // 10MB
-  MAX_VIDEO_SIZE: 100 * 1024 * 1024,  // 100MB
+  MAX_IMAGE_SIZE: 10 * 1024 * 1024, // 10MB
+  MAX_VIDEO_SIZE: 100 * 1024 * 1024, // 100MB
   MAX_FILES: 10,
   ALLOWED_IMAGE_TYPES: ['image/jpeg', 'image/png', 'image/gif', 'image/webp'],
   ALLOWED_VIDEO_TYPES: ['video/mp4', 'video/webm']

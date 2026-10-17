@@ -55,12 +55,17 @@ export const galleryApi = {
   uploadPhotos(id: number, files: File[]): Promise<ApiResponse<PhotoAlbum[]>> {
     const body = new FormData()
     files.forEach((file) => body.append('files', file))
-    return api.post(`/admin/albums/${id}/photos`, body, { headers: { 'Content-Type': 'multipart/form-data' } })
+    return api.post(`/admin/albums/${id}/photos`, body, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    })
   },
   deletePhoto(albumId: number, photoId: number): Promise<ApiResponse> {
     return api.delete(`/admin/albums/${albumId}/photos/${photoId}`)
   },
-  getCommentPage<T>(params: { pageNum?: number; pageSize?: number }): Promise<ApiResponse<PageResult<T>>> {
+  getCommentPage<T>(params: {
+    pageNum?: number
+    pageSize?: number
+  }): Promise<ApiResponse<PageResult<T>>> {
     return api.get('/admin/guest-comments', { params })
   }
 }

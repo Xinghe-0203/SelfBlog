@@ -75,4 +75,25 @@ class ReadingHtmlRendererTest {
         assertEquals(1, doc.select("meta[name=selfblog-site-origin]").size());
         assertEquals("https://public.example.com", doc.selectFirst("meta[name=selfblog-site-origin]").attr("content"));
     }
+
+    /** 首页声明 WebSite + SearchAction，让搜索引擎知道站内搜索入口（/search 本身 noindex）。 */
+    @Test void homePageAdvertisesWebSiteWithSearchAction() {
+        Document doc = Jsoup.parse(renderer.render(page(SeoModels.Kind.HOME, "首页", "/", "<p>欢迎</p>", true), base));
+        assertEquals(1, doc.select("script[type=application/ld+json]").size());
+        String json = doc.selectFirst("script[type=application/ld+json]").data();
+        assertTrue(json.contains("\"@type\":\"WebSite\""));
+        assertTrue(json.contains("\"name\":\"示例博客\""));
+        assertTrue(json.contains("\"url\":\"https://blog.example.com/\""));
+        assertTrue(json.contains("\"potentialAction\""));
+        assertTrue(json.contains("https://blog.example.com/search?q={search_term_string}"));
+        assertTrue(json.contains("required name=search_term_string"));
+    }
+
+    /** 阅读 HTML 必须保留模板里的首屏主题脚本，否则深色读者打开页脚会先闪白再翻黑。 */
+    @Test void inlineThemeBootScriptSurvivesRendering() {
+        Document doc = Jsoup.parse(renderer.render(page(SeoModels.Kind.POST, "标题", "/post/1", "<p>x</p>", true), base));
+        var inline = doc.select("script:not([src]):not([type=application/ld+json])");
+        assertEquals(1, inline.size());
+        assertTrue(inline.first().data().contains("edu_theme"));
+    }
 }

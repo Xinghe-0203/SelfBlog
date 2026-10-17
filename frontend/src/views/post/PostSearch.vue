@@ -1,7 +1,18 @@
 <template>
   <div class="post-search-page">
     <button class="back-link" @click="router.back()">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+      <svg
+        width="16"
+        height="16"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <polyline points="15 18 9 12 15 6" />
+      </svg>
       <span>返回</span>
     </button>
 
@@ -37,7 +48,11 @@
           <h2 class="post-row-title">{{ post.title }}</h2>
           <p class="post-row-excerpt">{{ truncateText(post.summary || post.content, 130) }}</p>
           <div class="post-row-meta">
-            <img :src="post.avatar || '/default-avatar.png'" :alt="post.nickname || post.username" class="post-row-avatar" />
+            <img
+              :src="post.avatar || '/default-avatar.png'"
+              :alt="post.nickname || post.username"
+              class="post-row-avatar"
+            />
             <span class="post-row-author">{{ post.nickname || post.username || '匿名' }}</span>
             <span class="meta-dot">&middot;</span>
             <span class="post-row-time">{{ formatRelativeTime(post.createTime) }}</span>
@@ -47,7 +62,9 @@
             <span class="stat-item">{{ post.likeCount || 0 }} 点赞</span>
           </div>
           <div v-if="post.tags && post.tags.length" class="post-row-tags">
-            <span v-for="tag in post.tags.slice(0, 3)" :key="tag.id" class="mini-tag">{{ tag.name }}</span>
+            <span v-for="tag in post.tags.slice(0, 3)" :key="tag.id" class="mini-tag">{{
+              tag.name
+            }}</span>
           </div>
         </div>
       </router-link>

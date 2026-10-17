@@ -29,7 +29,7 @@ services:
       # 持久化数据库数据（保留既有卷名，不与任何旧部署断开）
       - mysql_data:/var/lib/mysql
       # 初始化脚本只在空数据目录首次启动时执行；既有库请改用迁移脚本
-      - ./schema.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+      - ./schema-fresh-install.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
     networks:
       - selfblog-network
     healthcheck:

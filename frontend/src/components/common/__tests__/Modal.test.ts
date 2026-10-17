@@ -24,7 +24,12 @@ describe('shared modal integration', () => {
     document.body.append(host)
     const modal = mount(Modal, { props: { show: true, title: 'Site identity', closable: true } })
     try {
-      expect(host.querySelector('[role="dialog"]')?.getAttribute('aria-label')).toBe('Site identity')
-    } finally { modal.unmount(); host.remove() }
+      expect(host.querySelector('[role="dialog"]')?.getAttribute('aria-label')).toBe(
+        'Site identity'
+      )
+    } finally {
+      modal.unmount()
+      host.remove()
+    }
   })
 })

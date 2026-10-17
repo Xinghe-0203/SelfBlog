@@ -49,17 +49,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### 后端（`backend/`）
 
-本机 `mvn` **不在 PATH 上**，且 `JAVA_HOME` 指向项目不支持的 JDK 25。已核实可用的调用方式：
+本机 `mvn` **不在 PATH 上**，且 `JAVA_HOME` 指向项目不支持的 JDK 25。仓库已带 Maven Wrapper（`backend/mvnw`、`backend/mvnw.cmd`，wrapper 3.3.4 / Maven 3.9.12），已核实可用的调用方式：
 
 ```bash
 cd backend
 export JAVA_HOME='C:\Program Files\Java\jdk-21'
-MVN='C:/Users/Zora/.m2/wrapper/dists/apache-maven-3.9.12/59fe215c0ad6947fea90184bf7add084544567b927287592651fda3782e0e798/bin/mvn.cmd'
-"$MVN" test -Dskip.npm=true -Dskip.installnodenpm=true
+./mvnw.cmd test "-Dskip.npm=true" "-Dskip.installnodenpm=true"   # PowerShell 里 -D 参数要加引号
 ```
 
 - **跑后端测试必须带 `-Dskip.npm=true -Dskip.installnodenpm=true`**。`pom.xml` 里的 `frontend-maven-plugin` 在 `initialize`/`generate-resources` 阶段会在 `../frontend` 执行 `npm ci` + `npm run build`：不带这两个开关，一次测试会先把整个前端重建一遍，并且**会改写前端构建产物**。带上后全套测试约 1 分钟。
-- 基线：**559 tests, 0 failures**（2026-10-17 实测）。日志里大量 `[PERF] ... error:` 是 `PerformanceMonitoringAspect` 记录的正常负例断言，不是失败。
+- 基线：**564 tests, 0 failures**（2026-10-17 实测；CI 还会用真实 MySQL 8 再跑一遍）。日志里大量 `[PERF] ... error:` 是 `PerformanceMonitoringAspect` 记录的正常负例断言，不是失败。
 - 单测：`"$MVN" test -Dtest=AuthControllerTest -Dskip.npm=true -Dskip.installnodenpm=true`，加 `#方法名` 可只跑一条。
 - 打包：`"$MVN" clean package -DskipTests` → `target/selfblog.jar`（`finalName=selfblog`）。
 - 本地起服务：先把 `backend/.env.example` 复制为 `backend/.env`，填 `JWT_SECRET`（≥32 位）与 `ADMIN_PASSWORD`（≥12 位）。
@@ -77,8 +76,8 @@ cd frontend
 ```
 
 - **本机 `npm run <script>` 全部失败**（`'"node"' 不是内部或外部命令`），`dev` / `build` / `test:run` 都不例外；`npm ci`、`npm install` 正常。原因不在仓库：系统 PATH 中 `C:\Program Files\Java\jdk-25\bin"` 这一项带了一个**不配对的引号**，`cmd.exe` 解析 PATH 时把它当成未闭合引号的开头，其后所有条目失效——`node` 无法被 `cmd` 解析（`where node` 仍能找到，走的是 App Paths），而 `node_modules/.bin/*.cmd` 垫片结尾正是调用裸 `node`。bash 不受影响。**因此一律直接调用 `./node_modules/.bin/<tool>`**（POSIX 垫片，可用；上面五条均已实测通过）。根治办法是删掉那条 PATH 里多余的引号；临时办法是在 PowerShell 里把 `backend/target/frontend/node` 前置到 `PATH`（该目录由 Maven 插件生成，`target/` 被清理后需重新构建才有）。
-- 测试基线：**41 个文件 / 394 tests 全通过**（2026-10-17 实测，约 12s）。
-- 闸门：`lint:check`、`type-check`、`test:run` 全绿；部署适配另跑 `npm run test:deployment`（Vercel 代理生成器 + Docker/Compose 契约，27 项）。**`format:check` 不是可用闸门**——基线即在 **85 个文件**上失败（`core.autocrlf=true` 写入 CRLF 而 `.prettierrc` 要求 LF，外加历史漂移），非零退出属噪声。只检查自己改的文件用 `./node_modules/.bin/prettier --check --end-of-line auto <files>`；**不要跑仓库级 `npm run format`**，它会重写这 85 个无关文件。
+- 测试基线：**43 个文件 / 400 tests 全通过**（2026-10-17 实测）。
+- 闸门：`lint:check`、`format:check`、`type-check`、`test:run`、`build` 全绿；部署适配另跑 `npm run test:deployment`（Vercel 代理生成器 + Docker/Compose 契约，27 项）。`format:check` 自 2026-10-17 起是真实可用的仓库级闸门（`.prettierrc` 改为 `endOfLine: "auto"` 并重写了一次历史漂移）。
 - `tsconfig.json` 开启 `strict` + **`noUncheckedIndexedAccess`**：索引访问返回 `T | undefined`，`arr[0].foo` 过不了 `type-check`。用 `arr[0]?.foo`，或改用 `replace` 而非 `split()[0]` 这类写法。
 - 开发端口 3000，`/api` 与 `/uploads` 代理到 `VITE_API_TARGET`（默认 `http://localhost:8825`）。SPA 在没有后端时也能靠 `stores/site.ts` 的默认值正常渲染（`loadPublicSettings` 的 `fetch` 失败被静默吞掉），所以**只跑 `./node_modules/.bin/vite` 就能验收布局与样式**。
 
@@ -115,7 +114,7 @@ Post 与 Circle 采用同一套拆分，**新增功能要放对位置，不要�
 `DB_TYPE` 决定数据源，由 `config/db/DatabaseConfig.java` 创建（该 Bean 带 `@ConditionalOnProperty("DB_TYPE")`）：
 
 - **SQLite（默认）**：`jdbc:sqlite:campus_blog.db`，Hikari 池大小 1，自动执行 `src/main/resources/schema-sqlite.sql`（`CREATE TABLE IF NOT EXISTS`，**不迁移既有文件**）
-- **MySQL**：`schema.sql` 只用于全新空库；**已有库只能跑 `migration-selfblog.sql`**（`schema.sql` 含删表语句）
+- **MySQL**：`schema-fresh-install.sql` 只用于全新空库；**已有库只能跑 `migration-selfblog.sql`**（`schema-fresh-install.sql` 含删表语句，改名就是为了降低误执行风险）
 - **H2（测试）**：`DB_TYPE` 留空，走 `src/test/resources/application.yml` + `schema.sql`；若设置了 `DB_TYPE`，`DatabaseConfig` 会顶掉测试数据源
 
 Mapper XML 支持 `databaseId="mysql"` / `"sqlite"` 双语句（`MybatisPlusConfig` 注册 `VendorDatabaseIdProvider`）；**H2 没有映射 id，只会走无 databaseId 的兜底语句**，所以不要把 MySQL 专有 SQL 写进共享语句。

@@ -4,7 +4,49 @@
 
 ---
 
-## 未发布 — 死代码清理与文档同步 (2026-10-17)
+## v2.0.26 — P0–P3 加固批次：CI、Maven Wrapper、GFM 一致性与清理 (2026-10-17)
+
+### 说明
+
+- **CI（新增）**：`.github/workflows/ci.yml` 四个真实执行任务——`backend`（Temurin 21 + `./mvnw` + H2 全量）、`frontend`（Node 24.15.0 + `npm ci` + lint/format/type/test/deployment/build）、`mysql`（用 `backend/schema-fresh-install.sql` 初始化真实 MySQL 8 后跑全量后端测试）、`docker`（仓库根上下文构建镜像 → SQLite 起容器 → 等 `/actuator/health` → 抓取服务端渲染首页 `seo-reading`）。本机没有 MySQL/Docker 守护进程，真实 MySQL 与容器运行以 CI 为唯一已验证通道。
+- **Maven Wrapper**：`backend/mvnw`、`mvnw.cmd`、`.mvn/wrapper/maven-wrapper.properties`（only-script，wrapper 3.3.4，Maven 3.9.12，canonical `repo.maven.apache.org` 分发地址）；本地与 CI 共用同一入口，`-D` 参数在 PowerShell 中需加引号。
+- **GFM 一致性**：后端 `SafeMarkdown` 增加 commonmark 表格/删除线/任务列表扩展，与前端 `marked` + DOMPurify 输出对齐；两侧共用 fixture `docs/fixtures/gfm-sample.md`（`SafeMarkdownTest` 与前端 `markdownGfm.test.ts` 同时断言）。任务列表复选框在两侧都被安全策略移除，仅保留条目文字。
+- **深色首闪**：`frontend/index.html` 增加内联主题引导脚本，在 Vue 挂载与首帧之前根据 `edu_theme` 加 `html.dark-mode`；`seo-reading.css` 暗色改为 `html.dark-mode` 键控（不再用 `prefers-color-scheme`，避免与站内主题相反时二次闪烁）。新增 `src/__tests__/indexHtml.test.ts` 直接执行 `index.html?raw` 的真实脚本。
+- **阅读 HTML 缓存**：200 非 SHELL 响应带 ETag + `Cache-Control: public, max-age=0, must-revalidate`，`If-None-Match` 命中返回 304；错误页与 SHELL 保持 `no-store`。回归测试用 Mapper 更新（而非 `JdbcTemplate`），否则 MyBatis 本地会话缓存会掩盖变更。
+- **SEO 补强**：首页 JSON-LD 增加 `WebSite` + `SearchAction`；标签站点地图使用已发布文章的 `MAX(COALESCE(update_time, create_time))` 作为 `lastmod`（`BlogPostTagMapper.selectTagLastModified` + 类型化 DTO `TagLastModified`；H2 会把未加引号的别名转大写，不能用 `Map` 读）。
+- **前端遗留清理（第二波 25 个文件）**：删除仅有旧社区页面引用的 `api/{circle,collect,comment,follow,like,report}.ts`、`types/{circle,follow}.ts`、`components/common/{CollectButton,FollowButton,LikeButton}.vue`、`views/admin/{Reports,Statistics,Users}.vue`、`views/common/Report.vue` 与 10 个 `views/user/*` 页面；保留 `views/user/PasswordChange.vue` 并在后台设置的“后台与访客”面板新增“修改密码”入口。`api/user.ts`、`stores/user.ts`、`types/comment.ts` 保留。
+- **H2 唯一键对齐**：测试 schema 补齐 `sys_user` (username, email)、`blog_circle_like` (user_id, post_id)、`blog_topic` (name) 唯一约束，与 MySQL/SQLite 生产 schema 一致（此前只有 tag/like/collect/follow/post_tag/trending/draft_tag）。
+- **部署文件整理**：`backend/schema.sql` → `backend/schema-fresh-install.sql`（含 `DROP TABLE`，改名降低误执行风险），同步 `docker-compose.yml` 与全部文档引用；删除无用的 `backend/entrypoint.sh` 与 `backend/.dockerignore`（构建上下文本来就是仓库根）。
+- **`format:check` 修复**：`.prettierrc` `endOfLine: "lf"` → `"auto"`，一次性重写历史漂移文件；`format:check` 成为仓库级真实闸门并加入 CI。
+- **AGENTS.md 拆分**：根 `AGENTS.md` 变为入口页（命令快路径、CI、项目级记录），后端/前端详细规则分别移到 `docs/agents/backend.md`、`docs/agents/frontend.md`；同步更新根 `CLAUDE.md`、`frontend/CLAUDE.md`、`README.md`（含 v2.0.26 条目与文档索引）。
+- 版本：`frontend/package.json` 2.0.25 → 2.0.26；`backend/pom.xml` 0.0.1-SNAPSHOT → 2.0.26；本文件此前所有“未发布”章节一并归档到 v2.0.26。
+
+### 验证
+
+- 本地实测：后端 `./mvnw.cmd test -Dskip.npm=true -Dskip.installnodenpm=true` = **564 tests, 0 failures**；前端 43 文件 / 400 tests，`lint:check`（0 错误 / 43 警告）、`format:check`、`type-check`、`build`、`test:deployment` 27/27 全绿。
+- CI：`mysql` 与 `docker` 任务是本仓库对真实 MySQL 与容器运行的唯一验证通道。
+- 仍未验证（不当作已验证）：真实 Vercel 部署、搜索引擎实际收录。
+
+### 影响文件
+
+| 文件 | 改动类型 |
+| --- | --- |
+| `.github/workflows/ci.yml` | 新增（4 任务 CI） |
+| `backend/mvnw`、`mvnw.cmd`、`.mvn/wrapper/maven-wrapper.properties` | 新增（Maven Wrapper） |
+| `backend/schema.sql` → `schema-fresh-install.sql`、`docker-compose.yml`、`DEPLOY.md`、`README.md`、`CLAUDE.md` | 改名与引用同步 |
+| `backend/entrypoint.sh`、`backend/.dockerignore` | 删除（无实际用途） |
+| `backend/pom.xml`、`frontend/package.json`(+lock) | 版本与 GFM 依赖 |
+| `backend/src/main/java/com/selfblog/{service/site/seo/*,controller/SpaController.java,mapper/BlogPostTagMapper.*,dto/site/TagLastModified.java}`、`static/seo-reading.css` | 阅读 HTML/GFM/ETag/JSON-LD/lastmod |
+| `backend/src/test/resources/schema.sql` | H2 唯一键对齐 |
+| `SafeMarkdownTest`、`ReadingHtmlRendererTest`、`ReadingHtmlControllerTest`、`SitemapServiceTest` | 断言更新与新增 |
+| `frontend/index.html`、`src/__tests__/indexHtml.test.ts`、`src/components/pages/__tests__/markdownGfm.test.ts`、`vite.config.ts` | 首屏主题 + GFM/首屏测试 |
+| `frontend/src/views/admin/Settings.vue`、`router/modules/{user,auth,index}.ts`、25 个被删文件 | 遗留清理与密码入口 |
+| `docs/agents/backend.md`、`docs/agents/frontend.md`、`docs/fixtures/gfm-sample.md` | 新增（拆分文档与共享 fixture） |
+| `frontend/.prettierrc` 与漂移文件 | format 闸门修复 |
+
+---
+
+## v2.0.26 — 死代码清理与文档同步 (2026-10-17)
 
 ### 说明
 
@@ -24,7 +66,7 @@
 
 ---
 
-## 未发布 — 文章发布/编辑的标签与媒体修复 (2026-10-17)
+## v2.0.26 — 文章发布/编辑的标签与媒体修复 (2026-10-17)
 
 ### 说明（均为“先复现、再修复”）
 
@@ -63,7 +105,7 @@
 
 ---
 
-## 未发布 — 可抓取正文与统一部署 (2026-10-16)
+## v2.0.26 — 可抓取正文与统一部署 (2026-10-16)
 
 ### 说明
 
@@ -94,7 +136,7 @@
 
 ---
 
-## 未发布 — 逐页配置与独立内容页（第一批） (2026-10-16)
+## v2.0.26 — 逐页配置与独立内容页（第一批） (2026-10-16)
 
 ### 说明
 
@@ -120,7 +162,7 @@
 
 ---
 
-## 未发布 — 导航原型还原与前后端联调修正 (2026-10-16)
+## v2.0.26 — 导航原型还原与前后端联调修正 (2026-10-16)
 
 ### 说明
 
@@ -146,7 +188,7 @@
 
 ---
 
-## 未发布 — 清透空间重设计（三）：作者工作台 (2026-10-16)
+## v2.0.26 — 清透空间重设计（三）：作者工作台 (2026-10-16)
 
 ### 说明
 
@@ -176,7 +218,7 @@
 
 ---
 
-## 未发布 — 清透空间重设计（二）：公开阅读路径 (2026-10-16)
+## v2.0.26 — 清透空间重设计（二）：公开阅读路径 (2026-10-16)
 
 ### 说明
 
@@ -203,7 +245,7 @@
 
 ---
 
-## 未发布 — 清透空间重设计（一）：紧凑导航与音乐 (2026-10-16)
+## v2.0.26 — 清透空间重设计（一）：紧凑导航与音乐 (2026-10-16)
 
 ### 说明
 
@@ -234,7 +276,7 @@
 
 ---
 
-## 未发布 — 修复单 JAR 模式下静态 favicon 的 401 (2026-10-16)
+## v2.0.26 — 修复单 JAR 模式下静态 favicon 的 401 (2026-10-16)
 
 ### 修复
 
@@ -248,7 +290,7 @@
 
 ---
 
-## 未发布 — 视觉重设计（四）：全站圆角收尾 (2026-10-16)
+## v2.0.26 — 视觉重设计（四）：全站圆角收尾 (2026-10-16)
 
 批次一上调了圆角 token，但页面里仍有大量裸圆角值不跟随；本批把它们全部换成 token，让「大 R 角」真正覆盖全站。
 
@@ -268,7 +310,7 @@
 
 ---
 
-## 未发布 — 视觉重设计（三）：文章页阅读体验 (2026-10-16)
+## v2.0.26 — 视觉重设计（三）：文章页阅读体验 (2026-10-16)
 
 把阅读路径上的交互补齐：代码块、目录、锚点、灯箱与阅读时长。
 
@@ -307,7 +349,7 @@
 
 ---
 
-## 未发布 — 视觉重设计（二）：后台侧边栏 (2026-10-15)
+## v2.0.26 — 视觉重设计（二）：后台侧边栏 (2026-10-15)
 
 把公开页顶栏的同一套语言（内置图标、胶囊选中、品牌资产）带进后台。
 
@@ -332,7 +374,7 @@
 
 ---
 
-## 未发布 — 站点资源上传控件（前端）(2026-10-15)
+## v2.0.26 — 站点资源上传控件（前端）(2026-10-15)
 
 承接「资源上传通道（后端）」：后台「网站设置」页新增四个品牌资源字段，支持上传与预览。
 
@@ -360,7 +402,7 @@
 
 ---
 
-## 未发布 — 资源上传通道（后端）(2026-10-15)
+## v2.0.26 — 资源上传通道（后端）(2026-10-15)
 
 ### 新增
 
@@ -394,7 +436,7 @@
 
 ---
 
-## 未发布 — 视觉重设计（一）：设计底座与公开页导航 (2026-10-15)
+## v2.0.26 — 视觉重设计（一）：设计底座与公开页导航 (2026-10-15)
 
 站点视觉重设计的第一批落地：先把圆角 token、图标系统、滚动状态与品牌资产这些**共享底座**做好，再让公开页顶栏成为第一个消费者。后端上传通道、文章页阅读体验、后台胶囊化在后续批次。
 
@@ -447,7 +489,7 @@
 
 ---
 
-## 未发布 — SEO、订阅源与字体 (2026-10-15)
+## v2.0.26 — SEO、订阅源与字体 (2026-10-15)
 
 参考同类开源个人博客项目（`linhaojun857/aurora`、`weiwosuoai/WeBlog`、`iszhouhua/blog` 等）后补齐的能力。
 这些项目普遍具备「被订阅、被搜索、被分享」的基础设施，而本项目在此之前完全没有。
@@ -493,7 +535,7 @@
 
 ---
 
-## 未发布 — 样式系统与路由修复 (2026-10-15)
+## v2.0.26 — 样式系统与路由修复 (2026-10-15)
 
 ### Bug 修复
 

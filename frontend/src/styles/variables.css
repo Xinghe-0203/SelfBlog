@@ -13,15 +13,15 @@
   /* ---------------------------------------------------------------
      Canvas / Background
      --------------------------------------------------------------- */
-  --bg-primary:    #F5F6F8;
-  --bg-secondary:  #EEF0F4;
-  --bg-tertiary:   #E7EAF0;
+  --bg-primary: #f5f6f8;
+  --bg-secondary: #eef0f4;
+  --bg-tertiary: #e7eaf0;
 
   /* ---------------------------------------------------------------
      Surfaces
      --------------------------------------------------------------- */
-  --surface-primary:   #FFFFFF;     /* 卡片背景 — 纯白，与页面背景形成轻微对比 */
-  --surface-secondary: #F9FAFC;
+  --surface-primary: #ffffff; /* 卡片背景 — 纯白，与页面背景形成轻微对比 */
+  --surface-secondary: #f9fafc;
 
   /* ---------------------------------------------------------------
      Contrast Surface — 高对比实心表面（主按钮 / 反色块）
@@ -29,134 +29,134 @@
      --gray-900 会变成 #EBEBEB，导致按钮/代码块在深色页面上变成刺眼的亮块。
      这两个 token 由各自主题显式定义，语义稳定。
      --------------------------------------------------------------- */
-  --contrast-bg:        #111111;
-  --contrast-bg-hover:  #333333;
-  --contrast-bg-active: #0A0A0A;
-  --contrast-fg:        #FFFFFF;
+  --contrast-bg: #111111;
+  --contrast-bg-hover: #333333;
+  --contrast-bg-active: #0a0a0a;
+  --contrast-fg: #ffffff;
 
   /* ---------------------------------------------------------------
      Code Surface — 代码块
      浅色模式下为深色块（反转观感）；深色模式下同样保持深色，
      避免整页最亮的元素是一段代码。
      --------------------------------------------------------------- */
-  --code-bg:     #1D2129;
-  --code-text:   #E5E6EB;
-  --code-border: #2C333D;
+  --code-bg: #1d2129;
+  --code-text: #e5e6eb;
+  --code-border: #2c333d;
 
   /* ---------------------------------------------------------------
      Borders / Dividers
      --------------------------------------------------------------- */
-  --border-light:      #E3E6EC;
-  --border-ultra-light: #EDF0F4;
+  --border-light: #e3e6ec;
+  --border-ultra-light: #edf0f4;
 
   /* ---------------------------------------------------------------
      Text — 三级灰度梯度
      --------------------------------------------------------------- */
-  --text-primary:   #262A31;
-  --text-secondary: #67707E;
-  --text-muted:     #707A88;
-  --text-inverse:   #FFFFFF;
+  --text-primary: #262a31;
+  --text-secondary: #67707e;
+  --text-muted: #707a88;
+  --text-inverse: #ffffff;
 
   /* ---------------------------------------------------------------
      Primary — 柔和蓝 #165DFF
      --------------------------------------------------------------- */
-  --accent:       #165DFF;
+  --accent: #165dff;
   --accent-light: color-mix(in srgb, var(--accent) 10%, var(--surface-primary));
-  --accent-dark:  color-mix(in srgb, var(--accent) 82%, black);
+  --accent-dark: color-mix(in srgb, var(--accent) 82%, black);
 
   /* ---------------------------------------------------------------
      Secondary — 活力橙 #FF7D00（点赞、评论、热门标签点缀）
      --------------------------------------------------------------- */
-  --secondary:       #FF7D00;
-  --secondary-light: #FFF7E8;
-  --secondary-dark:  #D96400;
+  --secondary: #ff7d00;
+  --secondary-light: #fff7e8;
+  --secondary-dark: #d96400;
 
   /* ---------------------------------------------------------------
      Semantic Colors
      --------------------------------------------------------------- */
-  --success:       #00B42A;
-  --success-light: #E8FFEA;
-  --success-hover: #009A29;
+  --success: #00b42a;
+  --success-light: #e8ffea;
+  --success-hover: #009a29;
 
-  --warning:       #FF7D00;
-  --warning-light: #FFF7E8;
-  --warning-hover: #D96400;
+  --warning: #ff7d00;
+  --warning-light: #fff7e8;
+  --warning-hover: #d96400;
 
-  --error:         #F53F3F;
-  --error-light:   #FFECE8;
-  --error-hover:   #D9363E;
+  --error: #f53f3f;
+  --error-light: #ffece8;
+  --error-hover: #d9363e;
 
-  --info:          #165DFF;
-  --info-light:    #E8F3FF;
-  --info-hover:    #0E42D2;
+  --info: #165dff;
+  --info-light: #e8f3ff;
+  --info-hover: #0e42d2;
 
   /* ---------------------------------------------------------------
      Neutral Gray Scale — 统一灰度梯度
      --------------------------------------------------------------- */
-  --gray-50:  #F8FAFC;
-  --gray-100: #F1F5F9;
-  --gray-200: #E5E6EB;
-  --gray-300: #C9CDD4;
-  --gray-400: #86909C;
-  --gray-500: #4E5969;
-  --gray-600: #3D4550;
-  --gray-700: #2C333D;
-  --gray-800: #1D2129;
+  --gray-50: #f8fafc;
+  --gray-100: #f1f5f9;
+  --gray-200: #e5e6eb;
+  --gray-300: #c9cdd4;
+  --gray-400: #86909c;
+  --gray-500: #4e5969;
+  --gray-600: #3d4550;
+  --gray-700: #2c333d;
+  --gray-800: #1d2129;
   --gray-900: #111111;
-  --gray-950: #0A0A0A;
+  --gray-950: #0a0a0a;
 
   /* ---------------------------------------------------------------
      Backward-Compatibility Aliases — Primary System
      --------------------------------------------------------------- */
-  --primary:        var(--accent);
-  --primary-start:  var(--accent);
-  --primary-end:    var(--accent-dark);
-  --primary-hover:  var(--accent-dark);
+  --primary: var(--accent);
+  --primary-start: var(--accent);
+  --primary-end: var(--accent-dark);
+  --primary-hover: var(--accent-dark);
   --primary-active: var(--accent-dark);
-  --primary-light:  var(--accent-light);
+  --primary-light: var(--accent-light);
   --primary-subtle: color-mix(in srgb, var(--accent) 4%, transparent);
-  --primary-glow:   color-mix(in srgb, var(--accent) 20%, transparent);
+  --primary-glow: color-mix(in srgb, var(--accent) 20%, transparent);
 
   /* Backward-Compatibility — Accent System */
-  --accent-hover:   var(--accent-dark);
-  --accent-active:  var(--accent-dark);
-  --accent-subtle:  var(--primary-subtle);
-  --accent-glow:    var(--primary-glow);
+  --accent-hover: var(--accent-dark);
+  --accent-active: var(--accent-dark);
+  --accent-subtle: var(--primary-subtle);
+  --accent-glow: var(--primary-glow);
 
   /* Backward-Compatibility — Semantic Glow */
   --success-glow: rgba(0, 180, 42, 0.15);
   --warning-glow: rgba(255, 125, 0, 0.15);
-  --error-glow:   rgba(245, 63, 63, 0.15);
-  --info-glow:    rgba(22, 93, 255, 0.15);
+  --error-glow: rgba(245, 63, 63, 0.15);
+  --info-glow: rgba(22, 93, 255, 0.15);
 
   /* Backward-Compatibility — Semantic Aliases */
-  --background:       var(--bg-primary);
+  --background: var(--bg-primary);
   --background-solid: var(--bg-primary);
-  --surface:          var(--surface-primary);
-  --surface-solid:    var(--surface-primary);
-  --surface-raised:   var(--surface-secondary);
-  --border:           var(--border-ultra-light);
-  --border-solid:     var(--border-light);
-  --border-strong:    var(--gray-300);
+  --surface: var(--surface-primary);
+  --surface-solid: var(--surface-primary);
+  --surface-raised: var(--surface-secondary);
+  --border: var(--border-ultra-light);
+  --border-solid: var(--border-light);
+  --border-strong: var(--gray-300);
 
   /* ---------------------------------------------------------------
      Backward-Compatibility — Glass System (solid surfaces)
      --------------------------------------------------------------- */
-  --glass-bg:           var(--surface-primary);
-  --glass-bg-light:     var(--surface-secondary);
-  --glass-bg-heavy:     var(--surface-primary);
-  --glass-border:       var(--border-light);
+  --glass-bg: var(--surface-primary);
+  --glass-bg-light: var(--surface-secondary);
+  --glass-bg-heavy: var(--surface-primary);
+  --glass-border: var(--border-light);
   --glass-border-frost: var(--border-light);
-  --glass-shadow:       var(--shadow-sm);
+  --glass-shadow: var(--shadow-sm);
   --glass-shadow-frost: var(--shadow-md);
-  --glass-blur:         none;
-  --glass-blur-heavy:   none;
-  --glass-hover:        var(--bg-secondary);
-  --glass-shine:        none;
-  --glass-frost-glow:   none;
-  --glass-border-wet:   var(--border-light);
-  --glass-shadow-wet:   var(--shadow-md);
-  --glass-wet-glow:     none;
+  --glass-blur: none;
+  --glass-blur-heavy: none;
+  --glass-hover: var(--bg-secondary);
+  --glass-shine: none;
+  --glass-frost-glow: none;
+  --glass-border-wet: var(--border-light);
+  --glass-shadow-wet: var(--shadow-md);
+  --glass-wet-glow: none;
 
   /* Explicit opt-in: never turn legacy content cards into glass. */
   --functional-glass-bg: color-mix(in srgb, var(--surface-primary) 88%, transparent);
@@ -169,19 +169,19 @@
   /* ---------------------------------------------------------------
      Decorative Colors — 校园活力点缀（紫色微调）
      --------------------------------------------------------------- */
-  --blue:        var(--accent);
-  --blue-light:  var(--accent-light);
-  --green:       var(--success);
+  --blue: var(--accent);
+  --blue-light: var(--accent-light);
+  --green: var(--success);
   --green-light: var(--success-light);
-  --purple:      #6941C6;             /* 柔和紫 — 降低饱和度，更高级 */
-  --purple-light:#F4F0FF;             /* 浅紫背景 */
-  --purple-muted:#9B7ED1;             /* 柔和紫 — 辅助文字、标签 */
-  --pink:        #F772B2;
-  --pink-light:  #FFF0F6;
-  --red:         var(--error);
-  --red-light:   var(--error-light);
-  --orange:      var(--secondary);
-  --orange-light:var(--secondary-light);
+  --purple: #6941c6; /* 柔和紫 — 降低饱和度，更高级 */
+  --purple-light: #f4f0ff; /* 浅紫背景 */
+  --purple-muted: #9b7ed1; /* 柔和紫 — 辅助文字、标签 */
+  --pink: #f772b2;
+  --pink-light: #fff0f6;
+  --red: var(--error);
+  --red-light: var(--error-light);
+  --orange: var(--secondary);
+  --orange-light: var(--secondary-light);
 
   /* ---------------------------------------------------------------
      Typography System
@@ -192,89 +192,91 @@
      超时阻塞渲染。中文必须显式回退（苹方/微软雅黑/思源黑体），
      否则中文会落到浏览器默认字体，与西文混排时字重和字距都不一致。 */
   --font-display: var(--font-sans);
-  --font-sans:    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
-                  'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei',
-                  'Source Han Sans SC', 'Noto Sans CJK SC', Helvetica, Arial, sans-serif;
-  --font-serif:   'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia,
-                  'Songti SC', 'Source Han Serif SC', 'Noto Serif CJK SC', 'SimSun', serif;
-  --font-mono:    ui-monospace, SFMono-Regular, Menlo, Consolas,
-                  'JetBrains Mono', 'Sarasa Mono SC', 'Courier New', monospace;
+  --font-sans:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'PingFang SC', 'Hiragino Sans GB',
+    'Microsoft YaHei', 'Source Han Sans SC', 'Noto Sans CJK SC', Helvetica, Arial, sans-serif;
+  --font-serif:
+    'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, 'Songti SC', 'Source Han Serif SC',
+    'Noto Serif CJK SC', 'SimSun', serif;
+  --font-mono:
+    ui-monospace, SFMono-Regular, Menlo, Consolas, 'JetBrains Mono', 'Sarasa Mono SC',
+    'Courier New', monospace;
 
   /* Font Sizes */
-  --text-xs:   0.75rem;     /* 12px */
-  --text-sm:   0.875rem;    /* 14px */
-  --text-base: 1rem;        /* 16px */
-  --text-lg:   1.125rem;    /* 18px */
-  --text-xl:   1.25rem;     /* 20px */
-  --text-2xl:  1.5rem;      /* 24px */
-  --text-3xl:  1.875rem;    /* 30px */
-  --text-4xl:  2.25rem;     /* 36px */
-  --text-5xl:  3rem;        /* 48px */
+  --text-xs: 0.75rem; /* 12px */
+  --text-sm: 0.875rem; /* 14px */
+  --text-base: 1rem; /* 16px */
+  --text-lg: 1.125rem; /* 18px */
+  --text-xl: 1.25rem; /* 20px */
+  --text-2xl: 1.5rem; /* 24px */
+  --text-3xl: 1.875rem; /* 30px */
+  --text-4xl: 2.25rem; /* 36px */
+  --text-5xl: 3rem; /* 48px */
 
   /* Line Heights */
-  --leading-none:    1;
-  --leading-tight:   1.25;
-  --leading-snug:    1.375;
-  --leading-normal:  1.6;
+  --leading-none: 1;
+  --leading-tight: 1.25;
+  --leading-snug: 1.375;
+  --leading-normal: 1.6;
   --leading-relaxed: 1.75;
-  --leading-loose:   2;
+  --leading-loose: 2;
 
   /* Font Weights */
-  --font-normal:    400;
-  --font-medium:    500;
-  --font-semibold:  600;
-  --font-bold:      700;
+  --font-normal: 400;
+  --font-medium: 500;
+  --font-semibold: 600;
+  --font-bold: 700;
   --font-extrabold: 800;
 
   /* Letter Spacing */
-  --tracking-tight:  -0.025em;
-  --tracking-normal:  0;
-  --tracking-wide:    0.025em;
-  --tracking-wider:   0.05em;
+  --tracking-tight: -0.025em;
+  --tracking-normal: 0;
+  --tracking-wide: 0.025em;
+  --tracking-wider: 0.05em;
 
   /* ---------------------------------------------------------------
      Spacing System — 8px Base Unit
      --------------------------------------------------------------- */
-  --space-1:   4px;
-  --space-2:   8px;
-  --space-3:   12px;
-  --space-4:   16px;
-  --space-5:   20px;
-  --space-6:   24px;
-  --space-8:   32px;
-  --space-10:  40px;
-  --space-12:  48px;
-  --space-16:  64px;
-  --space-20:  80px;
-  --space-24:  96px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+  --space-20: 80px;
+  --space-24: 96px;
 
   /* Backward-Compatibility — Old spacing names */
-  --spacing-0:    0;
-  --spacing-0_5:  2px;
-  --spacing-1:    var(--space-1);
-  --spacing-1_5:  6px;
-  --spacing-2:    var(--space-2);
-  --spacing-2_5:  10px;
-  --spacing-3:    var(--space-3);
-  --spacing-3_5:  14px;
-  --spacing-4:    var(--space-4);
-  --spacing-5:    var(--space-5);
-  --spacing-6:    var(--space-6);
-  --spacing-7:    28px;
-  --spacing-8:    var(--space-8);
-  --spacing-9:    36px;
-  --spacing-10:   var(--space-10);
-  --spacing-12:   var(--space-12);
-  --spacing-14:   56px;
-  --spacing-16:   var(--space-16);
-  --spacing-20:   var(--space-20);
-  --spacing-24:   var(--space-24);
+  --spacing-0: 0;
+  --spacing-0_5: 2px;
+  --spacing-1: var(--space-1);
+  --spacing-1_5: 6px;
+  --spacing-2: var(--space-2);
+  --spacing-2_5: 10px;
+  --spacing-3: var(--space-3);
+  --spacing-3_5: 14px;
+  --spacing-4: var(--space-4);
+  --spacing-5: var(--space-5);
+  --spacing-6: var(--space-6);
+  --spacing-7: 28px;
+  --spacing-8: var(--space-8);
+  --spacing-9: 36px;
+  --spacing-10: var(--space-10);
+  --spacing-12: var(--space-12);
+  --spacing-14: 56px;
+  --spacing-16: var(--space-16);
+  --spacing-20: var(--space-20);
+  --spacing-24: var(--space-24);
 
-  --spacing-xs:  var(--space-1);
-  --spacing-sm:  var(--space-2);
-  --spacing-md:  var(--space-4);
-  --spacing-lg:  var(--space-6);
-  --spacing-xl:  var(--space-8);
+  --spacing-xs: var(--space-1);
+  --spacing-sm: var(--space-2);
+  --spacing-md: var(--space-4);
+  --spacing-lg: var(--space-6);
+  --spacing-xl: var(--space-8);
   --spacing-2xl: var(--space-12);
   --spacing-3xl: var(--space-16);
   --spacing-4xl: var(--space-24);
@@ -285,32 +287,32 @@
       8px controls, 12–14px content groups, 16px panels.
       Capsules are reserved for the slim navbar and circular controls. */
   --radius-none: 0;
-  --radius-xs:   4px;
-  --radius-sm:   6px;
-  --radius:      8px;
-  --radius-md:   8px;
-  --radius-lg:   12px;
-  --radius-xl:   14px;
-  --radius-2xl:  16px;
-  --radius-3xl:  20px;
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius: 8px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 14px;
+  --radius-2xl: 16px;
+  --radius-3xl: 20px;
   --radius-full: 9999px;
 
   /* ---------------------------------------------------------------
      Shadows — Quiet depth, mostly for functional layers
      --------------------------------------------------------------- */
-  --shadow-xs:   0 1px 2px rgb(20 32 51 / 3%);
-  --shadow-sm:   0 2px 6px rgb(20 32 51 / 4%);
-  --shadow:      0 4px 12px rgb(20 32 51 / 6%);
-  --shadow-md:   0 6px 20px rgb(20 32 51 / 8%);
-  --shadow-lg:   0 8px 28px rgb(20 32 51 / 10%);
-  --shadow-xl:   0 12px 36px rgb(20 32 51 / 12%);
-  --shadow-2xl:  0 16px 48px rgba(0, 0, 0, 0.20);
-  --shadow-inner:inset 0 2px 4px rgba(0, 0, 0, 0.06);
+  --shadow-xs: 0 1px 2px rgb(20 32 51 / 3%);
+  --shadow-sm: 0 2px 6px rgb(20 32 51 / 4%);
+  --shadow: 0 4px 12px rgb(20 32 51 / 6%);
+  --shadow-md: 0 6px 20px rgb(20 32 51 / 8%);
+  --shadow-lg: 0 8px 28px rgb(20 32 51 / 10%);
+  --shadow-xl: 0 12px 36px rgb(20 32 51 / 12%);
+  --shadow-2xl: 0 16px 48px rgba(0, 0, 0, 0.2);
+  --shadow-inner: inset 0 2px 4px rgba(0, 0, 0, 0.06);
 
   --shadow-glow-primary: none;
-  --shadow-glow-accent:  none;
+  --shadow-glow-accent: none;
   --shadow-glow-success: none;
-  --shadow-glow-error:   none;
+  --shadow-glow-error: none;
 
   /* ---------------------------------------------------------------
      Motion System — Snappy Spring Easing
@@ -318,25 +320,25 @@
 
   /* Durations */
   --duration-instant: 50ms;
-  --duration-fast:    150ms;
-  --duration-normal:  200ms;
-  --duration-slow:    300ms;
-  --duration-slower:  400ms;
+  --duration-fast: 150ms;
+  --duration-normal: 200ms;
+  --duration-slow: 300ms;
+  --duration-slower: 400ms;
 
   /* Easing Functions */
-  --ease-default:  cubic-bezier(0.16, 1, 0.3, 1);   /* Snappy ease-out */
-  --ease-in:       cubic-bezier(0.4, 0, 1, 1);
-  --ease-out:      cubic-bezier(0.16, 1, 0.3, 1);
-  --ease-in-out:   cubic-bezier(0.65, 0, 0.35, 1);
-  --ease-spring:   cubic-bezier(0.34, 1.56, 0.64, 1);
-  --ease-bounce:   cubic-bezier(0.68, -0.55, 0.265, 1.55);
-  --ease-smooth:   cubic-bezier(0.25, 0.1, 0.25, 1);
+  --ease-default: cubic-bezier(0.16, 1, 0.3, 1); /* Snappy ease-out */
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-bounce: cubic-bezier(0.68, -0.55, 0.265, 1.55);
+  --ease-smooth: cubic-bezier(0.25, 0.1, 0.25, 1);
 
   /* Semantic Transitions */
-  --transition-fast:   150ms cubic-bezier(0.16, 1, 0.3, 1);
-  --transition:        200ms cubic-bezier(0.16, 1, 0.3, 1);
-  --transition-base:   200ms cubic-bezier(0.16, 1, 0.3, 1);
-  --transition-slow:   300ms cubic-bezier(0.16, 1, 0.3, 1);
+  --transition-fast: 150ms cubic-bezier(0.16, 1, 0.3, 1);
+  --transition: 200ms cubic-bezier(0.16, 1, 0.3, 1);
+  --transition-base: 200ms cubic-bezier(0.16, 1, 0.3, 1);
+  --transition-slow: 300ms cubic-bezier(0.16, 1, 0.3, 1);
   --transition-spring: 400ms cubic-bezier(0.34, 1.56, 0.64, 1);
 
   /* ---------------------------------------------------------------
@@ -351,45 +353,45 @@
   /* ---------------------------------------------------------------
      Skeleton Loading
      --------------------------------------------------------------- */
-  --skeleton-base:      #E5E6EB;
-  --skeleton-highlight: #F1F5F9;
+  --skeleton-base: #e5e6eb;
+  --skeleton-highlight: #f1f5f9;
 
   /* ---------------------------------------------------------------
      Navbar
      --------------------------------------------------------------- */
-  --navbar-bg:     var(--functional-glass-bg);
+  --navbar-bg: var(--functional-glass-bg);
   --navbar-height: 52px;
   --anchor-offset: 96px;
 
   /* ---------------------------------------------------------------
      Secondary / Accent colors (for likes, comments, hot tags)
      --------------------------------------------------------------- */
-  --like-color:    var(--secondary);
-  --like-light:    var(--secondary-light);
-  --hot-tag-bg:    var(--secondary-light);
-  --hot-tag-text:  var(--secondary-dark);
+  --like-color: var(--secondary);
+  --like-light: var(--secondary-light);
+  --hot-tag-bg: var(--secondary-light);
+  --hot-tag-text: var(--secondary-dark);
 
   /* 点赞按钮的心形强调色。不要把这些值直接写死在组件里：
      浅色下的 #fff0f3 之类浅底在深色模式下会变成刺眼的亮块。 */
-  --like-accent:        #DC4762;
-  --like-accent-strong: #C82F50;
-  --like-accent-soft:   #FFF0F3;
-  --like-accent-border: #F0BDC9;
+  --like-accent: #dc4762;
+  --like-accent-strong: #c82f50;
+  --like-accent-soft: #fff0f3;
+  --like-accent-border: #f0bdc9;
 
   /* ---------------------------------------------------------------
      Z-Index Scale
      --------------------------------------------------------------- */
-  --z-dropdown:        1000;
-  --z-sticky:          1020;
-  --z-nav-panel:       1030;
-  --z-fixed:           1030;
-  --z-overlay:         1040;
-  --z-modal-backdrop:  1050;
-  --z-modal:           1060;
-  --z-popover:         1070;
-  --z-tooltip:         1080;
-  --z-toast:           1120;
-  --z-preview:         1100;
+  --z-dropdown: 1000;
+  --z-sticky: 1020;
+  --z-nav-panel: 1030;
+  --z-fixed: 1030;
+  --z-overlay: 1040;
+  --z-modal-backdrop: 1050;
+  --z-modal: 1060;
+  --z-popover: 1070;
+  --z-tooltip: 1080;
+  --z-toast: 1120;
+  --z-preview: 1100;
 
   /* ---------------------------------------------------------------
      Background Gradient — 清爽蓝灰渐变
@@ -397,6 +399,6 @@
   --background-gradient: var(--bg-primary);
 
   /* Brand Gradient — Now monochrome blue */
-  --brand-gradient:    linear-gradient(135deg, var(--accent), var(--accent-dark));
-  --brand-gradient-h:  linear-gradient(90deg, var(--accent), var(--accent-dark));
+  --brand-gradient: linear-gradient(135deg, var(--accent), var(--accent-dark));
+  --brand-gradient-h: linear-gradient(90deg, var(--accent), var(--accent-dark));
 }

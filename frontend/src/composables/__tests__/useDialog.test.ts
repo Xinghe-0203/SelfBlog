@@ -9,10 +9,13 @@ const Dialog = defineComponent({
   setup(props) {
     const open = ref(props.initial)
     const panel = ref<HTMLElement | null>(null)
-    const dialog = useDialog(open, panel, () => { open.value = false })
+    const dialog = useDialog(open, panel, () => {
+      open.value = false
+    })
     return { open, panel, ...dialog }
   },
-  template: '<div v-if="open" ref="panel" tabindex="-1" role="dialog"><button class="first">First</button><button class="last">Last</button></div>'
+  template:
+    '<div v-if="open" ref="panel" tabindex="-1" role="dialog"><button class="first">First</button><button class="last">Last</button></div>'
 })
 
 describe('shared dialog lifecycle', () => {
@@ -59,9 +62,13 @@ describe('shared dialog lifecycle', () => {
     const last = wrapper.get<HTMLButtonElement>('.last').element
     expect(document.activeElement).toBe(first)
     last.focus()
-    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true }))
+    document.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true })
+    )
     expect(document.activeElement).toBe(first)
-    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', shiftKey: true, bubbles: true, cancelable: true }))
+    document.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Tab', shiftKey: true, bubbles: true, cancelable: true })
+    )
     expect(document.activeElement).toBe(last)
     opener.focus()
     expect(document.activeElement).toBe(first)

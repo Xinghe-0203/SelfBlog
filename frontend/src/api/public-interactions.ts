@@ -25,13 +25,24 @@ export const publicInteractionApi = {
   toggleLike(postId: number): Promise<ApiResponse<AnonymousLike>> {
     return api.post(`/anonymous-likes/posts/${postId}`)
   },
-  getComments(postId: number, params: { pageNum?: number; pageSize?: number }): Promise<ApiResponse<PageResult<GuestComment>>> {
+  getComments(
+    postId: number,
+    params: { pageNum?: number; pageSize?: number }
+  ): Promise<ApiResponse<PageResult<GuestComment>>> {
     return api.get(`/guest-comments/post/${postId}`, { params })
   },
-  createComment(data: { postId: number; nickname: string; content: string }): Promise<ApiResponse<number>> {
+  createComment(data: {
+    postId: number
+    nickname: string
+    content: string
+  }): Promise<ApiResponse<number>> {
     return api.post('/guest-comments', { ...data, visitorId: getVisitorId() })
   },
-  getAdminComments(params: { pageNum?: number; pageSize?: number; status?: number }): Promise<ApiResponse<PageResult<GuestComment>>> {
+  getAdminComments(params: {
+    pageNum?: number
+    pageSize?: number
+    status?: number
+  }): Promise<ApiResponse<PageResult<GuestComment>>> {
     return api.get('/admin/guest-comments', { params })
   },
   updateCommentStatus(id: number, status: number): Promise<ApiResponse> {

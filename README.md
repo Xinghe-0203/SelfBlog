@@ -1,7 +1,7 @@
 # SelfBlog — 个人博客
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Version](https://img.shields.io/badge/version-v2.0.25-blue)](https://github.com/Xinghe-0203)
+[![Version](https://img.shields.io/badge/version-v2.0.26-blue)](https://github.com/Xinghe-0203)
 [![Java](https://img.shields.io/badge/Java-21-orange)](https://www.oracle.com/java/)
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.3.13-green)](https://spring.io/projects/spring-boot)
 [![Vue](https://img.shields.io/badge/Vue-3.5.44-brightgreen)](https://vuejs.org/)
@@ -145,7 +145,7 @@ SelfBlog/
 │   ├── pom.xml                     # Maven 依赖配置
 │   ├── Dockerfile                  # Docker 构建文件
 │   ├── docker-compose.yml          # Docker Compose 编排
-│   ├── schema.sql                  # 数据库建表脚本
+│   ├── schema-fresh-install.sql   # MySQL 全新空库建表脚本（含删表语句，勿对现有库执行）
 │   ├── .env.example                # 环境变量模板
 │   └── src/main/
 │       ├── java/com/selfblog/
@@ -227,7 +227,7 @@ java -jar selfblog.jar
 
 默认 `.env` 使用 SQLite，原有 SQLite 文件通过 `CREATE TABLE IF NOT EXISTS` 增量增加新表，不会重建文章表。
 
-如要使用 MySQL，将 `.env` 中的 `DB_TYPE` 改为 `mysql` 并填写完整连接信息。全新空数据库可按 `backend/schema.sql` 初始化；**已有数据库只运行** `backend/migration-selfblog.sql` 增加博客功能所需表。不要对有数据的数据库运行完整 `schema.sql`，该历史初始化脚本包含删表语句。
+如要使用 MySQL，将 `.env` 中的 `DB_TYPE` 改为 `mysql` 并填写完整连接信息。全新空数据库可按 `backend/schema-fresh-install.sql` 初始化；**已有数据库只运行** `backend/migration-selfblog.sql` 增加博客功能所需表。不要对有数据的数据库运行完整 `schema-fresh-install.sql`，该脚本是全新安装脚本，包含删表语句（改名原因之一）。
 
 ### 本地前后端开发
 
@@ -342,7 +342,8 @@ Controller（控制器）→ Service（服务）→ Mapper（数据访问）→ 
 |------|------|------|
 | 项目说明 | [README.md](README.md) | 本文档 |
 | 开发指南 | [CLAUDE.md](CLAUDE.md) | Claude Code 开发规范 |
-| Agent 指南 | [AGENTS.md](AGENTS.md) | AI Agent 项目指南 |
+| Agent 指南 | [AGENTS.md](AGENTS.md) | AI Agent 项目指南（入口页） |
+| Agent 细分指南 | [docs/agents/](docs/agents/) | `backend.md` / `frontend.md`：可复制的命令、闸门基线与易踩陷阱 |
 | 更新日志 | [CHANGELOG.md](CHANGELOG.md) | 版本变更记录 |
 | 后端文档 | [backend/README.md](backend/README.md) | 后端详细文档 |
 | 前端文档 | [frontend/README.md](frontend/README.md) | 前端详细文档 |
@@ -356,6 +357,15 @@ Controller（控制器）→ Service（服务）→ Mapper（数据访问）→ 
 ---
 
 ## 更新日志
+
+### v2.0.26 (2026-10-17)
+
+- 新增 GitHub Actions CI（后端 H2 全量、前端全部门禁、真实 MySQL 8 全量测试、Docker 镜像健康检查与首页抓取），并补上 Maven Wrapper（`backend/mvnw` / `mvnw.cmd`）
+- 服务端阅读 HTML 与浏览器共用同一套 GFM（表格/删除线/任务列表，共享 fixture `docs/fixtures/gfm-sample.md`）；首页 JSON-LD 增加 WebSite + SearchAction；标签站点地图补 `lastmod`
+- 公开阅读 HTML（200）使用 ETag + `must-revalidate`，未变更请求返回 304；深色模式首屏不再闪烁（内联引导脚本先于首帧生效）
+- 前端清理 25 个零引用遗留社区文件（保留 `/password-change`，并在后台设置中新增入口）；`format:check` 修复为真实可用的仓库级闸门
+- `AGENTS.md` 拆分为入口页 + `docs/agents/backend.md` / `docs/agents/frontend.md`；`backend/schema.sql` 改名 `schema-fresh-install.sql`，删除无用的 `entrypoint.sh` 与 `backend/.dockerignore`
+- 门禁：前端 43 文件 / 400 测试（lint/format/type/build/部署契约 27/27 全绿），后端 564 测试（本地 H2 与 CI 真实 MySQL）
 
 ### v2.0.25 (2026-10-14)
 

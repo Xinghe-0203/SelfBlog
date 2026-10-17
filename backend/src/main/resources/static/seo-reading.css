@@ -133,6 +133,23 @@
   padding-block: 44px 80px;
 }
 
+/* GFM 表格：与前端 marked（gfm: true）一致，不能退化成纯文本 */
+.seo-reading .seo-body table {
+  width: 100%;
+  margin: 18px 0;
+  border-collapse: collapse;
+  font-size: 15px;
+}
+.seo-reading .seo-body th,
+.seo-reading .seo-body td {
+  padding: 8px 10px;
+  border: 1px solid rgba(128, 128, 128, 0.3);
+  text-align: left;
+}
+.seo-reading .seo-body thead th {
+  background: rgba(128, 128, 128, 0.08);
+}
+
 @media (max-width: 600px) {
   .seo-reading {
     padding: 20px 18px 48px;
@@ -141,19 +158,31 @@
     font-size: 24px;
   }
 }
-@media (prefers-color-scheme: dark) {
-  .seo-reading {
-    color: #e4e7eb;
-  }
-  .seo-reading .seo-heading p,
-  .seo-reading .seo-post-meta,
-  .seo-reading .seo-hint,
-  .seo-reading .seo-empty,
-  .seo-reading .seo-entries time,
-  .seo-reading .seo-count {
-    color: #9aa5b1;
-  }
-  .seo-reading .seo-entries p {
-    color: #cbd2d9;
-  }
+
+/*
+  深色外观只跟随站点主题类（html.dark-mode），与 Vue 应用的 token 完全一致：
+  模板 <head> 的引导脚本在首次绘制前按 localStorage('edu_theme') 决定是否加类，
+  因此这里不再使用 prefers-color-scheme——否则“系统深色 + 站内浅色主题”的读者
+  会先看到深色正文再被 Vue 翻回浅色（闪烁正相反）。
+*/
+html.dark-mode .seo-reading {
+  color: #e4e7eb;
+}
+html.dark-mode .seo-reading .seo-heading p,
+html.dark-mode .seo-reading .seo-post-meta,
+html.dark-mode .seo-reading .seo-hint,
+html.dark-mode .seo-reading .seo-empty,
+html.dark-mode .seo-reading .seo-entries time,
+html.dark-mode .seo-reading .seo-count {
+  color: #9aa5b1;
+}
+html.dark-mode .seo-reading .seo-entries p {
+  color: #cbd2d9;
+}
+html.dark-mode .seo-reading .seo-body th,
+html.dark-mode .seo-reading .seo-body td {
+  border-color: rgba(154, 165, 177, 0.35);
+}
+html.dark-mode .seo-reading .seo-body thead th {
+  background: rgba(154, 165, 177, 0.12);
 }

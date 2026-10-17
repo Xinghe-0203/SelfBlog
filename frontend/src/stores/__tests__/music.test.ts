@@ -8,7 +8,7 @@ function media() {
     play: { value: vi.fn().mockResolvedValue(undefined), configurable: true },
     pause: { value: vi.fn(), configurable: true },
     load: { value: vi.fn(), configurable: true },
-    duration: { value: 180, configurable: true },
+    duration: { value: 180, configurable: true }
   })
   return audio
 }
@@ -16,12 +16,18 @@ function media() {
 function deferred() {
   let resolve!: () => void
   let reject!: (reason: unknown) => void
-  const promise = new Promise<void>((yes, no) => { resolve = yes; reject = no })
+  const promise = new Promise<void>((yes, no) => {
+    resolve = yes
+    reject = no
+  })
   return { promise, resolve, reject }
 }
 
 describe('music transport', () => {
-  beforeEach(() => { localStorage.clear(); setActivePinia(createPinia()) })
+  beforeEach(() => {
+    localStorage.clear()
+    setActivePinia(createPinia())
+  })
   afterEach(() => vi.restoreAllMocks())
 
   function ready() {
@@ -199,22 +205,24 @@ describe('music transport', () => {
 
   it('restores only preferences, never playback intent', () => {
     const { store, audio } = ready()
-    store.setVolume(.3)
+    store.setVolume(0.3)
     store.setLoop(false)
-    expect(audio.volume).toBe(.3)
+    expect(audio.volume).toBe(0.3)
     expect(audio.loop).toBe(false)
     setActivePinia(createPinia())
     const fresh = useMusicStore()
-    expect(fresh.volume).toBe(.3)
+    expect(fresh.volume).toBe(0.3)
     expect(fresh.loop).toBe(false)
     expect(fresh.playing).toBe(false)
   })
 
   it('tolerates malformed and unavailable storage', () => {
     localStorage.setItem('selfblog-music-preferences', 'broken-json')
-    expect(useMusicStore().volume).toBe(.65)
-    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('Blocked') })
-    expect(() => useMusicStore().setVolume(.2)).not.toThrow()
+    expect(useMusicStore().volume).toBe(0.65)
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new Error('Blocked')
+    })
+    expect(() => useMusicStore().setVolume(0.2)).not.toThrow()
   })
 
   it('does not show a fake working volume control on unsupported platforms', () => {

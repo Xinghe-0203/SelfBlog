@@ -88,13 +88,20 @@ onMounted(fetchPosts)
         <h1>文章管理</h1>
         <p>管理博客文章，编辑内容或检查前台展示。</p>
       </div>
-      <router-link :to="`${siteStore.adminRoot}/write`" class="new-post"><Icon name="plus" :size="16" />写文章</router-link>
+      <router-link :to="`${siteStore.adminRoot}/write`" class="new-post"
+        ><Icon name="plus" :size="16" />写文章</router-link
+      >
     </header>
 
     <form class="toolbar" @submit.prevent="submitSearch">
       <label class="search-box">
         <Icon name="search" :size="16" />
-        <input v-model="keyword" type="search" aria-label="搜索文章标题或关键词" placeholder="搜索文章标题或关键词" />
+        <input
+          v-model="keyword"
+          type="search"
+          aria-label="搜索文章标题或关键词"
+          placeholder="搜索文章标题或关键词"
+        />
       </label>
       <select v-model="statusFilter" aria-label="筛选文章状态">
         <option value="">所有状态</option>
@@ -128,7 +135,9 @@ onMounted(fetchPosts)
         <tbody>
           <tr v-for="post in posts" :key="post.id">
             <td class="title-cell">
-              <router-link :to="`${siteStore.adminRoot}/edit/${post.id}`">{{ post.title }}</router-link>
+              <router-link :to="`${siteStore.adminRoot}/edit/${post.id}`">{{
+                post.title
+              }}</router-link>
               <span v-if="post.category" class="category">{{ post.category }}</span>
             </td>
             <td>

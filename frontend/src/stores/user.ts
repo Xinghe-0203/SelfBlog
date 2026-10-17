@@ -10,7 +10,13 @@ import { userApi } from '@/api/user'
 import { useLogger } from '@/utils/logger'
 import { encodeData, decodeData } from '@/utils/crypto'
 import { STORAGE_KEY_PREFIX } from '@/constants'
-import type { User, LoginRequest, RegisterRequest, ChangePasswordRequest, UpdateProfileRequest } from '@/types'
+import type {
+  User,
+  LoginRequest,
+  RegisterRequest,
+  ChangePasswordRequest,
+  UpdateProfileRequest
+} from '@/types'
 
 const logger = useLogger('UserStore')
 
@@ -216,11 +222,32 @@ export const useAuthStore = defineStore('auth', () => {
       refreshToken.value = newRefreshToken
       user.value = {
         id,
-        username: loginUsername || (loginData as Record<string, unknown>).username as string || ((loginData as Record<string, unknown>).data as Record<string, unknown>)?.username as string,
-        nickname: loginNickname || (loginData as Record<string, unknown>).nickname as string || ((loginData as Record<string, unknown>).data as Record<string, unknown>)?.nickname as string,
-        avatar: loginAvatar || (loginData as Record<string, unknown>).avatar as string || ((loginData as Record<string, unknown>).data as Record<string, unknown>)?.avatar as string,
-        email: email || (loginData as Record<string, unknown>).email as string || ((loginData as Record<string, unknown>).data as Record<string, unknown>)?.email as string,
-        role: role || (loginData as Record<string, unknown>).role as 'user' | 'admin' || ((loginData as Record<string, unknown>).data as Record<string, unknown>)?.role as 'user' | 'admin'
+        username:
+          loginUsername ||
+          ((loginData as Record<string, unknown>).username as string) ||
+          (((loginData as Record<string, unknown>).data as Record<string, unknown>)
+            ?.username as string),
+        nickname:
+          loginNickname ||
+          ((loginData as Record<string, unknown>).nickname as string) ||
+          (((loginData as Record<string, unknown>).data as Record<string, unknown>)
+            ?.nickname as string),
+        avatar:
+          loginAvatar ||
+          ((loginData as Record<string, unknown>).avatar as string) ||
+          (((loginData as Record<string, unknown>).data as Record<string, unknown>)
+            ?.avatar as string),
+        email:
+          email ||
+          ((loginData as Record<string, unknown>).email as string) ||
+          (((loginData as Record<string, unknown>).data as Record<string, unknown>)
+            ?.email as string),
+        role:
+          role ||
+          ((loginData as Record<string, unknown>).role as 'user' | 'admin') ||
+          (((loginData as Record<string, unknown>).data as Record<string, unknown>)?.role as
+            | 'user'
+            | 'admin')
       }
 
       if (credentials.remember) {
@@ -247,7 +274,9 @@ export const useAuthStore = defineStore('auth', () => {
       logger.error('Login failed', { error: (error as Error).message })
       return {
         success: false,
-        message: (error as { response?: { data?: { message?: string } } }).response?.data?.message || '登录失败'
+        message:
+          (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
+          '登录失败'
       }
     } finally {
       loading.value = false
@@ -265,7 +294,9 @@ export const useAuthStore = defineStore('auth', () => {
       logger.error('Registration failed', { error: (error as Error).message })
       return {
         success: false,
-        message: (error as { response?: { data?: { message?: string } } }).response?.data?.message || '注册失败'
+        message:
+          (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
+          '注册失败'
       }
     } finally {
       loading.value = false
@@ -297,9 +328,23 @@ export const useAuthStore = defineStore('auth', () => {
   // 更新用户信息
   function updateUserInfo(userData: Partial<User>): void {
     const allowedFields: (keyof User)[] = [
-      'id', 'username', 'nickname', 'avatar', 'email', 'role',
-      'coverImage', 'bio', 'gender', 'birthday', 'phone', 'school', 'major', 'grade',
-      'signature', 'status', 'createdAt'
+      'id',
+      'username',
+      'nickname',
+      'avatar',
+      'email',
+      'role',
+      'coverImage',
+      'bio',
+      'gender',
+      'birthday',
+      'phone',
+      'school',
+      'major',
+      'grade',
+      'signature',
+      'status',
+      'createdAt'
     ]
     const filteredData = {} as Partial<User>
     for (const key of allowedFields) {
@@ -331,7 +376,9 @@ export const useAuthStore = defineStore('auth', () => {
   /**
    * 更新个人资料
    */
-  async function updateProfile(profileData: UpdateProfileRequest): Promise<{ success: boolean; message?: string }> {
+  async function updateProfile(
+    profileData: UpdateProfileRequest
+  ): Promise<{ success: boolean; message?: string }> {
     loading.value = true
     try {
       await userApi.updateProfile(profileData)
@@ -341,7 +388,9 @@ export const useAuthStore = defineStore('auth', () => {
       logger.error('Failed to update profile', { error: (error as Error).message })
       return {
         success: false,
-        message: (error as { response?: { data?: { message?: string } } }).response?.data?.message || '更新失败'
+        message:
+          (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
+          '更新失败'
       }
     } finally {
       loading.value = false
@@ -351,7 +400,9 @@ export const useAuthStore = defineStore('auth', () => {
   /**
    * 修改密码
    */
-  async function changePassword(passwordData: ChangePasswordRequest): Promise<{ success: boolean; message?: string }> {
+  async function changePassword(
+    passwordData: ChangePasswordRequest
+  ): Promise<{ success: boolean; message?: string }> {
     loading.value = true
     try {
       await userApi.changePassword(passwordData)
@@ -360,7 +411,9 @@ export const useAuthStore = defineStore('auth', () => {
       logger.error('Failed to change password', { error: (error as Error).message })
       return {
         success: false,
-        message: (error as { response?: { data?: { message?: string } } }).response?.data?.message || '修改密码失败'
+        message:
+          (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
+          '修改密码失败'
       }
     } finally {
       loading.value = false
@@ -380,7 +433,8 @@ export const useAuthStore = defineStore('auth', () => {
         messageApi.getUnreadCount()
       ])
       unreadNotifications.value =
-        (notifResult.status === 'fulfilled' ? (notifResult.value as { data?: number }).data : 0) || 0
+        (notifResult.status === 'fulfilled' ? (notifResult.value as { data?: number }).data : 0) ||
+        0
       unreadMessages.value =
         (msgResult.status === 'fulfilled' ? (msgResult.value as { data?: number }).data : 0) || 0
     } catch (error) {
@@ -439,4 +493,3 @@ export const useAuthStore = defineStore('auth', () => {
 // ============================================================
 
 export const useUserStore = useAuthStore
-

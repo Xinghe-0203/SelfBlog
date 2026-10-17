@@ -2,46 +2,96 @@
   <div class="password-page">
     <div class="password-icon-wrapper">
       <div class="password-icon-bg">
-        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        <svg
+          width="32"
+          height="32"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.5"
+        >
+          <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+          <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+        </svg>
       </div>
     </div>
     <div class="password-card card">
       <div class="password-header">
         <h2>修改密码</h2>
-        <router-link to="/profile" class="btn btn-ghost btn-sm">返回主页</router-link>
+        <router-link to="/" class="btn btn-ghost btn-sm">返回主页</router-link>
       </div>
 
       <form class="password-form" @submit.prevent="handleSubmit">
         <div class="form-group float-label-group">
-          <input v-model="form.oldPassword" type="password" class="form-input" placeholder=" " required />
+          <input
+            v-model="form.oldPassword"
+            type="password"
+            class="form-input"
+            placeholder=" "
+            required
+          />
           <label class="float-label">当前密码</label>
         </div>
 
         <div class="form-group float-label-group">
-          <input v-model="form.newPassword" type="password" class="form-input" :class="{ error: showPasswordError }" placeholder=" " required minlength="8" @input="updateStrength" />
+          <input
+            v-model="form.newPassword"
+            type="password"
+            class="form-input"
+            :class="{ error: showPasswordError }"
+            placeholder=" "
+            required
+            minlength="8"
+            @input="updateStrength"
+          />
           <label class="float-label">新密码</label>
           <div v-if="form.newPassword" class="strength-bar">
-            <div class="strength-fill" :style="{ width: strengthPercent + '%', background: strengthColor }"></div>
+            <div
+              class="strength-fill"
+              :style="{ width: strengthPercent + '%', background: strengthColor }"
+            ></div>
           </div>
-          <span class="form-hint">至少8位字符，强度：<span :style="{ color: strengthColor, fontWeight: 600 }">{{ strengthText }}</span></span>
+          <span class="form-hint"
+            >至少8位字符，强度：<span :style="{ color: strengthColor, fontWeight: 600 }">{{
+              strengthText
+            }}</span></span
+          >
           <span v-if="showPasswordError" class="form-error">{{ passwordError }}</span>
         </div>
 
         <div class="form-group float-label-group">
-          <input v-model="form.confirmPassword" type="password" class="form-input" :class="{ error: showConfirmError }" placeholder=" " required @input="validateConfirm" />
+          <input
+            v-model="form.confirmPassword"
+            type="password"
+            class="form-input"
+            :class="{ error: showConfirmError }"
+            placeholder=" "
+            required
+            @input="validateConfirm"
+          />
           <label class="float-label">确认新密码</label>
           <span v-if="showConfirmError" class="form-error">{{ confirmError }}</span>
         </div>
 
         <div class="form-actions">
-          <router-link to="/profile" class="btn btn-ghost">取消</router-link>
+          <router-link to="/" class="btn btn-ghost">取消</router-link>
           <button type="submit" class="btn btn-primary" :disabled="loading">
             <template v-if="loading">
               <span class="btn-spinner"></span>
               修改中...
             </template>
             <template v-else>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+              </svg>
               确认修改
             </template>
           </button>
@@ -69,7 +119,11 @@ const form = reactive({
   newPassword: '',
   confirmPassword: ''
 })
-const strengthResult = ref<{ level: string; text: string; color: string }>({ level: 'weak', text: '弱', color: '#F44336' })
+const strengthResult = ref<{ level: string; text: string; color: string }>({
+  level: 'weak',
+  text: '弱',
+  color: '#F44336'
+})
 const showPasswordError = ref(false)
 const passwordError = ref('')
 const showConfirmError = ref(false)
@@ -263,7 +317,9 @@ async function handleSubmit() {
 .strength-fill {
   height: 100%;
   border-radius: 2px;
-  transition: width 0.3s ease, background 0.3s ease;
+  transition:
+    width 0.3s ease,
+    background 0.3s ease;
 }
 
 .form-error {
@@ -293,7 +349,9 @@ async function handleSubmit() {
 }
 
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 @media (max-width: 768px) {

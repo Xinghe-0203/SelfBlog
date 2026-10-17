@@ -20,7 +20,10 @@ export function decodeData<T = unknown>(encoded: string | null): T | null {
   }
 }
 
-export function safeGetItem(key: string, storage: 'localStorage' | 'sessionStorage' = 'localStorage'): string | null {
+export function safeGetItem(
+  key: string,
+  storage: 'localStorage' | 'sessionStorage' = 'localStorage'
+): string | null {
   try {
     return window[storage].getItem(key)
   } catch {

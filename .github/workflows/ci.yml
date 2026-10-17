@@ -1,0 +1,155 @@
+# =============================================================================
+# SelfBlog CI
+#
+# 四个任务都做真实执行，而不是“文件存在性”检查：
+#   backend  —— H2 全量测试（测试默认配置）
+#   frontend —— npm ci + lint/format/type 检查 + 单测 + 部署契约 + 构建
+#   mysql    —— 用 schema-fresh-install.sql 初始化真实 MySQL 8，再跑后端测试
+#   docker   —— 真实构建镜像、起容器、等健康检查、抓取服务端渲染首页
+#
+# 说明：本地 AGENTS.md 记录的验证都是 Windows + 特定 JDK 路径；这里是同一套
+# 命令的 Linux 版本，wrapper（backend/mvnw）会自动下载 Maven 3.9.12。
+# =============================================================================
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend tests (H2)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      # 必须带两个 skip：否则 frontend-maven-plugin 会在构建后端时重装 Node 并重建前端
+      - name: Run backend tests
+        working-directory: backend
+        run: ./mvnw -B -ntp test -Dskip.npm=true -Dskip.installnodenpm=true
+
+  frontend:
+    name: Frontend checks
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          # engine-strict 要求 ^22.22.2 || ^24.15.0 || >=26（来自缩略依赖树）
+          node-version: '24.15.0'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm run lint:check
+      - run: npm run format:check
+      - run: npm run type-check
+      - run: npm run test:run
+      - run: npm run test:deployment
+      - run: npm run build
+
+  mysql:
+    name: Backend tests (MySQL 8)
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: campus_blog
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -u root --password=root"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=12
+    env:
+      # 用真实 MySQL 顶掉测试的 H2 数据源（DatabaseConfig 按 DB_TYPE 选择）
+      DB_TYPE: mysql
+      DB_HOST: 127.0.0.1
+      DB_PORT: '3306'
+      DB_NAME: campus_blog
+      DB_USERNAME: root
+      DB_PASSWORD: root
+      # test/resources/schema.sql 是 H2 专用的，MySQL 库由下面的脚本初始化
+      SPRING_SQL_INIT_MODE: never
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - name: Initialize MySQL with the fresh-install script
+        run: mysql --protocol=tcp -h 127.0.0.1 -P 3306 -u root -proot < backend/schema-fresh-install.sql
+      - name: Run backend tests against MySQL
+        working-directory: backend
+        run: ./mvnw -B -ntp test -Dskip.npm=true -Dskip.installnodenpm=true
+
+  docker:
+    name: Docker image smoke test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build image (repository-root context, like Compose uses)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: backend/Dockerfile
+          load: true
+          push: false
+          tags: selfblog:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Start container and wait for the real app
+        run: |
+          docker run -d --name selfblog-ci -p 8825:8825 \
+            -e DB_TYPE=sqlite \
+            -e JWT_SECRET=ci-only-jwt-secret-0123456789abcdefghijklmn \
+            -e ADMIN_PASSWORD=ci-only-admin-password \
+            selfblog:ci
+          ready=0
+          for attempt in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:8825/actuator/health > /dev/null; then
+              echo "healthy after ${attempt} attempt(s)"
+              ready=1
+              break
+            fi
+            if [ "$(docker inspect -f '{{.State.Running}}' selfblog-ci 2>/dev/null)" != "true" ]; then
+              echo "container exited early"
+              docker logs selfblog-ci
+              exit 1
+            fi
+            sleep 5
+          done
+          if [ "$ready" != "1" ]; then
+            echo "container never became healthy"
+            docker logs selfblog-ci
+            exit 1
+          fi
+          curl -fsS http://127.0.0.1:8825/actuator/health
+          # 服务端渲染的公开阅读 HTML 必须真实可用（不是空壳）
+          curl -fsS http://127.0.0.1:8825/ | grep -q 'seo-reading'
+      - name: Container logs on failure
+        if: failure()
+        run: docker logs selfblog-ci || true
+      - name: Cleanup
+        if: always()
+        run: docker rm -f selfblog-ci || true

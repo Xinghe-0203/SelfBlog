@@ -26,6 +26,10 @@ export default defineConfig(({ mode }) => {
     },
     server: {
       port: 3000,
+      fs: {
+        // 前端测试用 ?raw 读取仓库根共享的 GFM fixture（docs/fixtures/gfm-sample.md）
+        allow: ['..']
+      },
       proxy: {
         '/api': {
           target: env.VITE_API_TARGET || 'http://localhost:8825',
