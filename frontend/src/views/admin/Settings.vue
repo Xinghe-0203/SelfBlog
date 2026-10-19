@@ -172,6 +172,134 @@
         </div>
       </section>
 
+      <section class="settings-panel bg-panel">
+        <div class="panel-heading">
+          <div>
+            <h2>页面背景</h2>
+            <p class="panel-desc">
+              决定全站页面的底色：纯色、渐变或一张背景图；卡片的不透明度与模糊也在同一处调整。
+            </p>
+          </div>
+        </div>
+        <div class="bg-body">
+          <div class="bg-controls">
+            <label
+              >背景类型<select v-model="form.backgroundType" data-setting="backgroundType">
+                <option value="solid">纯色</option>
+                <option value="gradient">渐变</option>
+                <option value="image">背景图</option>
+              </select></label
+            >
+            <label v-if="backgroundType === 'solid'"
+              >背景颜色
+              <div class="color-input">
+                <input
+                  v-model="form.backgroundColor"
+                  type="color"
+                  data-setting="backgroundColor"
+                /><code>{{ form.backgroundColor }}</code>
+              </div></label
+            >
+            <template v-else-if="backgroundType === 'gradient'">
+              <label
+                >渐变起点
+                <div class="color-input">
+                  <input
+                    v-model="form.backgroundGradientFrom"
+                    type="color"
+                    data-setting="backgroundGradientFrom"
+                  /><code>{{ form.backgroundGradientFrom }}</code>
+                </div></label
+              >
+              <label
+                >渐变终点
+                <div class="color-input">
+                  <input
+                    v-model="form.backgroundGradientTo"
+                    type="color"
+                    data-setting="backgroundGradientTo"
+                  /><code>{{ form.backgroundGradientTo }}</code>
+                </div></label
+              >
+            </template>
+            <template v-else>
+              <SiteAssetField
+                :model-value="form.backgroundImageUrl"
+                kind="background"
+                label="背景图"
+                hint="支持 PNG/JPG/WEBP，最大 8MB；留空则沿用纯色背景。"
+                data-setting="backgroundImageUrl"
+                @update:model-value="setAsset('backgroundImageUrl', $event)"
+                @uploaded="applyUploadedAsset('backgroundImageUrl', $event)"
+              />
+              <label
+                >遮罩浓度
+                <div class="range-row">
+                  <input
+                    v-model="form.backgroundOverlay"
+                    type="range"
+                    min="0"
+                    max="90"
+                    step="1"
+                    data-setting="backgroundOverlay"
+                  /><code>{{ backgroundOverlay }}%</code>
+                </div>
+                <small>在背景图上叠一层黑色遮罩，数值越高文字越清晰。</small></label
+              >
+              <label class="toggle-row"
+                ><span
+                  ><strong>固定背景</strong><small>开启后页面滚动时背景图保持不动。</small></span
+                ><input
+                  v-model="form.backgroundFixed"
+                  type="checkbox"
+                  true-value="true"
+                  false-value="false"
+                  data-setting="backgroundFixed"
+              /></label>
+            </template>
+            <label
+              >卡片不透明度
+              <div class="range-row">
+                <input
+                  v-model="form.surfaceOpacity"
+                  type="range"
+                  min="60"
+                  max="100"
+                  step="1"
+                  data-setting="surfaceOpacity"
+                /><code>{{ surfaceOpacity }}%</code>
+              </div>
+              <small>低于 100% 时卡片呈半透明，需配合模糊避免内容发虚。</small></label
+            >
+            <label
+              >卡片模糊
+              <div class="range-row">
+                <input
+                  v-model="form.surfaceBlur"
+                  type="range"
+                  min="0"
+                  max="40"
+                  step="1"
+                  data-setting="surfaceBlur"
+                /><code>{{ surfaceBlur }}px</code>
+              </div>
+              <small>为半透明卡片加上背景模糊，0 表示不模糊。</small></label
+            >
+          </div>
+          <div class="bg-preview-column">
+            <div
+              class="bg-preview"
+              :style="previewStyle"
+              :data-bg-type="backgroundType"
+              data-preview="page-background"
+            >
+              <span class="bg-preview-card" :style="previewCardStyle">内容卡片</span>
+            </div>
+            <small class="bg-preview-hint">预览仅为示意，保存后应用到全站。</small>
+          </div>
+        </div>
+      </section>
+
       <div class="form-footer">
         <p>更改后台路径后将自动跳转到新地址。</p>
         <button class="save-button btn btn-primary" type="submit" :disabled="saving">
@@ -183,7 +311,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { useSiteStore, type SiteSettings } from '@/stores/site'
 import { siteApi } from '@/api/site'
 import SiteAssetField from '@/components/admin/SiteAssetField.vue'
@@ -194,7 +322,76 @@ const saving = ref(false)
 const saved = ref(false)
 const error = ref('')
 
-type AssetSettingKey = 'authorAvatar' | 'siteLogoUrl' | 'faviconUrl' | 'musicUrl'
+type AssetSettingKey =
+  | 'authorAvatar'
+  | 'siteLogoUrl'
+  | 'faviconUrl'
+  | 'musicUrl'
+  | 'backgroundImageUrl'
+
+/**
+ * 把字符串型数值设置夹到合法区间。
+ * 契约里所有设置都是字符串，后端是校验权威；这里只负责让预览和读数在
+ * 手输/脏数据下仍然可用，不把非法值渲染成 NaN 或越界的 CSS。
+ */
+function clampInt(raw: string | undefined, min: number, max: number, fallback: number): number {
+  const parsed = Number.parseInt(raw ?? '', 10)
+  if (!Number.isFinite(parsed)) return fallback
+  return Math.min(max, Math.max(min, parsed))
+}
+
+/** 背景类型：只有三种取值，未知值一律按纯色渲染，避免条件分支落空。 */
+const backgroundType = computed<'solid' | 'gradient' | 'image'>(() => {
+  const value = form.backgroundType
+  return value === 'gradient' || value === 'image' ? value : 'solid'
+})
+
+const backgroundOverlay = computed(() => clampInt(form.backgroundOverlay, 0, 90, 0))
+const surfaceOpacity = computed(() => clampInt(form.surfaceOpacity, 60, 100, 100))
+const surfaceBlur = computed(() => clampInt(form.surfaceBlur, 0, 40, 0))
+
+/**
+ * 预览用的背景图地址：剥掉服务端同样拒绝的字符（引号/括号/反斜杠/空白），
+ * 免得一个未保存的脏值把预览的 CSS 拆坏。服务端仍是最终校验权威。
+ * `|| ''` 兜底是必要的：设置接口返回的是部分字段，缺键时读 undefined 会把整页渲染打断。
+ */
+const previewImageUrl = computed(() => (form.backgroundImageUrl || '').replace(/[\s"'()\\]/g, ''))
+
+/** 只读 form 的预览样式；不写全局 DOM，也不碰 CSS 自定义属性。 */
+const previewStyle = computed<Record<string, string>>(() => {
+  // 每个分支都建一个显式 Record：直接返回对象字面量会让 TS 推出
+  // 各分支键集不同的联合类型，与 Record<string, string> 不兼容。
+  const style: Record<string, string> = {}
+  if (backgroundType.value === 'gradient') {
+    style.backgroundImage = `linear-gradient(135deg, ${form.backgroundGradientFrom}, ${form.backgroundGradientTo})`
+    return style
+  }
+  if (backgroundType.value === 'image') {
+    const url = previewImageUrl.value
+    style.backgroundColor = form.backgroundColor
+    if (!url) {
+      style.backgroundImage = 'none'
+      return style
+    }
+    const shade = backgroundOverlay.value / 100
+    style.backgroundImage = `linear-gradient(rgba(0, 0, 0, ${shade}), rgba(0, 0, 0, ${shade})), url("${url}")`
+    style.backgroundSize = 'cover'
+    style.backgroundPosition = 'center'
+    return style
+  }
+  style.backgroundColor = form.backgroundColor
+  style.backgroundImage = 'none'
+  return style
+})
+
+/** 预览里那张小卡片：用语义 token 混入透明度，深浅主题都跟着走。 */
+const previewCardStyle = computed<Record<string, string>>(() => {
+  const blur = surfaceBlur.value
+  return {
+    backgroundColor: `color-mix(in srgb, var(--surface-primary) ${surfaceOpacity.value}%, transparent)`,
+    backdropFilter: blur > 0 ? `blur(${blur}px)` : 'none'
+  }
+})
 
 function setAsset(key: AssetSettingKey, url: string): void {
   form[key] = url.trim()
@@ -299,7 +496,7 @@ onMounted(() => void load())
   color: var(--text-secondary);
   font-size: 13px;
 }
-input:not([type='checkbox']):not([type='color']),
+input:not([type='checkbox']):not([type='color']):not([type='range']),
 textarea,
 select {
   width: 100%;
@@ -430,6 +627,110 @@ label small {
   color: var(--text-muted);
   font-size: 11px;
 }
+.bg-panel {
+  grid-column: 1 / -1;
+}
+.bg-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+.bg-controls {
+  display: grid;
+  gap: 15px;
+}
+.bg-controls > label:not(.toggle-row) {
+  display: grid;
+  gap: 7px;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+.range-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.range-row input[type='range'] {
+  --range-fill: var(--accent);
+  --range-rail: var(--border-strong);
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 22px;
+  margin: 0;
+  appearance: none;
+  -webkit-appearance: none;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+.range-row input[type='range']::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: var(--radius-full);
+  background: var(--range-rail);
+}
+.range-row input[type='range']::-webkit-slider-thumb {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  margin-top: -5px;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--range-fill);
+}
+.range-row input[type='range']::-moz-range-track {
+  height: 4px;
+  border-radius: var(--radius-full);
+  background: var(--range-rail);
+}
+.range-row input[type='range']::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--range-fill);
+}
+.range-row code {
+  flex: 0 0 auto;
+  min-width: 48px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.bg-preview-column {
+  display: grid;
+  gap: 8px;
+}
+.bg-preview {
+  display: grid;
+  place-items: center;
+  min-height: 168px;
+  padding: 18px;
+  overflow: hidden;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-lg);
+}
+.bg-preview-card {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  max-width: 220px;
+  min-height: 84px;
+  padding: 14px;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 600;
+}
+.bg-preview-hint {
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.6;
+}
 .form-footer {
   grid-column: 1 / -1;
   display: flex;
@@ -476,6 +777,9 @@ label small {
 }
 @media (max-width: 760px) {
   .settings-grid {
+    grid-template-columns: 1fr;
+  }
+  .bg-body {
     grid-template-columns: 1fr;
   }
   .form-footer {

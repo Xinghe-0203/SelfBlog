@@ -104,7 +104,13 @@ watch(
 )
 
 watch(
-  () => [siteStore.settings.themeSkin, siteStore.settings.themePrimaryColor] as const,
+  // isDarkMode 也在依赖里：深色画布要撤掉作者的浅色背景，否则浅底浅字不可读。
+  () =>
+    [
+      siteStore.settings.themeSkin,
+      siteStore.settings.themePrimaryColor,
+      themeStore.isDarkMode
+    ] as const,
   applySiteTheme
 )
 

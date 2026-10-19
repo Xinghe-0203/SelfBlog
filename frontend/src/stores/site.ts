@@ -1,5 +1,6 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
+import { STORAGE_KEY_PREFIX } from '@/constants'
 
 export interface SiteSettings {
   siteTitle: string
@@ -22,6 +23,24 @@ export interface SiteSettings {
   siteLogoUrl: string
   /** 站点正式地址（origin）；为空时服务端回落到 SITE_BASE_URL 或当前访问地址。 */
   siteBaseUrl: string
+  /** 页面背景取色模式：solid | gradient | image。 */
+  backgroundType: string
+  /** 纯色模式的页面底色；等于默认值时视为「未设置」，让主题皮肤自己决定底色。 */
+  backgroundColor: string
+  /** 渐变模式的起始色。 */
+  backgroundGradientFrom: string
+  /** 渐变模式的结束色。 */
+  backgroundGradientTo: string
+  /** 背景图地址（http(s) 或本站 /uploads/ 路径）。 */
+  backgroundImageUrl: string
+  /** 背景图上的黑色遮罩百分比 0–90，用来保证前景文字可读。 */
+  backgroundOverlay: string
+  /** 背景图是否固定（不随滚动移动）。 */
+  backgroundFixed: string
+  /** 卡片等组件的不透明度百分比 60–100；100 = 完全不透明，保持既有观感。 */
+  surfaceOpacity: string
+  /** 卡片的背景模糊半径 0–40（px），只在组件半透明时才有意义。 */
+  surfaceBlur: string
 }
 
 const defaults: SiteSettings = {
@@ -41,11 +60,173 @@ const defaults: SiteSettings = {
   footerText: '用文字记录生活，用好奇探索世界。',
   faviconUrl: '',
   siteLogoUrl: '',
-  siteBaseUrl: ''
+  siteBaseUrl: '',
+  backgroundType: 'solid',
+  backgroundColor: '#f5f6f8',
+  backgroundGradientFrom: '#f5f6f8',
+  backgroundGradientTo: '#e7eaf0',
+  backgroundImageUrl: '',
+  backgroundOverlay: '0',
+  backgroundFixed: 'true',
+  surfaceOpacity: '100',
+  surfaceBlur: '0'
 }
 
 /** 运行时注入的 favicon 节点标记，用来和 index.html 里的静态兜底区分。 */
 const FAVICON_DATA_ATTR = 'runtime'
+
+/**
+ * 预置层（index.html 首屏内联脚本）允许转发的 CSS 变量白名单。
+ *
+ * 首屏预置脚本是**零逻辑转发**：它只按这份白名单读取 localStorage 并写到
+ * `document.documentElement`，因此这里既是持久化格式，也是安全边界 ——
+ * 白名单外的键（例如 `--bg-primary`）永远不会被首屏脚本写进样式。
+ */
+export const PREPAINT_APPEARANCE_VARS = [
+  '--ap-bg-color',
+  '--ap-bg-image',
+  '--ap-bg-attachment',
+  '--ap-bg-size',
+  '--ap-bg-repeat'
+] as const
+
+/** 首屏预置读取的存储键；与 index.html 内联脚本里的字面量必须一致。 */
+export const APPEARANCE_STORAGE_KEY = `${STORAGE_KEY_PREFIX}site_appearance`
+
+/**
+ * 各模式的默认底色 —— 刻意与 ocean 皮肤的 `--bg-primary` / `--bg-tertiary` 相同。
+ *
+ * 默认值等于默认皮肤的画布色，意味着「作者没动过这个设置」时我们可以**不写任何变量**，
+ * 让 `--bg-primary` 继续由皮肤或深色模式决定。否则换皮肤会被作者从未设过的
+ * 默认色覆盖掉。
+ */
+const DEFAULT_BACKGROUND_COLOR = '#f5f6f8'
+const DEFAULT_GRADIENT_TO = '#e7eaf0'
+
+const HEX_COLOR = /^#[0-9a-f]{6}$/i
+
+/** 取整并夹到 [min, max]；非法输入直接回落到 fallback。 */
+function clampInt(raw: string | undefined, min: number, max: number, fallback: number): number {
+  const parsed = Number.parseInt(String(raw ?? '').trim(), 10)
+  if (!Number.isFinite(parsed)) return fallback
+  return Math.min(max, Math.max(min, parsed))
+}
+
+/** 仅接受 `#RRGGBB`；其余（含服务端被绕过的脏数据）一律丢弃，避免拼进 CSS。 */
+function normalizeHex(raw: string | undefined): string {
+  const value = String(raw ?? '').trim()
+  return HEX_COLOR.test(value) ? value : ''
+}
+
+/**
+ * 背景图地址的二次校验。
+ *
+ * 服务端已经拒绝空白、引号、圆括号与反斜杠，但这里再挡一次：该值会被拼进
+ * `url("…")`，任何能闭合引号或括号的字符都可能撑开一条 CSS 注入路径。
+ * 前端不能假设数据一定来自本服务端的校验。
+ */
+function safeBackgroundUrl(raw: string | undefined): string {
+  const value = String(raw ?? '').trim()
+  if (!value) return ''
+  if (!/^https?:\/\//i.test(value) && !value.startsWith('/uploads/')) return ''
+  return /[\s"'()\\]/.test(value) ? '' : value
+}
+
+/**
+ * 是否处于「深色画布」。
+ *
+ * 除了显式的 .dark-mode（系统深色 / 站内深色），**midnight 皮肤本身就是深色画布**：
+ * 它把 --text-primary 换成了浅色，此时若再套用作者的浅色背景，就会变成浅底浅字。
+ * 所以判断依据必须是「这块画布有多深」，而不只是那个 class。
+ */
+export function isDarkCanvas(skin: string): boolean {
+  if (typeof document === 'undefined') return false
+  if (document.documentElement.classList.contains('dark-mode')) return true
+  return skin === 'midnight'
+}
+
+/**
+ * 深色画布下背景图的最小遮罩百分比。
+ *
+ * 深色模式的文字是浅色，压在一张明亮照片上必然读不清；无论作者把遮罩调到多低，
+ * 深色画布下都至少压这么厚，保证正文可读性优先于背景可见度。
+ */
+const DARK_CANVAS_MIN_OVERLAY = 45
+
+/**
+ * 计算页面背景的 CSS 变量。
+ *
+ * 只产出当前模式真正需要的键，且**默认配置下不产出任何键** ——
+ * 未被作者触碰过的背景继续跟随皮肤与深色模式，升级后观感逐像素不变。
+ *
+ * @param dark 是否深色画布（见 isDarkCanvas）。深色下忽略作者的纯色与渐变：
+ *   两者都是按浅色画布挑选的，浅底配浅字会直接不可读。背景图保留，但强制加厚遮罩。
+ */
+export function buildBackgroundVars(
+  settings: Partial<SiteSettings>,
+  dark = false
+): Record<string, string> {
+  const type = String(settings.backgroundType ?? '').trim() || 'solid'
+  const color = normalizeHex(settings.backgroundColor)
+  const vars: Record<string, string> = {}
+
+  if (type === 'image') {
+    const image = safeBackgroundUrl(settings.backgroundImageUrl)
+    const overlay = clampInt(settings.backgroundOverlay, 0, 90, 0)
+    if (image) {
+      const alpha = (dark ? Math.max(overlay, DARK_CANVAS_MIN_OVERLAY) : overlay) / 100
+      // 多图层写法：第一层在上，遮罩压住背景图，底色仍由 background-color 兜底。
+      const scrim =
+        alpha > 0 ? `linear-gradient(rgba(0, 0, 0, ${alpha}), rgba(0, 0, 0, ${alpha})), ` : ''
+      vars['--ap-bg-image'] = `${scrim}url("${image}")`
+    }
+    vars['--ap-bg-attachment'] = settings.backgroundFixed === 'false' ? 'scroll' : 'fixed'
+    vars['--ap-bg-size'] = 'cover'
+    vars['--ap-bg-repeat'] = 'no-repeat'
+  } else if (type === 'gradient' && !dark) {
+    const from = normalizeHex(settings.backgroundGradientFrom) || DEFAULT_BACKGROUND_COLOR
+    const to = normalizeHex(settings.backgroundGradientTo) || DEFAULT_GRADIENT_TO
+    vars['--ap-bg-image'] = `linear-gradient(180deg, ${from}, ${to})`
+  }
+
+  // 深色画布下不写纯色，让 --bg-primary 继续由深色主题决定。
+  vars['--ap-bg-color'] =
+    !dark && color && color.toLowerCase() !== DEFAULT_BACKGROUND_COLOR ? color : ''
+  return vars
+}
+
+/**
+ * 把背景变量持久化给首屏预置脚本。
+ *
+ * 只写白名单内的键；没有内容时整条删掉，避免 localStorage 留下空壳 ——
+ * 空串在预置脚本里等于「未设置」，此时 CSS 会走自己的回落链。
+ */
+export function persistAppearance(vars: Record<string, string>): void {
+  try {
+    const payload: Record<string, string> = {}
+    for (const key of PREPAINT_APPEARANCE_VARS) {
+      const value = vars[key]
+      if (value) payload[key] = value
+    }
+    if (Object.keys(payload).length === 0) {
+      localStorage.removeItem(APPEARANCE_STORAGE_KEY)
+    } else {
+      localStorage.setItem(APPEARANCE_STORAGE_KEY, JSON.stringify(payload))
+    }
+  } catch {
+    // 隐私模式等场景 localStorage 不可用；预置只是消闪烁的优化，失败不影响渲染。
+  }
+}
+
+/** 把背景变量写到 `:root`，让首个 `<body>` 绘制就能用上（早于 #selfblog 挂载）。 */
+function applyBackgroundVars(vars: Record<string, string>): void {
+  const html = document.documentElement
+  for (const key of PREPAINT_APPEARANCE_VARS) {
+    const value = vars[key]
+    if (value) html.style.setProperty(key, value)
+    else html.style.removeProperty(key)
+  }
+}
 
 /**
  * 由文件扩展名推导 favicon 的 MIME。
@@ -93,9 +274,18 @@ export const useSiteStore = defineStore('site', () => {
   )
 
   function applyAppearance(): void {
+    const skin = settings.value.themeSkin || 'ocean'
+    // 深色画布要重算：切到深色时必须把作者的浅色背景撤掉，否则浅底浅字不可读。
+    const vars = buildBackgroundVars(settings.value, isDarkCanvas(skin))
+    // 背景变量写 :root：早于 #selfblog 挂载也要生效（loadPublicSettings 在 mount 之前跑），
+    // 且 #selfblog 会自然继承，无需二次写入。
+    applyBackgroundVars(vars)
+    persistAppearance(vars)
+
     const root = document.getElementById('selfblog')
     if (!root) return
-    root.dataset.skin = settings.value.themeSkin || 'ocean'
+
+    root.dataset.skin = skin
     root.style.setProperty('--site-primary', settings.value.themePrimaryColor || '#165DFF')
     root.style.setProperty(
       '--accent',
@@ -110,6 +300,22 @@ export const useSiteStore = defineStore('site', () => {
       '--accent-dark',
       'color-mix(in srgb, var(--accent) 82%, var(--accent-shade, black))'
     )
+
+    // 组件不透明度 / 模糊：默认值下不写变量也不加属性，
+    // 保证「作者没配过」时走的是原来那套完全不透明的实心表面。
+    const opacity = clampInt(settings.value.surfaceOpacity, 60, 100, 100)
+    const blur = clampInt(settings.value.surfaceBlur, 0, 40, 0)
+    if (opacity < 100) root.style.setProperty('--ap-surface-opacity', `${opacity}%`)
+    else root.style.removeProperty('--ap-surface-opacity')
+    if (blur > 0) root.style.setProperty('--ap-surface-blur', `${blur}px`)
+    else root.style.removeProperty('--ap-surface-blur')
+
+    // 用属性做开关，而不是让 backdrop-filter 常驻 blur(0px)：
+    // 后者会给每张卡片都建合成层，白白付出层叠上下文的代价。
+    if (opacity < 100) root.dataset.surfaceTranslucent = ''
+    else delete root.dataset.surfaceTranslucent
+    if (blur > 0) root.dataset.surfaceBlur = ''
+    else delete root.dataset.surfaceBlur
   }
 
   function applySettings(input: Partial<SiteSettings> | Record<string, string>): void {

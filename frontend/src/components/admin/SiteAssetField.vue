@@ -18,7 +18,15 @@ const KIND_RULES: Record<SiteAssetKind, SiteAssetRule> = {
   logo: { extensions: ['.png', '.jpg', '.jpeg', '.webp', '.svg'], maxBytes: 2 * 1024 * 1024 },
   avatar: { extensions: ['.png', '.jpg', '.jpeg', '.webp', '.svg'], maxBytes: 2 * 1024 * 1024 },
   favicon: { extensions: ['.png', '.ico', '.svg'], maxBytes: 2 * 1024 * 1024 },
-  music: { extensions: ['.mp3', '.ogg', '.wav', '.m4a', '.aac'], maxBytes: 20 * 1024 * 1024 }
+  music: { extensions: ['.mp3', '.ogg', '.wav', '.m4a', '.aac'], maxBytes: 20 * 1024 * 1024 },
+  // 页面背景图：不接受 svg（会作为 CSS background-image 铺满视口）。阈值与后端
+  // SiteAssetKind.BACKGROUND 保持一致（8MB）——客户端预检刻意**不**比服务端更严：
+  // 更严就等于把服务端的额度作废，作者会被迫把照片压到掉画质，而那正是后端把
+  // 背景图上限提到 8MB 要解决的问题。明显超限的文件仍会在这里被拦下，省掉一次注定失败的往返。
+  background: {
+    extensions: ['.png', '.jpg', '.jpeg', '.webp'],
+    maxBytes: 8 * 1024 * 1024
+  }
 }
 
 const props = defineProps<{

@@ -168,6 +168,40 @@ focus regressions from independent review. See the
 [full report](../docs/reviews/2026-10-16-navigation-fidelity-and-fullstack-audit.md)
 for tested workflows and untested deployment environments.
 
+### Author-configurable appearance (2026-10-19)
+
+The author can now change the page background and content-surface opacity from
+`后台 → 网站设置 → 页面背景`, without touching code. Nine keys live in the `site_setting`
+KV table, so this needs **no schema migration**.
+
+- **Defaults emit no CSS variable at all.** `buildBackgroundVars()` in `stores/site.ts`
+  writes nothing when the background is the default grey or unconfigured, and every
+  consumer reads `var(--ap-bg-color, var(--bg-primary))`. A site that never opened this
+  panel therefore renders pixel-identically and keeps following its skin and dark mode.
+  A literal default value would instead override the skin the author never changed.
+- **Never "clear" these variables with an empty string** — an empty string counts as
+  *set*, which defeats the `var()` fallback chain.
+- `styles/appearance.css` must stay **last** in `main.css`, or author settings lose to
+  same-specificity declarations in `skins.css`/`dark-mode.css`.
+- Opacity/blur apply to a **deliberately narrow surface list** (cards, modals, settings
+  panels, page frames — enumerated in the header comment of `appearance.css`), not to
+  `--surface-primary` globally. Inputs, table rows and badges stay solid: small, thin-bordered
+  surfaces turn muddy when translucent. Renaming a class in that list silently disables it.
+- **Dark canvases drop the author's solid/gradient** (light text on a colour picked for a
+  light canvas is unreadable). `isDarkCanvas()` keys on `.dark-mode` **and** the `midnight`
+  skin, whose `--text-primary` is already light. Background *images* survive but get a
+  forced overlay of at least 45% (`DARK_CANVAS_MIN_OVERLAY`); an author-set overlay is
+  never thinned. `App.vue` watches `isDarkMode` so switching theme recomputes.
+- First paint uses a **cached-value relay, not a second calculation**: `applyAppearance()`
+  persists the composed CSS values to `localStorage` and the second inline script in
+  `index.html` forwards them by whitelist before paint. `buildBackgroundVars()` stays the
+  single source of truth for how values are composed.
+- The background URL is a CSS-injection surface (it lands inside `url("…")`), so the
+  backend rejects whitespace/quotes/parens/backslashes and `safeBackgroundUrl()` checks
+  again client-side.
+- `SiteAssetField.vue`'s client-side size pre-check must **not** be stricter than the
+  server: `KIND_RULES.background.maxBytes` is 8MB, matching `SiteAssetKind.BACKGROUND`.
+
 ### Configurable public pages
 
 - Author route `/<adminPath>/pages` manages8 built-in public-page/template configurations

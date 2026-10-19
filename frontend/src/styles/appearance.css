@@ -1,0 +1,163 @@
+/* =============================================================================
+   作者可配置外观（页面背景 / 组件不透明度）
+   =============================================================================
+
+   本文件里的变量全部由 `stores/site.ts` 的 `applyAppearance()` 写在 <html> 的内联样式上，
+   并在首屏由 index.html 的预置脚本按白名单转发（消闪烁）。
+   变量名统一用 `--ap-` 前缀，与设计系统 token 分开，便于一眼区分「作者配置」与「主题」。
+
+   三条承重规则：
+
+   1. 消费点一律写成 `var(--ap-*, <原来的值>)`。作者没配置时变量**未设置**，
+      CSS 取回落值 —— 于是皮肤（skins.css）与深色模式（dark-mode.css）继续说了算，
+      升级后观感逐像素不变。绝不要把变量设成空串来「清除」：空串是「已设置」，会让回落失效。
+
+   2. 不透明度只作用于**下面那份表面清单**，而不是全局改写 `--surface-primary`。
+     清单是刻意收窄的：半透明必须配合内容层次才有意义，把输入框、表格行、徽章
+      一并变半透明只会让界面发灰。清单外的组件保持完全不透明。
+
+   3. 本文件必须在 main.css 里**最后导入**：作者配置要能压过皮肤与深色模式中
+      同优先级的声明，否则选 forest/sunset 皮肤时背景不会变。
+
+   表面清单（这两个类在仓库里同时被 DOM 与样式使用，改名等于静默失效）：
+   .card .card-flat .card-elevated .functional-glass .article-list .sidebar-block
+   .intro-shell .state-panel .modal-content .modal-footer .comment-card .album-card
+   .workspace-card .welcome-panel .settings-panel .summary-grid article .panel
+   .table-container .post-table-wrap .editor-panel .editor-body .navigation-editor
+   .page-preview .auth-card .not-found-content .archive-list .site-footer
+   .page-frame[data-page-background]
+   ============================================================================= */
+
+/* ---------------------------------------------------------------
+   页面背景
+   --------------------------------------------------------------- */
+
+body {
+  /* 首屏最早被绘制的就是 body：预置脚本把变量写在 <html> 上，body 继承后立即生效，
+     所以这里必须消费 --ap-bg-*，否则预置拿不到任何可见效果（消闪烁就白做了）。
+     用长写法而不是 background 简写：简写会把 background-image 重置成 none，
+     把作者设置的背景图吃掉。 */
+  background-color: var(--ap-bg-color, var(--bg-primary));
+  background-image: var(--ap-bg-image, none);
+  background-attachment: var(--ap-bg-attachment, fixed);
+  background-size: var(--ap-bg-size, auto);
+  background-repeat: var(--ap-bg-repeat, repeat);
+}
+
+#selfblog {
+  /* min-height:100vh 且不透明的 #selfblog 实际盖住整个视口，
+     所以背景必须在这里再画一遍，否则 body 上画的背景图会被它整体遮住。
+     这里同样用长写法覆盖 skins.css 的 `--bg-primary` 结果。 */
+  background-color: var(--ap-bg-color, var(--bg-primary));
+  background-image: var(--ap-bg-image, none);
+  background-attachment: var(--ap-bg-attachment, fixed);
+  background-size: var(--ap-bg-size, auto);
+  background-repeat: var(--ap-bg-repeat, repeat);
+}
+
+/* 深色画布忽略作者的纯色/渐变画布：深色模式文字是浅色，浅底浅字直接不可读。
+   （midnight 皮肤本身就是深色画布，但它的 --text-primary 也是浅色，同理。）
+   背景图仍然生效 —— 那是作者明确的视觉选择，可读性靠加厚的遮罩保证，
+   厚度在 stores/site.ts 的 buildBackgroundVars 里按 DARK_CANVAS_MIN_OVERLAY 计算。
+   这里只是**兜底**：变量本就不会被写入，这条规则防的是「刚切到深色、
+   #selfblog 的内联样式还没更新」的那一帧。 */
+#selfblog.dark-mode,
+#selfblog[data-skin='midnight'] {
+  background-color: var(--bg-primary);
+}
+
+/* ---------------------------------------------------------------
+   表面不透明度 / 背景模糊
+   --------------------------------------------------------------- */
+
+/* 半透明表面的统一取值。集中成变量而不是在每个组件里各写一遍 color-mix，
+   这样无障碍降级只需要改一处。 */
+#selfblog[data-surface-translucent] {
+  --ap-surface-tint: color-mix(
+    in srgb,
+    var(--surface-primary) var(--ap-surface-opacity, 100%),
+    transparent
+  );
+  --ap-surface-tint-soft: color-mix(
+    in srgb,
+    var(--surface-secondary) var(--ap-surface-opacity, 100%),
+    transparent
+  );
+}
+
+/* 模糊强度；无障碍降级时整体置为 none。 */
+#selfblog {
+  --ap-surface-filter: blur(var(--ap-surface-blur, 8px)) saturate(1.05);
+}
+
+/* 表面清单 —— 只覆盖「大片、有边界」的表面。
+   刻意**不含**输入框、表格行、徽章、按钮：它们面积小、边界细，
+   半透明后与背景糊在一起反而降低可读性。 */
+#selfblog[data-surface-translucent] .card,
+#selfblog[data-surface-translucent] .card-flat,
+#selfblog[data-surface-translucent] .card-elevated,
+#selfblog[data-surface-translucent] .functional-glass,
+#selfblog[data-surface-translucent] .article-list,
+#selfblog[data-surface-translucent] .sidebar-block,
+#selfblog[data-surface-translucent] .intro-shell,
+#selfblog[data-surface-translucent] .state-panel,
+#selfblog[data-surface-translucent] .modal-content,
+#selfblog[data-surface-translucent] .comment-card,
+#selfblog[data-surface-translucent] .album-card,
+#selfblog[data-surface-translucent] .workspace-card,
+#selfblog[data-surface-translucent] .welcome-panel,
+#selfblog[data-surface-translucent] .settings-panel,
+#selfblog[data-surface-translucent] .summary-grid article,
+#selfblog[data-surface-translucent] .panel,
+#selfblog[data-surface-translucent] .table-container,
+#selfblog[data-surface-translucent] .post-table-wrap,
+#selfblog[data-surface-translucent] .editor-panel,
+#selfblog[data-surface-translucent] .editor-body,
+#selfblog[data-surface-translucent] .navigation-editor,
+#selfblog[data-surface-translucent] .page-preview,
+#selfblog[data-surface-translucent] .auth-card,
+#selfblog[data-surface-translucent] .not-found-content,
+#selfblog[data-surface-translucent] .archive-list,
+#selfblog[data-surface-translucent] .site-footer,
+#selfblog[data-surface-translucent] .page-frame[data-page-background='plain'] {
+  background: var(--ap-surface-tint);
+}
+
+/* 次级表面（弹窗页脚、soft 页面背景）用更浅的一档，保持原有层次差别。 */
+#selfblog[data-surface-translucent] .modal-footer,
+#selfblog[data-surface-translucent] .page-frame[data-page-background='soft'] {
+  background: var(--ap-surface-tint-soft);
+}
+
+/* 背景模糊只加在真正「大片」的表面类上。
+   backdrop-filter 会让元素单独合成一层；70 多个表面全加上会明显掉帧，
+   所以这份清单故意比上面的更窄，只覆盖正文卡片与浮层。 */
+#selfblog[data-surface-blur] .card,
+#selfblog[data-surface-blur] .card-flat,
+#selfblog[data-surface-blur] .card-elevated,
+#selfblog[data-surface-blur] .functional-glass,
+#selfblog[data-surface-blur] .article-list,
+#selfblog[data-surface-blur] .sidebar-block,
+#selfblog[data-surface-blur] .intro-shell,
+#selfblog[data-surface-blur] .modal-content,
+#selfblog[data-surface-blur] .settings-panel,
+#selfblog[data-surface-blur] .comment-card,
+#selfblog[data-surface-blur] .album-card,
+#selfblog[data-surface-blur] .workspace-card,
+#selfblog[data-surface-blur] .page-frame[data-page-background] {
+  backdrop-filter: var(--ap-surface-filter);
+  -webkit-backdrop-filter: var(--ap-surface-filter);
+}
+
+/* 无障碍降级：代价是「没有毛玻璃」，而不是「读不清字」。
+   两条规则都写在 #selfblog 上、媒体查询里的更靠后，同优先级下由后者生效。 */
+@media (prefers-reduced-transparency: reduce), (prefers-contrast: more), (forced-colors: active) {
+  #selfblog {
+    --ap-surface-filter: none;
+  }
+
+  #selfblog[data-surface-translucent] {
+    --ap-surface-tint: var(--surface-primary);
+    --ap-surface-tint-soft: var(--surface-secondary);
+  }
+}

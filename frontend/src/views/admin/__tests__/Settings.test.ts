@@ -33,6 +33,13 @@ function requireField(wrapper: Awaited<ReturnType<typeof mountSettings>>, kind: 
   return field
 }
 
+/** 与 requireField 相对：断言"某个资源字段当前没有渲染"时用它，找不到不会抛错。 */
+function hasField(wrapper: Awaited<ReturnType<typeof mountSettings>>, kind: string) {
+  return wrapper
+    .findAllComponents(SiteAssetField)
+    .some((candidate) => candidate.props('kind') === kind)
+}
+
 describe('Settings brand asset fields', () => {
   beforeEach(() => {
     document.head.innerHTML = STATIC_FAVICON
@@ -134,7 +141,7 @@ describe('Settings brand asset fields', () => {
   it('groups real setting fields by meaning and keeps a single save path', async () => {
     const wrapper = await mountSettings()
     const groupTitles = wrapper.findAll('.panel-heading h2').map((heading) => heading.text())
-    expect(groupTitles).toEqual(['站点资料', '后台与访客', '评论与音乐', '视觉主题'])
+    expect(groupTitles).toEqual(['站点资料', '后台与访客', '评论与音乐', '视觉主题', '页面背景'])
     expect(wrapper.findAll('form')).toHaveLength(1)
   })
 
@@ -165,5 +172,173 @@ describe('Settings brand asset fields', () => {
     await wrapper.find('form').trigger('submit')
     await flushPromises()
     expect(wrapper.get('[role="alert"]').text()).toContain('网站域名需为')
+  })
+
+  describe('page background panel', () => {
+    /** 9 个新字段的完整取值，用来验证「加载 → 渲染 → 提交」整条链路。 */
+    const BACKGROUND = {
+      backgroundType: 'image',
+      backgroundColor: '#123456',
+      backgroundGradientFrom: '#101010',
+      backgroundGradientTo: '#202020',
+      backgroundImageUrl: '/uploads/site-assets/background/hero.webp',
+      backgroundOverlay: '30',
+      backgroundFixed: 'false',
+      surfaceOpacity: '80',
+      surfaceBlur: '12'
+    } as const
+
+    function control(wrapper: Awaited<ReturnType<typeof mountSettings>>, name: string) {
+      const found = wrapper.find(`[data-setting="${name}"]`)
+      if (!found.exists()) throw new Error(`missing control: ${name}`)
+      return found
+    }
+
+    /** 断言"某个控件当前不存在"时必须用这个：control() 找不到会直接抛错。 */
+    function hasControl(wrapper: Awaited<ReturnType<typeof mountSettings>>, name: string) {
+      return wrapper.find(`[data-setting="${name}"]`).exists()
+    }
+
+    function preview(wrapper: Awaited<ReturnType<typeof mountSettings>>) {
+      return wrapper.get('[data-preview="page-background"]')
+    }
+
+    it('appends the panel after 视觉主题 and lists every control across the three types', async () => {
+      const wrapper = await mountSettings()
+      // tsconfig 的 lib 是 ES2020，没有 Array.prototype.at；用长度取最后一节。
+      const panels = wrapper.findAll('section.settings-panel')
+      const panel = panels[panels.length - 1]
+      expect(panel?.find('.panel-heading h2').text()).toBe('页面背景')
+      expect(panel?.find('.panel-desc').text()).toContain('卡片的不透明度与模糊')
+
+      // 类型选择 + 两个卡片表面控制（渐变/背景图分支之外始终可见）
+      expect(control(wrapper, 'backgroundType').exists()).toBe(true)
+      expect(control(wrapper, 'surfaceOpacity').attributes('min')).toBe('60')
+      expect(control(wrapper, 'surfaceOpacity').attributes('max')).toBe('100')
+      expect(control(wrapper, 'surfaceBlur').attributes('min')).toBe('0')
+      expect(control(wrapper, 'surfaceBlur').attributes('max')).toBe('40')
+
+      await control(wrapper, 'backgroundType').setValue('solid')
+      expect(control(wrapper, 'backgroundColor').exists()).toBe(true)
+      expect(hasControl(wrapper, 'backgroundGradientFrom')).toBe(false)
+
+      await control(wrapper, 'backgroundType').setValue('gradient')
+      expect(control(wrapper, 'backgroundGradientFrom').exists()).toBe(true)
+      expect(control(wrapper, 'backgroundGradientTo').exists()).toBe(true)
+
+      await control(wrapper, 'backgroundType').setValue('image')
+      const image = requireField(wrapper, 'background')
+      expect(image.props('kind')).toBe('background')
+      expect(control(wrapper, 'backgroundOverlay').attributes('max')).toBe('90')
+      expect(control(wrapper, 'backgroundFixed').exists()).toBe(true)
+    })
+
+    it('swaps the conditional controls with the selected background type', async () => {
+      const wrapper = await mountSettings()
+
+      await control(wrapper, 'backgroundType').setValue('solid')
+      expect(hasControl(wrapper, 'backgroundColor')).toBe(true)
+      expect(hasControl(wrapper, 'backgroundGradientFrom')).toBe(false)
+      expect(hasControl(wrapper, 'backgroundOverlay')).toBe(false)
+      expect(hasField(wrapper, 'background')).toBe(false)
+
+      await control(wrapper, 'backgroundType').setValue('gradient')
+      expect(hasControl(wrapper, 'backgroundColor')).toBe(false)
+      expect(hasControl(wrapper, 'backgroundGradientFrom')).toBe(true)
+      expect(hasControl(wrapper, 'backgroundGradientTo')).toBe(true)
+      expect(hasField(wrapper, 'background')).toBe(false)
+
+      await control(wrapper, 'backgroundType').setValue('image')
+      expect(hasControl(wrapper, 'backgroundColor')).toBe(false)
+      expect(hasControl(wrapper, 'backgroundGradientFrom')).toBe(false)
+      expect(hasField(wrapper, 'background')).toBe(true)
+      expect(hasControl(wrapper, 'backgroundFixed')).toBe(true)
+      // 卡片表面控制不随背景类型消失，作者在任一模式下都能调
+      expect(hasControl(wrapper, 'surfaceOpacity')).toBe(true)
+      expect(hasControl(wrapper, 'surfaceBlur')).toBe(true)
+    })
+
+    it('submits all nine background keys in the save payload', async () => {
+      getSettings.mockResolvedValue({
+        code: 200,
+        message: 'OK',
+        data: { ...useSiteStore().settings, ...BACKGROUND }
+      })
+      const wrapper = await mountSettings()
+
+      updateSettings.mockResolvedValue({
+        code: 200,
+        message: 'OK',
+        data: { ...useSiteStore().settings, ...BACKGROUND }
+      })
+      await wrapper.find('form').trigger('submit')
+      await flushPromises()
+
+      const payload = updateSettings.mock.calls[0]?.[0] as Record<string, string>
+      for (const [key, value] of Object.entries(BACKGROUND)) {
+        expect(payload[key]).toBe(value)
+      }
+    })
+
+    it('updates each range readout as the slider moves', async () => {
+      const wrapper = await mountSettings()
+
+      await control(wrapper, 'backgroundType').setValue('image')
+      await control(wrapper, 'backgroundOverlay').setValue('45')
+      expect(wrapper.get('.range-row code').text()).toBe('45%')
+
+      await control(wrapper, 'surfaceOpacity').setValue('72')
+      expect(control(wrapper, 'surfaceOpacity').element.parentElement?.textContent).toContain('72%')
+
+      await control(wrapper, 'surfaceBlur').setValue('18')
+      expect(control(wrapper, 'surfaceBlur').element.parentElement?.textContent).toContain('18px')
+
+      updateSettings.mockResolvedValue({
+        code: 200,
+        message: 'OK',
+        data: { ...useSiteStore().settings }
+      })
+      await wrapper.find('form').trigger('submit')
+      await flushPromises()
+      expect(updateSettings.mock.calls[0]?.[0]).toMatchObject({
+        backgroundOverlay: '45',
+        surfaceOpacity: '72',
+        surfaceBlur: '18'
+      })
+    })
+
+    it('mirrors the chosen background and card translucency in the preview only', async () => {
+      const wrapper = await mountSettings()
+
+      await control(wrapper, 'backgroundType').setValue('solid')
+      await control(wrapper, 'backgroundColor').setValue('#abcdef')
+      expect(preview(wrapper).attributes('data-bg-type')).toBe('solid')
+      expect(preview(wrapper).attributes('style')).toContain('rgb(171, 205, 239)')
+
+      await control(wrapper, 'backgroundType').setValue('gradient')
+      expect(preview(wrapper).attributes('style')).toContain('linear-gradient')
+
+      await control(wrapper, 'backgroundType').setValue('image')
+      // 显式给一张背景图，不依赖 store 默认值；再调遮罩看预览是否跟着叠色
+      requireField(wrapper, 'background').vm.$emit(
+        'update:modelValue',
+        '/uploads/site-assets/background/hero.webp'
+      )
+      await nextTick()
+      await control(wrapper, 'backgroundOverlay').setValue('50')
+      const imageStyle = preview(wrapper).attributes('style') ?? ''
+      expect(imageStyle).toContain('rgba(0, 0, 0, 0.5)')
+      expect(imageStyle).toContain('background-size: cover')
+
+      const card = wrapper.get('.bg-preview-card').attributes('style') ?? ''
+      await control(wrapper, 'surfaceBlur').setValue('20')
+      expect(wrapper.get('.bg-preview-card').attributes('style')).not.toBe(card)
+      expect(wrapper.get('.bg-preview-card').attributes('style')).toContain('blur(20px)')
+
+      // 预览是纯局部状态：不得改全局 DOM，也不得写 CSS 自定义属性
+      const root = document.getElementById('selfblog')
+      expect(root?.getAttribute('style') ?? '').not.toContain('--bg')
+      expect(wrapper.find('.bg-preview').attributes('style')).not.toContain('--')
+    })
   })
 })

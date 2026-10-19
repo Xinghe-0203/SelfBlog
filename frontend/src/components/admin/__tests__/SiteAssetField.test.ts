@@ -79,6 +79,40 @@ describe('SiteAssetField', () => {
     expect(uploadSiteAsset).not.toHaveBeenCalled()
   })
 
+  it('accepts raster images only for the background kind', () => {
+    // svg 不接受：背景图会铺满视口，而 svg 作为顶层文档打开时可能携带脚本。
+    expect(mountField({ kind: 'background' }).find('input[type="file"]').attributes('accept')).toBe(
+      '.png,.jpg,.jpeg,.webp'
+    )
+  })
+
+  it('lets the background kind through at a size the server also accepts', async () => {
+    // 承重：客户端预检必须与后端 SiteAssetKind.BACKGROUND 的 8MB 一致。
+    // 比服务端更严等于把服务端额度作废，作者会被迫把照片压到掉画质。
+    uploadSiteAsset.mockResolvedValue({
+      ...UPLOAD_RESPONSE,
+      data: { ...UPLOAD_RESPONSE.data, kind: 'background' }
+    })
+    const wrapper = mountField({ kind: 'background' })
+    const photo = new File([new Uint8Array(3 * 1024 * 1024)], 'hero.webp', { type: 'image/webp' })
+
+    await selectFile(wrapper, photo)
+    await flushPromises()
+
+    expect(wrapper.find('.asset-error').exists()).toBe(false)
+    expect(uploadSiteAsset).toHaveBeenCalledTimes(1)
+  })
+
+  it('still rejects a background file past the shared 8MB cap', async () => {
+    const wrapper = mountField({ kind: 'background' })
+    const oversized = new File([new Uint8Array(8 * 1024 * 1024 + 1)], 'huge.jpg')
+
+    await selectFile(wrapper, oversized)
+
+    expect(wrapper.find('.asset-error').text()).toContain('8MB')
+    expect(uploadSiteAsset).not.toHaveBeenCalled()
+  })
+
   it('uploads a valid file and emits the returned url', async () => {
     uploadSiteAsset.mockResolvedValue(UPLOAD_RESPONSE)
     const wrapper = mountField()

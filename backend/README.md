@@ -217,6 +217,34 @@ See the [audit report](../docs/reviews/2026-10-16-navigation-fidelity-and-fullst
 for exact scope. This does **not** validate a real MySQL deployment, Docker build,
 SMTP delivery or external media providers.
 
+## Author-configurable appearance
+
+Nine new keys — `backgroundType`, `backgroundColor`, `backgroundGradientFrom`,
+`backgroundGradientTo`, `backgroundImageUrl`, `backgroundOverlay`, `backgroundFixed`,
+`surfaceOpacity`, `surfaceBlur` — are registered in `SiteSettingsServiceImpl`'s whitelist
+and stored in the `site_setting` KV table. **No schema migration is required.**
+
+`validateValue` is the authority for every key: `backgroundType` is limited to
+`solid | gradient | image`, the three colour keys to `#RRGGBB`, `backgroundFixed` to a
+boolean, and the numeric keys go through `requireIntegerInRange` (pure decimal integers only,
+no decimals or signs). The declared ranges are `backgroundOverlay` 0-90, `surfaceOpacity`
+60-100, `surfaceBlur` 0-40. Defaults are chosen so an untouched site renders exactly as
+before, which is why the frontend emits **no** CSS variable in that case.
+
+`backgroundImageUrl` is a CSS-injection surface: the value is spliced into `url("…")`
+client-side, so whitespace and `\u00A0`, `"`, `'`, `(`, `)`, and `\` are all rejected,
+and the value must be `http(s)://` or `/uploads/` prefixed. The frontend re-checks
+(`safeBackgroundUrl()`) because it must not assume the data came from this server.
+
+`SiteAssetKind.BACKGROUND` (`"background"`) was added to the upload whitelist: raster
+formats only (`.png/.jpg/.jpeg/.webp`) with an **8MB** cap. `.svg` is excluded because an
+SVG opened as a top-level document can carry scripts and a background fills the viewport;
+`.ico` is favicon-only and too small to scale. The 8MB cap is deliberately above the
+2MB used for logos and avatars — a 2560px-wide photo routinely exceeds 2MB, and reusing the
+smaller limit would force authors to re-compress until quality degrades. The frontend's
+client-side pre-check must stay at the same 8MB, since a stricter check would make the
+server's allowance unreachable.
+
 ## Page management
 
 `PageService` stores separate versioned draft/published documents and slug reservations

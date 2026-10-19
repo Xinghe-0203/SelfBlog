@@ -4,6 +4,107 @@
 
 ---
 
+## 未发布 — 外观自定义：后台可换页面背景与组件不透明度 (2026-10-19)
+
+### 说明
+
+作者此前只能选皮肤和强调色，页面背景与卡片通透度都写死在 CSS 里，想换一张背景图必须改代码。
+现在「后台 → 网站设置」新增**页面背景**面板，全部外观能力都变成免改代码的设置项。
+
+不改动的默认行为被当作硬约束：作者没碰过任何新设置时，观感与升级前逐像素一致 —— 背景继续跟随
+皮肤与深色模式，卡片继续完全不透明。实现上靠「**默认值 = 不写任何 CSS 变量**」达成，而不是写一个
+看起来相同的默认值（见下方承重设计）。
+
+### 新增设置项
+
+九条，都存在 `site_setting` KV 表里，**零 schema 迁移**：
+
+| 键 | 取值 | 默认 |
+| --- | --- | --- |
+| `backgroundType` | `solid` / `gradient` / `image` | `solid` |
+| `backgroundColor` | `#RRGGBB` | `#f5f6f8` |
+| `backgroundGradientFrom` / `backgroundGradientTo` | `#RRGGBB` | `#f5f6f8` / `#e7eaf0` |
+| `backgroundImageUrl` | `http(s)` 或 `/uploads/` 路径，可留空 | 空 |
+| `backgroundOverlay` | `0-90`（遮罩浓度 %） | `0` |
+| `backgroundFixed` | `true` / `false`（视差固定） | `true` |
+| `surfaceOpacity` | `60-100`（卡片不透明度 %） | `100` |
+| `surfaceBlur` | `0-40`（卡片背景模糊 px） | `0` |
+
+### 承重设计（改动前请先读）
+
+1. **默认值不产生任何 CSS 变量。** `buildBackgroundVars()` 在纯色等于默认灰 (`#f5f6f8`)、
+   或未配置背景图时**不写该键**，`--ap-bg-*` 保持「未设置」；消费点写成
+   `var(--ap-bg-color, var(--bg-primary))`，于是皮肤与深色模式继续说了算。
+   反过来，如果默认值写成一个相同的颜色，换皮肤就会被这个作者从未设过的默认色压掉。
+   **永远不要用空串来「清除」这些变量**：空串是「已设置」，会让 `var()` 的回落失效。
+
+2. **不透明度只覆盖收窄的表面清单**，而不是全局改写 `--surface-primary`。清单（`.card`、
+   `.article-list`、`.modal-content`、`.settings-panel` 等约 30 个类）写在
+   `frontend/src/styles/appearance.css` 顶部注释里。刻意**不含**输入框、表格行、徽章、按钮：
+   它们面积小、边界细，半透明后会与背景糊在一起反而降低可读性。清单里的类名同时被 DOM 与样式
+   使用，**改名等于静默失效**。
+
+3. **`appearance.css` 必须在 `main.css` 里最后导入**，否则选 forest/sunset 皮肤时背景不会变。
+
+4. **深色画布撤掉作者的浅色背景。** 深色模式与 `midnight` 皮肤的文字都是浅色，浅底浅字会直接
+   不可读。因此 `isDarkCanvas()` 的判据不只是 `.dark-mode` 类，**还包括 `midnight` 皮肤本身**
+   （它的 `--text-primary` 就是浅色）。深色下忽略作者的纯色与渐变画布；**背景图保留** ——
+   那是作者明确的视觉选择，可读性由强制加厚到至少 45% 的遮罩保证
+   （`DARK_CANVAS_MIN_OVERLAY`），且只会在作者设得更厚时更厚，绝不调薄。
+   `App.vue` 的 watch 因此把 `themeStore.isDarkMode` 也纳入依赖，切主题时会重算。
+
+5. **首屏不闪烁靠 localStorage 转发，而不是靠再算一遍。** `/api/site/public` 在首次绘制前一定
+   拿不到，所以 `applyAppearance()` 会把**算好的最终 CSS 值**按白名单写进 localStorage，
+   `frontend/index.html` 的第二个内联脚本只做「零逻辑转发」：按同一份白名单原样
+   `setProperty` 到 `<html>`，不拼接任何 CSS 取值。取值组合的唯一事实来源仍是
+   `buildBackgroundVars()`。白名单是 `PREPAINT_APPEARANCE_VARS`（`frontend/src/stores/site.ts`），
+   存储键 `APPEARANCE_STORAGE_KEY`，两者都有测试钉住与 `index.html` 逐字一致。
+
+6. **背景图地址是 CSS 注入面。** 该值会被拼进 `url("…")`，能闭合引号/括号/反斜杠或截断声明的
+   空白都可能撑开注入路径。后端 `SiteSettingsServiceImpl.validateValue` 拒绝这两类字符，前端
+   `safeBackgroundUrl()` 再挡一次（前端不能假设数据一定来自本服务端的校验）。
+
+7. **客户端预检不得比服务端更严。** `SiteAssetField.vue` 的 `KIND_RULES.background.maxBytes`
+   与后端 `SiteAssetKind.BACKGROUND` 一致为 **8MB**。比服务端严就等于把服务端额度作废，作者会被迫
+   把照片压到掉画质 —— 而那正是后端把背景图上限从 2MB 提到 8MB 要解决的问题。
+
+### 修复
+
+- **`SiteSettingsServiceImpl` 新增的 9 个键此前会绕过校验。** 新增 `requireIntegerInRange()`
+  做统一的整型区间校验（只接受纯十进制整数，拒绝小数与正负号之外的杂质），
+  `backgroundType` 限定三种取值，三个颜色键限定 `#RRGGBB`。
+
+### 影响文件
+
+| 文件 | 改动类型 |
+| --- | --- |
+| `frontend/src/styles/appearance.css` | 新增（外观层：背景消费点 + 表面清单 + 无障碍降级） |
+| `frontend/src/styles/main.css` | 修改（最后导入 `appearance.css`） |
+| `frontend/src/stores/site.ts` | 新增（`isDarkCanvas` / `buildBackgroundVars` / `persistAppearance` / `PREPAINT_APPEARANCE_VARS` / `APPEARANCE_STORAGE_KEY`） |
+| `frontend/index.html` | 新增（第二个首屏内联脚本：白名单转发外观变量） |
+| `frontend/src/App.vue` | 修改（watch 依赖加入 `isDarkMode`，深色切换时重算背景） |
+| `frontend/src/views/admin/Settings.vue` | 新增（「页面背景」面板 + 预览 + 9 个控件） |
+| `frontend/src/api/site.ts` | 修改（`SiteAssetKind` 增加 `'background'`） |
+| `frontend/src/components/admin/SiteAssetField.vue` | 修改（`KIND_RULES.background`，8MB 与后端一致） |
+| `backend/src/main/java/com/selfblog/common/enums/SiteAssetKind.java` | 新增（`BACKGROUND`：仅光栅格式，上限 8MB） |
+| `backend/src/main/java/com/selfblog/service/site/impl/SiteSettingsServiceImpl.java` | 新增（9 个键的默认值与校验） |
+| `frontend/src/stores/__tests__/site.test.ts` | 新增（+27 用例：深色画布、背景变量、持久化） |
+| `frontend/src/__tests__/indexHtml.test.ts` | 新增（首屏脚本契约：顺序、白名单、畸形输入、存储抛错） |
+| `frontend/src/views/admin/__tests__/Settings.test.ts` | 新增（+5 用例：面板、条件分支、提交、预览隔离） |
+| `frontend/src/components/admin/__tests__/SiteAssetField.test.ts` | 新增（+3 用例：背景图 accept 与 8MB 双端一致） |
+| `backend/src/test/java/com/selfblog/common/enums/SiteAssetKindTest.java` | 新增（`BACKGROUND` 契约断言） |
+| `backend/src/test/java/com/selfblog/service/site/impl/SiteSettingsServiceImplTest.java` | 新增（9 个键的默认值与非法值） |
+
+### 验证
+
+- 后端全量：`Tests run: 747, Failures: 0, Errors: 0, Skipped: 0` + `BUILD SUCCESS`。
+- 前端六闸门全绿：`lint:check` 0 errors / 43 warnings、`format:check` 通过、
+  `type-check` 0、`test:run` **43 files / 438 tests**（基线 400）、`test:deployment` 27/27、`build` 通过。
+- **未验证**：真实浏览器里的首屏无闪烁与背景图观感、真实 8MB 照片的上传链路。
+  按仓库既有界限，本机无 MySQL/Docker，这两项需人工在浏览器与 CI 之外确认。
+
+---
+
 ## 未发布 — 修复 CI 两处红灯：Dockerfile 探针语法与启动播种幂等 (2026-10-19)
 
 ### 说明

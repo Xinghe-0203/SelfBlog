@@ -11,3 +11,5 @@
 @import './a11y.css';
 @import './skeleton.css';
 @import './skins.css';
+/* 必须最后导入：作者配置的背景/不透明度要能压过皮肤与深色模式里同优先级的声明。 */
+@import './appearance.css';

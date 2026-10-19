@@ -36,6 +36,40 @@
     })()
   </script>
 
+  <!--
+    首屏站点外观：作者配置了页面背景图或非默认背景色时，/api/site/public 在首次绘制前
+    一定拿不到，只能读上一次由 stores/site.ts 的 applyAppearance() 写进 localStorage
+    的最终 CSS 值，否则页面会先画默认浅色再跳变到作者配置的外观。
+    这里刻意做成「零逻辑转发」：只按白名单把字符串原样 setProperty 到 <html>，
+    不拼接任何 CSS 取值——取值组合的唯一事实来源仍然是 applyAppearance()。
+    #selfblog 由 Vue 挂载后才创建，<body> 里此刻只有 #app，
+    所以只有 document.documentElement（即 :root）可写。
+    存储键与 src/constants 的 STORAGE_KEY_PREFIX 保持一致（有测试固定）。
+  -->
+  <script>
+    ;(function () {
+      try {
+        var raw = localStorage.getItem('edu_site_appearance')
+        if (!raw) return
+        var appearance = JSON.parse(raw)
+        if (!appearance || typeof appearance !== 'object') return
+        var allowed = [
+          '--ap-bg-color',
+          '--ap-bg-image',
+          '--ap-bg-attachment',
+          '--ap-bg-size',
+          '--ap-bg-repeat'
+        ]
+        for (var i = 0; i < allowed.length; i++) {
+          var value = appearance[allowed[i]]
+          if (typeof value === 'string' && value) {
+            document.documentElement.style.setProperty(allowed[i], value)
+          }
+        }
+      } catch (e) {}
+    })()
+  </script>
+
   <!-- 订阅源自动发现：阅读器（Feedly / Inoreader / NetNewsWire 等）靠这三行找到订阅地址 -->
   <link rel="alternate" type="application/rss+xml" title="RSS 订阅" href="/feed.xml">
   <link rel="alternate" type="application/atom+xml" title="Atom 订阅" href="/atom.xml">

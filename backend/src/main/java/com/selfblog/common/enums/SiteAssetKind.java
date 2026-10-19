@@ -22,7 +22,18 @@ public enum SiteAssetKind {
     /** 站长头像，允许矢量图。 */
     AVATAR("avatar", Category.IMAGE, Set.of(".png", ".jpg", ".jpeg", ".webp", ".svg"), 2L * 1024 * 1024),
     /** 背景音乐。 */
-    MUSIC("music", Category.AUDIO, Set.of(".mp3", ".ogg", ".wav", ".m4a", ".aac"), 20L * 1024 * 1024);
+    MUSIC("music", Category.AUDIO, Set.of(".mp3", ".ogg", ".wav", ".m4a", ".aac"), 20L * 1024 * 1024),
+    /**
+     * 页面背景图，铺满视口的大幅照片。
+     *
+     * 只收光栅格式：.svg 不是照片格式，且作为顶层文档打开时可能携带脚本，没必要为背景图
+     * 承担这层风险；.ico 是 favicon 专用格式，尺寸上限 256px，铺满屏幕必然糊。
+     * 因此这里既不放 .svg 也不放 .ico。
+     *
+     * 上限 8MB 明显高于 logo/头像的 2MB：2MB 足够一张商标或头像，但一张 2560px 宽的
+     * 高质量照片很容易超过 2MB，用同一阈值会逼用户反复压缩到掉画质。
+     */
+    BACKGROUND("background", Category.IMAGE, Set.of(".png", ".jpg", ".jpeg", ".webp"), 8L * 1024 * 1024);
 
     /** 资产大类，决定用哪套魔数校验。 */
     public enum Category {

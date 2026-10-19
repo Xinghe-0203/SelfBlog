@@ -32,7 +32,7 @@ export interface PageResult<T> {
   pages: number
 }
 
-export type SiteAssetKind = 'logo' | 'favicon' | 'avatar' | 'music'
+export type SiteAssetKind = 'logo' | 'favicon' | 'avatar' | 'music' | 'background'
 
 export interface SiteAssetUpload {
   url: string
@@ -52,7 +52,7 @@ export const siteApi = {
     return api.put('/admin/site-settings', data)
   },
   /**
-   * 上传站点品牌资源（头像 / logo / favicon / 音乐）。
+   * 上传站点品牌资源（头像 / logo / favicon / 音乐 / 页面背景图）。
    * 与 /media/upload 不同：这条通道原样落盘，不会把图片重编码成 jpg。
    */
   uploadSiteAsset(

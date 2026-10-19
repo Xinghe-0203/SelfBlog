@@ -144,6 +144,32 @@ class SiteAssetServiceImplTest {
         assertTrue(vo.getUrl().endsWith(extension));
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {".png", ".jpg", ".jpeg", ".webp"})
+    @DisplayName("store_AcceptsEveryBackgroundRasterFormat")
+    void store_AcceptsEveryBackgroundRasterFormat(String extension) {
+        byte[] content = switch (extension) {
+            case ".png" -> PNG_BYTES;
+            case ".webp" -> WEBP_BYTES;
+            default -> JPEG_BYTES;
+        };
+        SiteAssetVO vo = service.store(file("wallpaper" + extension, content), "background");
+        assertEquals("background", vo.getKind());
+        assertTrue(vo.getUrl().startsWith("/uploads/site-assets/background/"));
+        assertTrue(vo.getUrl().endsWith(extension));
+    }
+
+    @Test
+    @DisplayName("store_RejectsSvgAndIcoForBackground")
+    void store_RejectsSvgAndIcoForBackground() {
+        BusinessException svgError = assertThrows(BusinessException.class,
+                () -> service.store(file("bg.svg", svg(PLAIN_SVG)), "background"));
+        assertEquals(400, svgError.getCode());
+        BusinessException icoError = assertThrows(BusinessException.class,
+                () -> service.store(file("bg.ico", ICO_BYTES), "background"));
+        assertEquals(400, icoError.getCode());
+    }
+
     @Test
     @DisplayName("store_AcceptsAacFrameSyncAsMusic")
     void store_AcceptsAacFrameSyncAsMusic() {
@@ -296,6 +322,23 @@ class SiteAssetServiceImplTest {
         BusinessException e = assertThrows(BusinessException.class,
                 () -> service.store(file("song.mp3", oversized), "music"));
         assertTrue(e.getMessage().contains("20MB"));
+    }
+
+    @Test
+    @DisplayName("store_AllowsBackgroundPastTheLogoCapButNotPastEightMegabytes")
+    void store_AllowsBackgroundPastTheLogoCapButNotPastEightMegabytes() {
+        // 3MB 超过 logo 的 2MB 上限，但对背景图合法：证明背景图走的是自己的 8MB 档位
+        byte[] bigBackground = new byte[3 * 1024 * 1024];
+        System.arraycopy(PNG_MAGIC_ONLY, 0, bigBackground, 0, PNG_MAGIC_ONLY.length);
+        SiteAssetVO vo = service.store(file("wallpaper.png", bigBackground), "background");
+        assertEquals((long) bigBackground.length, vo.getSize());
+
+        byte[] oversized = new byte[9 * 1024 * 1024];
+        System.arraycopy(PNG_MAGIC_ONLY, 0, oversized, 0, PNG_MAGIC_ONLY.length);
+        BusinessException e = assertThrows(BusinessException.class,
+                () -> service.store(file("wallpaper.png", oversized), "background"));
+        assertEquals(400, e.getCode());
+        assertTrue(e.getMessage().contains("8MB"));
     }
 
     // ---------- SVG 净化 ----------

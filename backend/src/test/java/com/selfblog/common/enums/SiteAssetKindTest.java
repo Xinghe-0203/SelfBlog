@@ -15,7 +15,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class SiteAssetKindTest {
 
     @ParameterizedTest
-    @ValueSource(strings = {"logo", "favicon", "avatar", "music"})
+    @ValueSource(strings = {"logo", "favicon", "avatar", "music", "background"})
     @DisplayName("fromWireName_AcceptsEveryDocumentedWireName")
     void fromWireName_AcceptsEveryDocumentedWireName(String raw) {
         SiteAssetKind kind = SiteAssetKind.fromWireName(raw);
@@ -51,6 +51,23 @@ class SiteAssetKindTest {
         assertFalse(SiteAssetKind.LOGO.isAudio());
         assertFalse(SiteAssetKind.FAVICON.isAudio());
         assertFalse(SiteAssetKind.AVATAR.isAudio());
+        assertFalse(SiteAssetKind.BACKGROUND.isAudio());
+    }
+
+    @Test
+    @DisplayName("backgroundAllowsRasterOnlyAndNoSvgOrIco")
+    void backgroundAllowsRasterOnlyAndNoSvgOrIco() {
+        assertTrue(SiteAssetKind.BACKGROUND.getExtensions().contains(".webp"));
+        assertTrue(SiteAssetKind.BACKGROUND.getExtensions().contains(".jpg"));
+        assertFalse(SiteAssetKind.BACKGROUND.getExtensions().contains(".svg"));
+        assertFalse(SiteAssetKind.BACKGROUND.getExtensions().contains(".ico"));
+    }
+
+    @Test
+    @DisplayName("backgroundGetsTheLargerCap")
+    void backgroundGetsTheLargerCap() {
+        assertEquals(8L, SiteAssetKind.BACKGROUND.getMaxMegabytes());
+        assertTrue(SiteAssetKind.BACKGROUND.getMaxBytes() > SiteAssetKind.LOGO.getMaxBytes());
     }
 
     @Test
