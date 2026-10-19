@@ -69,6 +69,50 @@
                 #{trending.commentCount}, #{trending.statDate}, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0)
     </insert>
 
+    <!--
+      批量 upsert：语义必须与单条 upsert 逐字一致（同一篇同一天一行 + 命中唯一键复位 is_deleted）。
+      三套 databaseId 语句各自保留方言，H2 走无 databaseId 的 MERGE 兜底。
+      调用方负责分批（见 TrendingServiceImpl 的 BATCH_SIZE），空列表不得调用。
+    -->
+
+    <!-- MySQL: 多值 INSERT + ON DUPLICATE KEY UPDATE（VALUES() 在 MySQL 8.0.x 仍受支持） -->
+    <insert id="upsertBatch" databaseId="mysql">
+        INSERT INTO blog_trending (post_id, score, view_count, like_count, comment_count, date, create_time, update_time, is_deleted)
+        VALUES
+        <foreach collection="trendings" item="t" separator=",">
+            (#{t.postId}, #{t.score}, #{t.viewCount}, #{t.likeCount},
+             #{t.commentCount}, #{t.statDate}, NOW(), NOW(), 0)
+        </foreach>
+        ON DUPLICATE KEY UPDATE
+            score = VALUES(score),
+            view_count = VALUES(view_count),
+            like_count = VALUES(like_count),
+            comment_count = VALUES(comment_count),
+            is_deleted = 0,
+            update_time = NOW()
+    </insert>
+
+    <!-- SQLite: 多值 INSERT OR REPLACE（整行重建，is_deleted 自然回到默认 0） -->
+    <insert id="upsertBatch" databaseId="sqlite">
+        INSERT OR REPLACE INTO blog_trending (post_id, score, view_count, like_count, comment_count, date, create_time, update_time)
+        VALUES
+        <foreach collection="trendings" item="t" separator=",">
+            (#{t.postId}, #{t.score}, #{t.viewCount}, #{t.likeCount},
+             #{t.commentCount}, #{t.statDate}, datetime('now','localtime'), datetime('now','localtime'))
+        </foreach>
+    </insert>
+
+    <!-- 默认（H2兼容）: 多值 MERGE by (post_id, date) -->
+    <insert id="upsertBatch">
+        MERGE INTO blog_trending (post_id, score, view_count, like_count, comment_count, date, create_time, update_time, is_deleted)
+        KEY(post_id, date)
+        VALUES
+        <foreach collection="trendings" item="t" separator=",">
+            (#{t.postId}, #{t.score}, #{t.viewCount}, #{t.likeCount},
+             #{t.commentCount}, #{t.statDate}, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0)
+        </foreach>
+    </insert>
+
     <!-- 获取所有文章的最新趋势数据（优化：使用 JOIN 替代相关子查询） -->
     <select id="selectAllLatest" resultType="com.selfblog.entity.BlogTrending">
         SELECT bt.* FROM blog_trending bt

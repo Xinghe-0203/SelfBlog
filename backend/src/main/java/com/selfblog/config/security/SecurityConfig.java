@@ -1,8 +1,6 @@
 package com.selfblog.config.security;
 
 import com.selfblog.utils.LogUtils;
-import com.selfblog.utils.SecurityUtils;
-import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -60,6 +58,14 @@ public class SecurityConfig {
 
     @Bean
     public BCryptPasswordEncoder passwordEncoder() {
+        // 启动期显式记录生效的 bcrypt cost：运维据此确认密码校验强度未被调低。
+        // cost 每 +1 约翻倍 CPU 耗时（cost=12 单次 matches 实测约 0.4-0.5s），
+        // 登录链路已把 BCrypt 移出数据库事务，因此不再独占连接。
+        if (bcryptStrength < 12) {
+            log.warn("bcrypt.strength={} 低于推荐值 12，密码哈希强度被调低，请确认这是有意配置", bcryptStrength);
+        } else {
+            log.info("BCrypt password encoder initialized with strength={}", bcryptStrength);
+        }
         return new BCryptPasswordEncoder(bcryptStrength);
     }
 
@@ -97,19 +103,6 @@ public class SecurityConfig {
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
         return source;
-    }
-
-    /**
-     * 记录管理员操作审计日志
-     */
-    private void logAdminOperation(String action, HttpServletRequest request) {
-        Long userId = SecurityUtils.getCurrentUserIdOrNull();
-        String clientIp = LogUtils.getClientIp(request);
-        String uri = request.getRequestURI();
-        String method = request.getMethod();
-        LogUtils.logSecurityEvent("ADMIN_OPERATION",
-                "action=" + action + ", uri=" + uri + ", method=" + method + ", userId=" + (userId != null ? userId : "anonymous"),
-                clientIp);
     }
 
     @Bean

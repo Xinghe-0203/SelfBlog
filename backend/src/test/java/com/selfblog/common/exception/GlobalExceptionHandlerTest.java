@@ -10,6 +10,7 @@ import jakarta.validation.constraints.Size;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.apache.tomcat.util.http.fileupload.impl.FileCountLimitExceededException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -18,6 +19,7 @@ import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -27,8 +29,12 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.validation.beanvalidation.MethodValidationPostProcessor;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.MultipartException;
 import org.springframework.web.servlet.NoHandlerFoundException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
+import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
@@ -118,6 +124,31 @@ public class GlobalExceptionHandlerTest {
         @GetMapping("/test/notfound/{id}")
         public Result<String> testNotFound(@PathVariable Long id) throws NoHandlerFoundException {
             throw new NoHandlerFoundException("GET", "/test/notfound/" + id, null);
+        }
+
+        // 静态资源不存在测试（Spring Boot 3.2+ 由 NoResourceFoundException 取代 NoHandlerFoundException）
+        @GetMapping("/test/resource/notfound")
+        public Result<String> testResourceNotFound() throws NoResourceFoundException {
+            throw new NoResourceFoundException(HttpMethod.GET, "/favicon.ico");
+        }
+
+        // multipart 解析异常测试 - 单次上传文件数量超限
+        @PostMapping("/test/multipart/filecount")
+        public Result<String> testMultipartFileCount() {
+            throw new MultipartException("Failed to parse multipart servlet request",
+                    new FileCountLimitExceededException("attachment", 10));
+        }
+
+        // multipart 解析异常测试 - 其他解析失败（无文件数量超限 cause）
+        @PostMapping("/test/multipart/generic")
+        public Result<String> testMultipartGeneric() {
+            throw new MultipartException("Failed to parse multipart servlet request");
+        }
+
+        // 文件大小超限测试（MaxUploadSizeExceededException 是 MultipartException 的子类）
+        @PostMapping("/test/multipart/maxsize")
+        public Result<String> testMaxUploadSize() {
+            throw new MaxUploadSizeExceededException(52428800L);
         }
 
         // 权限不足测试
@@ -311,6 +342,44 @@ public class GlobalExceptionHandlerTest {
                 .andExpect(status().is(404))
                 .andExpect(jsonPath("$.code").value(404))
                 .andExpect(jsonPath("$.message").value("资源不存在"));
+    }
+
+    @Test
+    @DisplayName("处理静态资源不存在 - NoResourceFoundException 返回404而非500")
+    void testHandleNoResourceFound() throws Exception {
+        mockMvc.perform(get("/test/resource/notfound"))
+                .andExpect(status().is(404))
+                .andExpect(jsonPath("$.code").value(404))
+                .andExpect(jsonPath("$.message").value("资源不存在"));
+    }
+
+    // ==================== multipart 上传异常测试 ====================
+
+    @Test
+    @DisplayName("处理multipart异常 - 单次上传文件数量超限返回400且提示文件数量")
+    void testHandleMultipartException_FileCountLimit() throws Exception {
+        mockMvc.perform(post("/test/multipart/filecount"))
+                .andExpect(status().is(400))
+                .andExpect(jsonPath("$.code").value(400))
+                .andExpect(jsonPath("$.message").value(containsString("单次上传文件数量超过上限")));
+    }
+
+    @Test
+    @DisplayName("处理multipart异常 - 通用解析失败返回400")
+    void testHandleMultipartException_Generic() throws Exception {
+        mockMvc.perform(post("/test/multipart/generic"))
+                .andExpect(status().is(400))
+                .andExpect(jsonPath("$.code").value(400))
+                .andExpect(jsonPath("$.message").value("上传请求解析失败，请检查上传内容后重试"));
+    }
+
+    @Test
+    @DisplayName("处理multipart异常 - MaxUploadSizeExceededException 仍走自身400文案，不被通用Multipart文案覆盖")
+    void testHandleMaxUploadSizeExceededException_NotSwallowedByMultipartHandler() throws Exception {
+        mockMvc.perform(post("/test/multipart/maxsize"))
+                .andExpect(status().is(400))
+                .andExpect(jsonPath("$.code").value(400))
+                .andExpect(jsonPath("$.message").value("上传文件大小超出限制"));
     }
 
     // ==================== 安全异常测试 ====================

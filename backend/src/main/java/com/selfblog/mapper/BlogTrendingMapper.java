@@ -56,6 +56,15 @@ public interface BlogTrendingMapper extends BaseMapper<BlogTrending> {
     void upsert(@Param("trending") BlogTrending trending);
 
     /**
+     * 批量插入或更新趋势记录，语义与 {@link #upsert} 完全一致：
+     * 同一篇文章同一天只有一行，命中唯一键时把 {@code is_deleted} 复位为 0。
+     *
+     * <p>用于每日定时任务，把「循环内逐条 IO」收敛成一次往返。
+     * @param trendings 趋势记录列表（调用方负责控制单批大小）
+     */
+    void upsertBatch(@Param("trendings") List<BlogTrending> trendings);
+
+    /**
      * 获取所有文章的最新趋势数据
      * @return 所有趋势记录
      */

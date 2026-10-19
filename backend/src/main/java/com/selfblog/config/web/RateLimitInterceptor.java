@@ -2,6 +2,7 @@ package com.selfblog.config.web;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import com.selfblog.utils.LogUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -34,7 +35,9 @@ public class RateLimitInterceptor implements HandlerInterceptor {
                              Object handler) throws Exception {
         // 与 MVC 查找路径保持一致：解码 URI、去掉应用上下文，编码同一路径不能绕过计数。
         String path = UrlPathHelper.defaultInstance.getLookupPathForRequest(request);
-        String ip = getClientIp(request);
+        // 与审计日志同源：两处必须给出同一个 clientIp，否则伪造 X-Forwarded-For 就能
+        // 让审计记录的 IP 与限流计数归属的 IP 不一致。实现只在 LogUtils 里保留一份。
+        String ip = LogUtils.getClientIp(request);
 
         // 使用配置的限流阈值
         Map<String, Integer> allLimits = rateLimitProperties.getAllLimits();
@@ -62,6 +65,12 @@ public class RateLimitInterceptor implements HandlerInterceptor {
         int current = count.incrementAndGet();
 
         if (current > maxRequests) {
+            // 限流命中此前完全无日志：生产 8 小时内 429 在 request.log / audit.log 里
+            // 都看不到。这里写 WARN 到 LogUtils 的审计通道（audit.log）。
+            LogUtils.logSecurityEvent("RATE_LIMIT_EXCEEDED",
+                    "path=" + path + ", method=" + request.getMethod()
+                            + ", limit=" + maxRequests + "/min, count=" + current,
+                    ip);
             response.setStatus(429);
             response.setContentType("application/json;charset=UTF-8");
             response.getWriter().write("{\"code\":429,\"message\":\"Too many requests, please try again later\"}");
@@ -70,48 +79,4 @@ public class RateLimitInterceptor implements HandlerInterceptor {
         return true;
     }
 
-    private String getClientIp(HttpServletRequest request) {
-        String remoteAddr = request.getRemoteAddr();
-        String xForwardedFor = request.getHeader("X-Forwarded-For");
-        String xRealIp = request.getHeader("X-Real-IP");
-
-        if (xForwardedFor != null && !xForwardedFor.isEmpty()) {
-            String firstIp = xForwardedFor.split(",")[0].trim();
-            if (isTrustedProxy(remoteAddr)) {
-                return firstIp;
-            }
-        }
-
-        if (xRealIp != null && !xRealIp.isEmpty()) {
-            if (isTrustedProxy(remoteAddr)) {
-                return xRealIp;
-            }
-        }
-
-        return remoteAddr;
-    }
-
-    private boolean isTrustedProxy(String addr) {
-        if (addr == null) {
-            return false;
-        }
-        if (addr.startsWith("10.")) {
-            return true;
-        }
-        if (addr.startsWith("192.168.")) {
-            return true;
-        }
-        if (addr.equals("127.0.0.1") || addr.equals("0:0:0:0:0:0:0:1") || addr.equals("::1")) {
-            return true;
-        }
-        if (addr.startsWith("172.")) {
-            try {
-                int secondOctet = Integer.parseInt(addr.split("\\.")[1]);
-                return secondOctet >= 16 && secondOctet <= 31;
-            } catch (Exception e) {
-                return false;
-            }
-        }
-        return false;
-    }
 }

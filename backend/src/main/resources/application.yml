@@ -47,6 +47,12 @@ spring:
       # 50MB = 52428800 字节，100MB = 104857600 字节
       max-file-size: ${UPLOAD_MAX_FILE_SIZE:52428800}
       max-request-size: ${UPLOAD_MAX_REQUEST_SIZE:104857600}
+      # 【重要】单次请求的「部件（文件）数量」上限，与 server.tomcat.max-part-count 保持一致。
+      # 只配字节上限时，一次批量上传超过 Tomcat 默认 10 个部件就会抛
+      # FileCountLimitExceededException（被全局异常处理器记为 400「单次上传文件数量超过上限」）。
+      # 这里把契约显式化：作者批量上传相册时请按该值拆分批次。
+      # 注意：MultipartProperties 本身没有 part-count 属性，真正的开关是
+      # server.tomcat.max-part-count（见下方 server 段）。
 
   # ==================== 邮件配置 ====================
   mail:
@@ -92,25 +98,36 @@ mybatis-plus:
 # ==================== 服务器配置 ====================
 server:
   port: ${SERVER_PORT:8825}  # 应用启动端口号（可通过环境变量配置）
+  tomcat:
+    # 【重要】单次 multipart 请求允许的最大部件（文件）数量，默认 20。
+    # 不显式配置时沿用 Tomcat 默认 10；作者批量上传相册极易超过，
+    # 触发 FileCountLimitExceededException → 400「单次上传文件数量超过上限」。
+    # 该值必须与前端批量上传的批次大小、以及 GlobalExceptionHandler 的文案一致。
+    max-part-count: ${UPLOAD_MAX_PART_COUNT:20}
   compression:
     enabled: true
     mime-types: application/json,application/xml,text/html,text/css,text/javascript,application/javascript
     min-response-size: 1024
 
 # ==================== Knife4j (Swagger) API 文档配置 ====================
+# 【重要】默认关闭（默认值 false）。生产事故根因之一就是「忘记设 profile」：
+# 过去默认 true，未激活任何 profile 时 Swagger/Knife4j 直接对公网开放。
+# 现在改为「显式开启」：本地开发在 .env 里设 SWAGGER_ENABLED=true，
+# 或激活 dev profile（application-dev.yml 会打开）；prod profile 保持关闭。
+# 环境变量 SWAGGER_ENABLED 仍然可以覆盖该默认值。
 springdoc:
   api-docs:
-    enabled: ${SWAGGER_ENABLED:true}               # 开启 API 文档
+    enabled: ${SWAGGER_ENABLED:false}              # 开启 API 文档（默认关闭）
     path: /v3/api-docs          # API 文档路径
   swagger-ui:
-    enabled: ${SWAGGER_ENABLED:true}               # 开启 Swagger UI
+    enabled: ${SWAGGER_ENABLED:false}              # 开启 Swagger UI（默认关闭）
     path: /swagger-ui.html      # Swagger UI 访问路径
     url: /api/v3/api-docs
     config-url: /api/v3/api-docs/swagger-config
 
-# Knife4j 增强配置
+# Knife4j 增强配置（与 springdoc 同步，默认关闭）
 knife4j:
-  enable: true                   # 开启 Knife4j
+  enable: ${SWAGGER_ENABLED:false}  # 开启 Knife4j（默认关闭）
   setting:
     language: zh_CN              # 中文界面
 

@@ -5,6 +5,15 @@
 # 构建上下文必须是仓库根目录（backend 与 frontend 是同级目录）：
 #   docker build -f backend/Dockerfile -t selfblog .
 # 或使用 backend/docker-compose*.yml（已配置 context: ..）。
+#
+# 【端口 / profile 契约】（2026-10-18 修复配置漂移）
+#   - 监听端口由 SERVER_PORT 决定，默认 8825（application.yml: server.port: ${SERVER_PORT:8825}）。
+#   - 镜像 ENV SERVER_PORT=8825，EXPOSE 8825，compose 也声明 8825。
+#   - HEALTHCHECK 不再硬编码端口：用 CMD-SHELL + ${SERVER_PORT:-8825}，
+#     这样即使运行时用 -e SERVER_PORT=xxxx 覆盖，探针也会打同一个端口。
+#   - 生产必须以 prod profile 运行（compose 已设 SPRING_PROFILES_ACTIVE=prod）。
+#     未激活 profile 会回落到 "default"，使 application-prod.yml 全部失效
+#     （Swagger 对公网开放、management 暴露面不收窄、日志分流失效）。
 # ============================================
 
 # ============================================
@@ -54,8 +63,11 @@ EXPOSE 8825
 
 # 数据库就绪由 Compose 的 depends_on: condition: service_healthy 负责，
 # 应用自身仍会在启动时校验 JWT_SECRET / ADMIN_PASSWORD / 数据库配置。
+#
+# 探针端口必须与 SERVER_PORT 一致：这里用 shell 形式读 ${SERVER_PORT:-8825}，
+# 避免「应用实际监听 8888、探针打 8825」导致容器被判不健康并反复重启。
 HEALTHCHECK --interval=10s --timeout=5s --start-period=60s --retries=3 \
-    CMD curl -f http://localhost:8825/actuator/health || exit 1
+    CMD-SHELL curl -f "http://localhost:${SERVER_PORT:-8825}/actuator/health" || exit 1
 
 USER appuser
 

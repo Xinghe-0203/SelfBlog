@@ -26,11 +26,14 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataAccessException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.util.Objects;
+import java.util.function.Supplier;
 
 /**
  * 用户服务实现类
@@ -50,6 +53,36 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
 
     @Autowired
     private HtmlSanitizer htmlSanitizer;
+
+    /**
+     * 事务管理器：login 需要把 BCrypt 校验放到事务之外，因此显式拆成多个短事务。
+     * required=false 是为了兼容手工 new 出来的实例（单元测试），此时 inTransaction 退化为直接执行。
+     */
+    @Autowired(required = false)
+    private PlatformTransactionManager transactionManager;
+
+    private volatile TransactionTemplate transactionTemplate;
+
+    /**
+     * 在独立短事务中执行一段数据库操作，返回前连接已归还连接池。
+     *
+     * <p><b>注意：</b>异常必须在事务块之外抛出。若在块内抛出 RuntimeException，
+     * 该短事务会回滚，写入（例如登录失败计数）将不会被持久化。</p>
+     *
+     * @param action 需要在事务中执行的数据库操作
+     * @return 操作结果
+     */
+    private <T> T inTransaction(Supplier<T> action) {
+        if (transactionManager == null) {
+            return action.get();
+        }
+        TransactionTemplate template = this.transactionTemplate;
+        if (template == null) {
+            template = new TransactionTemplate(transactionManager);
+            this.transactionTemplate = template;
+        }
+        return template.execute(status -> action.get());
+    }
 
     /**
      * 校验密码复杂度
@@ -150,8 +183,24 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
         log.info("邮箱验证注册成功: username={}, userId={}, email={}", user.getUsername(), user.getId(), StringMaskUtils.maskEmail(request.getEmail()));
     }
 
+    /**
+     * 账号脱敏：邮箱走 {@link StringMaskUtils#maskEmail}，用户名只保留首尾字符。
+     * 审计日志不能出现明文账号（尤其是邮箱/手机号形式的登录名）。
+     */
+    private static String maskAccount(String account) {
+        if (account == null || account.isEmpty()) {
+            return account;
+        }
+        if (account.contains("@")) {
+            return StringMaskUtils.maskEmail(account);
+        }
+        if (account.length() <= 2) {
+            return account.charAt(0) + "***";
+        }
+        return account.charAt(0) + "***" + account.charAt(account.length() - 1);
+    }
+
     @Override
-    @Transactional(rollbackFor = Exception.class)
     public UserLoginResponse login(UserLoginRequest request) {
         // 参数校验：支持用户名或邮箱登录
         String loginAccount = request.getUsername();
@@ -167,91 +216,112 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
         }
 
         loginAccount = loginAccount.trim();
+        final String account = loginAccount;
+        final boolean emailLogin = isEmailLogin;
 
-        // 查询用户：优先按用户名查询，如果失败且输入是邮箱格式则按邮箱查询
-        LambdaQueryWrapper<SysUser> wrapper = new LambdaQueryWrapper<>();
-        SysUser user = null;
+        // 查询用户：优先按用户名查询，如果失败且输入是邮箱格式则按邮箱查询。
+        // 短事务 1：只读查询，出块即归还数据库连接，不把连接占在密码校验期间。
+        SysUser user = inTransaction(() -> {
+            LambdaQueryWrapper<SysUser> wrapper = new LambdaQueryWrapper<>();
+            if (emailLogin || account.contains("@")) {
+                // 邮箱登录
+                wrapper.eq(SysUser::getEmail, account);
+            } else {
+                // 用户名登录
+                wrapper.eq(SysUser::getUsername, account);
+            }
+            return this.getOne(wrapper);
+        });
 
-        if (isEmailLogin || loginAccount.contains("@")) {
-            // 邮箱登录
-            wrapper.eq(SysUser::getEmail, loginAccount);
-            user = this.getOne(wrapper);
-            if (user == null) {
-                log.warn("用户登录失败: email={}, 原因=邮箱或密码错误", StringMaskUtils.maskEmail(loginAccount));
-                throw new BusinessException(401, "用户名/邮箱或密码错误");
+        if (user == null) {
+            if (emailLogin || account.contains("@")) {
+                log.warn("用户登录失败: email={}, 原因=邮箱或密码错误", StringMaskUtils.maskEmail(account));
+            } else {
+                log.warn("用户登录失败: username={}, 原因=用户名或密码错误", account);
             }
-        } else {
-            // 用户名登录
-            wrapper.eq(SysUser::getUsername, loginAccount);
-            user = this.getOne(wrapper);
-            if (user == null) {
-                log.warn("用户登录失败: username={}, 原因=用户名或密码错误", loginAccount);
-                throw new BusinessException(401, "用户名/邮箱或密码错误");
-            }
+            LogUtils.logLogin(maskAccount(account), false,
+                    LogUtils.getClientIpFromCurrentRequest(), "account_not_found");
+            throw new BusinessException(401, "用户名/邮箱或密码错误");
         }
+        final SysUser verifiedUser = user;
 
         // 检查账户是否被锁定
-        if (user.getLockUntil() != null && user.getLockUntil().isAfter(LocalDateTime.now())) {
-            long minutesLeft = java.time.Duration.between(LocalDateTime.now(), user.getLockUntil()).toMinutes() + 1;
+        if (verifiedUser.getLockUntil() != null && verifiedUser.getLockUntil().isAfter(LocalDateTime.now())) {
+            long minutesLeft = java.time.Duration.between(LocalDateTime.now(), verifiedUser.getLockUntil()).toMinutes() + 1;
+            LogUtils.logLogin(maskAccount(account), false,
+                    LogUtils.getClientIpFromCurrentRequest(), "account_locked");
             throw new BusinessException(403, "登录失败次数过多，请" + minutesLeft + "分钟后再试");
         }
 
         // 检查账号状态（先于密码验证）
-        if (user.getStatus() == UserStatus.DISABLED.getValue()) {
+        if (verifiedUser.getStatus() == UserStatus.DISABLED.getValue()) {
+            LogUtils.logLogin(maskAccount(account), false,
+                    LogUtils.getClientIpFromCurrentRequest(), "account_disabled");
             throw new BusinessException(403, "账号已被禁用");
         }
 
-        // 验证密码
-        if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
-            String accountLabel = isEmailLogin ? "邮箱" : "用户名";
-            log.warn("用户登录失败: account={}, 原因={}或密码错误", loginAccount, accountLabel);
-            // 密码错误，使用原子操作增加失败计数
-            int affected = handleLoginFailAtomic(user.getId());
+        // 验证密码。BCrypt 是 CPU 密集型慢哈希（cost=12 时单次约 0.4-0.5s），
+        // 必须在事务之外执行：否则整个校验期间会独占数据库连接（SQLite 池大小 1 时阻塞全站）。
+        if (!passwordEncoder.matches(request.getPassword(), verifiedUser.getPassword())) {
+            String accountLabel = emailLogin ? "邮箱" : "用户名";
+            log.warn("用户登录失败: account={}, 原因={}或密码错误", account, accountLabel);
+            LogUtils.logLogin(maskAccount(account), false,
+                    LogUtils.getClientIpFromCurrentRequest(), "bad_credentials");
+            // 密码错误，使用原子操作增加失败计数。
+            // 短事务 2：计数必须提交；BusinessException 一律在事务块之外抛出，否则会被回滚。
+            int affected = inTransaction(() -> handleLoginFailAtomic(verifiedUser.getId()));
             if (affected == 0) {
                 // 更新行数为0，说明账号已被锁定（SQL中的WHERE条件不满足）
                 throw new BusinessException(403, "登录失败次数过多，请稍后再试");
             }
-            // 重新查询获取最新锁定状态
-            SysUser updatedUser = this.getById(user.getId());
+            // 重新查询获取最新锁定状态（独立短事务，读到的是已提交的计数与锁定时间）
+            SysUser updatedUser = inTransaction(() -> this.getById(verifiedUser.getId()));
             if (updatedUser.getLockUntil() != null && updatedUser.getLockUntil().isAfter(LocalDateTime.now())) {
                 long minutesLeft = java.time.Duration.between(LocalDateTime.now(), updatedUser.getLockUntil()).toMinutes() + 1;
-                log.warn("用户登录失败: account={}, 原因=账号已被锁定至{}", loginAccount, updatedUser.getLockUntil());
+                log.warn("用户登录失败: account={}, 原因=账号已被锁定至{}", account, updatedUser.getLockUntil());
                 throw new BusinessException(403, "登录失败次数过多，请" + minutesLeft + "分钟后再试");
             }
             throw new BusinessException(401, "用户名/邮箱或密码错误");
         }
 
-        if (!"admin".equalsIgnoreCase(user.getRole())) {
+        if (!"admin".equalsIgnoreCase(verifiedUser.getRole())) {
+            LogUtils.logLogin(maskAccount(account), false,
+                    LogUtils.getClientIpFromCurrentRequest(), "not_admin");
             throw new BusinessException(403, "此博客仅开放作者后台登录");
         }
 
-        // 登录成功，重置失败计数和锁定
-        if (user.getLoginFailCount() == null || user.getLoginFailCount() > 0) {
-            this.update(new LambdaUpdateWrapper<SysUser>()
-                    .eq(SysUser::getId, user.getId())
-                    .set(SysUser::getLoginFailCount, 0)
-                    .set(SysUser::getLockUntil, null));
+        // 登录成功，重置失败计数和锁定（短事务 3）
+        if (verifiedUser.getLoginFailCount() == null || verifiedUser.getLoginFailCount() > 0) {
+            inTransaction(() -> {
+                this.update(new LambdaUpdateWrapper<SysUser>()
+                        .eq(SysUser::getId, verifiedUser.getId())
+                        .set(SysUser::getLoginFailCount, 0)
+                        .set(SysUser::getLockUntil, null));
+                return null;
+            });
         }
 
         // 令牌对绑定实际通过密码验证的快照，并发改密时不能升级旧凭据。
-        String credentialVersion = jwtUtils.credentialVersionFor(user);
-        String token = jwtUtils.generateToken(user.getId(), user.getUsername(), user.getRole(), credentialVersion);
-        String refreshToken = jwtUtils.generateRefreshToken(user.getId(), user.getUsername(), user.getRole(), credentialVersion);
+        String credentialVersion = jwtUtils.credentialVersionFor(verifiedUser);
+        String token = jwtUtils.generateToken(verifiedUser.getId(), verifiedUser.getUsername(), verifiedUser.getRole(), credentialVersion);
+        String refreshToken = jwtUtils.generateRefreshToken(verifiedUser.getId(), verifiedUser.getUsername(), verifiedUser.getRole(), credentialVersion);
 
         // 注册设备Token
-        jwtUtils.registerDeviceToken(user.getId(), token);
+        jwtUtils.registerDeviceToken(verifiedUser.getId(), token);
 
-        log.info("用户登录成功: username={}, userId={}, email={}", user.getUsername(), user.getId(),
-                user.getEmail() != null ? StringMaskUtils.maskEmail(user.getEmail()) : "未设置");
+        log.info("用户登录成功: username={}, userId={}, email={}", verifiedUser.getUsername(), verifiedUser.getId(),
+                verifiedUser.getEmail() != null ? StringMaskUtils.maskEmail(verifiedUser.getEmail()) : "未设置");
+        LogUtils.logLogin(maskAccount(verifiedUser.getUsername()), true,
+                LogUtils.getClientIpFromCurrentRequest(), null);
         return new UserLoginResponse(
-                user.getId(),
-                user.getUsername(),
-                user.getNickname(),
-                user.getAvatar(),
-                user.getEmail(),
+                verifiedUser.getId(),
+                verifiedUser.getUsername(),
+                verifiedUser.getNickname(),
+                verifiedUser.getAvatar(),
+                verifiedUser.getEmail(),
                 token,
                 refreshToken,
-                user.getRole()
+                verifiedUser.getRole()
         );
     }
 
@@ -273,7 +343,6 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
     }
 
     @Override
-    @Transactional(rollbackFor = Exception.class)
     public void changePassword(Long userId, String oldPassword, String newPassword) {
         // 参数校验
         if (userId == null) {
@@ -289,29 +358,40 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
             throw new BusinessException(400, "新密码长度至少为8位");
         }
 
-        // 获取用户
-        SysUser user = this.getById(userId);
+        // 短只读事务：取出用户与 CAS 用的旧哈希快照，出块即归还数据库连接。
+        SysUser user = inTransaction(() -> this.getById(userId));
         if (user == null) {
             throw new BusinessException(404, "用户不存在");
         }
+        final String currentHash = user.getPassword();
 
-        // 验证旧密码
-        if (!passwordEncoder.matches(oldPassword, user.getPassword())) {
+        // 验证旧密码。BCrypt 是 CPU 密集型慢哈希（cost=12 单次约 0.4-0.5s），必须在事务之外执行，
+        // 否则整个校验期间会独占数据库连接（生产池较小时阻塞全站其它请求）。
+        if (!passwordEncoder.matches(oldPassword, currentHash)) {
             log.warn("用户修改密码失败: userId={}, 原因=旧密码错误", userId);
             throw new BusinessException(400, "旧密码不正确");
         }
 
-        // 新密码复杂度校验
+        // 新密码复杂度校验（顺序与异常不变）
         validatePasswordStrength(newPassword);
 
-        // 更新密码
-        if (baseMapper.updatePasswordIfUnchanged(user.getId(), user.getPassword(),
-                passwordEncoder.encode(newPassword)) != 1) {
-            throw new BusinessException(409, "密码已发生变化，请重新登录后重试");
-        }
+        // 新哈希同样在事务之外计算（encode 与 matches 同为慢哈希）。
+        String newHash = passwordEncoder.encode(newPassword);
 
-        // 密码修改后使当前用户所有 Token 失效
-        jwtUtils.revokeAllUserTokens(userId);
+        // 短写事务：CAS 条件更新 + 撤销令牌。
+        // 注意：旧哈希的读取与条件更新现在分处两个事务，并发防覆盖仍由 SQL 的
+        // `WHERE id = ? AND password = <读到的旧哈希>` 保证 —— 该条件更新是唯一的防覆盖手段，
+        // 拆分事务并未削弱它（原实现也只在默认隔离级别下读后写，没有 SELECT FOR UPDATE）。
+        // BusinessException 在块内抛出会回滚本短事务并向上传播，语义与原先一致。
+        inTransaction(() -> {
+            if (baseMapper.updatePasswordIfUnchanged(userId, currentHash, newHash) != 1) {
+                throw new BusinessException(409, "密码已发生变化，请重新登录后重试");
+            }
+            // 密码修改后使当前用户所有 Token 失效（必须在密码更新成功之后）
+            jwtUtils.revokeAllUserTokens(userId);
+            return null;
+        });
+
         log.info("用户修改密码成功: userId={}", userId);
     }
 
@@ -546,19 +626,26 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
     }
 
     @Override
-    @Transactional(rollbackFor = Exception.class)
     public String resetPassword(Long userId) {
-        SysUser user = this.getById(userId);
+        // 短只读事务：取用户与 CAS 用的旧哈希快照，出块即归还连接。
+        SysUser user = inTransaction(() -> this.getById(userId));
         if (user == null) {
             throw new BusinessException(404, "用户不存在");
         }
+        final String currentHash = user.getPassword();
 
+        // 随机密码与 BCrypt 编码都在事务之外完成（encode 是慢哈希）。
         String newPassword = generateRandomPassword(12);
-        if (baseMapper.updatePasswordIfUnchanged(user.getId(), user.getPassword(),
-                passwordEncoder.encode(newPassword)) != 1) {
-            throw new BusinessException(409, "密码已发生变化，请重新登录后重试");
-        }
-        jwtUtils.revokeAllUserTokens(userId);
+        String newHash = passwordEncoder.encode(newPassword);
+
+        // 短写事务：CAS 条件更新 + 撤销令牌；防覆盖仍由条件更新保证。
+        inTransaction(() -> {
+            if (baseMapper.updatePasswordIfUnchanged(userId, currentHash, newHash) != 1) {
+                throw new BusinessException(409, "密码已发生变化，请重新登录后重试");
+            }
+            jwtUtils.revokeAllUserTokens(userId);
+            return null;
+        });
 
         log.info("管理员重置用户密码: adminId={}, targetUserId={}, targetUsername={}",
                 SecurityUtils.getCurrentUserId(), userId, user.getUsername());
@@ -596,7 +683,6 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
     }
 
     @Override
-    @Transactional(rollbackFor = Exception.class)
     public void resetPassword(String email, String newPassword) {
         // 参数校验
         if (email == null || email.trim().isEmpty()) {
@@ -606,21 +692,33 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
             throw new BusinessException(400, "新密码不能为空");
         }
 
-        // 密码复杂度校验
+        // 密码复杂度校验（顺序与异常不变，仍在查用户之前）
         validatePasswordStrength(newPassword);
 
-        // 查找用户
-        SysUser user = getUserByEmail(email);
+        // 短只读事务：按邮箱取用户与 CAS 用的旧哈希快照。
+        SysUser user = inTransaction(() -> {
+            LambdaQueryWrapper<SysUser> wrapper = new LambdaQueryWrapper<>();
+            wrapper.eq(SysUser::getEmail, email.trim());
+            return this.getOne(wrapper);
+        });
         if (user == null) {
             throw new BusinessException(404, "用户不存在");
         }
+        final String currentHash = user.getPassword();
+        final Long userId = user.getId();
 
-        // 更新密码
-        if (baseMapper.updatePasswordIfUnchanged(user.getId(), user.getPassword(),
-                passwordEncoder.encode(newPassword)) != 1) {
-            throw new BusinessException(409, "密码已发生变化，请重新登录后重试");
-        }
-        jwtUtils.revokeAllUserTokens(user.getId());
-        log.info("用户密码重置成功: userId={}, email={}", user.getId(), StringMaskUtils.maskEmail(email));
+        // BCrypt 编码在事务之外完成。
+        String newHash = passwordEncoder.encode(newPassword);
+
+        // 短写事务：CAS 条件更新 + 撤销令牌；防覆盖仍由条件更新保证。
+        inTransaction(() -> {
+            if (baseMapper.updatePasswordIfUnchanged(userId, currentHash, newHash) != 1) {
+                throw new BusinessException(409, "密码已发生变化，请重新登录后重试");
+            }
+            jwtUtils.revokeAllUserTokens(userId);
+            return null;
+        });
+
+        log.info("用户密码重置成功: userId={}, email={}", userId, StringMaskUtils.maskEmail(email));
     }
 }

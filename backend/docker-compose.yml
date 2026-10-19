@@ -89,12 +89,16 @@ services:
       JWT_EXPIRATION: ${JWT_EXPIRATION:-86400000}
       JWT_REFRESH_EXPIRATION: ${JWT_REFRESH_EXPIRATION:-604800000}
       # 服务配置
+      # 【契约】监听端口必须与 Dockerfile HEALTHCHECK / ports 映射一致；
+      # 健康检查用 $${SERVER_PORT:-8825} 读取同一个值，改这里不用改探针。
       SERVER_PORT: 8825
       # 站点对外地址（RSS/Atom/sitemap/canonical 的绝对链接）。
       # 未设置时按请求 Host 推导；放在反向代理后请显式设置。
       # SITE_BASE_URL: https://blog.example.com
       # CORS 配置（生产环境请修改为具体域名）
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:8825}
+      # 【必须】生产必须以 prod profile 运行。缺失会回落到 default，
+      # 使 application-prod.yml 失效（Swagger 开放、management 暴露面不收窄）。
       SPRING_PROFILES_ACTIVE: prod
     ports:
       - "127.0.0.1:8825:8825"
@@ -105,8 +109,9 @@ services:
     networks:
       - selfblog-network
     healthcheck:
-      # curl 已由运行镜像安装，健康检查与镜像内容一致
-      test: ["CMD", "curl", "-f", "http://localhost:8825/actuator/health"]
+      # curl 已由运行镜像安装，健康检查与镜像内容一致。
+      # $$ 转义为容器内 shell 的变量展开：探针端口跟随 SERVER_PORT，不再硬编码。
+      test: ["CMD-SHELL", "curl -f http://localhost:$${SERVER_PORT:-8825}/actuator/health || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 3

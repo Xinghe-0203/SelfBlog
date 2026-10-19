@@ -9,6 +9,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.catalina.connector.ClientAbortException;
+import org.apache.tomcat.util.http.fileupload.impl.FileCountLimitExceededException;
 import org.springframework.beans.TypeMismatchException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.DuplicateKeyException;
@@ -26,8 +27,10 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.MultipartException;
 import org.springframework.web.multipart.support.MissingServletRequestPartException;
 import org.springframework.web.servlet.NoHandlerFoundException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.io.IOException;
 
@@ -103,6 +106,16 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(NoHandlerFoundException.class)
     public ResponseEntity<Result<Void>> handleNoHandlerFoundException(NoHandlerFoundException e) {
         log.warn("[EXCEPTION] NotFound: {}", e.getRequestURL());
+        return ResponseEntity.status(404).body(Result.error(404, "资源不存在"));
+    }
+
+    /**
+     * 处理静态资源不存在异常（Spring Boot 3.2+ 静态资源缺失抛出的异常）
+     * 典型场景：GET /favicon.ico、robots.txt 等缺失资源；属于客户端错误，用 warn 记录、不打堆栈
+     */
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<Result<Void>> handleNoResourceFoundException(NoResourceFoundException e) {
+        log.warn("[EXCEPTION] ResourceNotFound: {} {}", e.getHttpMethod(), e.getResourcePath());
         return ResponseEntity.status(404).body(Result.error(404, "资源不存在"));
     }
 
@@ -220,6 +233,23 @@ public class GlobalExceptionHandler {
     public ResponseEntity<Result<Void>> handleMaxUploadSizeExceededException(MaxUploadSizeExceededException e) {
         log.warn("[EXCEPTION] UploadSizeExceeded: {}", e.getMessage());
         return ResponseEntity.status(400).body(Result.error(400, "上传文件大小超出限制"));
+    }
+
+    /**
+     * 处理 multipart 解析异常（请求体不是合法 multipart、请求被截断、单次文件数量超限等）
+     * 说明：MaxUploadSizeExceededException 是本异常的子类，Spring 会优先选择更具体的处理器，
+     *      因此文件大小超限仍走上面的 400 语义，不会被这里的通用文案覆盖。
+     *      Tomcat 的 FileCountLimitExceededException 会被包装成 MultipartException，
+     *      故单独识别并给出「减少单次上传文件数量」的可操作提示；属于客户端错误，用 warn 记录、不打堆栈
+     */
+    @ExceptionHandler(MultipartException.class)
+    public ResponseEntity<Result<Void>> handleMultipartException(MultipartException e) {
+        String message = "上传请求解析失败，请检查上传内容后重试";
+        if (e.contains(FileCountLimitExceededException.class)) {
+            message = "单次上传文件数量超过上限，请减少文件数量后分批上传";
+        }
+        log.warn("[EXCEPTION] Multipart: {}", message);
+        return ResponseEntity.status(400).body(Result.error(400, message));
     }
 
     /**

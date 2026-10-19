@@ -86,6 +86,10 @@
     <!-- ==================== 性能日志 Appender ==================== -->
     <appender name="PERFORMANCE" class="ch.qos.logback.core.rolling.RollingFileAppender">
         <file>${LOG_PATH}/performance.log</file>
+        <!-- 只收 INFO 及以上：DEBUG 档（<1000ms）的性能事件不应落盘，避免噪声 -->
+        <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
+            <level>INFO</level>
+        </filter>
         <encoder>
             <pattern>${FILE_LOG_PATTERN}</pattern>
             <charset>UTF-8</charset>
@@ -204,6 +208,12 @@
             <appender-ref ref="CONSOLE"/>
             <appender-ref ref="ASYNC_PERFORMANCE"/>
         </logger>
+        <!-- [PERFORMANCE] 专用 logger：与 prod/default 段对齐，让性能日志进 performance.log。
+             level=INFO（不是 DEBUG）：DEBUG 档是 <1000ms 的正常请求，若放开会让 performance.log 变成噪声。 -->
+        <logger name="com.selfblog.performance" level="INFO" additivity="false">
+            <appender-ref ref="CONSOLE"/>
+            <appender-ref ref="ASYNC_PERFORMANCE"/>
+        </logger>
         <!-- MyBatis SQL日志 -->
         <logger name="com.selfblog.mapper" level="DEBUG" additivity="false">
             <appender-ref ref="CONSOLE"/>
@@ -252,6 +262,10 @@
         <logger name="com.selfblog.aspect.PerformanceMonitoringAspect" level="INFO" additivity="false">
             <appender-ref ref="ASYNC_PERFORMANCE"/>
         </logger>
+        <!-- [PERFORMANCE] 专用 logger：让性能日志进 performance.log，不再混入 audit.log -->
+        <logger name="com.selfblog.performance" level="INFO" additivity="false">
+            <appender-ref ref="ASYNC_PERFORMANCE"/>
+        </logger>
         <!-- MyBatis SQL日志 -->
         <logger name="com.selfblog.mapper" level="WARN" additivity="false">
             <appender-ref ref="ASYNC_FILE"/>
@@ -282,6 +296,12 @@
     </springProfile>
 
     <!-- ==================== 默认配置（未指定 profile 时）==================== -->
+    <!--
+      【重要】默认段必须与 prod 段保持同等分流。生产事故根因之一就是容器未激活
+      profile 而回落到 default：请求/性能/审计日志同时写 stdout 与文件、MyBatis SQL
+      appender 被绑定、RateLimitInterceptor 没有 logger 绑定。
+      这里已与 prod 对齐：stdout 只保留 root/启动日志，业务日志各归各的文件。
+    -->
     <springProfile name="default">
         <root level="INFO">
             <appender-ref ref="CONSOLE"/>
@@ -290,38 +310,40 @@
         </root>
         <!-- 项目日志 -->
         <logger name="com.selfblog" level="INFO" additivity="false">
-            <appender-ref ref="CONSOLE"/>
             <appender-ref ref="ASYNC_FILE"/>
             <appender-ref ref="ASYNC_ERROR"/>
         </logger>
-        <!-- 请求日志 -->
+        <!-- 请求日志（只进 request.log，不再重复写 stdout） -->
         <logger name="com.selfblog.config.web.HttpRequestLoggingInterceptor" level="INFO" additivity="false">
-            <appender-ref ref="CONSOLE"/>
             <appender-ref ref="ASYNC_REQUEST"/>
         </logger>
         <!-- 安全日志 -->
         <logger name="com.selfblog.config.security.SecurityConfig" level="INFO" additivity="false">
-            <appender-ref ref="CONSOLE"/>
             <appender-ref ref="ASYNC_SECURITY"/>
         </logger>
         <logger name="com.selfblog.config.security.JwtAuthenticationFilter" level="INFO" additivity="false">
-            <appender-ref ref="CONSOLE"/>
             <appender-ref ref="ASYNC_SECURITY"/>
         </logger>
-        <!-- 性能日志 -->
+        <!-- 性能日志（AOP 层） -->
         <logger name="com.selfblog.aspect.PerformanceMonitoringAspect" level="INFO" additivity="false">
-            <appender-ref ref="CONSOLE"/>
             <appender-ref ref="ASYNC_PERFORMANCE"/>
         </logger>
-        <!-- 审计日志 -->
+        <!-- [PERFORMANCE] 专用 logger：让性能日志进 performance.log，不再混入 audit.log -->
+        <logger name="com.selfblog.performance" level="INFO" additivity="false">
+            <appender-ref ref="ASYNC_PERFORMANCE"/>
+        </logger>
+        <!-- 审计日志（只进 audit.log，不再重复写 stdout） -->
         <logger name="com.selfblog.utils.LogUtils" level="INFO" additivity="false">
-            <appender-ref ref="CONSOLE"/>
             <appender-ref ref="ASYNC_AUDIT"/>
         </logger>
-        <!-- MyBatis SQL日志 -->
+        <!-- MyBatis SQL 日志：默认（等同生产）不绑定 SQL appender，避免生产刷 SQL -->
         <logger name="com.selfblog.mapper" level="WARN" additivity="false">
-            <appender-ref ref="CONSOLE"/>
-            <appender-ref ref="ASYNC_SQL"/>
+            <appender-ref ref="ASYNC_FILE"/>
+            <appender-ref ref="ASYNC_ERROR"/>
+        </logger>
+        <!-- 限流日志 -->
+        <logger name="com.selfblog.config.web.RateLimitInterceptor" level="WARN" additivity="false">
+            <appender-ref ref="ASYNC_SECURITY"/>
         </logger>
     </springProfile>
 </configuration>

@@ -418,7 +418,6 @@ public class TrendingServiceImpl extends ServiceImpl<BlogTrendingMapper, BlogTre
 
         LocalDateTime now = LocalDateTime.now();
         LocalDateTime todayStart = now.toLocalDate().atStartOfDay();
-        LocalDateTime todayEnd = todayStart.plusDays(1);
 
         while (true) {
             Page<BlogPost> page = new Page<>(pageNum, pageSize);
@@ -432,17 +431,12 @@ public class TrendingServiceImpl extends ServiceImpl<BlogTrendingMapper, BlogTre
                 break;
             }
 
-            // 批量预加载当天已有的trending记录，减少N+1查询
-            List<Long> postIds = postPage.getRecords().stream()
-                    .map(BlogPost::getId)
+            // 批量写入：原先在循环里对每条文章各发一次 upsert（N 次串行往返）。
+            // 这里改为先把整页构造成 BlogTrending 列表，再分块批量 upsert。
+            List<BlogTrending> trendings = postPage.getRecords().stream()
+                    .map(post -> buildTrending(post, todayStart))
                     .collect(Collectors.toList());
-            List<BlogTrending> existingTrendings = baseMapper.selectByPostIdsAndDate(postIds, todayStart, todayEnd);
-            Map<Long, BlogTrending> trendingMap = existingTrendings.stream()
-                    .collect(Collectors.toMap(BlogTrending::getPostId, t -> t));
-
-            for (BlogPost post : postPage.getRecords()) {
-                updatePostTrendingBatch(post, todayStart, trendingMap.get(post.getId()));
-            }
+            flushTrendingBatch(trendings);
 
             if (!postPage.hasNext()) {
                 break;
@@ -451,12 +445,31 @@ public class TrendingServiceImpl extends ServiceImpl<BlogTrendingMapper, BlogTre
         }
 
         // 更新话题热度分数与动态数（基于关联的已发布文章和校友圈动态）
+        // 说明：这两条是全表重算，但只在每天凌晨 00:00 执行一次，且 topicMapper 的语句本身
+        // 是单条 UPDATE ... SET col = (相关子查询)，不存在 Java 侧循环，因此保留不降频。
         topicMapper.recalculateAllTrendingScore();
         topicMapper.recalculateAllPostCount();
         log.debug("定时任务: 更新所有话题的热度分数与动态数完成");
     }
 
-    private void updatePostTrendingBatch(BlogPost post, LocalDateTime todayStart, BlogTrending existingTrending) {
+    /** 单次批量 upsert 的最大行数：控制 SQL 长度与绑定变量数（SQLite 默认变量上限 999/32766）。 */
+    private static final int TRENDING_BATCH_SIZE = 500;
+
+    /**
+     * 把整批趋势记录按 {@link #TRENDING_BATCH_SIZE} 分块写入，语义与逐条 upsert 等价
+     * （同一篇文章同一天只保留一行；命中唯一键时复位 is_deleted）。
+     */
+    private void flushTrendingBatch(List<BlogTrending> trendings) {
+        for (int from = 0; from < trendings.size(); from += TRENDING_BATCH_SIZE) {
+            int to = Math.min(from + TRENDING_BATCH_SIZE, trendings.size());
+            baseMapper.upsertBatch(trendings.subList(from, to));
+        }
+    }
+
+    /**
+     * 由文章快照构造当天的趋势记录（不做任何 IO）。
+     */
+    private BlogTrending buildTrending(BlogPost post, LocalDateTime todayStart) {
         // 计算热度评分（使用 null-safe 取值）
         int score = (post.getViewCount() != null ? post.getViewCount().intValue() : 0) * VIEW_WEIGHT
                 + (post.getLikeCount() != null ? post.getLikeCount() : 0) * LIKE_WEIGHT
@@ -471,7 +484,6 @@ public class TrendingServiceImpl extends ServiceImpl<BlogTrendingMapper, BlogTre
         trending.setLikeCount(post.getLikeCount() != null ? post.getLikeCount() : 0);
         trending.setCommentCount(post.getCommentCount() != null ? post.getCommentCount() : 0);
         trending.setStatDate(todayStart.toLocalDate());
-
-        baseMapper.upsert(trending);
+        return trending;
     }
 }
