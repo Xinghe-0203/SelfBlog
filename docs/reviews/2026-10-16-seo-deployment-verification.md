@@ -2,7 +2,7 @@
 
 ## 范围与结果
 
-本批实现已确认的[设计规格](../superpowers/specs/2026-10-16-crawlable-html-and-deployment-design.md)：
+本批实现已确认的设计规格（原存于 `docs/superpowers/specs/2026-10-16-crawlable-html-and-deployment-design.md`，该目录已于 2026-10-19 清理）：
 公开阅读 HTML、完整分片站点地图、动态 robots、共享 canonical origin，以及 Docker / Vercel 部署适配。
 **未改变全站字号与页面比例，未迁移框架，未改动现有数据库与上传目录。**
 

@@ -175,7 +175,7 @@ Mapper XML 支持 `databaseId="mysql"` / `"sqlite"` 双语句（`MybatisPlusConf
 
 1. **`CHANGELOG.md`**：在顶部追加 `## 未发布 — <标题> (日期)`，正文写「说明 / 修复」要点，并附 **`### 影响文件`** 表格（文件 + 改动类型）。已有条目可为格式范例。
 2. 受影响的分册文档：`README.md`、`backend/README.md`、`frontend/README.md`、`backend/DEPLOY.md`。**注意这些文档的版本号与结构清单常落后于代码，以 `pom.xml` / `package.json` / 实际目录为准。**
-3. 较大的改动走 `docs/superpowers/`：先 `specs/` 写设计（含「已核实的现状」证据表），再 `plans/` 拆成带 `- [ ]` 复选框的可独立验收任务，然后实现。
+3. 较大的改动先写设计再实现：设计稿（含「已核实的现状」证据表）与带 `- [ ]` 复选框的可独立验收任务清单放在 `docs/` 下（历史上曾用 `docs/superpowers/specs/` 与 `docs/superpowers/plans/`，该目录已于 2026-10-19 清理）。
 
 ---
 
@@ -190,7 +190,7 @@ Mapper XML 支持 `databaseId="mysql"` / `"sqlite"` 双语句（`MybatisPlusConf
 
 - `AGENTS.md`：更细的本机构建环境与验证笔记（Maven/Node 目录、切片测试配方、Playwright、页面/SEO 不变量），与本文互补。
 - `frontend/CLAUDE.md`：前端设计 token 使用约定、路由约定与页面配置/预览约束。
-- `docs/page-management.md`：后台「页面管理」使用说明；`docs/decisions/` 是 ADR；`docs/reviews/` 是各批次真实验证记录；`docs/superpowers/` 为历史规格与计划（当时状态记录，**当前行为以 CHANGELOG 与验证记录为准**）。
+- `docs/page-management.md`：后台「页面管理」使用说明；`docs/decisions/` 是 ADR；`docs/reviews/` 是各批次真实验证记录。（历史规格与计划目录 `docs/superpowers/` 已于 2026-10-19 清理，**当前行为以 CHANGELOG 与验证记录为准**。）
 
 ---
 

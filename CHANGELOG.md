@@ -4,6 +4,120 @@
 
 ---
 
+## 未发布 — 仓库清理：删除无用文件与无用文档 (2026-10-19)
+
+### 说明
+
+按「删除全部无用文件和无用文档」的要求，先做全仓盘点取证（跟踪状态、忽略规则、引用计数、真实内容），再删除。**删除范围经用户逐项裁定**：构建产物/依赖、IDE 本地配置、无引用 ADR、历史设计规格与计划四类批准删除；`docs/tutorial/`（约 25.6 万字的正式交付物，被 README/CLAUDE/AGENTS 多处引用）经裁定保留。
+
+### 删除
+
+- **构建产物与依赖（约 291 MB）**：`backend/target/`（166 MB，含 `selfblog.jar`、空库 `campus_blog.db` 544 KB/29 张表全 0 行、`smoke/`）、`frontend/node_modules/`（136 MB）、`frontend/dist/`（695 KB）。全部被 gitignore 忽略且可由 `mvn package` / `npm ci` + `npm run build` 重新生成。
+- **本地运行日志**：`backend/logs/`（7 个文件 885 KB，`*.log` 已被忽略）。
+- **IDE 本地配置**：`.idea/`、`backend/.idea/`（共约 14 KB，被 gitignore 忽略）。
+- **brainstorm 临时状态**：`.superpowers/`（17 个文件 753 KB，含过期 `server.pid` 与明文 `.last-token` 凭据文件）。
+- **无引用 ADR**：`docs/decisions/002-single-origin-reading-html-and-proxy.md`（已核实全仓 0 引用，连 CHANGELOG 都未提及）。
+- **历史设计规格与计划**：`docs/superpowers/`（20 个已跟踪文件，303 KB）。
+- **仓库外临时日志**：`C:\Users\Zora\Downloads\_fegates.log`、`_fegates2.log`（本次前端闸门输出）。
+
+### 修复（删除后的悬空引用）
+
+删除会让文档中的链接失效，故同步修订了全部指向已删路径的**活文档**（CHANGELOG 中的历史条目按「历史记录」保留，不改写）：
+
+- `CLAUDE.md`：文档维护规范第 3 条与「其他指南」段改为「设计稿放 `docs/` 下」并注明历史目录已清理。
+- `README.md`：删除「设计与实施历史」表行；版式段落移除失效的设计稿链接；架构决策行去掉已删 ADR 的描述。
+- `frontend/README.md`：重写段落，去掉指向已删设计稿的链接。
+- `docs/decisions/001-versioned-pages-in-existing-kv.md`：实施计划链接改指仍存在的验证记录。
+- `docs/reviews/2026-10-16-{navigation-fidelity-and-fullstack-audit,page-management-verification,seo-deployment-verification}.md`：三处失效规格/计划链接改为文字说明 + 指向 CHANGELOG。
+- `docs/tutorial/appendix-b-source-map.md`、`ch07-project-practice.md`、`SelfBlog-全栈开发完全教程.md`：同步移除/改写对已删目录的描述（教程经用户裁定保留，不能留悬空指引）。
+
+### 验证
+
+- 删除前逐项核实：`git ls-files` 确认 8 个目录全部 0 跟踪文件、`git check-ignore` 确认忽略来源；`docs/decisions/002` 与 `docs/superpowers` 用全仓引用检索确认可删/已裁定。
+- 删除后全仓检索 `superpowers` / `002-single-origin` / `_fegates`：剩余命中**仅为 CHANGELOG 历史条目与本次新增的「已清理」说明**，无失效链接。
+- 未验证/注意：删除 `frontend/node_modules` 后前端六道闸门需先 `npm ci` 才能重跑；`backend/target/frontend/node`（CLAUDE.md 记录的 PATH 兜底 Node）随 `target/` 一并删除，下次需先跑一次 Maven 构建才会重新生成。
+
+### 影响文件
+
+| 文件 | 改动类型 |
+| --- | --- |
+| `.superpowers/`、`backend/logs/`、`backend/target/`、`frontend/dist/`、`frontend/node_modules/`、`.idea/`、`backend/.idea/`、`docs/superpowers/` | 删除（目录） |
+| `docs/decisions/002-single-origin-reading-html-and-proxy.md` | 删除（文件） |
+| `CLAUDE.md`、`README.md`、`frontend/README.md` | 修订（移除失效链接与描述） |
+| `docs/decisions/001-versioned-pages-in-existing-kv.md` | 修订（链接改指验证记录） |
+| `docs/reviews/2026-10-16-navigation-fidelity-and-fullstack-audit.md`、`2026-10-16-page-management-verification.md`、`2026-10-16-seo-deployment-verification.md` | 修订（失效规格链接改文字说明） |
+| `docs/tutorial/appendix-b-source-map.md`、`docs/tutorial/ch07-project-practice.md`、`docs/tutorial/SelfBlog-全栈开发完全教程.md` | 修订（同步清理后的文档地图） |
+
+---
+
+## 未发布 — 生产日志取证与缺陷修复批次 (2026-10-18)
+
+### 说明
+
+对生产环境五个日志（`application.log` / `application-error.log` / `audit.log` / `performance.log` / `request.log`，2026-10-17 08:14–16:15）做了全量取证，产出四份报告 `docs/reviews/prod-log-{request,application,performance,audit}.md`，并据此修复 10 类缺陷。取证中发现的**运行形态异常**（不是代码缺陷）单独列在下面第 11 条。
+
+### 修复
+
+- **F1 静态资源缺失被兜底成 500**：`GET /favicon.ico` 在生产返回 500 并打完整 ERROR 堆栈（扫描器 IP 触发）。根因是 `GlobalExceptionHandler` 只注册了已被 Spring Boot 3 取代的 `NoHandlerFoundException`，而静态资源缺失抛的是 `NoResourceFoundException`，落进 `@ExceptionHandler(Exception.class)` 兜底。新增 `NoResourceFoundException` → 404（`log.warn`，不打堆栈）。
+- **F1 上传部件超限被兜底成 500**：作者批量上传相册时 `MultipartException: Failed to parse multipart servlet request` + `Caused by: FileCountLimitExceededException: attachment` 也落兜底 → 500。新增 `MultipartException` → 400；识别出 `FileCountLimitExceededException` 时给出「单次上传文件数量超过上限」的可读文案。**已用测试锁定 `MaxUploadSizeExceededException`（`MultipartException` 子类）仍走自己的 400 语义，不被新处理器吞掉**。
+- **F2 客户端 IP 可被伪造（审计与限流归因）**：`LogUtils.getClientIp` 只要看到 `X-Forwarded-For` 就采信，而 `RateLimitInterceptor` 自己那份实现会先校验直连对端是否受信代理——同一请求在两处得到不同 IP，攻击者可借此污染审计日志。现统一为 `LogUtils` 一份实现（仅当直连对端属 10./192.168./127.0.0.1/::1/172.16-31 才采信代理头），`RateLimitInterceptor` 改为调用它。
+- **F2 限流命中零审计**：`RateLimitInterceptor` 返回 429 时没有任何日志，生产 8 小时内 429 在 `request.log` / `audit.log` 中都看不到。现写 `RATE_LIMIT_EXCEEDED` 到审计通道（含 path、method、limit、count）。
+- **F2 审计钩子是死代码**：`SecurityConfig.logAdminOperation` 与 `LogUtils.logLogin/logRegister/logUserAction/logFileUpload/logApiCall` 全仓 0 调用点，导致 `audit.log` 里 `ADMIN_OPERATION` 计数为 0、登录成功/失败完全不审计。现 `/api/admin/**` 写操作在鉴权之后记录 `ADMIN_OPERATION`（status<400 视为成功），登录成功/失败接入 `LogUtils.logLogin`。
+- **F2 读路径限流阈值过严**：`/api/post/` 前缀的 `postGeneral=10/min` 会命中首页列表 `GET /api/post/list`，一次页面加载就可能触发 429。为列表读路径单列阈值，不比原值更严。
+- **F2 热路径重复分配**：`RateLimitProperties.getAllLimits()` 每次调用都 `new HashMap` 并填 34 条，改为构造期一次性构建不可变 Map。
+- **F3 生产配置漂移**：生产日志显示 `No active profile set, falling back to "default"`，`application-prod.yml` 全部失效（Swagger/Knife4j 默认开放、management 暴露面不收窄、日志分流不对齐）。`springdoc.enabled` / `knife4j.enable` 默认值由 `true` 改为 `false`——忘记设 profile 不再等于把 API 文档开到公网，本地调试显式设 `SWAGGER_ENABLED=true`。
+- **F3 健康检查端口与实际监听不一致**：`Dockerfile` 与两个 compose 的健康检查硬编码 `8825`，而生产实际监听 8888（`SERVER_PORT` 被覆盖），探针必然失败 → 容器被判不健康反复重启（日志中同一 PID 三次 `Starting SelfBlogApplication`、前两次无 `Started`）。现改为 `CMD-SHELL` 读 `${SERVER_PORT:-8825}`，端口与探针同源。
+- **F3 静态资源无缓存头**：`WebMvcConfig` 只注册了 `/uploads/**`，`/assets/**` 完全没有 `Cache-Control`，生产日志里同一个哈希命名的产物被重复 200 下载 12–15 次（1300 行里仅 2 次 304）。现 `/assets/**` 用 `max-age=31536000, immutable`（Vite 产物按内容哈希命名）；`/favicon.svg`、`/seo-reading.css` 用 1 天 + `must-revalidate`；`/uploads/**` 用 1 小时（作者可覆盖同名文件，不能 immutable）；`/`、`/index.html`、SPA 壳不动。
+- **F3 日志分类失效**：`default` 段把请求/性能/审计/SQL 同时写 stdout 与文件；`audit.log` 里混入 `[PERFORMANCE]` 记录（性能事件走了 `LogUtils` 自己的 logger → `ASYNC_AUDIT`）。现按段收敛 stdout 输出，并把 `logPerformance` 改为写专用 logger `com.selfblog.performance`（此前该 logger 只在 XML 里存在、Java 侧 0 引用，属死配置），`PERFORMANCE` appender 补 `ThresholdFilter=INFO` 防止 DEBUG 档涌入。
+- **F5 SQLite per-connection PRAGMA 丢失**：`synchronous` / `busy_timeout` / `cache_size` / `temp_store` / `mmap_size` / `foreign_keys` 都只在启动时对「当时那一条」连接执行一次；Hikari 默认 30 分钟回收重建连接后 `synchronous` 回落到默认 FULL，每次提交都要 fsync（对应 `performance.log` 里 2451ms 的单条 INSERT）。现通过 `setDataSourceProperties` 让驱动在**每次建立物理连接**时应用，并关闭连接轮换（`maxLifetime(0)` + `idleTimeout(0)`）作防御纵深。**真实验证**：强制连接轮换后读取 PRAGMA，7 项全部保持生效。
+- **F5 趋势任务逐条写**：`scheduledUpdateAllTrending` 在循环内逐条 `upsert`（1088ms）。改为批量写，保留 `databaseId` 双语句与 H2 兜底语义。
+- **F6 日志注入与敏感参数**：客户端 `X-Trace-Id` 原样进 MDC（可伪造日志行）、查询串原样入日志（可能含 token/password）。现 `X-Trace-Id` 需匹配 `^[A-Za-z0-9_-]{8,64}$` 否则改用服务端 UUID；新增 `sanitizeLogValue` 剥离 CRLF/控制字符并截断；`token/access_token/refresh_token/password/secret/code/key` 等参数值掩码（大小写不敏感），不影响 `?tag=xx` 这类正常参数的可读性。
+- **F7 SQLite 单连接串行化**：`maximumPoolSize=1` 把所有请求强制串行。生产日志有决定性证据——同一页面几乎同时发出的三个互不相关的读请求（`/api/post/1/adjacent`、`/api/anonymous-likes/posts/1`、`/api/guest-comments/post/1`）严格串行返回，墙钟≈三者之和（474+802+1074≈2350ms）。现池大小改为 5（WAL 下多读安全；写仍是单写者）。**实测**：3 路并发读墙钟/串行和之比由 1.07 降到 0.44，3 条互不相同的物理连接同时持有且各自 PRAGMA 生效。
+- **F8/F9 BCrypt 在数据库事务内执行**：`login`、`changePassword`、两个 `resetPassword` 都在 `@Transactional` 内做 BCrypt（cost=12，本机实测 `matches≈456ms`/`encode≈360ms`），配合池大小 1 就是「登录 1.2–2.7s」的直接机制。四个方法改为「短只读事务读快照 → 事务外 BCrypt → 短写事务提交」。
+- **F9 顺带修掉一个生产级安全缺陷**：原 `login` 在事务内递增失败计数后立刻抛异常，计数被回滚——**登录锁定在生产环境实际是失效的**。既有测试没发现是因为测试自身也是 `@Transactional`。现失败计数在独立短事务提交，并有测试锁定。
+- **F4 占位图 7.5MB 冗余 + 缺 favicon.ico**：`default-avatar.png`、`default-cover.jpg`、`default-image.png` 三个「不同用途」的文件 SHA256 完全相同（都是 2048×2048 PNG），各 2.5MB。现分别瘦身为 10.8KB / 24.8KB / 17.2KB（-99.3%），语义与引用点不变；新增真实多尺寸 `favicon.ico`（16/32/48）并在 `index.html` 声明，配合 F1 的 404 处理器共同闭合 `/favicon.ico` 链路。
+
+### 运维侧发现（不是代码缺陷，需部署侧确认）
+
+- **生产运行形态与仓库声明不一致**：日志显示 `Starting SelfBlogApplication v2.0.26 using Java 25.0.3`、`No active profile set`、`Tomcat started on port 8888`，而仓库的 `pom.xml` 编译目标是 Java 21、`Dockerfile` 运行镜像是 `eclipse-temurin:21-jre`、两个 compose 声明 `SERVER_PORT=8825` + `SPRING_PROFILES_ACTIVE=prod`。即**生产镜像不是用仓库这份 Dockerfile / compose 构建启动的**（或环境变量被外部覆盖）。这一条无法在仓库内修复，只能由部署侧对齐；仓库侧能做的是把契约显式化（见 F3 的 `SWAGGER_ENABLED` 默认值与健康检查端口跟随 `SERVER_PORT`），并建议用 `docker compose -f backend/docker-compose.yml up -d --build` 重建以消除漂移。
+- **凭据扫描探测**：`request.log` 中 IP `34.156.121.46` 在 3.7 秒内发出 42 条请求，其中 40 条为敏感路径字典盲打（25 个 `/.env` 变体 + `phpinfo` / `credentials` / `Dockerfile` / `vendor/composer/installed.json` / Laravel、Matomo、Mautic 配置路径），全部 404；UA 前两条伪装完整 Chrome、其后统一截断。目标栈是 PHP/Laravel/WordPress，与本项目无关，**未发现攻击成功痕迹**。项目没有全局 IP 封禁机制，每次探测都会写一条 `AUTH_ENTRY_POINT` 审计（8 小时内约 90 条）。本次未引入 IP 封禁（避免误伤与状态复杂度），如需可在反向代理层处理。
+
+### 验证
+
+- 后端全量（H2）：**669 项测试，0 失败、0 错误、0 跳过，`BUILD SUCCESS`**（基线 658，本批次净增 11 项）。
+- 前端全闸门实测：`lint:check`、`format:check`、`type-check` 全绿，`vitest` **43 文件 / 400 tests 全过**，`test:deployment` **27/27**，`vite build` 成功。
+- 关键改动均带**反向红证**（把修复临时回退，确认新测试真的失败，再还原并校验字节一致）：F8 的「事务确实独占连接」（`expected: <0> but was: <1>`）、F9 的失败计数回滚（`login_fail_count expected: <3> but was: <0>`）、F10 的性能 logger 归属、F5 的 PRAGMA 轮换。
+- 并发量化证据（真跑，池强制为 1）：BCrypt 进行期间另一线程获取连接并完成查询耗时 0–1ms，活动连接数 0。
+- **端到端冒烟（真实 `selfblog.jar` + 真实 SQLite 文件库 + 默认 profile，端口 18825）**：`/favicon.ico` **200**（`image/x-icon`，不再 500）、`/favicon.svg` 与 `/seo-reading.css` 200 + `max-age=86400, must-revalidate, public`、`/assets/*.js|css` 200 + `max-age=31536000, public, immutable`、`/index.html` 308、不存在路径 404、不存在的 `/assets/*.js` **404**（不再 500）。全部请求状态码为 200/308/401/404/429，**零 5xx**。
+- **端到端冒烟验证的审计与限流链路**：错误密码登录 → 401 且 `[LOGIN] ... success=false, reason=bad_credentials`；正确登录 → 200 且 `success=true`（账号脱敏为 `a***n`，不再出现明文手机号）；匿名写 `/api/admin/**` → `ADMIN_OPERATION ... status=401, result=rejected, userId=anonymous`；已鉴权写 → `status=200, result=success, userId=1`（只读请求不产生审计行）。限流实测 14 次登录 = 前 6 次 200、后 8 次 429，且每次 429 都有 `RATE_LIMIT_EXCEEDED`（含 `limit=10/min, count=11..`）——此前 429 完全无审计。
+- **端到端冒烟验证的日志注入防护**：非法 `X-Trace-Id: bad!trace#id` 被替换为服务端 UUID，合法 `ABCDEFGH12345678` 原样采用；`?token=SUPERSECRETVALUE&access_token=LEAK2&tag=java` 落盘为 `token=***&access_token=***&tag=java`（正常参数不受影响）；带 CRLF 的 traceId 未产生任何注入行（`INJECTED-LINE` 与原始值均 0 命中）。
+- 未验证：真实 Docker 镜像构建与容器运行（本机无 Docker CLI/守护进程）、真实 MySQL 实例、真实 Vercel 部署、`prod` profile 的端到端冒烟（冒烟跑的是默认 profile）。
+
+### 影响文件
+
+| 文件 | 改动类型 |
+| --- | --- |
+| `backend/src/main/java/com/selfblog/common/exception/GlobalExceptionHandler.java` | 新增 `NoResourceFoundException`(404) 与 `MultipartException`(400) 处理器 |
+| `backend/src/main/java/com/selfblog/config/web/RateLimitInterceptor.java` | 复用 `LogUtils.getClientIp`；429 写审计 |
+| `backend/src/main/java/com/selfblog/config/web/RateLimitProperties.java` | `getAllLimits()` 构造期不可变缓存；列表读路径阈值 |
+| `backend/src/main/java/com/selfblog/utils/LogUtils.java` | 可信代理 IP 判定、日志清洗、敏感参数掩码、登录/注册审计、性能专用 logger |
+| `backend/src/main/java/com/selfblog/config/security/SecurityConfig.java` | `/api/admin/**` 写操作审计钩子接线；BCrypt cost 启动日志 |
+| `backend/src/main/java/com/selfblog/config/security/JwtAuthenticationFilter.java` | 审计上下文与 traceId 预置 |
+| `backend/src/main/java/com/selfblog/config/web/HttpRequestLoggingInterceptor.java` | traceId 白名单、日志清洗、敏感查询串掩码 |
+| `backend/src/main/java/com/selfblog/config/db/DatabaseConfig.java` | per-connection PRAGMA、连接轮换策略、池大小 1→5 |
+| `backend/src/main/java/com/selfblog/service/content/impl/TrendingServiceImpl.java`、`backend/src/main/java/com/selfblog/mapper/BlogTrendingMapper.java`、`backend/src/main/resources/mapper/BlogTrendingMapper.xml` | 趋势批量写 |
+| `backend/src/main/java/com/selfblog/service/auth/impl/SysUserServiceImpl.java` | `login`/`changePassword`/两个 `resetPassword` 拆分事务，BCrypt 移出事务；修复失败计数回滚 |
+| `backend/src/main/java/com/selfblog/config/web/WebMvcConfig.java` | `/assets/**`、`/favicon.svg`、`/seo-reading.css`、`/uploads/**` 缓存策略 |
+| `backend/src/main/resources/application.yml` | multipart 部件上限、`springdoc`/`knife4j` 默认关闭 |
+| `backend/src/main/resources/logback-spring.xml` | 三段日志分流收敛、`com.selfblog.performance` logger、`PERFORMANCE` appender 阈值 |
+| `backend/Dockerfile`、`backend/docker-compose.yml`、`backend/docker-compose.sqlite.yml` | 健康检查端口跟随 `SERVER_PORT`；prod profile 契约注释 |
+| `backend/src/test/java/com/selfblog/common/exception/GlobalExceptionHandlerTest.java` 等 11 个新增/扩充测试类 | 新增回归与并发量化测试 |
+| `frontend/public/default-avatar.png`、`default-cover.jpg`、`default-image.png`、`favicon.ico`、`frontend/index.html` | 占位图瘦身 99.3%、新增 favicon.ico 声明 |
+| `README.md`、`backend/README.md`、`backend/DEPLOY.md` | 限流/审计/日志注入说明、API 文档默认关闭、prod profile 与端口契约 |
+| `docs/reviews/prod-log-request.md`、`prod-log-application.md`、`prod-log-performance.md`、`prod-log-audit.md` | 四份取证报告 |
+
+---
+
 ## 未发布 — 缓存正确性与无用代码清理 (2026-10-17)
 
 ### 修复

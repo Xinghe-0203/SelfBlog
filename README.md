@@ -131,7 +131,7 @@
 - 相册改用共享弹窗与灯箱：遮罩高于导航，支持 Esc、焦点回收与滚动锁，保留密码相册与短期令牌流程
 - 作者工作台统一标题与内容层级，侧栏抽屉接管焦点与滚动锁；登录页、概览、文章、标签、访客、评论、相册与设置共用 8px 控件 / 12–16px 分组
 
-全站布局重做按[已确认设计](docs/superpowers/specs/2026-10-16-selfblog-ios-glass-redesign-design.md)分三批实施：设计底座/导航/音乐、公开阅读路径、作者工作台均已完成，实现记录见 [CHANGELOG.md](CHANGELOG.md)。
+全站布局重做分三批实施：设计底座/导航/音乐、公开阅读路径、作者工作台均已完成，实现记录见 [CHANGELOG.md](CHANGELOG.md)。（当时的已确认设计稿与实施计划原存于 `docs/superpowers/`，该目录已于 2026-10-19 清理。）
 
 **后续修正（2026-10-16）**：导航已按批准原型恢复链接分组、浅蓝胶囊选中态、声条＋「听一会儿」及音乐面板布局；修复后台抽屉、发布误报、恢复草稿重复创建、取消确认焦点丢失及标签长度问题。真实 SQLite 联调初查为 13/15，修正并增加复核场景后为 **17/17**；前端 **345** / 后端 **463** 项测试通过，类型、Lint（0 错误）及构建通过。范围、证据及未覆盖环境见[导航与前后端复查报告](docs/reviews/2026-10-16-navigation-fidelity-and-fullstack-audit.md)。
 
@@ -306,7 +306,9 @@ Controller（控制器）→ Service（服务）→ Mapper（数据访问）→ 
 | 令牌黑名单 | 单次登出/刷新轮换的黑名单在进程内维护；不替代改密后的持久撤销 |
 | 登录锁定 | 5 次失败锁定 15 分钟（原子操作） |
 | XSS 防护 | 服务端 Jsoup HTML 净化 + 前端 DOMPurify |
-| 限流 | 按路径段匹配、最长规则优先（RateLimitInterceptor）；匿名评论创建每 IP 5 次/分钟，站点资源上传 30 次/分钟 |
+| 限流 | 按路径段匹配、最长规则优先（RateLimitInterceptor）；匿名评论创建每 IP 5 次/分钟，站点资源上传 30 次/分钟；命中 429 会写入审计日志 |
+| 审计日志 | 后台写操作、登录成功/失败、401/403、限流命中、业务异常均落 `audit.log`；客户端 IP 只在直连对端为受信代理时才采信 `X-Forwarded-For`，避免伪造归因 |
+| 日志注入防护 | 进入日志的外部可控值（`X-Trace-Id`、查询串、UA、异常消息）先过白名单/控制字符清洗，敏感查询参数（token/password 等）自动掩码 |
 | SQL 注入 | MyBatis Plus 参数化查询 |
 | CORS | 可配置白名单，生产环境禁止 `*` |
 | 数据校验 | Spring Validation（@Valid、@NotBlank） |
@@ -318,7 +320,7 @@ Controller（控制器）→ Service（服务）→ Mapper（数据访问）→ 
 
 启动后端后访问 Knife4j API 文档：
 
-**http://localhost:8825/doc.html**（`prod` profile 下关闭）
+**http://localhost:8825/doc.html**（默认关闭；本地调试设 `SWAGGER_ENABLED=true` 开启）
 
 公开 API 提供已发布文章、标签、搜索、访客统计采集、匿名点赞、访客评论和相册访问。文章写入、站点配置、访客/评论/相册管理等接口要求作者管理员身份；注册关闭。
 
@@ -350,9 +352,8 @@ Controller（控制器）→ Service（服务）→ Mapper（数据访问）→ 
 | 前端文档 | [frontend/README.md](frontend/README.md) | 前端详细文档 |
 | 部署文档 | [backend/DEPLOY.md](backend/DEPLOY.md) | 生产环境部署指南（含 Docker 与 Vercel） |
 | 页面管理说明 | [docs/page-management.md](docs/page-management.md) | 后台逐页配置/内容页/导航使用指南 |
-| 架构决策 | [docs/decisions/](docs/decisions/) | ADR：KV 版本化存储、单一 origin 阅读 HTML |
+| 架构决策 | [docs/decisions/](docs/decisions/) | ADR：KV 版本化存储 |
 | 验证记录 | [docs/reviews/](docs/reviews/) | 各批次真实验证证据与已知限制 |
-| 设计与实施历史 | [docs/superpowers/](docs/superpowers/) | 历史规格与计划（当时状态记录，当前行为以 CHANGELOG 与验证记录为准） |
 | API 文档 | http://localhost:8825/doc.html | 启动后端后访问 |
 
 ---

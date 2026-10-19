@@ -4,7 +4,7 @@
 - 初次检查对象：`9e7358a`；随后按用户「继续」确认的范围修正当前工作区
 - 状态：**导航纠偏与已复现缺陷已修复，自动化、真实联调及独立代码复核通过**
 
-以下第 1、2 节保留修复前的证据，不代表问题仍然存在。修复设计见[纠偏规格](../superpowers/specs/2026-10-16-navigation-fidelity-correction-design.md)。
+以下第 1、2 节保留修复前的证据，不代表问题仍然存在。修复设计原存于 `docs/superpowers/specs/2026-10-16-navigation-fidelity-correction-design.md`（该目录已于 2026-10-19 清理），修复结果以本记录第 3 节与 [CHANGELOG.md](../../CHANGELOG.md) 为准。
 
 ## 1. 导航与已批准原型的差异
 

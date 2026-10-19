@@ -2,7 +2,7 @@
 
 ## 状态
 
-Accepted — 用户已确认页面管理设计。实现与验证状态以[实施计划](../superpowers/plans/2026-10-16-configurable-public-pages.md)为准。
+Accepted — 用户已确认页面管理设计。实现与验证状态以[验证记录](../reviews/2026-10-16-page-management-verification.md)与 CHANGELOG 为准（当时的实施计划原存于 `docs/superpowers/plans/`，该目录已于 2026-10-19 清理）。
 
 ## 日期
 

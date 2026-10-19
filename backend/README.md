@@ -52,7 +52,7 @@ npm run dev                     # Vue dev server at http://localhost:3000
 | Blog | http://localhost:8825/ |
 | Default author entry | http://localhost:8825/admin |
 | API | http://localhost:8825/api |
-| API Docs | http://localhost:8825/doc.html |
+| API Docs | http://localhost:8825/doc.html (off by default; set `SWAGGER_ENABLED=true` to enable) |
 | Health | http://localhost:8825/actuator/health |
 
 The first startup creates the author account from `ADMIN_USERNAME` (default `admin`) and `ADMIN_PASSWORD`; there is no fixed default password. The author can change the admin path in site settings.
@@ -162,7 +162,7 @@ The site runs in single-author mode: registration is disabled and password authe
 | `AVATAR_ALLOWED_DOMAINS` | `localhost,127.0.0.1` | No | Allowed hosts for avatar URLs |
 | `UPLOAD_MAX_FILE_SIZE` | `52428800` | No | Max single upload (bytes, 50 MB) |
 | `UPLOAD_MAX_REQUEST_SIZE` | `104857600` | No | Max multipart request (bytes, 100 MB) |
-| `SWAGGER_ENABLED` | `true` | No | Toggle API docs (disabled under the `prod` profile) |
+| `SWAGGER_ENABLED` | `false` | No | Toggle API docs. Defaults to **off**; set `true` for local debugging. The `prod` profile additionally pins it off |
 | `MAIL_*` | — | No | SMTP configuration for password reset (`MAIL_SSL_ENABLED` defaults to `true`) |
 | `ENV_VALIDATION_ENABLED` | `true` | No | Startup environment validation |
 | `MYBATIS_SQL_LOG` | — | No | Optional SQL logging implementation class |

@@ -41,15 +41,21 @@ cd /opt/selfblog
 java -jar selfblog.jar
 ```
 
-常用地址（默认端口 8825）：
+常用地址（默认端口 8825，由 `SERVER_PORT` 决定）：
 
 | 页面 | 地址 |
 |---|---|
 | 博客 | `http://localhost:8825/` |
 | 作者后台 | `http://localhost:8825/admin`（默认，可在后台修改） |
 | API | `http://localhost:8825/api` |
-| API 文档 | `http://localhost:8825/doc.html`（prod profile 下关闭） |
+| API 文档 | `http://localhost:8825/doc.html`（默认关闭，需 `SWAGGER_ENABLED=true`） |
 | 健康检查 | `http://localhost:8825/actuator/health` |
+
+### 必须激活 prod profile
+
+生产部署**必须**设置 `SPRING_PROFILES_ACTIVE=prod`（两个 `docker-compose*.yml` 已声明）。未激活任何 profile 时 Spring 会回落到 `default`，`application-prod.yml` 全部失效：API 文档与 Knife4j 会按 `SWAGGER_ENABLED` 的默认值暴露、management 端点不收窄、日志分流也不再与 prod 对齐。自 v2.0.26 后 API 文档默认关闭（`springdoc.enabled` / `knife4j.enable` 的默认值均为 `false`），因此即使忘记设 profile 也不会把 Swagger 直接开到公网；本地要调试时显式设 `SWAGGER_ENABLED=true`。
+
+端口与健康检查的契约：应用监听 `SERVER_PORT`（默认 8825），镜像与 compose 的健康检查读取同一个变量，因此用 `-e SERVER_PORT=xxxx` 覆盖端口时探针会跟随，不会出现「应用监听 8888、探针打 8825」导致容器被判不健康而反复重启。
 
 首次启动会用 `ADMIN_USERNAME` 和 `ADMIN_PASSWORD` 创建管理员；没有固定默认密码。已有账号不会被覆盖，历史示例密码 `Admin123` 会在提供有效 `ADMIN_PASSWORD` 时被替换。
 

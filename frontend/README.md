@@ -108,11 +108,14 @@ Content surfaces and legacy `--glass-*` tokens remain solid. Only functional chr
 opts into `.functional-glass`; unsupported blur, reduced transparency and high contrast
 fall back to solid surfaces. Reduced motion removes panel displacement and looping sound bars.
 
-The [approved whole-site redesign](../docs/superpowers/specs/2026-10-16-selfblog-ios-glass-redesign-design.md)
+The approved whole-site redesign
 has three batches, all implemented: foundation/navigation/music, the public reading
 pages (shared `ArticleList`, rebuilt home/archives/about/404/search/tag/reader/gallery)
 and the author workspace (compact admin shell with a focus-managed drawer, unified
-page hierarchy, shared album dialog, login card and editor shell).
+page hierarchy, shared album dialog, login card and editor shell). The design
+specification originally lived in `docs/superpowers/specs/`; that directory was
+cleaned up on 2026-10-19, so the recorded outcome in [CHANGELOG.md](../CHANGELOG.md)
+is authoritative.
 
 ### CSS Variables
 
