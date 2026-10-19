@@ -51,4 +51,17 @@ public interface SysUserMapper extends BaseMapper<SysUser> {
      * 批量统计每日新增用户数（避免 N+1 查询）
      */
     List<Map<String, Object>> countUsersGroupByDate(@Param("since") LocalDateTime since);
+
+    /**
+     * 绕过 @TableLogic 按用户名查任意状态（含已软删除）的用户行。
+     *
+     * <p>sys_user.username 有唯一约束，而删除是逻辑删除：删除后同名行仍占用唯一索引。
+     * 启动播种（DataInitializer）必须先能看到那行已删除的记录并恢复它，
+     * 否则查不到 → 再次 INSERT → 撞唯一键 → 应用启动失败（生产崩溃循环）。
+     * 这里是刻意不过滤 is_deleted 的原始查询。
+     */
+    SysUser selectRawByUsername(@Param("username") String username);
+
+    /** 恢复被逻辑删除的用户行（is_deleted=1 → 0）。 */
+    int restoreDeletedById(@Param("userId") Long userId);
 }

@@ -4,6 +4,46 @@
 
 ---
 
+## 未发布 — 修复 CI 两处红灯：Dockerfile 探针语法与启动播种幂等 (2026-10-19)
+
+### 说明
+
+`4689309` 推送后 CI（run 39200430765）四个 job 中两个失败，且与本次文档提交无关，是 `f8cc5be` 引入的存量缺陷在 main 上首次被 CI 覆盖：
+
+- **`Docker image smoke test`**：`dockerfile parse error on line 69: Unknown type "CMD-SHELL" in HEALTHCHECK (try CMD)`。
+- **`Backend tests (MySQL 8)`**：`Tests run: 669, Errors: 161`，首因是 `DataInitializer` 启动抛 `Duplicate entry 'test-admin' for key 'sys_user.uk_username'`，其余 160 个错误全是 Spring 上下文缓存失败阈值（1）级联跳过。
+
+### 修复
+
+- **`backend/Dockerfile`**：`HEALTHCHECK` 的 `CMD-SHELL` 改为 `CMD`。`CMD-SHELL` 是 **docker-compose** `healthcheck.test` 数组的关键字，Dockerfile 的 `HEALTHCHECK` 只接受 `CMD` / `NONE`；写成 `CMD-SHELL` 直接构建失败。`CMD` 用 shell 形式（非 JSON 数组）时经 `/bin/sh -c` 执行，`${SERVER_PORT:-8825}` 与 `|| exit 1` 都能正常工作，端口覆盖能力不丢。两个 compose 文件里的 `test: ["CMD-SHELL", ...]` 是合法写法，**未改动**。
+- **`DataInitializer.initAdminAccount()`**：启动播种改为幂等。原逻辑用 `selectOne(username=...)` 判断存在性，而该查询受 `@TableLogic` 约束只返回 `is_deleted = 0`；一旦作者行被软删除（测试里 `sysUserMapper.delete(null)` 就是逻辑删除），查询误判「不存在」→ 再次 `INSERT` → 撞 `uk_username` 唯一索引 → `CommandLineRunner` 抛异常 → 上下文加载失败。现在改为：
+  - 用新增的 `SysUserMapper.selectRawByUsername`（刻意不过滤 `is_deleted`）取原始行；
+  - 命中软删除行时调 `SysUserMapper.restoreDeletedById`（`WHERE id = ? AND is_deleted = 1`）恢复该行，**保留作者已设置的密码，不重置**；
+  - 命中存活行时沿用原有「旧版示例密码 `Admin123` 一次性升级」分支；
+  - 确实不存在时才校验 `ADMIN_PASSWORD` 长度并插入；`insert` 外面兜一层 `catch (DataAccessException)`，捕获到后重新做一次原始查询，确认是并发/多上下文竞态才降级为跳过，否则原样抛出。
+  - 兜底刻意捕获父类 `DataAccessException` 而非 `DuplicateKeyException`：H2/MySQL 抛前者子类，SQLite 的约束错误是 `UncategorizedSQLException`，只有父类跨三库可移植。
+- **`frontend/scripts/__tests__/docker-config.test.mjs`**：新增两条回归断言 —— 全文件不得出现 `CMD-SHELL`，且 `HEALTHCHECK` 后必须是 `CMD curl -f` 形式。这条闸门以后能在 CI 之前拦住同类语法错误。
+
+### 验证
+
+- 红证（证明新测试真能拦住该 bug）：把 `DataInitializer.java` 临时还原为 `HEAD` 版本后跑 `DataInitializerIdempotencyTest#reinsertingAfterLogicalDeleteDoesNotFailStartup`，得到 `DuplicateKeyException` + `Tests run: 1, Failures: 1`，与 CI 的 MySQL 失败同因；恢复修复版后同测试通过。
+- 后端全量：`Tests run: 673, Failures: 0, Errors: 0, Skipped: 0` + `BUILD SUCCESS`（基线 669 + 新增 4）。
+- 前端六闸门全绿：`lint:check` 0 errors/43 warnings、`format:check` 通过、`type-check` 0、`test:run` 43 files / 400 tests、`test:deployment` 27/27、`build` 5.81s。
+- 未验证（本机无 Docker、无 MySQL 客户端）：真实镜像构建与真实 MySQL 8 上的全量测试，需由 CI 的 `docker` 与 `mysql` job 复核。
+
+### 影响文件
+
+| 文件 | 改动类型 |
+| --- | --- |
+| `backend/Dockerfile` | 修复（HEALTHCHECK `CMD-SHELL` → `CMD`） |
+| `backend/src/main/java/com/selfblog/config/db/DataInitializer.java` | 修复（启动播种幂等 + 软删除恢复 + 并发兜底） |
+| `backend/src/main/java/com/selfblog/mapper/SysUserMapper.java` | 新增（`selectRawByUsername` / `restoreDeletedById`） |
+| `backend/src/main/resources/mapper/SysUserMapper.xml` | 新增（对应两条无 `databaseId` 的跨库语句） |
+| `backend/src/test/java/com/selfblog/config/db/DataInitializerIdempotencyTest.java` | 新增（4 个用例） |
+| `frontend/scripts/__tests__/docker-config.test.mjs` | 新增（`CMD-SHELL` 与 `HEALTHCHECK ... CMD` 回归断言） |
+
+---
+
 ## 未发布 — 仓库清理：删除无用文件与无用文档 (2026-10-19)
 
 ### 说明

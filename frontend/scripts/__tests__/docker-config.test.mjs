@@ -25,6 +25,11 @@ test('runtime is nonroot, owns media/data directories and contains its healthche
     assert.ok(dockerfile.includes(path))
   assert.match(dockerfile, /USER appuser/)
   assert.match(dockerfile, /HEALTHCHECK[\s\S]*curl -f/)
+  // Dockerfile HEALTHCHECK only accepts CMD or NONE. CMD-SHELL belongs to compose
+  // healthcheck syntax; using it here is a parse error that fails the image build
+  // (CI: `Unknown type "CMD-SHELL" in HEALTHCHECK (try CMD)`).
+  assert.doesNotMatch(dockerfile, /CMD-SHELL/)
+  assert.match(dockerfile, /HEALTHCHECK[\s\S]*?\n\s*CMD curl -f/)
   assert.match(dockerfile, /ENTRYPOINT \["java", "-jar", "\/app\/selfblog\.jar"\]/)
 })
 
