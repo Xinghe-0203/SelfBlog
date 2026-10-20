@@ -75,11 +75,11 @@ const cover = (post: Post) => getSafeImageUrl(post.coverImage || post.coverUrl, 
   align-items: center;
   gap: 6px 14px;
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: var(--text-2xs);
 }
 .article-title {
   margin: 8px 0;
-  font-size: 18px;
+  font-size: var(--text-lg);
   font-weight: 650;
   line-height: 1.5;
   letter-spacing: -0.025em;
@@ -92,7 +92,7 @@ const cover = (post: Post) => getSafeImageUrl(post.coverImage || post.coverUrl, 
   color: var(--accent);
 }
 .article-list--featured .article-row:first-child .article-title {
-  font-size: 22px;
+  font-size: var(--text-2xl);
 }
 .article-summary {
   display: -webkit-box;
@@ -102,7 +102,7 @@ const cover = (post: Post) => getSafeImageUrl(post.coverImage || post.coverUrl, 
   line-clamp: 2;
   margin: 0;
   color: var(--text-secondary);
-  font-size: 13px;
+  font-size: var(--text-sm);
   line-height: 1.85;
   overflow-wrap: anywhere;
 }
@@ -123,7 +123,7 @@ const cover = (post: Post) => getSafeImageUrl(post.coverImage || post.coverUrl, 
   border-radius: var(--radius-xs);
   color: var(--text-secondary);
   background: var(--bg-primary);
-  font-size: 11px;
+  font-size: var(--text-2xs);
 }
 .article-tags a:hover {
   color: var(--accent);
@@ -132,7 +132,7 @@ const cover = (post: Post) => getSafeImageUrl(post.coverImage || post.coverUrl, 
 .reading-time {
   flex-shrink: 0;
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: var(--text-2xs);
 }
 .row-cover {
   flex: 0 0 130px;
@@ -157,10 +157,10 @@ const cover = (post: Post) => getSafeImageUrl(post.coverImage || post.coverUrl, 
     padding-block: 22px;
   }
   .article-title {
-    font-size: 16px;
+    font-size: var(--text-base);
   }
   .article-list--featured .article-row:first-child .article-title {
-    font-size: 20px;
+    font-size: var(--text-xl);
   }
   .row-cover {
     flex-basis: 77px;
@@ -168,7 +168,7 @@ const cover = (post: Post) => getSafeImageUrl(post.coverImage || post.coverUrl, 
     height: 79px;
   }
   .article-meta {
-    font-size: 11px;
+    font-size: var(--text-2xs);
   }
 }
 </style>

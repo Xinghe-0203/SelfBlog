@@ -167,7 +167,7 @@ const handleKeydown = (e: KeyboardEvent) => {
   align-items: center;
   gap: 2px;
   font-family: var(--font-sans);
-  font-size: 0.6875rem;
+  font-size: var(--text-2xs);
   font-weight: var(--font-medium, 500);
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -178,7 +178,7 @@ const handleKeydown = (e: KeyboardEvent) => {
 
 .input-label__required {
   color: var(--error, #dc2626);
-  font-size: 0.75rem;
+  font-size: var(--text-xs);
   line-height: 1;
 }
 
@@ -201,7 +201,7 @@ const handleKeydown = (e: KeyboardEvent) => {
 .input-field {
   width: 100%;
   font-family: var(--font-sans);
-  font-size: var(--text-sm, 0.8125rem);
+  font-size: var(--text-sm);
   line-height: var(--leading-normal, 1.6);
   color: var(--text-primary, #292524);
   background: var(--surface-solid, #ffffff);
@@ -221,7 +221,7 @@ const handleKeydown = (e: KeyboardEvent) => {
 /* Sizes */
 .input-wrap--sm .input-field {
   padding: 7px 12px;
-  font-size: var(--text-xs, 0.75rem);
+  font-size: var(--text-xs);
   border-radius: var(--radius-sm, 6px);
 }
 
@@ -231,7 +231,7 @@ const handleKeydown = (e: KeyboardEvent) => {
 
 .input-wrap--lg .input-field {
   padding: 13px 16px;
-  font-size: var(--text-base, 0.9375rem);
+  font-size: var(--text-base);
   border-radius: var(--radius-md, 12px);
 }
 
@@ -329,7 +329,7 @@ const handleKeydown = (e: KeyboardEvent) => {
 
 .input-message {
   font-family: var(--font-sans);
-  font-size: 0.6875rem;
+  font-size: var(--text-2xs);
   line-height: 1.4;
   margin: 0;
   animation: input-msg-enter 0.15s ease-out;

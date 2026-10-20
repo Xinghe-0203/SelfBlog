@@ -224,7 +224,7 @@ onBeforeUnmount(() => {
 
 .toast-message {
   flex: 1;
-  font-size: 0.875rem;
+  font-size: var(--text-sm);
   color: var(--text-primary);
   line-height: 1.5;
 }
@@ -232,7 +232,7 @@ onBeforeUnmount(() => {
 .toast-action {
   flex-shrink: 0;
   padding: 4px 12px;
-  font-size: 0.8rem;
+  font-size: var(--text-xs);
   font-weight: 500;
   background: var(--primary-light);
   color: var(--primary);

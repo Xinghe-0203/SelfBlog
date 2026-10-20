@@ -585,7 +585,7 @@ onUnmounted(() => {
   gap: 5px;
   min-height: 44px;
   color: var(--text-muted);
-  font-size: 0.8rem;
+  font-size: var(--text-xs);
   text-decoration: none;
 }
 .back-link:hover,
@@ -641,12 +641,12 @@ onUnmounted(() => {
   background: var(--surface-primary);
   color: var(--text-secondary);
   font: inherit;
-  font-size: 0.82rem;
+  font-size: var(--text-sm);
   cursor: pointer;
 }
 .like-action span {
   color: var(--like-accent);
-  font-size: 1.1rem;
+  font-size: var(--text-lg);
 }
 .like-action.active {
   border-color: var(--like-accent-border);
@@ -658,11 +658,11 @@ onUnmounted(() => {
   cursor: wait;
 }
 .like-action strong {
-  font-size: 0.76rem;
+  font-size: var(--text-xs);
 }
 .interaction-note {
   color: var(--text-muted);
-  font-size: 0.72rem;
+  font-size: var(--text-xs);
 }
 
 /* 上一篇 / 下一篇：博客阅读器的标准出口，避免读完只能在浏览器里按后退 */
@@ -697,11 +697,11 @@ onUnmounted(() => {
   align-items: center;
   gap: 4px;
   color: var(--text-muted);
-  font-size: 0.7rem;
+  font-size: var(--text-2xs);
 }
 .adjacent-title {
   color: var(--text-primary);
-  font-size: 0.88rem;
+  font-size: var(--text-sm);
   font-weight: 600;
   line-height: 1.45;
   display: -webkit-box;
@@ -724,7 +724,7 @@ onUnmounted(() => {
 .comments-heading .eyebrow {
   margin: 0 0 6px;
   color: var(--primary);
-  font-size: 0.67rem;
+  font-size: var(--text-2xs);
   font-weight: 700;
   letter-spacing: 0.15em;
 }
@@ -749,7 +749,7 @@ onUnmounted(() => {
   display: grid;
   gap: 6px;
   color: var(--text-secondary);
-  font-size: 0.75rem;
+  font-size: var(--text-xs);
 }
 .comment-form input,
 .comment-form textarea {
@@ -760,7 +760,7 @@ onUnmounted(() => {
   background: var(--bg-primary);
   color: var(--text-primary);
   font: inherit;
-  font-size: 0.85rem;
+  font-size: var(--text-sm);
 }
 .comment-form textarea {
   resize: vertical;
@@ -773,7 +773,7 @@ onUnmounted(() => {
 }
 .comment-form-footer small {
   color: var(--text-muted);
-  font-size: 0.7rem;
+  font-size: var(--text-2xs);
 }
 .comment-form-footer button {
   padding: 9px 13px;
@@ -781,7 +781,7 @@ onUnmounted(() => {
   border-radius: var(--radius-sm);
   background: var(--primary);
   color: white;
-  font-size: 0.76rem;
+  font-size: var(--text-xs);
   font-weight: 700;
   cursor: pointer;
 }
@@ -816,16 +816,16 @@ onUnmounted(() => {
   gap: 10px;
 }
 .reader-comment header strong {
-  font-size: 0.82rem;
+  font-size: var(--text-sm);
 }
 .reader-comment time {
   color: var(--text-muted);
-  font-size: 0.67rem;
+  font-size: var(--text-2xs);
 }
 .reader-comment p {
   margin: 7px 0 0;
   color: var(--text-secondary);
-  font-size: 0.85rem;
+  font-size: var(--text-sm);
   line-height: 1.7;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
@@ -833,7 +833,7 @@ onUnmounted(() => {
 .no-comments {
   padding: 23px 0;
   color: var(--text-muted);
-  font-size: 0.82rem;
+  font-size: var(--text-sm);
   text-align: center;
 }
 .load-more-comments {
@@ -844,7 +844,7 @@ onUnmounted(() => {
   border-radius: var(--radius-sm);
   background: var(--surface-primary);
   color: var(--primary);
-  font-size: 0.78rem;
+  font-size: var(--text-xs);
   cursor: pointer;
 }
 .article-tags {
@@ -855,7 +855,7 @@ onUnmounted(() => {
 }
 .article-tags a {
   color: var(--primary);
-  font-size: 0.75rem;
+  font-size: var(--text-xs);
   text-decoration: none;
 }
 .article-tags a:hover {
@@ -864,7 +864,7 @@ onUnmounted(() => {
 .article-category {
   margin: 0 0 9px;
   color: var(--primary);
-  font-size: 0.69rem;
+  font-size: var(--text-2xs);
   font-weight: 700;
 }
 .article-header h1 {
@@ -878,7 +878,7 @@ onUnmounted(() => {
 .article-summary {
   margin: 17px 0 0;
   color: var(--text-secondary);
-  font-size: 1.03rem;
+  font-size: var(--text-base);
   line-height: 1.8;
 }
 .article-meta {
@@ -888,7 +888,7 @@ onUnmounted(() => {
   gap: 10px;
   margin-top: 18px;
   color: var(--text-muted);
-  font-size: 0.76rem;
+  font-size: var(--text-xs);
 }
 .meta-dot {
   width: 3px;
@@ -901,7 +901,7 @@ onUnmounted(() => {
   padding-top: 28px;
   color: var(--text-primary);
   font-family: var(--font-display);
-  font-size: 1.075rem;
+  font-size: var(--text-lg);
   line-height: 1.9;
   overflow-wrap: anywhere;
 }
@@ -914,15 +914,15 @@ onUnmounted(() => {
   scroll-margin-top: 0;
 }
 .markdown-body :deep(h1) {
-  font-size: 1.85rem;
+  font-size: var(--text-3xl);
 }
 .markdown-body :deep(h2) {
   padding-bottom: 0.45em;
   border-bottom: 1px solid var(--border-solid);
-  font-size: 1.55rem;
+  font-size: var(--text-2xl);
 }
 .markdown-body :deep(h3) {
-  font-size: 1.25rem;
+  font-size: var(--text-xl);
 }
 .markdown-body :deep(p) {
   margin: 0 0 1.35em;
@@ -949,7 +949,7 @@ onUnmounted(() => {
   background: var(--code-bg);
   color: var(--code-text);
   border: 1px solid var(--code-border);
-  font-size: 0.82rem;
+  font-size: var(--text-sm);
   line-height: 1.65;
 }
 .markdown-body :deep(pre code) {
@@ -983,7 +983,7 @@ onUnmounted(() => {
 .markdown-body :deep(.code-lang) {
   color: var(--code-text);
   font-family: var(--font-mono);
-  font-size: 0.72rem;
+  font-size: var(--text-xs);
   opacity: 0.6;
 }
 .markdown-body :deep(.code-copy) {
@@ -996,7 +996,7 @@ onUnmounted(() => {
   background: transparent;
   color: var(--code-text);
   font: inherit;
-  font-size: 0.72rem;
+  font-size: var(--text-xs);
   opacity: 0.75;
   cursor: pointer;
   transition: all var(--transition-fast);
@@ -1016,7 +1016,7 @@ onUnmounted(() => {
   background: transparent;
   color: var(--code-text);
   font: inherit;
-  font-size: 0.72rem;
+  font-size: var(--text-xs);
   opacity: 0.7;
   cursor: pointer;
 }
@@ -1103,7 +1103,7 @@ onUnmounted(() => {
   margin: 8px 0 0;
   color: var(--text-secondary);
   font-family: var(--font-display);
-  font-size: 1.1rem;
+  font-size: var(--text-lg);
 }
 .article-end a {
   display: inline-flex;
@@ -1111,7 +1111,7 @@ onUnmounted(() => {
   gap: 5px;
   min-height: 44px;
   color: var(--primary);
-  font-size: 0.8rem;
+  font-size: var(--text-xs);
   text-decoration: none;
 }
 .article-end a:hover {
@@ -1132,7 +1132,7 @@ onUnmounted(() => {
 .toc-card h2 {
   margin: 0 0 11px;
   font-family: var(--font-display);
-  font-size: 1rem;
+  font-size: var(--text-base);
 }
 .toc-card nav {
   display: flex;
@@ -1151,7 +1151,7 @@ onUnmounted(() => {
   color: var(--text-muted);
   cursor: pointer;
   font: inherit;
-  font-size: 0.75rem;
+  font-size: var(--text-xs);
   line-height: 1.5;
   text-align: left;
 }
@@ -1188,7 +1188,7 @@ onUnmounted(() => {
   color: var(--text-primary);
   cursor: pointer;
   font: inherit;
-  font-size: 0.8rem;
+  font-size: var(--text-xs);
   text-decoration: none;
 }
 .state-panel button:hover,
@@ -1217,16 +1217,16 @@ onUnmounted(() => {
     margin-bottom: 0;
   }
   .article-header h1 {
-    font-size: 28px;
+    font-size: var(--text-3xl);
   }
   .markdown-body {
-    font-size: 1rem;
+    font-size: var(--text-base);
   }
   .markdown-body :deep(h1) {
-    font-size: 1.55rem;
+    font-size: var(--text-2xl);
   }
   .markdown-body :deep(h2) {
-    font-size: 1.35rem;
+    font-size: var(--text-xl);
   }
   .reader-interactions {
     flex-wrap: wrap;

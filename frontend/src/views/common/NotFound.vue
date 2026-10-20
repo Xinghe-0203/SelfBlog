@@ -66,16 +66,16 @@ function doSearch(): void {
 }
 .error-code {
   margin-bottom: 14px;
-  font-size: 14px;
+  font-size: var(--text-sm);
   color: var(--text-muted);
   font-variant-numeric: tabular-nums;
 }
 h1 {
-  font-size: 30px;
+  font-size: var(--text-3xl);
 }
 .error-text {
   margin-block: 16px 24px;
-  font-size: 14px;
+  font-size: var(--text-sm);
 }
 .search-box {
   display: flex;
@@ -97,7 +97,7 @@ h1 {
   outline: 0;
   color: var(--text-primary);
   background: transparent;
-  font-size: 16px;
+  font-size: var(--text-base);
 }
 .error-actions {
   display: flex;
@@ -113,7 +113,7 @@ h1 {
     padding: 24px;
   }
   h1 {
-    font-size: 26px;
+    font-size: var(--text-2xl);
   }
 }
 </style>

@@ -29,7 +29,7 @@ onBeforeUnmount(() => {
 <style scoped>
 .page-markdown {
   overflow-wrap: anywhere;
-  font-size: 16px;
+  font-size: var(--text-base);
   line-height: 1.9;
 }
 .page-markdown :deep(img) {

@@ -229,11 +229,11 @@ onBeforeUnmount(() => {
   margin-bottom: 28px;
 }
 .gallery-hero h1 {
-  font-size: 30px;
+  font-size: var(--text-3xl);
 }
 .gallery-hero p {
   margin-top: 12px;
-  font-size: 14px;
+  font-size: var(--text-sm);
 }
 .album-grid {
   display: grid;
@@ -282,7 +282,7 @@ onBeforeUnmount(() => {
   border-radius: var(--radius-sm);
   background: var(--preview-scrim);
   color: white;
-  font-size: 11px;
+  font-size: var(--text-2xs);
 }
 .album-meta {
   display: flex;
@@ -294,16 +294,16 @@ onBeforeUnmount(() => {
 .album-meta strong {
   min-width: 0;
   overflow-wrap: anywhere;
-  font-size: 14px;
+  font-size: var(--text-sm);
 }
 .album-meta small {
   flex-shrink: 0;
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: var(--text-2xs);
 }
 .album-description {
   padding-inline: 16px;
-  font-size: 12px;
+  font-size: var(--text-xs);
   line-height: 1.8;
   color: var(--text-secondary);
   overflow-wrap: anywhere;
@@ -315,15 +315,15 @@ onBeforeUnmount(() => {
   padding: 48px 20px;
   border-radius: var(--radius-lg);
   color: var(--text-secondary);
-  font-size: 14px;
+  font-size: var(--text-sm);
   text-align: center;
 }
 .gallery-state p {
-  font-size: 14px;
+  font-size: var(--text-sm);
 }
 .album-intro {
   margin-bottom: 20px;
-  font-size: 14px;
+  font-size: var(--text-sm);
   overflow-wrap: anywhere;
 }
 .unlock-form {
@@ -338,10 +338,10 @@ onBeforeUnmount(() => {
   color: var(--accent);
 }
 .unlock-form h3 {
-  font-size: 18px;
+  font-size: var(--text-lg);
 }
 .unlock-form p {
-  font-size: 13px;
+  font-size: var(--text-sm);
 }
 .unlock-form input {
   width: 100%;
@@ -350,13 +350,13 @@ onBeforeUnmount(() => {
   border-radius: var(--radius);
   background: var(--surface-primary);
   color: var(--text-primary);
-  font-size: 16px;
+  font-size: var(--text-base);
 }
 .unlock-form .btn {
   width: 100%;
 }
 .unlock-form small {
-  font-size: 13px;
+  font-size: var(--text-sm);
   color: var(--error);
 }
 .photo-grid {
@@ -384,7 +384,7 @@ onBeforeUnmount(() => {
   padding: 25px 10px 9px;
   background: linear-gradient(transparent, var(--preview-scrim));
   color: white;
-  font-size: 12px;
+  font-size: var(--text-xs);
   text-align: left;
 }
 @media (max-width: 760px) {

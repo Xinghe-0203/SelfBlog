@@ -131,7 +131,7 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   gap: 12px;
-  font-size: 14px;
+  font-size: var(--text-sm);
 }
 .preview-toolbar select {
   min-height: 44px;
@@ -142,7 +142,7 @@ onBeforeUnmount(() => {
   color: var(--text-primary);
 }
 .preview-toolbar small {
-  font-size: 12px;
+  font-size: var(--text-xs);
   color: var(--text-muted);
 }
 .preview-scroll {

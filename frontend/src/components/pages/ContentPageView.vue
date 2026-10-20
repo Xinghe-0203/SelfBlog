@@ -32,7 +32,7 @@ defineProps<{ page: PublicPage }>()
   margin-bottom: var(--page-section-gap, 28px);
 }
 .content-heading h1 {
-  font-size: 30px;
+  font-size: var(--text-3xl);
   overflow-wrap: anywhere;
 }
 .content-heading p {
@@ -42,7 +42,7 @@ defineProps<{ page: PublicPage }>()
 }
 .content-updated {
   margin-bottom: 24px;
-  font-size: 12px;
+  font-size: var(--text-xs);
   color: var(--text-muted);
 }
 .content-links {
@@ -58,14 +58,14 @@ defineProps<{ page: PublicPage }>()
   align-items: center;
   min-height: 44px;
   color: var(--accent);
-  font-size: 14px;
+  font-size: var(--text-sm);
 }
 @media (max-width: 600px) {
   .content-page {
     padding: 8px 18px 36px;
   }
   .content-heading h1 {
-    font-size: 26px;
+    font-size: var(--text-2xl);
   }
 }
 </style>

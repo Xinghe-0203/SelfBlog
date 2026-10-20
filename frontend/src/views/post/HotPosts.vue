@@ -307,7 +307,7 @@ onMounted(() => {
 }
 
 .mini-tag {
-  font-size: 0.6875rem;
+  font-size: var(--text-2xs);
   font-weight: var(--font-medium);
   color: var(--primary);
   background: var(--primary-light);

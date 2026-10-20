@@ -347,16 +347,16 @@ function setSeo(key: keyof PageSeo, value: string | boolean | null) {
   align-items: center;
   min-height: 44px;
   color: var(--text-secondary);
-  font-size: 13px;
+  font-size: var(--text-sm);
 }
 .editor-heading h1 {
-  font-size: 24px;
+  font-size: var(--text-2xl);
   overflow-wrap: anywhere;
 }
 .editor-heading p {
   margin-top: 8px;
   color: var(--text-muted);
-  font-size: 13px;
+  font-size: var(--text-sm);
 }
 .editor-actions {
   display: flex;
@@ -368,7 +368,7 @@ function setSeo(key: keyof PageSeo, value: string | boolean | null) {
   padding: 12px 14px;
   border: 1px solid var(--border-light);
   border-radius: var(--radius);
-  font-size: 14px;
+  font-size: var(--text-sm);
 }
 .editor-alert {
   color: var(--error);
@@ -386,7 +386,7 @@ function setSeo(key: keyof PageSeo, value: string | boolean | null) {
   display: flex;
   flex-wrap: wrap;
   gap: 16px;
-  font-size: 12px;
+  font-size: var(--text-xs);
   color: var(--text-secondary);
 }
 .editor-tabs {
@@ -417,7 +417,7 @@ function setSeo(key: keyof PageSeo, value: string | boolean | null) {
   display: grid;
   gap: 8px;
   color: var(--text-secondary);
-  font-size: 14px;
+  font-size: var(--text-sm);
 }
 .page-field input:not([type='checkbox']),
 textarea,
@@ -430,7 +430,7 @@ select {
   background: var(--surface-primary);
   color: var(--text-primary);
   font: inherit;
-  font-size: 16px;
+  font-size: var(--text-base);
 }
 .page-field textarea {
   resize: vertical;
@@ -439,7 +439,7 @@ select {
 .page-field small,
 .field-hint,
 .editor-footer small {
-  font-size: 12px;
+  font-size: var(--text-xs);
   color: var(--text-muted);
   line-height: 1.7;
 }
@@ -465,14 +465,14 @@ select {
 }
 .module-fields legend {
   margin-bottom: 12px;
-  font-size: 14px;
+  font-size: var(--text-sm);
 }
 .module-fields label {
   display: flex;
   align-items: center;
   gap: 8px;
   min-height: 44px;
-  font-size: 14px;
+  font-size: var(--text-sm);
 }
 .slug-field {
   display: flex;
@@ -481,7 +481,7 @@ select {
 }
 .slug-field span {
   flex-shrink: 0;
-  font-size: 14px;
+  font-size: var(--text-sm);
 }
 .editor-footer {
   display: flex;

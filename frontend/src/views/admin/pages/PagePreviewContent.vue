@@ -75,6 +75,6 @@ onMounted(() => {
 }
 .preview-message {
   padding: 24px;
-  font-size: 14px;
+  font-size: var(--text-sm);
 }
 </style>

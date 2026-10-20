@@ -125,13 +125,13 @@ onMounted(fetchArchives)
 .page-heading h1 {
   margin: 0;
   font-family: var(--font-display);
-  font-size: 30px;
+  font-size: var(--text-3xl);
   letter-spacing: -0.045em;
 }
 .page-heading > p:last-child {
   margin: 12px 0 0;
   color: var(--text-secondary);
-  font-size: 0.93rem;
+  font-size: var(--text-sm);
 }
 .archive-list {
   padding: 0 26px;
@@ -155,7 +155,7 @@ onMounted(fetchArchives)
   gap: 10px;
   margin: 4px 0 0;
   font-family: var(--font-display);
-  font-size: 1.18rem;
+  font-size: var(--text-lg);
 }
 .archive-group h2 span {
   color: var(--text-muted);
@@ -177,12 +177,12 @@ onMounted(fetchArchives)
 }
 .archive-group time {
   color: var(--text-muted);
-  font-size: 0.75rem;
+  font-size: var(--text-xs);
   white-space: nowrap;
 }
 .archive-group a {
   color: var(--text-primary);
-  font-size: 0.9rem;
+  font-size: var(--text-sm);
   line-height: 1.55;
   text-decoration: none;
 }
@@ -191,7 +191,7 @@ onMounted(fetchArchives)
 }
 .category {
   color: var(--text-muted);
-  font-size: 0.72rem;
+  font-size: var(--text-xs);
 }
 .state-panel {
   margin-top: 28px;

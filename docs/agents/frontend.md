@@ -16,7 +16,7 @@ Applies to `frontend/` (Vue 3.5 + Vite 6 + Pinia + Vitest). `AGENTS.md` is the e
   If that directory is missing (fresh `target/` cleanup), run a Maven build once to re-provision it, or call `node_modules/.bin/<tool>` directly.
 - On this machine a bare `npm run <script>` fails on the default PATH (verified 2026-10-16): the system PATH contains an unmatched quote (`C:\Program Files\Java\jdk-25\bin"`), which derails `cmd.exe`'s PATH parsing so the `.bin` shims cannot resolve bare `node`. Prefix the provisioned Node directory as above (what all verified commands do), or call the shims directly.
 - `node_modules` was reinstalled on Windows with the provisioned Node (`npm ci`), so the `.bin/*.cmd` shims and win32 native packages (`@rollup/rollup-win32-x64-msvc`, `@esbuild/win32-x64`) are present.
-- Test baseline as of 2026-10-17: `npx vitest run` = **43 files / 400 tests**, all passing (~19s). `lint:check` (0 errors / 43 warnings), `format:check`, `type-check`, `test:deployment` (27/27) and `build` are all green at the same commit; never leave any of them below that.
+- Test baseline as of 2026-10-19: `npx vitest run` = **43 files / 438 tests**, all passing (~48s). `lint:check` (0 errors / 43 warnings), `format:check`, `type-check`, `test:deployment` (27/27) and `build` are all green at the same commit; never leave any of them below that.
 
 ```sh
 npm ci

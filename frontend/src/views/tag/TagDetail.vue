@@ -124,7 +124,7 @@ watch(() => route.params.id, fetchTag, { immediate: true })
   min-height: 44px;
   margin-bottom: 12px;
   color: var(--text-muted);
-  font-size: 0.8rem;
+  font-size: var(--text-xs);
   text-decoration: none;
 }
 .back-link:hover {
@@ -136,7 +136,7 @@ watch(() => route.params.id, fetchTag, { immediate: true })
 .tag-heading h1 {
   margin: 0;
   font-family: var(--font-display);
-  font-size: 30px;
+  font-size: var(--text-3xl);
   letter-spacing: -0.045em;
   overflow-wrap: anywhere;
 }
@@ -147,7 +147,7 @@ watch(() => route.params.id, fetchTag, { immediate: true })
 .tag-heading > p:last-child {
   margin: 10px 0 0;
   color: var(--text-muted);
-  font-size: 0.84rem;
+  font-size: var(--text-sm);
 }
 .state-panel {
   margin-top: 25px;
@@ -174,7 +174,7 @@ watch(() => route.params.id, fetchTag, { immediate: true })
   color: var(--text-primary);
   cursor: pointer;
   font: inherit;
-  font-size: 0.82rem;
+  font-size: var(--text-sm);
 }
 .load-more button:hover:not(:disabled) {
   border-color: var(--primary);
@@ -188,7 +188,7 @@ watch(() => route.params.id, fetchTag, { immediate: true })
 .end-note {
   margin: 18px 0 0;
   color: var(--text-muted);
-  font-size: 0.78rem;
+  font-size: var(--text-xs);
   text-align: center;
 }
 @media (max-width: 600px) {

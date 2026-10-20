@@ -154,7 +154,7 @@ onUnmounted(() => {
   background: linear-gradient(135deg, var(--primary-start), var(--primary-end));
   color: white;
   padding: 0.5rem 1rem;
-  font-size: 0.875rem;
+  font-size: var(--text-sm);
   font-weight: 500;
   border-radius: 0 0 var(--radius) var(--radius);
   z-index: 10000;

@@ -455,12 +455,12 @@ onMounted(() => void load())
 }
 .page-heading h1 {
   margin: 0 0 8px;
-  font-size: 24px;
+  font-size: var(--text-2xl);
 }
 .page-heading p:not(.eyebrow) {
   margin: 0;
   color: var(--text-muted);
-  font-size: 13px;
+  font-size: var(--text-sm);
 }
 .settings-grid {
   display: grid;
@@ -482,19 +482,19 @@ onMounted(() => void load())
 }
 .panel-heading h2 {
   margin: 0 0 5px;
-  font-size: 15px;
+  font-size: var(--text-base);
 }
 .panel-heading p {
   margin: 0;
   color: var(--text-muted);
-  font-size: 12px;
+  font-size: var(--text-xs);
   line-height: 1.6;
 }
 .settings-panel > label:not(.toggle-row) {
   display: grid;
   gap: 7px;
   color: var(--text-secondary);
-  font-size: 13px;
+  font-size: var(--text-sm);
 }
 input:not([type='checkbox']):not([type='color']):not([type='range']),
 textarea,
@@ -506,14 +506,14 @@ select {
   background: var(--surface-primary);
   color: var(--text-primary);
   font: inherit;
-  font-size: 16px;
+  font-size: var(--text-base);
 }
 textarea {
   resize: vertical;
 }
 label small {
   color: var(--text-muted);
-  font-size: 12px;
+  font-size: var(--text-xs);
   line-height: 1.6;
 }
 .toggle-row {
@@ -530,12 +530,12 @@ label small {
   gap: 4px;
 }
 .toggle-row strong {
-  font-size: 13px;
+  font-size: var(--text-sm);
 }
 .toggle-row small {
   max-width: 400px;
   color: var(--text-muted);
-  font-size: 12px;
+  font-size: var(--text-xs);
   line-height: 1.6;
 }
 .toggle-row input {
@@ -558,12 +558,12 @@ label small {
   gap: 4px;
 }
 .security-row strong {
-  font-size: 13px;
+  font-size: var(--text-sm);
 }
 .security-row small {
   max-width: 400px;
   color: var(--text-muted);
-  font-size: 12px;
+  font-size: var(--text-xs);
   line-height: 1.6;
 }
 .path-input {
@@ -596,7 +596,7 @@ label small {
 }
 .color-input code {
   color: var(--text-secondary);
-  font-size: 13px;
+  font-size: var(--text-sm);
 }
 .skin-preview {
   display: grid;
@@ -621,11 +621,11 @@ label small {
   grid-column: 2;
 }
 .skin-preview b {
-  font-size: 13px;
+  font-size: var(--text-sm);
 }
 .skin-preview small {
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: var(--text-2xs);
 }
 .bg-panel {
   grid-column: 1 / -1;
@@ -644,7 +644,7 @@ label small {
   display: grid;
   gap: 7px;
   color: var(--text-secondary);
-  font-size: 13px;
+  font-size: var(--text-sm);
 }
 .range-row {
   display: flex;
@@ -695,7 +695,7 @@ label small {
   flex: 0 0 auto;
   min-width: 48px;
   color: var(--text-secondary);
-  font-size: 13px;
+  font-size: var(--text-sm);
   font-variant-numeric: tabular-nums;
   text-align: right;
 }
@@ -723,12 +723,12 @@ label small {
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-sm);
   color: var(--text-primary);
-  font-size: 13px;
+  font-size: var(--text-sm);
   font-weight: 600;
 }
 .bg-preview-hint {
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: var(--text-2xs);
   line-height: 1.6;
 }
 .form-footer {
@@ -741,14 +741,14 @@ label small {
 }
 .form-footer p {
   color: var(--text-muted);
-  font-size: 12px;
+  font-size: var(--text-xs);
 }
 .alert,
 .success {
   margin: 0;
   padding: 12px 13px;
   border-radius: var(--radius);
-  font-size: 13px;
+  font-size: var(--text-sm);
 }
 .alert {
   background: var(--error-light);

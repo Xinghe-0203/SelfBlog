@@ -160,13 +160,13 @@ onMounted(() => {
 .search-heading h1 {
   margin: 0;
   font-family: var(--font-display);
-  font-size: 30px;
+  font-size: var(--text-3xl);
   letter-spacing: -0.045em;
 }
 .search-heading > p:last-child {
   margin: 12px 0 0;
   color: var(--text-secondary);
-  font-size: 0.9rem;
+  font-size: var(--text-sm);
 }
 .search-form {
   display: flex;
@@ -187,7 +187,7 @@ onMounted(() => {
   background: transparent;
   color: var(--text-primary);
   font: inherit;
-  font-size: 0.95rem;
+  font-size: var(--text-base);
 }
 .search-form input::placeholder {
   color: var(--text-muted);
@@ -205,7 +205,7 @@ onMounted(() => {
   color: white;
   cursor: pointer;
   font: inherit;
-  font-size: 0.85rem;
+  font-size: var(--text-sm);
   font-weight: 600;
 }
 .search-form button:hover:not(:disabled) {
@@ -228,11 +228,11 @@ onMounted(() => {
 .results-heading h2 {
   margin: 0;
   font-family: var(--font-display);
-  font-size: 1.15rem;
+  font-size: var(--text-lg);
 }
 .results-heading > span {
   color: var(--text-muted);
-  font-size: 0.78rem;
+  font-size: var(--text-xs);
 }
 .state-panel {
   margin-top: 20px;
@@ -269,7 +269,7 @@ onMounted(() => {
   gap: 20px;
   padding-top: 23px;
   color: var(--text-muted);
-  font-size: 0.8rem;
+  font-size: var(--text-xs);
 }
 .pagination button {
   display: flex;
@@ -296,12 +296,12 @@ onMounted(() => {
 }
 .search-prompt > span {
   color: var(--primary);
-  font-size: 2.8rem;
+  font-size: var(--text-5xl);
   line-height: 1;
 }
 .search-prompt p {
   margin: 0;
-  font-size: 0.88rem;
+  font-size: var(--text-sm);
 }
 .sr-only {
   position: absolute;

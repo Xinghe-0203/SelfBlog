@@ -253,13 +253,13 @@ onMounted(() => {
 
 .page-heading h1 {
   margin: 0;
-  font-size: 24px;
+  font-size: var(--text-2xl);
 }
 
 .page-heading p {
   margin: 8px 0 0;
   color: var(--text-muted);
-  font-size: 13px;
+  font-size: var(--text-sm);
 }
 
 .create-form {
@@ -273,7 +273,7 @@ onMounted(() => {
 .form-title {
   margin-bottom: 12px;
   color: var(--text-primary);
-  font-size: 15px;
+  font-size: var(--text-base);
   font-weight: 600;
 }
 
@@ -290,7 +290,7 @@ onMounted(() => {
   border-radius: var(--radius);
   background: var(--surface-primary);
   color: var(--text-primary);
-  font-size: 16px;
+  font-size: var(--text-base);
   outline: none;
 }
 
@@ -328,7 +328,7 @@ onMounted(() => {
 .data-table th {
   background: var(--bg-secondary);
   color: var(--text-muted);
-  font-size: 12px;
+  font-size: var(--text-xs);
   font-weight: 600;
 }
 
@@ -339,13 +339,13 @@ onMounted(() => {
 .id-cell {
   color: var(--text-muted);
   font-family: var(--font-mono);
-  font-size: 12px;
+  font-size: var(--text-xs);
 }
 
 .tag-name {
   min-width: 160px;
   color: var(--text-primary);
-  font-size: 14px;
+  font-size: var(--text-sm);
   font-weight: 500;
   overflow-wrap: anywhere;
   white-space: normal;
@@ -357,7 +357,7 @@ onMounted(() => {
   border-radius: var(--radius-xs);
   background: var(--accent-light);
   color: var(--accent);
-  font-size: 12px;
+  font-size: var(--text-xs);
   font-weight: 600;
 }
 
@@ -369,7 +369,7 @@ onMounted(() => {
 .actions .btn {
   min-height: 36px;
   padding-inline: 10px;
-  font-size: 12px;
+  font-size: var(--text-xs);
 }
 
 .actions .danger {
@@ -386,7 +386,7 @@ onMounted(() => {
 
 .page-info {
   color: var(--text-muted);
-  font-size: 12px;
+  font-size: var(--text-xs);
 }
 
 .pagination button {
@@ -397,7 +397,7 @@ onMounted(() => {
   padding-inline: 10px;
   border-radius: var(--radius);
   color: var(--accent);
-  font-size: 12px;
+  font-size: var(--text-xs);
 }
 
 .pagination button:hover:not(:disabled) {
@@ -421,7 +421,7 @@ onMounted(() => {
   align-items: center;
   gap: 10px;
   color: var(--text-muted);
-  font-size: 13px;
+  font-size: var(--text-sm);
 }
 
 .state-panel {
@@ -437,7 +437,7 @@ onMounted(() => {
 
 .state-panel p {
   margin: 0;
-  font-size: 14px;
+  font-size: var(--text-sm);
 }
 
 .sk-line {
@@ -474,7 +474,7 @@ onMounted(() => {
   display: block;
   margin-bottom: 8px;
   color: var(--text-secondary);
-  font-size: 13px;
+  font-size: var(--text-sm);
   font-weight: 500;
 }
 

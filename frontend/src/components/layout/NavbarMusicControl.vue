@@ -130,7 +130,7 @@ function togglePlayback(): void {
   padding-inline: 12px;
   border-radius: var(--radius);
   color: var(--text-primary);
-  font-size: 11px;
+  font-size: var(--text-2xs);
   white-space: nowrap;
 }
 .music-trigger::before {
@@ -224,12 +224,12 @@ function togglePlayback(): void {
   gap: 4px;
 }
 .track-copy strong {
-  font-size: 13px;
+  font-size: var(--text-sm);
   line-height: 1.5;
   overflow-wrap: anywhere;
 }
 .track-copy span {
-  font-size: 11px;
+  font-size: var(--text-2xs);
   color: var(--text-secondary);
 }
 .player-close {
@@ -304,7 +304,7 @@ input:disabled {
   display: flex;
   justify-content: space-between;
   color: var(--text-secondary);
-  font-size: 11px;
+  font-size: var(--text-2xs);
   font-variant-numeric: tabular-nums;
 }
 .transport-row {
@@ -359,19 +359,19 @@ input:disabled {
 }
 .volume-hint {
   color: var(--text-secondary);
-  font-size: 12px;
+  font-size: var(--text-xs);
 }
 .player-error {
   margin-top: 14px;
   padding-top: 12px;
   border-top: 1px solid var(--border-light);
-  font-size: 12px;
+  font-size: var(--text-xs);
   line-height: 1.7;
 }
 .retry-button {
   min-height: 44px;
   color: var(--accent);
-  font-size: 12px;
+  font-size: var(--text-xs);
   font-weight: 600;
 }
 .music-panel-enter-active,

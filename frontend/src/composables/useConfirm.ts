@@ -58,7 +58,8 @@ export function useConfirm() {
               h(
                 'p',
                 {
-                  style: 'font-size: 0.9rem; color: var(--text-secondary); line-height: 1.6;'
+                  style:
+                    'font-size: var(--text-sm); color: var(--text-secondary); line-height: 1.6;'
                 },
                 msg.value
               ),

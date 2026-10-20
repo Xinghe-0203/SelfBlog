@@ -195,7 +195,7 @@ async function handleFileChange(event: Event): Promise<void> {
 }
 .asset-label {
   color: var(--text-secondary);
-  font-size: 0.78rem;
+  font-size: var(--text-xs);
 }
 .asset-row {
   display: flex;
@@ -220,7 +220,7 @@ async function handleFileChange(event: Event): Promise<void> {
 }
 .asset-thumb-empty {
   color: var(--text-muted);
-  font-size: 0.68rem;
+  font-size: var(--text-2xs);
 }
 .asset-controls {
   display: flex;
@@ -237,7 +237,7 @@ async function handleFileChange(event: Event): Promise<void> {
   background: var(--bg-primary);
   color: var(--text-primary);
   font: inherit;
-  font-size: 0.84rem;
+  font-size: var(--text-sm);
 }
 .asset-input:disabled {
   opacity: 0.6;
@@ -250,7 +250,7 @@ async function handleFileChange(event: Event): Promise<void> {
   border-radius: var(--radius-sm);
   background: var(--primary);
   color: white;
-  font-size: 0.78rem;
+  font-size: var(--text-xs);
   font-weight: 700;
   cursor: pointer;
 }
@@ -270,17 +270,17 @@ async function handleFileChange(event: Event): Promise<void> {
 }
 .asset-audio-meta {
   color: var(--text-muted);
-  font-size: 0.72rem;
+  font-size: var(--text-xs);
 }
 .asset-error {
   margin: 0;
   color: var(--error);
-  font-size: 0.72rem;
+  font-size: var(--text-xs);
 }
 .asset-hint {
   margin: 0;
   color: var(--text-muted);
-  font-size: 0.7rem;
+  font-size: var(--text-2xs);
   line-height: 1.5;
 }
 </style>

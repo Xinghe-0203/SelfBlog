@@ -90,7 +90,7 @@ onBeforeUnmount(() => {
   padding: var(--page-padding-block, 24px) 24px 48px;
 }
 .about-heading h1 {
-  font-size: 30px;
+  font-size: var(--text-3xl);
 }
 .about-heading p {
   margin-top: 16px;
@@ -102,7 +102,7 @@ onBeforeUnmount(() => {
 .body-error {
   margin-block: 20px;
   color: var(--text-secondary);
-  font-size: 14px;
+  font-size: var(--text-sm);
 }
 .body-error button {
   min-height: 44px;
@@ -130,36 +130,36 @@ onBeforeUnmount(() => {
   place-items: center;
   background: var(--accent-light);
   color: var(--accent);
-  font-size: 28px;
+  font-size: var(--text-3xl);
 }
 .profile-copy {
   min-width: 0;
 }
 .profile-label {
-  font-size: 12px;
+  font-size: var(--text-xs);
   color: var(--text-muted);
   margin-bottom: 7px;
 }
 .profile-copy h1 {
-  font-size: 30px;
+  font-size: var(--text-3xl);
   overflow-wrap: anywhere;
 }
 .author-bio {
   margin-top: 18px;
   white-space: pre-line;
   overflow-wrap: anywhere;
-  font-size: 16px;
+  font-size: var(--text-base);
   line-height: 1.9;
 }
 .about-site {
   margin: var(--page-section-gap, 32px) 34px 0;
 }
 .about-site h2 {
-  font-size: 18px;
+  font-size: var(--text-lg);
 }
 .about-site p {
   margin-block: 12px 20px;
-  font-size: 14px;
+  font-size: var(--text-sm);
 }
 .about-site nav {
   display: flex;
@@ -176,7 +176,7 @@ onBeforeUnmount(() => {
   border-radius: var(--radius);
   background: var(--surface-primary);
   color: var(--text-secondary);
-  font-size: 13px;
+  font-size: var(--text-sm);
 }
 .about-site a:hover {
   color: var(--accent);
@@ -197,7 +197,7 @@ onBeforeUnmount(() => {
     height: 64px;
   }
   .profile-copy h1 {
-    font-size: 26px;
+    font-size: var(--text-2xl);
   }
   .about-site {
     margin-inline: 6px;

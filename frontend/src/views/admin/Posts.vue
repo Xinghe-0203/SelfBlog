@@ -189,12 +189,12 @@ onMounted(fetchPosts)
 }
 .page-heading h1 {
   margin: 0;
-  font-size: 24px;
+  font-size: var(--text-2xl);
 }
 .page-heading p:last-child {
   margin: 8px 0 0;
   color: var(--text-muted);
-  font-size: 13px;
+  font-size: var(--text-sm);
 }
 .new-post {
   display: inline-flex;
@@ -206,7 +206,7 @@ onMounted(fetchPosts)
   border-radius: var(--radius);
   background: var(--accent);
   color: var(--text-inverse);
-  font-size: 13px;
+  font-size: var(--text-sm);
   font-weight: 600;
 }
 .new-post:hover {
@@ -243,7 +243,7 @@ onMounted(fetchPosts)
   background: transparent;
   color: var(--text-primary);
   font: inherit;
-  font-size: 14px;
+  font-size: var(--text-sm);
 }
 .toolbar select,
 .search-button {
@@ -254,7 +254,7 @@ onMounted(fetchPosts)
   background: var(--surface-primary);
   color: var(--text-primary);
   font: inherit;
-  font-size: 13px;
+  font-size: var(--text-sm);
 }
 .search-button {
   border-color: var(--accent);
@@ -274,7 +274,7 @@ onMounted(fetchPosts)
   border-radius: var(--radius-lg);
   background: var(--surface-primary);
   color: var(--text-secondary);
-  font-size: 14px;
+  font-size: var(--text-sm);
 }
 .state-panel--error {
   color: var(--text-secondary);
@@ -309,7 +309,7 @@ onMounted(fetchPosts)
 .post-table th {
   color: var(--text-muted);
   background: var(--bg-secondary);
-  font-size: 12px;
+  font-size: var(--text-xs);
   font-weight: 600;
 }
 .post-table tbody tr:last-child td {
@@ -322,7 +322,7 @@ onMounted(fetchPosts)
 }
 .title-cell > a {
   color: var(--text-primary);
-  font-size: 14px;
+  font-size: var(--text-sm);
   font-weight: 600;
 }
 .title-cell > a:hover {
@@ -332,7 +332,7 @@ onMounted(fetchPosts)
   display: block;
   margin-top: 4px;
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: var(--text-2xs);
 }
 .status {
   display: inline-block;
@@ -340,7 +340,7 @@ onMounted(fetchPosts)
   border-radius: var(--radius-xs);
   background: var(--bg-secondary);
   color: var(--text-secondary);
-  font-size: 11px;
+  font-size: var(--text-2xs);
 }
 .status-public {
   background: var(--accent-light);
@@ -348,7 +348,7 @@ onMounted(fetchPosts)
 }
 .muted {
   color: var(--text-muted);
-  font-size: 12px;
+  font-size: var(--text-xs);
 }
 .row-actions {
   display: flex;
@@ -363,7 +363,7 @@ onMounted(fetchPosts)
   border-radius: var(--radius-sm);
   color: var(--text-secondary);
   font: inherit;
-  font-size: 12px;
+  font-size: var(--text-xs);
 }
 .row-actions a:hover,
 .row-actions button:hover {
@@ -380,7 +380,7 @@ onMounted(fetchPosts)
   gap: 17px;
   padding: 18px 0 0;
   color: var(--text-muted);
-  font-size: 12px;
+  font-size: var(--text-xs);
 }
 .pagination button {
   display: inline-flex;
@@ -391,7 +391,7 @@ onMounted(fetchPosts)
   border-radius: var(--radius);
   color: var(--accent);
   font: inherit;
-  font-size: 12px;
+  font-size: var(--text-xs);
 }
 .pagination button:hover:not(:disabled) {
   background: var(--accent-light);

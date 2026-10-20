@@ -1286,7 +1286,7 @@ onBeforeRouteLeave((_to, _from) => {
   border-radius: var(--radius);
   color: var(--text-secondary);
   cursor: pointer;
-  font-size: 13px;
+  font-size: var(--text-sm);
   transition:
     color var(--transition-fast),
     border-color var(--transition-fast);
@@ -1330,7 +1330,7 @@ onBeforeRouteLeave((_to, _from) => {
 /* 编辑容器 */
 .edit-container {
   display: grid;
-  grid-template-columns: 1fr 320px;
+  grid-template-columns: minmax(0, 1fr) 320px;
   gap: var(--spacing-lg);
   align-items: start;
 }
@@ -1354,7 +1354,7 @@ onBeforeRouteLeave((_to, _from) => {
   flex: 1;
   min-width: 0;
   border: none;
-  font-size: 24px;
+  font-size: var(--text-2xl);
   font-weight: 700;
   background: transparent;
   color: var(--text-primary);
@@ -1381,7 +1381,7 @@ onBeforeRouteLeave((_to, _from) => {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  font-size: 0.75rem;
+  font-size: var(--text-xs);
   color: var(--text-muted);
   min-width: 70px;
   text-align: right;
@@ -1405,7 +1405,7 @@ onBeforeRouteLeave((_to, _from) => {
   align-items: center;
   gap: var(--spacing-sm);
   margin-top: var(--spacing-sm);
-  font-size: 0.75rem;
+  font-size: var(--text-xs);
   color: var(--text-muted);
   flex-wrap: wrap;
 }
@@ -1428,6 +1428,8 @@ onBeforeRouteLeave((_to, _from) => {
 /* 编辑器主体 */
 .editor-main-wrapper {
   grid-column: 1;
+  /* 网格项默认 min-width:auto，会让 .toolbar 的 overflow-x:auto 失效并把整页撑宽 */
+  min-width: 0;
 }
 
 .editor-body {
@@ -1462,7 +1464,7 @@ onBeforeRouteLeave((_to, _from) => {
   background: transparent;
   border-radius: var(--radius-sm);
   cursor: pointer;
-  font-size: 14px;
+  font-size: var(--text-sm);
   color: var(--text-secondary);
   display: flex;
   align-items: center;
@@ -1498,7 +1500,7 @@ onBeforeRouteLeave((_to, _from) => {
   border: 1px solid var(--border-light);
   border-radius: var(--radius);
   background: var(--surface-primary);
-  font-size: 12px;
+  font-size: var(--text-xs);
   color: var(--text-secondary);
   cursor: pointer;
 }
@@ -1535,7 +1537,7 @@ onBeforeRouteLeave((_to, _from) => {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.625rem;
+  font-size: var(--text-2xs);
   color: var(--text-inverse);
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
 }
@@ -1550,7 +1552,7 @@ onBeforeRouteLeave((_to, _from) => {
   min-height: 460px;
   padding: 20px;
   border: none;
-  font-size: 15px;
+  font-size: var(--text-base);
   line-height: 1.9;
   color: var(--text-primary);
   background: transparent;
@@ -1600,7 +1602,7 @@ onBeforeRouteLeave((_to, _from) => {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 13px;
+  font-size: var(--text-sm);
   font-weight: 600;
   margin-bottom: 14px;
   padding-bottom: 10px;
@@ -1614,7 +1616,7 @@ onBeforeRouteLeave((_to, _from) => {
 
 .form-label {
   display: block;
-  font-size: 0.75rem;
+  font-size: var(--text-xs);
   font-weight: 500;
   color: var(--text-secondary);
   margin-bottom: 6px;
@@ -1625,7 +1627,7 @@ onBeforeRouteLeave((_to, _from) => {
   padding: 10px 12px;
   border: 1px solid var(--border-light);
   border-radius: var(--radius);
-  font-size: 14px;
+  font-size: var(--text-sm);
   color: var(--text-primary);
   background: var(--surface-primary);
   resize: vertical;
@@ -1641,7 +1643,7 @@ onBeforeRouteLeave((_to, _from) => {
 .char-hint {
   display: block;
   text-align: right;
-  font-size: 11px;
+  font-size: var(--text-2xs);
   color: var(--text-muted);
   margin-top: 4px;
 }
@@ -1651,7 +1653,7 @@ onBeforeRouteLeave((_to, _from) => {
   padding: 10px 12px;
   border: 1px solid var(--border-light);
   border-radius: var(--radius);
-  font-size: 16px;
+  font-size: var(--text-base);
   background: var(--surface-primary);
   color: var(--text-primary);
 }
@@ -1695,7 +1697,7 @@ onBeforeRouteLeave((_to, _from) => {
   border: none;
   border-radius: var(--radius);
   cursor: pointer;
-  font-size: 14px;
+  font-size: var(--text-sm);
 }
 
 .remove-cover:hover {
@@ -1726,7 +1728,7 @@ onBeforeRouteLeave((_to, _from) => {
 }
 
 .upload-hint {
-  font-size: 0.6875rem;
+  font-size: var(--text-2xs);
   opacity: 0.7;
 }
 
@@ -1762,7 +1764,7 @@ onBeforeRouteLeave((_to, _from) => {
   background: var(--primary-light);
   color: var(--primary);
   border-radius: var(--radius-sm);
-  font-size: 0.75rem;
+  font-size: var(--text-xs);
   font-weight: 500;
 }
 
@@ -1791,7 +1793,7 @@ onBeforeRouteLeave((_to, _from) => {
   flex: 1;
   min-width: 80px;
   border: none;
-  font-size: 0.8125rem;
+  font-size: var(--text-sm);
   background: transparent;
   color: var(--text-primary);
   padding: 2px 4px;
@@ -1815,7 +1817,7 @@ onBeforeRouteLeave((_to, _from) => {
 .suggested-tag {
   min-height: 30px;
   padding: 2px 10px;
-  font-size: 12px;
+  font-size: var(--text-xs);
   background: var(--surface-secondary);
   color: var(--text-secondary);
   border: 1px solid var(--border-light);
@@ -1838,7 +1840,7 @@ onBeforeRouteLeave((_to, _from) => {
   border: none;
   color: var(--accent);
   cursor: pointer;
-  font-size: 12px;
+  font-size: var(--text-xs);
   padding: 4px 0;
 }
 
@@ -1847,7 +1849,7 @@ onBeforeRouteLeave((_to, _from) => {
 }
 
 .btn-xs {
-  font-size: 12px;
+  font-size: var(--text-xs);
 }
 
 /* 响应式 */
@@ -1874,7 +1876,7 @@ onBeforeRouteLeave((_to, _from) => {
   }
 
   .title-input {
-    font-size: 21px;
+    font-size: var(--text-xl);
   }
 }
 
@@ -1886,7 +1888,7 @@ onBeforeRouteLeave((_to, _from) => {
   .content-input {
     min-height: 300px;
     padding: 16px;
-    font-size: 15px;
+    font-size: var(--text-base);
   }
 
   .toolbar {

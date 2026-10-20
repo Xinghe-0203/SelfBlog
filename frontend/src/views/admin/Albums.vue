@@ -228,12 +228,12 @@ onMounted(() => void load())
 }
 .page-heading h1 {
   margin: 0 0 8px;
-  font-size: 24px;
+  font-size: var(--text-2xl);
 }
 .page-heading p:not(.eyebrow) {
   margin: 0;
   color: var(--text-muted);
-  font-size: 13px;
+  font-size: var(--text-sm);
 }
 .album-list {
   display: grid;
@@ -255,19 +255,19 @@ onMounted(() => void load())
   align-items: center;
   gap: 9px;
   margin: 0 0 6px;
-  font-size: 15px;
+  font-size: var(--text-base);
 }
 .album-heading p {
   margin: 0;
   color: var(--text-muted);
-  font-size: 12px;
+  font-size: var(--text-xs);
 }
 .private-label {
   padding: 3px 7px;
   border-radius: var(--radius-xs);
   background: var(--accent-light);
   color: var(--accent);
-  font-size: 11px;
+  font-size: var(--text-2xs);
   font-weight: 500;
 }
 .album-actions {
@@ -283,7 +283,7 @@ onMounted(() => void load())
   border-radius: var(--radius);
   background: transparent;
   color: var(--text-secondary);
-  font-size: 12px;
+  font-size: var(--text-xs);
   cursor: pointer;
 }
 .album-actions button:hover {
@@ -338,7 +338,7 @@ onMounted(() => void load())
   cursor: pointer;
 }
 .upload-tile small {
-  font-size: 11px;
+  font-size: var(--text-2xs);
 }
 .upload-tile input {
   position: absolute;
@@ -355,7 +355,7 @@ onMounted(() => void load())
   padding-top: 10px;
   border-top: 1px solid var(--border-light);
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: var(--text-2xs);
 }
 .empty {
   padding: 40px;
@@ -363,11 +363,11 @@ onMounted(() => void load())
   border-radius: var(--radius-lg);
   color: var(--text-muted);
   text-align: center;
-  font-size: 13px;
+  font-size: var(--text-sm);
 }
 .error {
   color: var(--error);
-  font-size: 13px;
+  font-size: var(--text-sm);
 }
 .album-dialog {
   display: grid;
@@ -377,7 +377,7 @@ onMounted(() => void load())
   display: grid;
   gap: 7px;
   color: var(--text-secondary);
-  font-size: 13px;
+  font-size: var(--text-sm);
 }
 .album-dialog input:not([type='checkbox']),
 .album-dialog textarea {
@@ -387,7 +387,7 @@ onMounted(() => void load())
   border-radius: var(--radius);
   background: var(--surface-primary);
   color: var(--text-primary);
-  font-size: 16px;
+  font-size: var(--text-base);
 }
 .album-dialog .check-row {
   display: flex;
@@ -397,7 +397,7 @@ onMounted(() => void load())
 .dialog-error {
   margin: 0;
   color: var(--error);
-  font-size: 13px;
+  font-size: var(--text-sm);
 }
 @media (max-width: 640px) {
   .page-heading {

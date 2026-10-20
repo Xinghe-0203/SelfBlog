@@ -165,7 +165,7 @@ onBeforeUnmount(() => document.removeEventListener('keydown', handleKeydown))
 .preview-caption {
   margin-bottom: 6px;
   color: white;
-  font-size: 13px;
+  font-size: var(--text-sm);
   overflow-wrap: anywhere;
 }
 .preview-counter {
@@ -174,7 +174,7 @@ onBeforeUnmount(() => document.removeEventListener('keydown', handleKeydown))
   border-radius: var(--radius);
   color: white;
   background: rgb(20 26 36 / 80%);
-  font-size: 13px;
+  font-size: var(--text-sm);
   font-variant-numeric: tabular-nums;
 }
 .preview-enter-active,

@@ -110,7 +110,7 @@ function selectItem(item: TocItem): void {
   color: var(--text-secondary);
   box-shadow: var(--shadow-lg);
   font: inherit;
-  font-size: 0.8rem;
+  font-size: var(--text-xs);
   cursor: pointer;
   transition:
     color var(--duration-fast) var(--ease-default),
@@ -181,7 +181,7 @@ function selectItem(item: TocItem): void {
   background: none;
   color: var(--text-secondary);
   font: inherit;
-  font-size: 0.82rem;
+  font-size: var(--text-sm);
   line-height: 1.5;
   text-align: left;
   cursor: pointer;

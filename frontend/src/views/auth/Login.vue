@@ -223,7 +223,7 @@ const handleLogin = async () => {
 .brand-name {
   overflow: hidden;
   color: var(--text-primary);
-  font-size: 14px;
+  font-size: var(--text-sm);
   font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -231,7 +231,7 @@ const handleLogin = async () => {
 
 .brand-tagline {
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: var(--text-2xs);
 }
 
 .auth-header {
@@ -240,13 +240,13 @@ const handleLogin = async () => {
 
 .auth-header h1 {
   margin-bottom: 8px;
-  font-size: 22px;
+  font-size: var(--text-2xl);
 }
 
 .auth-header p {
   margin: 0;
   color: var(--text-secondary);
-  font-size: 13px;
+  font-size: var(--text-sm);
   line-height: 1.7;
 }
 
@@ -262,7 +262,7 @@ const handleLogin = async () => {
 
 .form-label {
   color: var(--text-secondary);
-  font-size: 13px;
+  font-size: var(--text-sm);
 }
 
 .input-wrap {
@@ -277,7 +277,7 @@ const handleLogin = async () => {
   border-radius: var(--radius);
   background: var(--surface-primary);
   color: var(--text-primary);
-  font-size: 16px;
+  font-size: var(--text-base);
 }
 
 .form-input--password {
@@ -286,7 +286,7 @@ const handleLogin = async () => {
 
 .form-input::placeholder {
   color: var(--text-muted);
-  font-size: 14px;
+  font-size: var(--text-sm);
 }
 
 .form-input:hover {
@@ -363,12 +363,12 @@ const handleLogin = async () => {
 
 .check-text {
   color: var(--text-secondary);
-  font-size: 13px;
+  font-size: var(--text-sm);
 }
 
 .link-subtle {
   color: var(--text-muted);
-  font-size: 12px;
+  font-size: var(--text-xs);
 }
 
 .btn-primary {
@@ -381,7 +381,7 @@ const handleLogin = async () => {
   border-radius: var(--radius);
   background: var(--contrast-bg);
   color: var(--contrast-fg);
-  font-size: 15px;
+  font-size: var(--text-base);
   font-weight: 600;
 }
 

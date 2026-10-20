@@ -52,7 +52,7 @@ const siteStore = useSiteStore()
 .footer-inner small {
   margin: 5px 0 0;
   color: var(--text-muted);
-  font-size: 0.75rem;
+  font-size: var(--text-xs);
 }
 
 .footer-links {
@@ -65,7 +65,7 @@ const siteStore = useSiteStore()
   align-items: center;
   min-height: 44px;
   color: var(--text-secondary);
-  font-size: 0.8125rem;
+  font-size: var(--text-sm);
   text-decoration: none;
 }
 

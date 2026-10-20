@@ -164,13 +164,13 @@ onMounted(() => void load())
 }
 .page-heading h1 {
   margin: 0 0 8px;
-  font-size: 24px;
+  font-size: var(--text-2xl);
 }
 .page-heading p:not(.eyebrow),
 .section-heading p {
   margin: 0;
   color: var(--text-muted);
-  font-size: 13px;
+  font-size: var(--text-sm);
 }
 .refresh,
 .pagination button {
@@ -183,7 +183,7 @@ onMounted(() => void load())
   border-radius: var(--radius);
   background: var(--surface-primary);
   color: var(--text-primary);
-  font-size: 13px;
+  font-size: var(--text-sm);
   cursor: pointer;
 }
 .refresh:hover,
@@ -209,10 +209,10 @@ onMounted(() => void load())
 }
 .metrics small {
   color: var(--text-muted);
-  font-size: 12px;
+  font-size: var(--text-xs);
 }
 .metrics strong {
-  font-size: 22px;
+  font-size: var(--text-2xl);
   font-variant-numeric: tabular-nums;
 }
 .panel {
@@ -224,7 +224,7 @@ onMounted(() => void load())
 }
 .section-heading h2 {
   margin: 0 0 5px;
-  font-size: 15px;
+  font-size: var(--text-base);
 }
 .chart {
   display: grid;
@@ -244,7 +244,7 @@ onMounted(() => void load())
   color: var(--text-muted);
 }
 .chart-day strong {
-  font-size: 11px;
+  font-size: var(--text-2xs);
   font-weight: 500;
 }
 .bar {
@@ -254,7 +254,7 @@ onMounted(() => void load())
   background: linear-gradient(180deg, var(--accent), color-mix(in srgb, var(--accent) 45%, white));
 }
 .chart-day small {
-  font-size: 10px;
+  font-size: var(--text-2xs);
   white-space: nowrap;
 }
 .data-grid {
@@ -274,7 +274,7 @@ onMounted(() => void load())
 }
 code {
   color: var(--accent);
-  font-size: 12px;
+  font-size: var(--text-xs);
 }
 .top-pages code {
   overflow: hidden;
@@ -287,12 +287,12 @@ code {
 table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 12px;
+  font-size: var(--text-xs);
   text-align: left;
 }
 th {
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: var(--text-2xs);
   font-weight: 600;
 }
 th,
@@ -313,7 +313,7 @@ td.path {
   gap: 14px;
   padding-top: 15px;
   color: var(--text-muted);
-  font-size: 12px;
+  font-size: var(--text-xs);
 }
 .pagination button:disabled {
   opacity: 0.45;
@@ -323,7 +323,7 @@ td.path {
   padding: 24px 0;
   color: var(--text-muted);
   text-align: center;
-  font-size: 13px;
+  font-size: var(--text-sm);
 }
 .error {
   margin: 0;
@@ -342,7 +342,7 @@ td.path {
     gap: 3px;
   }
   .chart-day small {
-    font-size: 9px;
+    font-size: var(--text-2xs);
   }
 }
 @media (max-width: 460px) {

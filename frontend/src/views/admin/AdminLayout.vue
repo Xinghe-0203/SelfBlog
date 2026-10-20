@@ -195,13 +195,13 @@ watch(() => route.path, closeOnMobile)
 }
 .sidebar-brand strong {
   overflow: hidden;
-  font-size: 13px;
+  font-size: var(--text-sm);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .sidebar-brand small {
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: var(--text-2xs);
 }
 .close-menu {
   display: none;
@@ -233,7 +233,7 @@ watch(() => route.path, closeOnMobile)
   padding-inline: 11px;
   border-radius: var(--radius);
   color: var(--text-secondary);
-  font-size: 13px;
+  font-size: var(--text-sm);
   text-align: left;
 }
 .sidebar-nav a:hover,
@@ -272,7 +272,7 @@ watch(() => route.path, closeOnMobile)
   backdrop-filter: blur(12px) saturate(1.1);
   -webkit-backdrop-filter: blur(12px) saturate(1.1);
   color: var(--text-secondary);
-  font-size: 13px;
+  font-size: var(--text-sm);
 }
 .workspace-author {
   overflow: hidden;
@@ -294,7 +294,7 @@ watch(() => route.path, closeOnMobile)
   border: 1px solid var(--border-light);
   border-radius: var(--radius);
   color: var(--text-secondary);
-  font-size: 12px;
+  font-size: var(--text-xs);
 }
 .logout-button:hover {
   color: var(--error);

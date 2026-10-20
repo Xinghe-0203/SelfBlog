@@ -140,20 +140,20 @@ const handleClick = (e: MouseEvent) => {
 /* ==================== Sizes ==================== */
 .btn--sm {
   padding: 7px 14px;
-  font-size: var(--text-xs, 0.75rem);
+  font-size: var(--text-xs);
   border-radius: var(--radius-sm, 6px);
   gap: 6px;
 }
 
 .btn--md {
   padding: 10px 20px;
-  font-size: var(--text-sm, 0.8125rem);
+  font-size: var(--text-sm);
   gap: 8px;
 }
 
 .btn--lg {
   padding: 13px 28px;
-  font-size: var(--text-base, 0.9375rem);
+  font-size: var(--text-base);
   border-radius: var(--radius-md, 12px);
   gap: 10px;
 }
@@ -405,7 +405,7 @@ const handleClick = (e: MouseEvent) => {
 @media (max-width: 640px) {
   .btn--lg {
     padding: 11px 22px;
-    font-size: var(--text-sm, 0.8125rem);
+    font-size: var(--text-sm);
   }
 }
 </style>

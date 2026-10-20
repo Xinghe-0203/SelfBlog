@@ -13,7 +13,7 @@ npm run build          # 构建生产版本（先 vue-tsc --noEmit，再 Vite）
 npm run preview        # 预览生产版本
 npm run lint:check     # 只读 ESLint 检查（npm run lint 会改写文件）
 npm run type-check     # vue-tsc --noEmit（必过闸门）
-npm run test:run       # Vitest 单次运行（当前 43 文件 / 400 tests；原始基线 210）
+npm run test:run       # Vitest 单次运行（当前 43 文件 / 438 tests；原始基线 210）
 npm run test:deployment # node:test：Vercel 代理生成器 + Docker/Compose 源契约（27 项）
 ```
 
@@ -92,6 +92,12 @@ src/
   - `--code-bg` / `--code-text` / `--code-border` — 代码块，两种主题下都保持深色
   - `--contrast-bg` / `--contrast-bg-hover` / `--contrast-bg-active` / `--contrast-fg` — 高对比实心按钮（浅色模式近黑，深色模式自动反转为浅底深字）
 - 组件只引用语义 token，不直接写十六进制色值
+- **字号一律走 `--text-*` 字阶，不要在组件里写裸 px / rem。** 十档，唯一定义处 `src/styles/variables.css`
+  （`--text-2xs: 0.6875rem` 11px / `--text-xs` 12 / `--text-sm` 14 / `--text-base` 16 / `--text-lg` 18 /
+  `--text-xl` 20 / `--text-2xl` 24 / `--text-3xl` 30 / `--text-4xl` 36 / `--text-5xl` 48）。
+  只有三类例外可保留非 token 写法：`html` 根字号（`base.css` 的 `16px`，rem 的基准）、
+  相对父级缩放的 `em`（正文代码与标题锚点）、以及需要随视口流动的 `clamp()`（首页与阅读页大标题）。
+  新增档位要连 `variables.css` 注释一起加，不要就地写魔数。
 - 圆角：按钮/输入框 8px，内容分组 12–14px，面板 16px；细长导航、圆形头像/播放键才用 `--radius-full`
 - `.functional-glass` 是显式功能层，不要把旧 `.glass` 正文卡片改为半透明；透明/高对比降级在 glassmorphism.css
 - `#overlay-root` 在 App 的主题根内、路由过渡外；模态层用 `useDialog`，不要另建 body 滚动计数或直接传送到裸 body

@@ -133,13 +133,13 @@ const handleClick = (e: MouseEvent) => {
 /* ==================== Sizes ==================== */
 .tag--sm {
   padding: 3px 10px;
-  font-size: 0.625rem;
+  font-size: var(--text-2xs);
   line-height: 1.4;
 }
 
 .tag--md {
   padding: 4px 12px;
-  font-size: 0.6875rem;
+  font-size: var(--text-2xs);
   line-height: 1.5;
 }
 

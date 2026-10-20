@@ -86,7 +86,7 @@ const { layer } = useDialog(
   border-bottom: 1px solid var(--border-light);
 }
 .modal-header h3 {
-  font-size: 17px;
+  font-size: var(--text-lg);
   font-weight: 600;
   overflow-wrap: anywhere;
 }

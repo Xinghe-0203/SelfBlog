@@ -4,6 +4,102 @@
 
 ---
 
+## 未发布 — 首页封面面板与全站字阶收敛 (2026-10-20)
+
+### 说明
+
+两项长期存在但一直没被测试钉住的观感缺陷：
+
+1. **首页在没有封面图时留出一块 43% 宽的空灰矩形。** `.intro-visual` 面板自己刷了
+   `background: var(--bg-tertiary)`，所以只要「封面模块」开着，即使 `<img>` 不存在
+   （首页首屏没有任何文章带封面，或封面图加载失败被 `@error` 清空），那块面板照样渲染，
+   只在 `::after` 渐变下被部分盖住。
+2. **字阶没有任何集中约定。** 全站 402 处 `font-size` 散落在 43 个不同取值上，
+   `px` 与 `rem` 两套写法并存且互相漂移（同一层级的小字既有 `12px` 也有 `0.75rem`、
+   `0.72rem`、`0.6875rem`），改一处视觉权重只能靠肉眼找。
+3. **写文章页在窄视口下横向溢出。** 390px 宽时 `documentElement.scrollWidth` 达 854px，
+   整页可左右拖动。根因与字号无关（见下方「顺带修复的既有缺陷」）。
+
+### 修复
+
+- **`Home.vue`**：封面面板的渲染条件从 `showModule('cover')` 收紧为
+  `showModule('cover') && heroCover` —— 没有可用封面时整块面板不渲染，`.intro-shell`
+  恢复为纯文字卡。`.intro-visual` 自身的灰底保留，因为它在「有封面」时仍是图片的占位底。
+- **`Home.test.ts`**：原有「封面加载失败」用例只断言 `.intro-visual img` 消失，
+  于是灰底容器漏网。改为断言 **`.intro-visual` 整块消失**（并加一条前置断言确认它在
+  失败前确实存在），再翻页确认不会复活。这条断言现在是该缺陷的哨兵。
+- **字阶收敛**：`variables.css` 新增 `--text-2xs: 0.6875rem`（11px），把
+  `--text-xs` 起的九档补齐为十档；全站 402 处声明里 **325 处被改写**成 token
+  （324 处脚本归一 + `useConfirm.ts` 内联样式 1 处），其中 74 处因并列取整方向修正
+  而二次改写过，其余 77 处本来就已是 token 写法或是白名单例外。
+
+### 顺带修复的既有缺陷
+
+真机视觉核对时发现 `PostEdit.vue`（后台「写文章」页）在 390px 视口下横向溢出，
+`scrollWidth` 854px。**这不是本次字阶改动引入的**：用探针把该页字号整体改回 HEAD 的
+`13/15/21px` 后仍是 854，而只加一条 `min-width: 0` 就回到 390（决定性对照见
+`docs/reviews/2026-10-20-font-scale-and-hero-visual-verification.md` §3）。
+
+根因是 `PostEdit.vue` 的 `.edit-container` 用了裸 `1fr`（等价 `minmax(auto, 1fr)`），
+网格项默认 `min-width: auto` 使 `.editor-main-wrapper` 在窄视口不收缩，于是
+`@media (max-width: 768px)` 里 `.toolbar { overflow-x: auto }` 失效、溢出转嫁给整页。
+仓库既有惯例（`Home.vue`、`Archives.vue`）都已写 `minmax(0, 1fr)`，`PostEdit.vue` 是漏网者。
+
+修复两处，都在 `frontend/src/views/post/PostEdit.vue`：`:1333` 改为
+`grid-template-columns: minmax(0, 1fr) 320px`；`:1429-1431` 给 `.editor-main-wrapper`
+补 `min-width: 0`（带注释说明为什么）。范围核对：1440px 下 6 个后台页 `scrollWidth`
+全等于视口宽；390px 下修复前只有「写文章」是 854、其余 5 页正常，修复后也归 390，
+且 `.toolbar` 恢复为自身横向滚动（`scrollWidth` 820 / `clientWidth` 324），正是原设计意图。
+
+### 承重规则（改动前请先读）
+
+1. **并列一律取更大的那一档。** 13px 距 `--text-xs`(12) 与 `--text-sm`(14) 各 1px。
+   第一版脚本在并列时取小档，把 `.btn-primary`、`.content-input`、`.modal-header h3`、
+   `.section-heading h2`、`.summary-grid strong` 等 74 处**缩小到原文之下**——
+   整合不得静默缩小文字。修正后的归属：`13px → --text-sm`、`15px → --text-base`、
+   `17px → --text-lg`、`19px/21px/22px → --text-xl/--text-2xl`。
+2. **媒体查询里的字号必须与主值一起归位。** `PostDetail.vue` 的 `≤600px` 断点、
+   `Home.vue` 的 `≤600px` 断点内都有独立 `font-size` 声明，只改主值会让移动端与桌面端脱钩。
+3. **只留三类非 token 写法**，其余一律 token：`base.css` 的 `html { font-size: 16px }`
+   （rem 基准）、正文代码与标题锚点的 `em`（需相对父级缩放）、首页与阅读页大标题的
+   `clamp()`（需随视口流动）。`useConfirm.ts` 的内联 `0.9rem` 已折为 `var(--text-sm)`。
+4. **字阶是十档，唯一定义处 `variables.css`。** 新增档位要连注释一起加，不要就地写魔数。
+
+### 影响文件
+
+| 文件 | 改动类型 |
+| --- | --- |
+| `frontend/src/styles/variables.css` | 修改（新增 `--text-2xs: 0.6875rem`） |
+| `frontend/src/views/Home.vue` | 修改（封面面板渲染条件收紧 + 自身字号归 token） |
+| `frontend/src/views/__tests__/Home.test.ts` | 修改（封面失败断言改为整块面板消失） |
+| `frontend/src/composables/useConfirm.ts` | 修改（内联 `0.9rem` → `var(--text-sm)`） |
+| `frontend/src/**`（其余 40 个文件） | 修改（402 处 `font-size` 归一到 `--text-*` 字阶） |
+| `frontend/src/views/post/PostEdit.vue` | 修改（字号归 token；另修既有移动端横向溢出：`minmax(0, 1fr)` + `.editor-main-wrapper { min-width: 0 }`） |
+| `frontend/CLAUDE.md` | 修改（新增「字号一律走 `--text-*` 字阶」约定） |
+| `CLAUDE.md`、`AGENTS.md`、`docs/agents/frontend.md`、`docs/agents/backend.md` | 修改（测试基线更新为后端 747 / 前端 43 文件 438 tests） |
+| `docs/reviews/2026-10-20-font-scale-and-hero-visual-verification.md` | 新增（真机视觉验证记录 + 6 张对照截图） |
+
+### 验证
+
+- 后端全量：`Tests run: 747, Failures: 0, Errors: 0, Skipped: 0` + `BUILD SUCCESS`。
+- 前端六闸门全绿：`lint:check` 0 errors / 43 warnings、`format:check` 通过、
+  `type-check` 0、`test:run` **43 files / 438 tests**、`test:deployment` 27/27、`build` 通过。
+- 收敛后全仓 `font-size` 普查：只剩 7 处非 token 声明，全部命中上面的三类例外
+  （`16px` 根字号、3 处 `em`、2 处 `clamp`、1 处 `inherit`）。
+- 真机浏览器核对（Chromium headless，1440x900 与 390x844，覆盖首页有/无封面、
+  文章详情、登录页、后台 Dashboard/Visitors/Albums/写文章页）：computed 字号与预期逐条
+  一致（`.markdown-body` 17.2→18px、`.article-header h1` 38px、`.section-heading h2`
+  19→20px、`.summary-grid strong` 22→24px、`.btn-primary` 15→16px）；无封面首页右侧
+  9 个采样点全部落在 `.intro-shell` 的 `--surface-secondary`，灰底面板确认消失。
+  证据：`docs/reviews/2026-10-20-font-scale-and-hero-visual-verification.md`。
+- 溢出修复前后：390x844 下「写文章」页 `scrollWidth` 854 → **390**（修复后等于视口宽），
+  同视口其余 5 个后台页修复前后均为 390；`.toolbar` 恢复为自身横向滚动
+  （`scrollWidth` 820 / `clientWidth` 324）。
+- **未验证**：真机里的逐页观感仍需人工过目（截图已留证）；字阶改动没有测试断言钉住
+  —— 全仓 `*.test.ts` 中没有任何 `font-size` 断言，本轮靠真机 computed 读数兜底，
+  后续若要防回退需自建断言。
+---
+
 ## 未发布 — 外观自定义：后台可换页面背景与组件不透明度 (2026-10-19)
 
 ### 说明

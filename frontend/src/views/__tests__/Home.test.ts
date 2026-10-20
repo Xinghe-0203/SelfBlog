@@ -85,11 +85,16 @@ describe('home spatial introduction and article list', () => {
       page([{ ...post, coverImage: '/uploads/broken.jpg' }])
     )
     const { wrapper, router } = await setup()
+    // The cover panel paints its own grey backdrop, so a broken image must remove
+    // the whole panel rather than leaving a 43%-wide empty rectangle behind.
+    expect(wrapper.find('.intro-visual').exists()).toBe(true)
     await wrapper.get('.intro-visual img').trigger('error')
+    await flushPromises()
+    expect(wrapper.find('.intro-visual').exists()).toBe(false)
     expect(wrapper.find('.intro-visual img').exists()).toBe(false)
     await router.push('/?page=2')
     await flushPromises()
-    expect(wrapper.find('.intro-visual img').exists()).toBe(false)
+    expect(wrapper.find('.intro-visual').exists()).toBe(false)
   })
 
   it('allows retry after an initial failure and captures that successful cover', async () => {

@@ -370,7 +370,7 @@ onBeforeUnmount(() => {
   min-width: 0;
   flex-shrink: 1;
   color: var(--text-primary);
-  font-size: 14px;
+  font-size: var(--text-sm);
   font-weight: 650;
 }
 .brand-mark {
@@ -420,7 +420,7 @@ onBeforeUnmount(() => {
   outline: 0;
   background: transparent;
   color: var(--text-primary);
-  font-size: 13px;
+  font-size: var(--text-sm);
 }
 .nav-search input::placeholder,
 .panel-search input::placeholder {
@@ -448,7 +448,7 @@ onBeforeUnmount(() => {
   padding-inline: 12px;
   border-radius: var(--radius-full);
   color: var(--text-secondary);
-  font-size: 13px;
+  font-size: var(--text-sm);
   font-weight: 500;
   white-space: nowrap;
 }
@@ -471,7 +471,7 @@ onBeforeUnmount(() => {
   padding-inline: 12px;
   border-radius: var(--radius-full);
   color: var(--text-secondary);
-  font-size: 13px;
+  font-size: var(--text-sm);
   white-space: nowrap;
 }
 .nav-more:hover,
@@ -495,7 +495,7 @@ onBeforeUnmount(() => {
   padding-inline: 12px;
   border-radius: var(--radius);
   color: var(--text-secondary);
-  font-size: 14px;
+  font-size: var(--text-sm);
   overflow-wrap: anywhere;
 }
 .more-panel > a:hover,
@@ -587,7 +587,7 @@ onBeforeUnmount(() => {
   border: 1px solid var(--border-solid);
   border-radius: var(--radius);
   background: var(--surface-primary);
-  font-size: 16px;
+  font-size: var(--text-base);
 }
 .panel-search input:focus-visible {
   outline: 2px solid var(--accent);
@@ -612,7 +612,7 @@ onBeforeUnmount(() => {
   padding-inline: 12px;
   border-radius: var(--radius);
   color: var(--text-secondary);
-  font-size: 14px;
+  font-size: var(--text-sm);
   text-align: left;
 }
 .mobile-panel > a.active,
@@ -673,7 +673,7 @@ onBeforeUnmount(() => {
   .brand {
     flex: 1 1 auto;
     gap: 6px;
-    font-size: 13px;
+    font-size: var(--text-sm);
   }
   .brand-name {
     max-width: 95px;

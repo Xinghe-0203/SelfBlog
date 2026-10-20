@@ -113,13 +113,13 @@ onMounted(async () => {
 }
 .welcome-panel h1 {
   margin: 0;
-  font-size: 24px;
+  font-size: var(--text-2xl);
 }
 .welcome-panel > div > p {
   max-width: 520px;
   margin: 10px 0 0;
   color: var(--text-secondary);
-  font-size: 13px;
+  font-size: var(--text-sm);
   line-height: 1.8;
 }
 .primary-link {
@@ -132,7 +132,7 @@ onMounted(async () => {
   border-radius: var(--radius);
   background: var(--accent);
   color: var(--text-inverse);
-  font-size: 13px;
+  font-size: var(--text-sm);
   font-weight: 600;
 }
 .primary-link:hover {
@@ -169,12 +169,12 @@ onMounted(async () => {
   color: var(--accent);
 }
 .workspace-card h2 {
-  font-size: 15px;
+  font-size: var(--text-base);
 }
 .workspace-card p {
   margin: 0;
   color: var(--text-secondary);
-  font-size: 12px;
+  font-size: var(--text-xs);
   line-height: 1.8;
 }
 .card-link {
@@ -184,13 +184,13 @@ onMounted(async () => {
   margin-top: auto;
   padding-top: 14px;
   color: var(--accent);
-  font-size: 12px;
+  font-size: var(--text-xs);
   font-weight: 600;
 }
 .dashboard-note {
   margin: 18px 2px 0;
   color: var(--text-muted);
-  font-size: 12px;
+  font-size: var(--text-xs);
 }
 .summary-grid {
   display: grid;
@@ -208,10 +208,10 @@ onMounted(async () => {
 }
 .summary-grid small {
   color: var(--text-muted);
-  font-size: 12px;
+  font-size: var(--text-xs);
 }
 .summary-grid strong {
-  font-size: 22px;
+  font-size: var(--text-2xl);
   font-variant-numeric: tabular-nums;
 }
 @media (max-width: 860px) {

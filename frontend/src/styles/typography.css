@@ -148,7 +148,7 @@ b {
   padding: 0;
   background: transparent;
   color: var(--text-primary);
-  font-size: 0.8125rem;
+  font-size: var(--text-sm);
   line-height: 1.7;
 }
 

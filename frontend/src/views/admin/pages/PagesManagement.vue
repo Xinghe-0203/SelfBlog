@@ -138,12 +138,12 @@ onBeforeUnmount(() => {
   gap: 24px;
 }
 .page-heading h1 {
-  font-size: 24px;
+  font-size: var(--text-2xl);
 }
 .page-heading p {
   margin-top: 8px;
   color: var(--text-muted);
-  font-size: 13px;
+  font-size: var(--text-sm);
 }
 .create-page-form {
   padding: 22px;
@@ -154,11 +154,11 @@ onBeforeUnmount(() => {
 .create-page-form h2,
 .page-group h2 {
   margin-bottom: 12px;
-  font-size: 17px;
+  font-size: var(--text-lg);
 }
 .create-page-form p,
 .empty-pages {
-  font-size: 13px;
+  font-size: var(--text-sm);
   color: var(--text-secondary);
   line-height: 1.7;
 }
@@ -174,7 +174,7 @@ onBeforeUnmount(() => {
   flex: 1 1 220px;
   min-width: 0;
   gap: 8px;
-  font-size: 13px;
+  font-size: var(--text-sm);
 }
 .create-fields input {
   min-width: 0;
@@ -185,7 +185,7 @@ onBeforeUnmount(() => {
   border-radius: var(--radius);
   background: var(--surface-primary);
   color: var(--text-primary);
-  font-size: 16px;
+  font-size: var(--text-base);
 }
 .slug-input {
   display: flex;
@@ -200,7 +200,7 @@ onBeforeUnmount(() => {
   display: block;
   margin-top: 12px;
   color: var(--text-muted);
-  font-size: 12px;
+  font-size: var(--text-xs);
 }
 .pages-alert {
   padding: 12px;
@@ -235,12 +235,12 @@ onBeforeUnmount(() => {
   gap: 6px;
 }
 .page-list strong {
-  font-size: 14px;
+  font-size: var(--text-sm);
   overflow-wrap: anywhere;
 }
 .page-list small,
 .page-list li > span {
-  font-size: 12px;
+  font-size: var(--text-xs);
   color: var(--text-muted);
   overflow-wrap: anywhere;
 }

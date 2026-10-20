@@ -88,8 +88,8 @@ onMounted(() => {
 <template>
   <PageFrame :config="config" class="blog-home">
     <section v-if="showModule('hero')" class="intro-shell">
-      <div v-if="showModule('cover')" class="intro-visual" aria-hidden="true">
-        <img v-if="heroCover" :src="heroCover" alt="" @error="heroCover = ''" />
+      <div v-if="showModule('cover') && heroCover" class="intro-visual" aria-hidden="true">
+        <img :src="heroCover" alt="" @error="heroCover = ''" />
       </div>
       <div class="intro-copy">
         <p class="intro-author">{{ text('eyebrow', siteStore.settings.authorName) }}</p>
@@ -190,7 +190,7 @@ onMounted(() => {
 .intro-author {
   margin-bottom: 12px;
   color: var(--text-secondary);
-  font-size: 12px;
+  font-size: var(--text-xs);
 }
 .intro-copy h1 {
   max-width: 600px;
@@ -204,7 +204,7 @@ onMounted(() => {
   margin-top: 15px;
   max-width: 410px;
   color: var(--text-secondary);
-  font-size: 12px;
+  font-size: var(--text-xs);
   line-height: 1.8;
 }
 .intro-visual {
@@ -249,12 +249,12 @@ onMounted(() => {
   margin-bottom: 18px;
 }
 .section-heading h2 {
-  font-size: 19px;
+  font-size: var(--text-xl);
   letter-spacing: -0.025em;
 }
 .result-count {
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: var(--text-2xs);
 }
 .sidebar-block {
   padding: 21px;
@@ -264,7 +264,7 @@ onMounted(() => {
   background: var(--surface-primary);
 }
 .sidebar-block h2 {
-  font-size: 14px;
+  font-size: var(--text-sm);
   overflow-wrap: anywhere;
 }
 .author-heading {
@@ -287,7 +287,7 @@ onMounted(() => {
 .author-card p {
   margin-block: 16px;
   color: var(--text-secondary);
-  font-size: 12px;
+  font-size: var(--text-xs);
   line-height: 1.85;
   overflow-wrap: anywhere;
 }
@@ -296,7 +296,7 @@ onMounted(() => {
   align-items: center;
   gap: 6px;
   min-height: 32px;
-  font-size: 12px;
+  font-size: var(--text-xs);
 }
 .sidebar-tags {
   display: flex;
@@ -309,7 +309,7 @@ onMounted(() => {
   border-radius: var(--radius-xs);
   background: var(--bg-primary);
   color: var(--text-secondary);
-  font-size: 11px;
+  font-size: var(--text-2xs);
 }
 .sidebar-tags a:hover {
   background: var(--accent-light);
@@ -323,7 +323,7 @@ onMounted(() => {
   border: 1px dashed var(--border-light);
   border-radius: var(--radius-xl);
   color: var(--text-secondary);
-  font-size: 12px;
+  font-size: var(--text-xs);
 }
 .archive-callout span {
   flex: 1;
@@ -341,10 +341,10 @@ onMounted(() => {
   border-radius: var(--radius-xl);
   background: var(--surface-primary);
   color: var(--text-secondary);
-  font-size: 14px;
+  font-size: var(--text-sm);
 }
 .state-panel p {
-  font-size: 14px;
+  font-size: var(--text-sm);
 }
 .home-pagination {
   display: flex;
@@ -352,7 +352,7 @@ onMounted(() => {
   justify-content: center;
   gap: 20px;
   margin-top: 20px;
-  font-size: 12px;
+  font-size: var(--text-xs);
   color: var(--text-muted);
 }
 .home-pagination button {
@@ -390,7 +390,7 @@ onMounted(() => {
     border-radius: var(--radius-xl);
   }
   .intro-copy h1 {
-    font-size: 29px;
+    font-size: var(--text-3xl);
     max-width: 95%;
   }
   .intro-description {
@@ -404,7 +404,7 @@ onMounted(() => {
     margin-top: 27px;
   }
   .section-heading h2 {
-    font-size: 18px;
+    font-size: var(--text-lg);
   }
 }
 </style>

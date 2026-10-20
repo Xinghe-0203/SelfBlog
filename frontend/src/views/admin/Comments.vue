@@ -138,12 +138,12 @@ onMounted(() => void load())
 }
 .page-heading h1 {
   margin: 0 0 8px;
-  font-size: 24px;
+  font-size: var(--text-2xl);
 }
 .page-heading p:not(.eyebrow) {
   margin: 0;
   color: var(--text-muted);
-  font-size: 13px;
+  font-size: var(--text-sm);
 }
 select {
   min-height: 44px;
@@ -152,7 +152,7 @@ select {
   border-radius: var(--radius);
   background: var(--surface-primary);
   color: var(--text-primary);
-  font-size: 13px;
+  font-size: var(--text-sm);
 }
 .comment-list {
   display: grid;
@@ -179,14 +179,14 @@ select {
 .comment-top span,
 .comment-top time {
   color: var(--text-muted);
-  font-size: 12px;
+  font-size: var(--text-xs);
 }
 .comment-top a {
   color: var(--accent);
 }
 .comment-content {
   margin: 15px 0;
-  font-size: 14px;
+  font-size: var(--text-sm);
   line-height: 1.8;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
@@ -198,7 +198,7 @@ select {
 .status {
   padding: 3px 8px;
   border-radius: var(--radius-xs);
-  font-size: 11px;
+  font-size: var(--text-2xs);
 }
 .status-1 {
   background: var(--success-light);
@@ -227,7 +227,7 @@ select {
   padding-inline: 10px;
   border-radius: var(--radius-sm);
   color: var(--text-secondary);
-  font-size: 12px;
+  font-size: var(--text-xs);
 }
 .actions button:hover {
   background: var(--bg-secondary);
@@ -241,7 +241,7 @@ select {
   padding: 30px;
   color: var(--text-muted);
   text-align: center;
-  font-size: 13px;
+  font-size: var(--text-sm);
 }
 .error {
   color: var(--error);
@@ -252,7 +252,7 @@ select {
   justify-content: center;
   gap: 14px;
   color: var(--text-muted);
-  font-size: 12px;
+  font-size: var(--text-xs);
 }
 .pagination button {
   min-height: 44px;

@@ -172,10 +172,10 @@ onBeforeUnmount(() => {
 }
 .navigation-editor h2 {
   margin-bottom: 12px;
-  font-size: 17px;
+  font-size: var(--text-lg);
 }
 .navigation-editor > p {
-  font-size: 13px;
+  font-size: var(--text-sm);
   line-height: 1.8;
   color: var(--text-secondary);
 }
@@ -205,7 +205,7 @@ onBeforeUnmount(() => {
   border-radius: var(--radius);
   background: var(--surface-primary);
   color: var(--text-primary);
-  font-size: 16px;
+  font-size: var(--text-base);
 }
 .navigation-buttons {
   display: flex;
@@ -216,7 +216,7 @@ onBeforeUnmount(() => {
   padding-inline: 12px;
   border-radius: var(--radius);
   color: var(--text-secondary);
-  font-size: 13px;
+  font-size: var(--text-sm);
 }
 .navigation-buttons button:hover:not(:disabled) {
   background: var(--accent-light);
