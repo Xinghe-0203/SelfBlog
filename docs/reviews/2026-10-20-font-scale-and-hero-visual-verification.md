@@ -165,8 +165,8 @@ Icon 组件，故该规则自 `HEAD` 起就是死代码，**无视觉影响**（
 | `.markdown-body` 代码块在 390px 超出视口（`code.language-js` 宽 400.3px、右缘 436.3） | **已被容器收住，不是页面破损**：父 `<pre>` 有 `overflow-x: auto`（scrollW 434 / clientW 352），外层 `div.code-block` 为 `overflow-x: hidden`；`documentElement.scrollWidth` 保持 390 |
 
 其余全部干净：7 个页面 × 2 个视口 × 8 个标题选择器，`clipped=false` / `overflowsViewport=false`；
-各页 `documentElement.scrollWidth === clientWidth`；控制台 0 错误。唯一的两行换行是 390px 下
-`.intro-copy h1` 的正常句子换行，非截断。
+各页 `documentElement.scrollWidth === clientWidth`；除下方那条已知的 `visitor/track` 403 外，
+控制台无其它错误。唯一的两行换行是 390px 下 `.intro-copy h1` 的正常句子换行，非截断。
 
 ## 7. 本轮**未**验证的事项
 
