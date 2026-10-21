@@ -75,11 +75,11 @@
         UPDATE sys_user SET following_count = CASE WHEN following_count - 1 &gt; 0 THEN following_count - 1 ELSE 0 END WHERE id = #{userId}
     </update>
 
-    <!-- 批量统计每日新增用户数 -->
+    <!-- 批量统计每日新增用户数。别名必须双引号，否则 H2 折叠成大写导致统计接口 NPE（同 BlogPostMapper.xml） -->
     <select id="countUsersGroupByDate" resultType="java.util.Map">
-        SELECT DATE(create_time) as date, COUNT(*) as count FROM sys_user
+        SELECT DATE(create_time) as "date", COUNT(*) as "count" FROM sys_user
         WHERE create_time &gt;= #{since} AND is_deleted = 0
-        GROUP BY DATE(create_time) ORDER BY date
+        GROUP BY DATE(create_time) ORDER BY "date"
     </select>
 
     <!-- 刻意不过滤 is_deleted：用户名唯一 + 逻辑删除，启动播种必须能找到已删除的同名行并恢复。

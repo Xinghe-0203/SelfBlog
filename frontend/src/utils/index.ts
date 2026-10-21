@@ -19,15 +19,19 @@ export function formatRelativeTime(date: string | Date | null | undefined): stri
   const minutes = Math.floor(seconds / 60)
   const hours = Math.floor(minutes / 60)
   const days = Math.floor(hours / 24)
-  const months = Math.floor(days / 30)
-  const years = Math.floor(months / 12)
 
   if (seconds < 60) return '刚刚'
   if (minutes < 60) return `${minutes}分钟前`
   if (hours < 24) return `${hours}小时前`
   if (days < 30) return `${days}天前`
+
+  // 30 天近似会把「还差几天满一年」的日期提前说成「1年前」；改用真实日历月差。
+  let months =
+    (now.getFullYear() - target.getFullYear()) * 12 + (now.getMonth() - target.getMonth())
+  if (now.getDate() < target.getDate()) months -= 1
+  if (months < 1) return `${days}天前`
   if (months < 12) return `${months}个月前`
-  return `${years}年前`
+  return `${Math.floor(months / 12)}年前`
 }
 
 /**
@@ -55,23 +59,6 @@ export function formatDate(
     .replace('HH', hours)
     .replace('mm', minutes)
     .replace('ss', seconds)
-}
-
-/**
- * 格式化数字（如：1234 -> 1.2k）
- */
-export function formatNumber(num: number | null | undefined): string {
-  if (num == null) return '0'
-  if (num >= 100000000) {
-    return (num / 100000000).toFixed(1) + '亿'
-  }
-  if (num >= 10000) {
-    return (num / 10000).toFixed(1) + '万'
-  }
-  if (num >= 1000) {
-    return (num / 1000).toFixed(1) + 'k'
-  }
-  return num.toString()
 }
 
 /**
@@ -105,97 +92,6 @@ export function getSafeImageUrl(
 
   // 其他情况返回 fallback
   return fallback
-}
-
-/**
- * 防抖函数
- */
-export function debounce<T extends (...args: unknown[]) => unknown>(
-  fn: T,
-  delay = 300
-): T & { cancel: () => void } {
-  let timer: ReturnType<typeof setTimeout> | null = null
-  const debounced = function (this: unknown, ...args: unknown[]) {
-    if (timer) clearTimeout(timer)
-    timer = setTimeout(() => {
-      fn.apply(this, args)
-      timer = null
-    }, delay)
-  } as T & { cancel: () => void }
-  debounced.cancel = function () {
-    if (timer) {
-      clearTimeout(timer)
-      timer = null
-    }
-  }
-  return debounced
-}
-
-/**
- * 生成唯一ID
- */
-export function generateId(): string {
-  return (
-    crypto.randomUUID?.()?.replace(/-/g, '') ||
-    Array.from(crypto.getRandomValues(new Uint8Array(16)))
-      .map((b) => b.toString(16).padStart(2, '0'))
-      .join('')
-  )
-}
-
-/**
- * 复制文本到剪贴板
- */
-export async function copyToClipboard(text: string): Promise<boolean> {
-  try {
-    await navigator.clipboard.writeText(text)
-    return true
-  } catch {
-    // 降级方案
-    const textarea = document.createElement('textarea')
-    textarea.value = text
-    textarea.style.position = 'fixed'
-    textarea.style.opacity = '0'
-    document.body.appendChild(textarea)
-    textarea.select()
-    try {
-      document.execCommand('copy')
-      return true
-    } catch {
-      return false
-    } finally {
-      document.body.removeChild(textarea)
-    }
-  }
-}
-
-/**
- * 本地存储封装
- */
-export const storage = {
-  get<T = unknown>(key: string): T | null {
-    try {
-      const value = localStorage.getItem(key)
-      return value ? (JSON.parse(value) as T) : null
-    } catch {
-      return null
-    }
-  },
-  set(key: string, value: unknown): boolean {
-    try {
-      localStorage.setItem(key, JSON.stringify(value))
-      return true
-    } catch {
-      return false
-    }
-  },
-  remove(key: string): void {
-    try {
-      localStorage.removeItem(key)
-    } catch {
-      // storage unavailable
-    }
-  }
 }
 
 /**

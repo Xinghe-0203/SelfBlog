@@ -35,6 +35,9 @@ public class WebMvcConfig implements WebMvcConfigurer {
     @Autowired
     private HttpRequestLoggingInterceptor httpRequestLoggingInterceptor;
 
+    @Autowired
+    private SiteAssetSecurityHeaderInterceptor siteAssetSecurityHeaderInterceptor;
+
     @Value("${app.api-prefix:/api}")
     private String apiPrefix;
 
@@ -63,6 +66,12 @@ public class WebMvcConfig implements WebMvcConfigurer {
         registry.addInterceptor(rateLimitInterceptor)
                 .addPathPatterns("/api/**")
                 .order(2);
+
+        // 站点资产响应安全头（S1）：/uploads/site-assets/** 是公开同源资源且可作顶层文档打开，
+        // 这里补 CSP + nosniff。日志拦截器已排除 /uploads/**，所以两者不冲突。
+        registry.addInterceptor(siteAssetSecurityHeaderInterceptor)
+                .addPathPatterns("/uploads/site-assets/**")
+                .order(0);
     }
 
     @Override

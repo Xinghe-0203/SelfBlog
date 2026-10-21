@@ -8,6 +8,7 @@ import com.selfblog.entity.PhotoAlbum;
 import com.selfblog.mapper.AlbumPhotoMapper;
 import com.selfblog.mapper.PhotoAlbumMapper;
 import com.selfblog.service.site.PhotoAlbumService;
+import com.selfblog.utils.ImageDimensionUtils;
 import com.selfblog.vo.site.AlbumAccessVO;
 import com.selfblog.vo.site.AlbumImage;
 import com.selfblog.vo.site.AlbumPhotoVO;
@@ -257,6 +258,18 @@ public class PhotoAlbumServiceImpl implements PhotoAlbumService {
     }
 
     private String detectImageType(MultipartFile file) {
+        String mimeType = sniffMagicBytes(file);
+        // S5：相册照片只存原始字节、从不解码，因此必须在落盘前按文件头拦截声明尺寸
+        // 超大的解压缩炸弹（否则它会被原样存下并在后续请求里被原样送出）。
+        try (var input = file.getInputStream()) {
+            ImageDimensionUtils.validatePixelCount(input, file.getOriginalFilename());
+        } catch (IOException e) {
+            throw new BusinessException(400, "图片读取失败");
+        }
+        return mimeType;
+    }
+
+    private String sniffMagicBytes(MultipartFile file) {
         try {
             byte[] header;
             try (var input = file.getInputStream()) {

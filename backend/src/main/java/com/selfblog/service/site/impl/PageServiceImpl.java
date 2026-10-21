@@ -20,9 +20,17 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.*;
 
-/** Versioned page documents in existing KV storage; never part of public global settings. */
+/**
+ * Versioned page documents in existing KV storage; never part of public global settings.
+ *
+ * <p>C7: 本类刻意<b>没有</b>类级 {@code @Transactional}。这些读方法会在"找不到"时抛
+ * {@link BusinessException}（404/400），而任何 RuntimeException 都会把当前事务标记为
+ * rollback-only：一旦外层调用方自己也开了事务（两者共享同一个事务），提交时就会变成
+ * {@code UnexpectedRollbackException}，浏览器看到的是 500 而不是 404。
+ * {@code ReadingPageService} 早就因为同样的原因没有加事务注解，这里照同一形状处理：
+ * 读方法不开事务（Mapper 的每次查询各自走自己的连接），写方法保留方法级事务注解。</p>
+ */
 @Service
-@Transactional(readOnly = true)
 public class PageServiceImpl implements PageService {
     private static final String DRAFT = "page.draft.", PUBLISHED = "page.published.", SLUG = "page.slug.", NAV = "page.navigation";
     private final SiteSettingMapper mapper;

@@ -8,6 +8,7 @@ import type { Post } from '@/types'
 import PageFrame from '@/components/pages/PageFrame.vue'
 import { usePageConfig } from '@/composables/usePageConfig'
 import { usePageSeo } from '@/composables/usePageSeo'
+import { useLatestRequest } from '@/composables/useLatestRequest'
 const { config, text, module: showModule } = usePageConfig('search')
 usePageSeo('search', () => ({
   title: text('title', '搜索文章'),
@@ -25,6 +26,7 @@ const currentPage = ref(1)
 const totalPages = ref(1)
 const totalResults = ref(0)
 const pageSize = 12
+const beginSearchRequest = useLatestRequest().begin
 
 const search = async (keyword: string, page = 1) => {
   const normalizedKeyword = keyword.trim()
@@ -34,6 +36,8 @@ const search = async (keyword: string, page = 1) => {
     return
   }
 
+  // 翻页/改词都会并发发请求：先发后到的旧响应不许覆盖新结果。
+  const isLatest = beginSearchRequest()
   loading.value = true
   error.value = ''
   currentPage.value = page
@@ -43,16 +47,18 @@ const search = async (keyword: string, page = 1) => {
       pageNum: page,
       pageSize
     })
+    if (!isLatest()) return
     const data = response.data || {}
     results.value = data.records || []
     totalPages.value = Math.max(1, data.pages || 1)
     totalResults.value = data.total || 0
   } catch {
+    if (!isLatest()) return
     results.value = []
     totalResults.value = 0
     error.value = '搜索暂时不可用，请稍后重试。'
   } finally {
-    loading.value = false
+    if (isLatest()) loading.value = false
   }
 }
 
@@ -293,11 +299,6 @@ onMounted(() => {
   gap: 9px;
   min-height: 190px;
   color: var(--text-muted);
-}
-.search-prompt > span {
-  color: var(--primary);
-  font-size: var(--text-5xl);
-  line-height: 1;
 }
 .search-prompt p {
   margin: 0;

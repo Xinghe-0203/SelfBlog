@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach, vi } from 'vitest'
-import { enhanceMarkdown } from '../useMarkdownEnhance'
+import { enhanceMarkdown, disposeMarkdownEnhance } from '../useMarkdownEnhance'
 
 /** 挂到文档里再增强 —— 复制/折叠都要求节点是真实可交互的 DOM。 */
 function fixture(html: string): HTMLElement {
@@ -190,5 +190,61 @@ describe('enhanceMarkdown — 幂等性', () => {
     expect(root.querySelectorAll('.code-expand')).toHaveLength(1)
     expect(root.querySelectorAll('.heading-anchor')).toHaveLength(1)
     expect(root.querySelectorAll('pre')).toHaveLength(1)
+  })
+})
+
+describe('enhanceMarkdown — 资源清理', () => {
+  it('cancels the pending copy-feedback timer when the root is disposed', async () => {
+    const writeText = vi.fn<(text: string) => Promise<void>>().mockResolvedValue(undefined)
+    stubClipboard(writeText)
+    const root = fixture('<pre><code class="language-ts">let x = 1</code></pre>')
+    enhanceMarkdown(root)
+    const copy = query<HTMLButtonElement>(root, '.code-copy')
+
+    vi.useFakeTimers()
+    try {
+      copy.click()
+      await flushMicrotasks()
+      expect(copy.textContent).toBe('已复制')
+
+      // 正文被重新渲染：旧按钮的节点即将被丢弃，回退定时器必须先释放
+      disposeMarkdownEnhance(root)
+      vi.advanceTimersByTime(1500)
+      expect(copy.textContent).toBe('已复制')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('is a no-op for a root that was never enhanced or already disposed', () => {
+    const root = fixture('<p>正文</p>')
+    expect(() => disposeMarkdownEnhance(root)).not.toThrow()
+    enhanceMarkdown(root)
+    disposeMarkdownEnhance(root)
+    expect(() => disposeMarkdownEnhance(root)).not.toThrow()
+  })
+
+  it('does not cancel timers owned by another root', async () => {
+    const writeText = vi.fn<(text: string) => Promise<void>>().mockResolvedValue(undefined)
+    stubClipboard(writeText)
+    const first = fixture('<pre><code class="language-ts">let a = 1</code></pre>')
+    const second = fixture('<pre><code class="language-ts">let b = 2</code></pre>')
+    enhanceMarkdown(first)
+    enhanceMarkdown(second)
+    const copyFirst = query<HTMLButtonElement>(first, '.code-copy')
+    const copySecond = query<HTMLButtonElement>(second, '.code-copy')
+
+    vi.useFakeTimers()
+    try {
+      copyFirst.click()
+      copySecond.click()
+      await flushMicrotasks()
+      disposeMarkdownEnhance(first)
+      vi.advanceTimersByTime(1500)
+      expect(copyFirst.textContent).toBe('已复制')
+      expect(copySecond.textContent).toBe('复制')
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })

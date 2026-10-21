@@ -19,6 +19,7 @@ import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.Caching;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -39,7 +40,7 @@ public class NotificationServiceImpl extends ServiceImpl<BlogNotificationMapper,
     private HtmlSanitizer htmlSanitizer;
 
     @Override
-    @Cacheable(value = CaffeineCacheConfig.USER_CACHE, key = "'notifList:' + #userId + ':' + #pageNum + ':' + #pageSize")
+    @Cacheable(value = CaffeineCacheConfig.NOTIFICATION_LIST_CACHE, key = "'notifList:' + #userId + ':' + #pageNum + ':' + #pageSize")
     @Transactional(readOnly = true)
     public Page<NotificationVO> getNotificationList(Integer pageNum, Integer pageSize, Long userId) {
         Page<BlogNotification> page = new Page<>(pageNum, pageSize);
@@ -66,7 +67,10 @@ public class NotificationServiceImpl extends ServiceImpl<BlogNotificationMapper,
     }
 
     @Override
-    @CacheEvict(value = CaffeineCacheConfig.USER_CACHE, key = "'unreadNotif:' + #userId")
+    @Caching(evict = {
+            @CacheEvict(value = CaffeineCacheConfig.USER_CACHE, key = "'unreadNotif:' + #userId"),
+            @CacheEvict(value = CaffeineCacheConfig.NOTIFICATION_LIST_CACHE, allEntries = true)
+    })
     @Transactional(rollbackFor = Exception.class)
     public void markAsRead(Long notificationId, Long userId) {
         BlogNotification notification = this.getById(notificationId);
@@ -82,7 +86,10 @@ public class NotificationServiceImpl extends ServiceImpl<BlogNotificationMapper,
     }
 
     @Override
-    @CacheEvict(value = CaffeineCacheConfig.USER_CACHE, key = "'unreadNotif:' + #userId")
+    @Caching(evict = {
+            @CacheEvict(value = CaffeineCacheConfig.USER_CACHE, key = "'unreadNotif:' + #userId"),
+            @CacheEvict(value = CaffeineCacheConfig.NOTIFICATION_LIST_CACHE, allEntries = true)
+    })
     @Transactional(rollbackFor = Exception.class)
     public void markAllAsRead(Long userId) {
         LambdaQueryWrapper<BlogNotification> wrapper = new LambdaQueryWrapper<>();
@@ -95,7 +102,10 @@ public class NotificationServiceImpl extends ServiceImpl<BlogNotificationMapper,
     }
 
     @Override
-    @CacheEvict(value = CaffeineCacheConfig.USER_CACHE, key = "'unreadNotif:' + #userId")
+    @Caching(evict = {
+            @CacheEvict(value = CaffeineCacheConfig.USER_CACHE, key = "'unreadNotif:' + #userId"),
+            @CacheEvict(value = CaffeineCacheConfig.NOTIFICATION_LIST_CACHE, allEntries = true)
+    })
     @Transactional(rollbackFor = Exception.class)
     public void deleteNotification(Long notificationId, Long userId) {
         BlogNotification notification = this.getById(notificationId);
@@ -111,7 +121,10 @@ public class NotificationServiceImpl extends ServiceImpl<BlogNotificationMapper,
     }
 
     @Override
-    @CacheEvict(value = CaffeineCacheConfig.USER_CACHE, key = "'unreadNotif:' + #toUserId")
+    @Caching(evict = {
+            @CacheEvict(value = CaffeineCacheConfig.USER_CACHE, key = "'unreadNotif:' + #toUserId"),
+            @CacheEvict(value = CaffeineCacheConfig.NOTIFICATION_LIST_CACHE, allEntries = true)
+    })
     @Transactional(rollbackFor = Exception.class)
     public void sendNotification(String type, String title, String content, Long fromUserId, Long toUserId, String targetType, Long targetId) {
         // 不通知自己
@@ -138,19 +151,6 @@ public class NotificationServiceImpl extends ServiceImpl<BlogNotificationMapper,
         notification.setIsRead(0);
 
         this.save(notification);
-    }
-
-    /**
-     * 转换实体为VO（优化：批量查询fromUser避免N+1）
-     */
-    private NotificationVO convertToVO(BlogNotification notification) {
-        NotificationVO vo = new NotificationVO();
-        BeanUtils.copyProperties(notification, vo);
-
-        // 计算timeAgo
-        vo.setTimeAgo(TimeUtils.getTimeAgo(notification.getCreateTime()));
-
-        return vo;
     }
 
     /**

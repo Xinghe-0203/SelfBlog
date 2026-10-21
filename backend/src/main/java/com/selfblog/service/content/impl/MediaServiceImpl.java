@@ -12,6 +12,7 @@ import com.selfblog.mapper.BlogPostMediaMapper;
 import com.selfblog.mapper.MediaMapper;
 import com.selfblog.service.post.BlogPostService;
 import com.selfblog.service.content.MediaService;
+import com.selfblog.utils.ImageDimensionUtils;
 import com.selfblog.utils.SecurityUtils;
 import com.selfblog.vo.content.MediaVO;
 import jakarta.annotation.PostConstruct;
@@ -20,11 +21,16 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.multipart.MultipartFile;
 
 import javax.imageio.ImageIO;
+import javax.imageio.ImageReader;
+import javax.imageio.stream.ImageInputStream;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
@@ -44,6 +50,19 @@ public class MediaServiceImpl extends ServiceImpl<MediaMapper, Media> implements
 
     @Autowired
     private BlogPostService blogPostService;
+
+    /**
+     * 自身代理，用于让 {@link #uploadFiles} 里的每次上传各自开一个短事务。
+     * 通过 {@code this.} 自调用会绕过 Spring 事务代理，所有文件被迫共享一个事务（C4）。
+     * 直接 new 出来的单元测试实例里为 null，调用方需回退到 {@code this}。
+     */
+    @Autowired
+    @Lazy
+    private MediaService mediaSelf;
+
+    private MediaService selfOrThis() {
+        return mediaSelf != null ? mediaSelf : this;
+    }
 
     @Value("${upload.base-path:./uploads}")
     private String uploadPath;
@@ -115,7 +134,8 @@ public class MediaServiceImpl extends ServiceImpl<MediaMapper, Media> implements
         } catch (BusinessException e) {
             throw e;
         } catch (Exception e) {
-            throw new BusinessException(400, "文件读取失败，无法校验文件类型: " + e.getMessage());
+            log.error("[Media] 读取文件头失败: file={}, error={}", file.getOriginalFilename(), e.getMessage(), e);
+            throw new BusinessException(400, "文件读取失败，无法校验文件类型");
         }
     }
 
@@ -154,6 +174,10 @@ public class MediaServiceImpl extends ServiceImpl<MediaMapper, Media> implements
     private File processImage(File inputFile, File outputFile) throws IOException {
         log.info("[Media] 处理图片: {} -> {}", inputFile.getAbsolutePath(), outputFile.getAbsolutePath());
         log.info("[Media] 输入文件存在: {}, 大小: {}", inputFile.exists(), inputFile.length());
+
+        // S5：解码前先读文件头拿声明尺寸，拦截“小文件声明超大尺寸”的解压缩炸弹。
+        // ImageDimensionUtils 只用 getWidth/getHeight，不触发像素分配。
+        ImageDimensionUtils.validatePixelCount(inputFile, inputFile.getName());
 
         BufferedImage image = ImageIO.read(inputFile);
         if (image == null) {
@@ -281,12 +305,16 @@ public class MediaServiceImpl extends ServiceImpl<MediaMapper, Media> implements
             destFile = new File(uploadDir, newFilename);
 
             try {
+                // S5：落盘/解码之前再按文件头校验一次声明尺寸，避免把解压缩炸弹写入磁盘。
+                try (InputStream headerStream = file.getInputStream()) {
+                    ImageDimensionUtils.validatePixelCount(headerStream, originalFilename);
+                }
                 file.transferTo(tempFile);
                 processImage(tempFile, destFile);
                 fileSize = destFile.length();
             } catch (IOException e) {
                 log.error("[Media] 图片处理失败: {}", e.getMessage(), e);
-                throw new BusinessException(500, "图片处理失败: " + e.getMessage());
+                throw new BusinessException(500, "图片处理失败，请稍后重试");
             } finally {
                 if (tempFile.exists()) {
                     tempFile.delete();
@@ -299,7 +327,7 @@ public class MediaServiceImpl extends ServiceImpl<MediaMapper, Media> implements
                 file.transferTo(destFile);
             } catch (IOException e) {
                 log.error("[Media] 文件保存失败: {}", e.getMessage(), e);
-                throw new BusinessException(500, "文件保存失败: " + e.getMessage());
+                throw new BusinessException(500, "文件保存失败，请稍后重试");
             }
             fileSize = file.getSize();
         }
@@ -359,12 +387,41 @@ public class MediaServiceImpl extends ServiceImpl<MediaMapper, Media> implements
             throw new BusinessException(403, "无权删除此媒体文件");
         }
 
+        // C3: 必须先提交数据库删除，再删除磁盘字节。原实现先删文件再删行：一旦行删除失败/事务回滚，
+        // 文件已经不可恢复，而数据库里仍留着一条指向空文件的记录（列表里出现打不开的媒体）。
+        // 反过来，先删行、提交后再删文件，最坏情况只是留下一个孤儿字节文件，不会出现"有记录无文件"。
         File file = new File(media.getFilePath());
-        if (file.exists()) {
-            file.delete();
-        }
-
         this.removeById(mediaId);
+        deleteFileAfterCommit(file);
+    }
+
+    /**
+     * 把文件删除挂到当前事务提交之后执行；没有事务（单元测试直接 new 出来的实例）时立即删除。
+     *
+     * @param file 待删除的物理文件
+     */
+    private void deleteFileAfterCommit(File file) {
+        if (file == null) {
+            return;
+        }
+        Runnable cleanup = () -> {
+            if (!file.exists()) {
+                return;
+            }
+            if (!file.delete()) {
+                log.warn("[Media] 文件删除失败，留下孤儿文件: {}", file.getAbsolutePath());
+            }
+        };
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            cleanup.run();
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                cleanup.run();
+            }
+        });
     }
 
     @Override
@@ -464,7 +521,6 @@ public class MediaServiceImpl extends ServiceImpl<MediaMapper, Media> implements
     }
 
     @Override
-    @Transactional(rollbackFor = Exception.class)
     public List<MediaVO> uploadFiles(MultipartFile[] files, Long userId, String type) {
         if (files == null || files.length == 0) {
             throw new BusinessException(400, "请选择要上传的文件");
@@ -473,14 +529,51 @@ public class MediaServiceImpl extends ServiceImpl<MediaMapper, Media> implements
             throw new BusinessException(400, "最多只能上传9个文件");
         }
 
+        // C4: 这里刻意不加 @Transactional。原实现用单个事务包住整批上传：每成功一个文件就已经
+        // 把字节写到了磁盘，第 N 个失败时数据库回滚掉前 N-1 行，但磁盘上的字节没有任何东西负责清理，
+        // 于是每批失败都会留下孤儿文件；而 SQLite 连接池只有 1 条连接，整批长事务还会把上传串行化。
+        // 现在每个文件走自己的短事务（经 selfOrThis() 走代理），失败时用补偿删除回收本批已落地的
+        // 行与字节——批量上传变成"要么全部成功，要么尽力回到原状"，且不再长时间占用连接。
         List<MediaVO> result = new ArrayList<>();
-        for (MultipartFile file : files) {
-            if (file != null && !file.isEmpty()) {
-                MediaVO mediaVO = uploadMedia(file, userId, type);
-                result.add(mediaVO);
+        try {
+            for (MultipartFile file : files) {
+                if (file != null && !file.isEmpty()) {
+                    result.add(selfOrThis().uploadMedia(file, userId, type));
+                }
             }
+        } catch (RuntimeException e) {
+            compensateUploaded(result);
+            throw e;
         }
         return result;
+    }
+
+    /**
+     * 批量上传失败后的补偿：删除本批已经提交的行，并清理对应的磁盘字节。
+     * 补偿自身失败只记日志，不掩盖原始异常。
+     *
+     * @param uploaded 本批已经成功保存的媒体
+     */
+    private void compensateUploaded(List<MediaVO> uploaded) {
+        for (MediaVO vo : uploaded) {
+            if (vo == null || vo.getId() == null) {
+                continue;
+            }
+            try {
+                Media media = this.getById(vo.getId());
+                if (media == null) {
+                    continue;
+                }
+                this.removeById(vo.getId());
+                File file = new File(media.getFilePath());
+                if (file.exists() && !file.delete()) {
+                    log.warn("[Media] 补偿删除失败，留下孤儿文件: {}", file.getAbsolutePath());
+                }
+            } catch (Exception cleanupFailure) {
+                log.error("[Media] 批量上传补偿失败: mediaId={}, error={}",
+                        vo.getId(), cleanupFailure.getMessage(), cleanupFailure);
+            }
+        }
     }
 
     @Override

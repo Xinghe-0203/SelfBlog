@@ -127,6 +127,12 @@ public interface BlogPostService extends IService<BlogPost> {
     void decrementCommentCount(Long postId, int count);
 
     /**
+     * 用真实评论行数覆盖文章的评论数（绝对值同步，见 C8）。
+     * @param postId 文章ID
+     */
+    void syncCommentCount(Long postId);
+
+    /**
      * 增加收藏数
      * @param postId 文章ID
      */

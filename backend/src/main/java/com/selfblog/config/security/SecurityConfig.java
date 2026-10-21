@@ -115,6 +115,14 @@ public class SecurityConfig {
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .headers(headers -> headers
                 .frameOptions(frameOptions -> frameOptions.deny())
+                // S9：HSTS 与 nosniff 是全局安全响应头。这里刻意不加全局 CSP——
+                // Vue SPA 依赖内联样式与构建期注入的脚本，全局 CSP 会直接白屏；
+                // 站点资源（/uploads/site-assets/**）另由 SiteAssetSecurityHeaderInterceptor
+                // 单独下发严格 CSP。
+                .httpStrictTransportSecurity(hsts -> hsts
+                    .includeSubDomains(true)
+                    .maxAgeInSeconds(31536000))
+                .contentTypeOptions(contentTypeOptions -> { })
                 .referrerPolicy(referrer -> referrer
                     .policy(ReferrerPolicyHeaderWriter.ReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN))
                 .permissionsPolicy(permissions -> permissions

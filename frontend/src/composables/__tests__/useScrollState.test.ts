@@ -120,4 +120,28 @@ describe('useScrollState', () => {
     // 卸载后监听已摘除，状态被冻结在上一次的值。
     expect(state.textContent).toBe('true|down')
   })
+
+  it('cancels the frame queued before unmount instead of updating after teardown', async () => {
+    const wrapper = mountHarness()
+    // 替身按真实语义移除队列里的回调：取消后这一帧不会再被执行。
+    const cancel = vi.fn((id: number) => {
+      frameQueue = frameQueue.filter((_, index) => index + 1 !== id)
+    })
+    vi.stubGlobal('cancelAnimationFrame', cancel)
+
+    Object.defineProperty(window, 'scrollY', { writable: true, configurable: true, value: 400 })
+    window.dispatchEvent(new Event('scroll'))
+    expect(frameQueue).toHaveLength(1)
+
+    wrapper.unmount()
+
+    // 排队中的那一帧（id 为 1）被显式取消，而不是等它自己跑完。
+    expect(cancel).toHaveBeenCalledWith(1)
+    expect(frameQueue).toHaveLength(0)
+
+    // 就算再 flush 也没有待执行的帧：组件销毁后不会再读 scrollY、写 ref。
+    flushFrame()
+    await nextTick()
+    expect(rafCalls).toBe(1)
+  })
 })

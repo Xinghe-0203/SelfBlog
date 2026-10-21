@@ -36,12 +36,14 @@ public class PasswordController {
     @Operation(summary = "发送验证码", description = "发送密码找回验证码到指定邮箱")
     @PostMapping("/send-code")
     public Result<Void> sendCode(@Valid @RequestBody SendCodeRequest request) {
-        // 检查邮箱是否已注册（未注册的邮箱不能重置密码）
-        if (!emailService.isEmailRegistered(request.getEmail())) {
-            throw new BusinessException(400, "该邮箱未注册");
+        // 防邮箱枚举（S3）：无论邮箱是否已注册，都返回同一个成功信封。
+        // 只有已注册的地址才真的发信，所以调用方无法用状态码/文案区分二者。
+        if (emailService.isEmailRegistered(request.getEmail())) {
+            emailService.sendVerificationCode(request.getEmail(), EmailService.VerificationType.PASSWORD_RESET);
+        } else {
+            log.info("密码找回请求：邮箱未注册，按统一信封静默返回: {}", StringMaskUtils.maskEmail(request.getEmail()));
         }
-        emailService.sendVerificationCode(request.getEmail(), EmailService.VerificationType.PASSWORD_RESET);
-        return Result.success("验证码已发送", null);
+        return Result.success("如果该邮箱已注册，验证码将发送到该邮箱", null);
     }
 
     /**

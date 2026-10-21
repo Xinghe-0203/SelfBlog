@@ -1,7 +1,3 @@
-/* ==================== Surface System — Flat Clean Surfaces ==================== */
-/* Glassmorphism replaced with clean flat surfaces in v5.0 */
-/* Class names retained for backward compatibility */
-
 /* Functional chrome opts in; unsupported/accessible modes keep a solid surface. */
 .functional-glass {
   background: var(--surface-primary);
@@ -10,7 +6,6 @@
     var(--functional-glass-shadow),
     inset 0 1px 0 var(--functional-glass-edge);
 }
-
 @supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
   .functional-glass {
     background: var(--functional-glass-bg);
@@ -18,7 +13,6 @@
     -webkit-backdrop-filter: blur(var(--functional-glass-blur)) saturate(1.15);
   }
 }
-
 @media (prefers-reduced-transparency: reduce), (prefers-contrast: more), (forced-colors: active) {
   .functional-glass {
     background: var(--surface-primary);
@@ -27,21 +21,6 @@
     box-shadow: none;
   }
 }
-
-/* Flat surface card */
-.glass-frost {
-  background: var(--surface-primary);
-  border: 1px solid var(--border-light);
-  box-shadow: var(--shadow-sm);
-  position: relative;
-  overflow: hidden;
-}
-
-.glass-frost:hover {
-  box-shadow: var(--shadow);
-  transform: translateY(-1px);
-}
-
 /* Backward-compat: .glass */
 .glass {
   background: var(--surface-primary);
@@ -50,133 +29,7 @@
   position: relative;
   overflow: hidden;
 }
-
 .glass:hover {
   box-shadow: var(--shadow);
   transform: translateY(-1px);
-}
-
-/* Backward-compat: .glass-rain */
-.glass-rain {
-  background: var(--surface-primary);
-  border: 1px solid var(--border-light);
-  box-shadow: var(--shadow-sm);
-}
-
-/* Surface Variants */
-.glass-light {
-  background: var(--surface-secondary);
-  border: 1px solid var(--border-ultra-light);
-  box-shadow: none;
-}
-
-.glass-heavy {
-  background: var(--surface-primary);
-  border: 1px solid var(--border-light);
-  box-shadow: var(--shadow);
-}
-
-/* ==================== Accent Border Decoration ==================== */
-.frost-glow {
-  position: relative;
-}
-
-.frost-glow::after {
-  content: '';
-  position: absolute;
-  inset: -1px;
-  border-radius: inherit;
-  padding: 1px;
-  background: linear-gradient(
-    135deg,
-    rgba(31, 108, 159, 0.15),
-    rgba(255, 255, 255, 0.5),
-    rgba(31, 108, 159, 0.1)
-  );
-  -webkit-mask:
-    linear-gradient(#fff 0 0) content-box,
-    linear-gradient(#fff 0 0);
-  -webkit-mask-composite: xor;
-  mask-composite: exclude;
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity var(--transition-slow);
-}
-
-.frost-glow:hover::after {
-  opacity: 1;
-}
-
-/* Brand Gradient Border */
-.brand-border {
-  position: relative;
-}
-
-.brand-border::after {
-  content: '';
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 3px;
-  background: var(--brand-gradient-h);
-  border-radius: 0 0 inherit inherit;
-  opacity: 0;
-  transition: opacity var(--transition);
-}
-
-.brand-border:hover::after {
-  opacity: 1;
-}
-
-/* ==================== Shine Sweep Effect ==================== */
-.glass-shine-sweep {
-  position: relative;
-  overflow: hidden;
-}
-
-/* Backward-compat stubs — effects removed */
-.rain-bg {
-  display: none;
-}
-.rain-drop {
-  display: none;
-}
-.water-drops::before,
-.water-drops::after {
-  display: none;
-}
-.water-ripple::before {
-  display: none;
-}
-
-/* Backward-compat: .wet-border */
-.wet-border {
-  position: relative;
-}
-
-.wet-border::after {
-  content: '';
-  position: absolute;
-  inset: -1px;
-  border-radius: inherit;
-  padding: 1px;
-  background: linear-gradient(
-    135deg,
-    rgba(31, 108, 159, 0.15),
-    rgba(255, 255, 255, 0.5),
-    rgba(31, 108, 159, 0.1)
-  );
-  -webkit-mask:
-    linear-gradient(#fff 0 0) content-box,
-    linear-gradient(#fff 0 0);
-  -webkit-mask-composite: xor;
-  mask-composite: exclude;
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity var(--transition-slow);
-}
-
-.wet-border:hover::after {
-  opacity: 1;
 }

@@ -45,6 +45,7 @@ public class RateLimitInterceptor implements HandlerInterceptor {
         boolean matched = false;
 
         int longestMatch = -1;
+        String matchedBase = null;
         for (Map.Entry<String, Integer> entry : allLimits.entrySet()) {
             String prefix = entry.getKey();
             String base = prefix.endsWith("/") ? prefix.substring(0, prefix.length() - 1) : prefix;
@@ -53,6 +54,7 @@ public class RateLimitInterceptor implements HandlerInterceptor {
                 maxRequests = entry.getValue();
                 matched = true;
                 longestMatch = base.length();
+                matchedBase = base;
             }
         }
 
@@ -60,7 +62,15 @@ public class RateLimitInterceptor implements HandlerInterceptor {
             return true;
         }
 
-        String key = ip + ":" + path;
+        // 计数按**「命中的最长前缀 + 前缀之后的路径层数」**归桶，而不是按具体路径：
+        // 按具体路径计数时 `/api/post/10`、`/api/post/11`… 各自一个桶，攻击者只要换 id
+        // 就能让每个桶都停在阈值以下，前缀配额形同虚设（实测每个 id 都能各自刷满 10 次）。
+        // 但只按前缀归桶会走向另一个极端：同一前缀下的读路径与写路径共用一份配额，
+        // `/api/guest-comments/post/{id}` 的阅读会吃掉 `/api/guest-comments` 的 5/min
+        // 创建配额（既有用例 readingCommentsDoesNotConsumeCreationQuota 明确要求互不消耗）。
+        // 取「前缀 + 层数」后：同一层上的路径变量（换 id）共享一份配额，
+        // 层数不同的路径各占一桶；最长前缀语义不变，`/api/post/list` 仍走自己的 60/min。
+        String key = ip + ":" + matchedBase + "#" + pathDepthAfter(path, matchedBase);
         AtomicInteger count = requestCounts.get(key, k -> new AtomicInteger(0));
         int current = count.incrementAndGet();
 
@@ -77,6 +87,22 @@ public class RateLimitInterceptor implements HandlerInterceptor {
             return false;
         }
         return true;
+    }
+
+    /**
+     * 命中的最长前缀之后还剩多少层路径。`/api/post/` + `/api/post/10` → 1 层，
+     * `/api/post/` + `/api/post/10/comments` → 2 层，`/api/guest-comments` + 它自身 → 0 层。
+     * 同一层内的路径变量（各种 id）会归入同一个桶，换 id 无法绕过配额。
+     */
+    private int pathDepthAfter(String path, String base) {
+        String rest = path.length() > base.length() ? path.substring(base.length()) : "";
+        int depth = 0;
+        for (String segment : rest.split("/")) {
+            if (!segment.isEmpty()) {
+                depth++;
+            }
+        }
+        return depth;
     }
 
 }

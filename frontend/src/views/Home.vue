@@ -11,6 +11,7 @@ import type { Post, Tag } from '@/types'
 import PageFrame from '@/components/pages/PageFrame.vue'
 import { usePageConfig } from '@/composables/usePageConfig'
 import { usePageSeo } from '@/composables/usePageSeo'
+import { useLatestRequest } from '@/composables/useLatestRequest'
 
 const route = useRoute()
 const router = useRouter()
@@ -33,8 +34,11 @@ const totalPages = ref(1)
 const heroCover = ref('')
 let heroChosen = false
 const pageSize = 9
+const beginPostsRequest = useLatestRequest().begin
 
 async function fetchPosts(): Promise<void> {
+  // 快速翻页会并发发请求：先发后到的旧响应不许覆盖新一页。
+  const isLatest = beginPostsRequest()
   loading.value = true
   error.value = ''
   try {
@@ -43,6 +47,7 @@ async function fetchPosts(): Promise<void> {
       pageSize,
       sort: 'latest'
     })
+    if (!isLatest()) return
     const data = response.data || {}
     posts.value = data.records || []
     totalPages.value = Math.max(1, data.pages || 1)
@@ -55,10 +60,11 @@ async function fetchPosts(): Promise<void> {
       heroChosen = true
     }
   } catch {
+    if (!isLatest()) return
     posts.value = []
     error.value = '文章暂时无法加载，请稍后重试。'
   } finally {
-    loading.value = false
+    if (isLatest()) loading.value = false
   }
 }
 async function fetchTags(): Promise<void> {

@@ -171,6 +171,89 @@ class RateLimitInterceptorTest {
         assertFalse(call("/api/post/list/featured", "203.0.113.42", new MockHttpServletResponse()));
     }
 
+    // ==================== 路径变量不得各自成桶 ====================
+
+    @Test
+    void differentIdsUnderTheSamePrefixShareOneQuota() throws Exception {
+        // 回归：计数原先按具体路径归桶，/api/post/10、/api/post/11… 各自一份 10/min，
+        // 换 id 就能无限刷。这里要求同一前缀下的不同 id 共享同一份配额。
+        for (int id = 1; id <= 10; id++) {
+            assertTrue(call("/api/post/" + id, "203.0.113.50", new MockHttpServletResponse()),
+                    "第 " + id + " 个 id 仍应在 /api/post/ 的 10/min 配额内");
+        }
+        // 第 11 次请求即使换成全新的 id，也必须被同一前缀配额拦下。
+        assertFalse(call("/api/post/999999", "203.0.113.50", new MockHttpServletResponse()));
+    }
+
+    @Test
+    void distinctPrefixesStillHaveIndependentQuotas() throws Exception {
+        // 按前缀归桶不能把不同前缀合并：刷满 /api/post/ 不应影响 /api/topic/。
+        for (int id = 1; id <= 11; id++) {
+            call("/api/post/" + id, "203.0.113.51", new MockHttpServletResponse());
+        }
+        assertTrue(call("/api/topic/7", "203.0.113.51", new MockHttpServletResponse()));
+    }
+
+    @Test
+    void postListKeepsItsOwnBucketUnderThePrefixRule() throws Exception {
+        // /api/post/list 必须继续走自己的 60/min 桶：既不能被 /api/post/ 的 10/min 误伤，
+        // 也不能反过来把 /api/post/ 的计数算进自己头上。
+        for (int i = 0; i < 10; i++) {
+            assertTrue(call("/api/post/list", "203.0.113.52", new MockHttpServletResponse()));
+        }
+        // /api/post/list 自己的 10 次不消耗 /api/post/ 的配额：此处还能再发 10 次。
+        for (int id = 1; id <= 10; id++) {
+            assertTrue(call("/api/post/" + id, "203.0.113.52", new MockHttpServletResponse()));
+        }
+        assertFalse(call("/api/post/11", "203.0.113.52", new MockHttpServletResponse()));
+        // 且 /api/post/ 已满时，/api/post/list 仍未被牵连（第 11 次 list 请求仍放行）。
+        assertTrue(call("/api/post/list", "203.0.113.52", new MockHttpServletResponse()));
+    }
+
+    // ==================== S8：后台与未登记前缀的兜底限流 ====================
+
+    @Test
+    void adminNamespaceWithoutANamedPrefixIsLimitedByTheCatchAll() throws Exception {
+        // 回归：/api/admin/users 这类后台接口此前不匹配任何前缀，直接无限放行。
+        for (int i = 0; i < 60; i++) {
+            assertTrue(call("/api/admin/users", "203.0.113.60", new MockHttpServletResponse()),
+                    "第 " + (i + 1) + " 次后台请求仍应在 60/min 兜底内");
+        }
+        assertFalse(call("/api/admin/users", "203.0.113.60", new MockHttpServletResponse()),
+                "后台兜底阈值用尽后必须拒绝，而不是继续放行");
+    }
+
+    @Test
+    void namedAdminPrefixesStillWinOverTheCatchAll() throws Exception {
+        // 最长前缀优先必须继续成立：/api/admin/site-assets 是 30/min，
+        // 不能被 /api/admin/ 的 60/min 顶掉（否则更严格的阈值被兜底放宽）。
+        for (int i = 0; i < 30; i++) {
+            assertTrue(call("/api/admin/site-assets", "203.0.113.61", new MockHttpServletResponse()));
+        }
+        assertFalse(call("/api/admin/site-assets", "203.0.113.61", new MockHttpServletResponse()),
+                "具名 admin 前缀的 30/min 必须优先于 /api/admin/ 的兜底");
+        // 兜底桶与具名桶彼此独立：另一个后台路径还有自己的 60 次。
+        assertTrue(call("/api/admin/users", "203.0.113.61", new MockHttpServletResponse()));
+    }
+
+    @Test
+    void unregisteredApiPathsFallBackToTheGlobalDefaultInsteadOfUnlimited() throws Exception {
+        // 回归：未命中任何前缀的 /api/** 原先 `return true` 无条件放行。
+        for (int i = 0; i < 60; i++) {
+            assertTrue(call("/api/not-registered-anywhere", "203.0.113.62", new MockHttpServletResponse()));
+        }
+        assertFalse(call("/api/not-registered-anywhere", "203.0.113.62", new MockHttpServletResponse()),
+                "未登记路径必须受 /api/ 兜底限流约束");
+    }
+
+    @Test
+    void nonApiPathsAreNotLimitedByTheFallback() throws Exception {
+        // 兜底只覆盖 /api/ 命名空间；SEO 等非 /api 路径不在本拦截器职责内。
+        for (int i = 0; i < 80; i++) {
+            assertTrue(call("/feed.xml", "203.0.113.63", new MockHttpServletResponse()));
+        }
+    }
+
     private boolean call(String path, String ip, MockHttpServletResponse response) throws Exception {
         var request = new MockHttpServletRequest("POST", path);
         request.setRemoteAddr(ip);

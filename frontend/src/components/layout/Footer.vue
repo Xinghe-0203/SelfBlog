@@ -18,9 +18,16 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
+import { useRoute } from 'vue-router'
 import { useSiteStore } from '@/stores/site'
 
-const currentYear = new Date().getFullYear()
+const route = useRoute()
+// 按路由路径缓存：跨年时用户在页内跳转一次就会拿到新的年份，而不是一直显示打开页面时的旧值。
+const currentYear = computed(() => {
+  void route.path
+  return new Date().getFullYear()
+})
 const siteStore = useSiteStore()
 </script>
 

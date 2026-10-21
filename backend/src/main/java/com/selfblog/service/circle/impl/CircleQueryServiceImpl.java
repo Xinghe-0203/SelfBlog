@@ -14,13 +14,17 @@ import com.selfblog.mapper.*;
 import com.selfblog.service.circle.CircleQueryService;
 import com.selfblog.service.social.FollowService;
 import com.selfblog.service.content.TopicService;
+import com.selfblog.utils.SqlLikeUtils;
 import com.selfblog.utils.TimeUtils;
 import com.selfblog.vo.circle.CirclePostVO;
 import com.selfblog.vo.user.UserVO;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -53,6 +57,33 @@ public class CircleQueryServiceImpl extends ServiceImpl<CirclePostMapper, Circle
 
     @Autowired
     private TopicMapper topicMapper;
+
+    /**
+     * 事务管理器：详情页的浏览量自增要在独立的短写事务中完成，不能混进只读的读取事务。
+     * required=false 是为了兼容手工 new 出来的实例（单元测试），此时退化为直接执行。
+     */
+    @Autowired(required = false)
+    private PlatformTransactionManager transactionManager;
+
+    private volatile TransactionTemplate viewCountTemplate;
+
+    /**
+     * 在独立短事务（REQUIRES_NEW）中自增浏览量：读详情本身是只读事务，
+     * 若把 UPDATE 放在同一个只读事务里，在 H2/MySQL 上会被忽略或直接报错。
+     */
+    private void incrementViewCountInNewTransaction(Long postId) {
+        if (transactionManager == null) {
+            baseMapper.incrementViewCount(postId);
+            return;
+        }
+        TransactionTemplate template = this.viewCountTemplate;
+        if (template == null) {
+            template = new TransactionTemplate(transactionManager);
+            template.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+            this.viewCountTemplate = template;
+        }
+        template.executeWithoutResult(status -> baseMapper.incrementViewCount(postId));
+    }
 
     @Override
     @Transactional(readOnly = true)
@@ -107,7 +138,7 @@ public class CircleQueryServiceImpl extends ServiceImpl<CirclePostMapper, Circle
     }
 
     @Override
-    @Transactional(rollbackFor = Exception.class)
+    @Transactional(readOnly = true)
     public CirclePostVO getPostDetail(Long postId, Long currentUserId) {
         CirclePost post = this.getById(postId);
         if (post == null) {
@@ -118,8 +149,10 @@ public class CircleQueryServiceImpl extends ServiceImpl<CirclePostMapper, Circle
             throw new BusinessException(403, "无权查看此动态");
         }
 
-        baseMapper.incrementViewCount(postId);
-        post.setViewCount(post.getViewCount() + 1);
+        // 详情是只读事务，浏览量自增放到独立的短写事务里，避免 GET 打开写事务
+        incrementViewCountInNewTransaction(postId);
+        // view_count 允许为 NULL，直接拆箱会 NPE
+        post.setViewCount((post.getViewCount() == null ? 0L : post.getViewCount()) + 1);
 
         List<CirclePost> posts = Collections.singletonList(post);
         List<CirclePostVO> voList = convertToVOList(posts, currentUserId);
@@ -148,7 +181,7 @@ public class CircleQueryServiceImpl extends ServiceImpl<CirclePostMapper, Circle
                         .or(currentUserId != null && !followingIds.isEmpty(), w3 -> w3
                                 .eq(CirclePost::getVisibility, 1)
                                 .in(CirclePost::getUserId, followingIds)))
-                .like(CirclePost::getContent, keyword.trim())
+                .apply("content LIKE {0}" + SqlLikeUtils.ESCAPE_CLAUSE, SqlLikeUtils.containsPattern(keyword.trim()))
                 .orderByDesc(CirclePost::getCreateTime);
 
         List<CirclePost> posts = this.page(

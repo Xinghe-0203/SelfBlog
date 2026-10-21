@@ -1,5 +1,6 @@
 package com.selfblog.service.post.impl;
 
+import com.selfblog.mapper.BlogCommentMapper;
 import com.selfblog.mapper.BlogPostMapper;
 import com.selfblog.service.post.PostInteractionService;
 import lombok.extern.slf4j.Slf4j;
@@ -20,6 +21,9 @@ public class PostInteractionServiceImpl implements PostInteractionService {
 
     @Autowired
     private BlogPostMapper blogPostMapper;
+
+    @Autowired
+    private BlogCommentMapper blogCommentMapper;
 
     private static final int MAX_VIEW_COUNT_CACHE_SIZE = 10000;
     private final ConcurrentMap<String, AtomicLong> viewCountCache = new ConcurrentHashMap<>();
@@ -98,6 +102,16 @@ public class PostInteractionServiceImpl implements PostInteractionService {
     @Transactional(rollbackFor = Exception.class)
     public void decrementCommentCount(Long postId, int count) {
         blogPostMapper.decrementCommentCount(postId, count);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void syncCommentCount(Long postId) {
+        if (postId == null) {
+            return;
+        }
+        Long active = blogCommentMapper.countActiveByPostId(postId);
+        blogPostMapper.syncCommentCount(postId, active == null ? 0 : active.intValue());
     }
 
     @Override

@@ -303,35 +303,39 @@ public class LogUtils {
     }
 
     /**
-     * 判断直连对端地址是否属于可信代理网段。
-     * 语义与限流拦截器历史上的私有实现一致：10./192.168./127.0.0.1/::1/0:0:0:0:0:0:0:1/172.16-31。
-     * 该判定是审计与限流共用的唯一来源，两处必须同源，避免同一请求得到不同 IP。
+     * 可信代理白名单（S2）。
+     *
+     * <p>旧实现在这里硬编码"整个私有网段都可信"（10./192.168./172.16-31./环回）。
+     * 用 {@code docker run -p 8825:8825} 发布端口时，直连对端是网桥网关
+     * {@code 172.17.0.1} —— 落在私有网段里 —— 于是任何客户端都能伪造
+     * {@code X-Forwarded-For} 来控制限流桶与审计 IP。现在改为显式白名单，
+     * 默认只信任环回地址；宿主机反向代理需由 {@code app.trusted-proxies}
+     * 显式登记，未登记时客户端 IP 退化为直连对端地址（安全的失败方向）。</p>
+     *
+     * <p>该判定是审计、限流、访客哈希共用的唯一来源，三处必须同源。</p>
+     */
+    private static volatile TrustedProxyMatcher trustedProxyMatcher = TrustedProxyMatcher.parse(null);
+
+    /**
+     * 注入可信代理白名单（由 {@code TrustedProxyConfig} 在启动时用配置值调用）。
+     * 传入 null/空值时回退到默认的环回白名单，绝不退化成"全部信任"。
+     *
+     * @param csv 逗号分隔的 IP 或 CIDR 列表，例如 {@code 127.0.0.1/32,::1/128,10.0.0.0/8}
+     */
+    public static void configureTrustedProxies(String csv) {
+        TrustedProxyMatcher matcher = TrustedProxyMatcher.parse(csv);
+        trustedProxyMatcher = matcher;
+        log.info("[TrustedProxy] 可信代理白名单已加载: {}", matcher);
+    }
+
+    /**
+     * 判断直连对端地址是否属于可信代理网段（默认仅环回地址）。
      *
      * @param addr 直连对端地址（request.getRemoteAddr()）
      * @return true 表示可信代理，可采用代理头
      */
     public static boolean isTrustedProxy(String addr) {
-        if (addr == null) {
-            return false;
-        }
-        if (addr.startsWith("10.")) {
-            return true;
-        }
-        if (addr.startsWith("192.168.")) {
-            return true;
-        }
-        if (addr.equals("127.0.0.1") || addr.equals("0:0:0:0:0:0:0:1") || addr.equals("::1")) {
-            return true;
-        }
-        if (addr.startsWith("172.")) {
-            try {
-                int secondOctet = Integer.parseInt(addr.split("\\.")[1]);
-                return secondOctet >= 16 && secondOctet <= 31;
-            } catch (Exception e) {
-                return false;
-            }
-        }
-        return false;
+        return trustedProxyMatcher.matches(addr);
     }
 
     /**

@@ -220,8 +220,13 @@ public class ReportServiceImpl extends ServiceImpl<BlogReportMapper, BlogReport>
                         // 记录文章的话题信息，用于后续调整话题计数
                         List<Long> topicIds = parseTopicIds(post.getTopicIds());
 
-                        post.setIsDeleted(1);
-                        blogPostMapper.updateById(post);
+                        // 必须用显式 UpdateWrapper 写 is_deleted：MyBatis-Plus 的 updateById 会把
+                        // logic-delete-field 从 SET 子句剔除并在 WHERE 追加 is_deleted = 0，
+                        // 于是 post.setIsDeleted(1) + updateById 是静默空操作——被举报文章会继续
+                        // 在线可读，而下面的点赞/收藏清理与话题计数却已经执行。
+                        blogPostMapper.update(null, new LambdaUpdateWrapper<BlogPost>()
+                                .eq(BlogPost::getId, targetId)
+                                .set(BlogPost::getIsDeleted, 1));
                         // 级联清理点赞记录
                         blogLikeMapper.update(null, new LambdaUpdateWrapper<BlogLike>()
                                 .eq(BlogLike::getPostId, targetId)

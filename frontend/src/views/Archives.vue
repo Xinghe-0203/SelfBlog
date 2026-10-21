@@ -6,6 +6,7 @@ import type { Post } from '@/types'
 import PageFrame from '@/components/pages/PageFrame.vue'
 import { usePageConfig } from '@/composables/usePageConfig'
 import { usePageSeo } from '@/composables/usePageSeo'
+import { useLatestRequest } from '@/composables/useLatestRequest'
 const { config, text, module: showModule } = usePageConfig('archives')
 usePageSeo('archives', () => ({
   title: text('title', '文章归档'),
@@ -23,6 +24,8 @@ const posts = ref<Post[]>([])
 const loading = ref(true)
 const error = ref('')
 const pageSize = 100
+/** 挂载与「重新加载」都会发请求：被取代的那一次不得再追加或覆盖列表。 */
+const beginArchiveRequest = useLatestRequest().begin
 
 const archiveGroups = computed<ArchiveGroup[]>(() => {
   const groups = new Map<string, Post[]>()
@@ -44,10 +47,12 @@ const archiveGroups = computed<ArchiveGroup[]>(() => {
 })
 
 const fetchArchives = async () => {
+  const isLatest = beginArchiveRequest()
   loading.value = true
   error.value = ''
   try {
     const firstResponse = await postApi.getPostList({ pageNum: 1, pageSize, sort: 'latest' })
+    if (!isLatest()) return
     const firstPage = firstResponse.data || {}
     const allPosts: Post[] = firstPage.records || []
     const totalPages = Math.max(1, firstPage.pages || 1)
@@ -61,14 +66,17 @@ const fetchArchives = async () => {
       const responses = await Promise.all(
         pageNumbers.map((pageNum) => postApi.getPostList({ pageNum, pageSize, sort: 'latest' }))
       )
+      if (!isLatest()) return
       for (const response of responses) allPosts.push(...(response.data?.records || []))
     }
 
-    posts.value = allPosts
+    // 两次加载可能交叠，且分页边界处可能重复返回同一条：按 id 去重，避免重复的 v-for key。
+    posts.value = [...new Map(allPosts.map((item) => [item.id, item])).values()]
   } catch {
+    if (!isLatest()) return
     error.value = '归档暂时无法加载，请稍后重试。'
   } finally {
-    loading.value = false
+    if (isLatest()) loading.value = false
   }
 }
 

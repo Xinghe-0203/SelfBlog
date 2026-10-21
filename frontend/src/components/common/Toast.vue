@@ -123,6 +123,9 @@ function updateProgress(): void {
   })
   if (toasts.value.length > 0) {
     animFrame = requestAnimationFrame(updateProgress)
+  } else {
+    // 列表清空后必须释放帧 id：否则 `!animFrame` 的看门条件永远为假，下一条通知的进度条不会再动。
+    animFrame = null
   }
 }
 

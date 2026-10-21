@@ -11,6 +11,7 @@ import com.selfblog.mapper.CirclePostMapper;
 import com.selfblog.mapper.TopicMapper;
 import com.selfblog.service.content.TopicService;
 import com.selfblog.utils.HtmlSanitizer;
+import com.selfblog.utils.SqlLikeUtils;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.constraints.Max;
@@ -20,7 +21,6 @@ import jakarta.validation.constraints.Size;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
@@ -57,7 +57,8 @@ public class AdminTopicController {
         LambdaQueryWrapper<Topic> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(Topic::getIsDeleted, 0);
         if (StrUtil.isNotBlank(keyword)) {
-            wrapper.like(Topic::getName, keyword.trim());
+            wrapper.apply("name LIKE {0}" + SqlLikeUtils.ESCAPE_CLAUSE,
+                    SqlLikeUtils.containsPattern(keyword.trim()));
         }
         if (status != null) {
             wrapper.eq(Topic::getStatus, status);
@@ -117,42 +118,10 @@ public class AdminTopicController {
     @Operation(summary = "更新话题")
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('admin')")
-    @Transactional(rollbackFor = Exception.class)
     public Result<Map<String, Object>> updateTopic(@PathVariable Long id,
                                                     @Validated @RequestBody UpdateTopicRequest request) {
-        Topic topic = topicMapper.selectById(id);
-        if (topic == null) {
-            throw new BusinessException(404, "话题不存在");
-        }
-        if (request.getName() != null) {
-            String sanitizedName = htmlSanitizer.sanitizePlainText(request.getName().trim());
-            if (sanitizedName.length() > 50) {
-                throw new BusinessException(400, "话题名称不能超过50个字符");
-            }
-            // 检查名称是否与其他话题重复
-            LambdaQueryWrapper<Topic> dupWrapper = new LambdaQueryWrapper<>();
-            dupWrapper.eq(Topic::getName, sanitizedName)
-                     .ne(Topic::getId, id)
-                     .eq(Topic::getIsDeleted, 0);
-            if (topicMapper.selectCount(dupWrapper) > 0) {
-                throw new BusinessException(400, "话题名称已存在");
-            }
-            topic.setName(sanitizedName);
-        }
-        if (request.getDescription() != null) {
-            String sanitizedDesc = htmlSanitizer.sanitizePlainText(request.getDescription().trim());
-            if (sanitizedDesc.length() > 500) {
-                throw new BusinessException(400, "话题描述不能超过500个字符");
-            }
-            topic.setDescription(sanitizedDesc);
-        }
-        if (request.getStatus() != null) {
-            if (request.getStatus() != 0 && request.getStatus() != 1) {
-                throw new BusinessException(400, "状态值无效");
-            }
-            topic.setStatus(request.getStatus());
-        }
-        topicMapper.updateById(topic);
+        // 事务边界在 TopicServiceImpl.updateTopic：控制器只做参数校验与委托
+        Topic topic = topicService.updateTopic(id, request.getName(), request.getDescription(), request.getStatus());
 
         Long postCount = circlePostMapper.countByTopicId(id);
         Map<String, Object> map = new LinkedHashMap<>();
@@ -170,13 +139,9 @@ public class AdminTopicController {
     @Operation(summary = "删除话题")
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('admin')")
-    @Transactional(rollbackFor = Exception.class)
     public Result<Void> deleteTopic(@PathVariable Long id) {
-        Topic topic = topicMapper.selectById(id);
-        if (topic == null) {
-            throw new BusinessException(404, "话题不存在");
-        }
-        topicService.removeById(id);
+        // 事务边界在 TopicServiceImpl.deleteTopic
+        topicService.deleteTopic(id);
         log.info("管理员 {} 删除了话题 {}", com.selfblog.utils.SecurityUtils.getCurrentUserId(), id);
         return Result.success(null);
     }
@@ -184,21 +149,11 @@ public class AdminTopicController {
     @Operation(summary = "切换话题状态")
     @PutMapping("/{id}/status")
     @PreAuthorize("hasRole('admin')")
-    @Transactional(rollbackFor = Exception.class)
     public Result<Void> toggleStatus(@PathVariable Long id,
                                       @RequestBody Map<String, Integer> body) {
+        // 事务边界在 TopicServiceImpl.toggleStatus
         Integer status = body.get("status");
-        if (status == null || (status != 0 && status != 1)) {
-            throw new BusinessException(400, "状态值无效，只能为0（禁用）或1（启用）");
-        }
-        Topic topic = topicMapper.selectById(id);
-        if (topic == null) {
-            throw new BusinessException(404, "话题不存在");
-        }
-        Topic update = new Topic();
-        update.setId(id);
-        update.setStatus(status);
-        topicMapper.updateById(update);
+        topicService.toggleStatus(id, status);
         log.info("管理员 {} 切换话题 {} 状态为 {}", com.selfblog.utils.SecurityUtils.getCurrentUserId(), id, status);
         return Result.success(null);
     }

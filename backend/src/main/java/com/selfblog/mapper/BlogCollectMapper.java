@@ -63,4 +63,29 @@ public interface BlogCollectMapper extends BaseMapper<BlogCollect> {
      */
     @Select("SELECT COUNT(*) FROM blog_collect WHERE user_id = #{userId} AND (is_deleted = 0 OR is_deleted IS NULL)")
     Long countByUserId(@Param("userId") Long userId);
+
+    /**
+     * C21：分页查询用户收藏记录，且只保留「已发布且未删除」的文章。
+     *
+     * <p>把文章可见性谓词下推到 SQL，records 与 total 使用同一个谓词，
+     * 避免「本页条数 &lt; total」或深页返回空。手写 SQL 必须自己带 {@code is_deleted}。</p>
+     */
+    @Select("<script>" +
+            "SELECT c.* FROM blog_collect c JOIN blog_post p ON p.id = c.post_id " +
+            "WHERE c.user_id = #{userId} AND (c.is_deleted = 0 OR c.is_deleted IS NULL) " +
+            "AND p.status = 1 AND (p.is_deleted = 0 OR p.is_deleted IS NULL) " +
+            "ORDER BY c.create_time DESC " +
+            "LIMIT #{offset}, #{limit}" +
+            "</script>")
+    List<BlogCollect> selectPublishedPageByUserId(@Param("userId") Long userId,
+                                                  @Param("offset") int offset,
+                                                  @Param("limit") int limit);
+
+    /**
+     * C21：与 {@link #selectPublishedPageByUserId} 完全相同的谓词，用于取真实总数。
+     */
+    @Select("SELECT COUNT(*) FROM blog_collect c JOIN blog_post p ON p.id = c.post_id " +
+            "WHERE c.user_id = #{userId} AND (c.is_deleted = 0 OR c.is_deleted IS NULL) " +
+            "AND p.status = 1 AND (p.is_deleted = 0 OR p.is_deleted IS NULL)")
+    Long countPublishedByUserId(@Param("userId") Long userId);
 }

@@ -4,6 +4,252 @@
 
 ---
 
+## 未发布 — 全仓深度排查：后端正确性/并发/安全加固 + 前端正确性/死代码清理 (2026-10-21)
+
+### 说明
+
+一次覆盖 `backend/` 与 `frontend/` 的全量缺陷排查，目标是「按证据修，不按猜测改」。
+先产出三份只读审计（后端正确性 319 行、后端安全 772 行、前端正确性 210 行），
+每一条发现都附「已尝试证伪」的过程；再由两轮修复批次落地，每项都补了能失败的回归测试。
+后端测试从 **747 → 878（+131）**，前端 **43 文件 / 438 → 45 文件 / 444 tests**。
+
+按严重度收敛出的根因有三类，值得单独记住（见下方「承重规则」）：
+
+1. **MyBatis-Plus 的逻辑删除让一批「看起来对」的写法静默失效**——`updateById` 既写不了
+   `is_deleted`，也读不到已软删的行。匿名点赞的「取消」、举报核实的「下架」、
+   删除文章后的「计数器归零」都因此是空操作，而代码本身读起来毫无问题。
+2. **`synchronized` + `@Transactional` 是错的组合**——锁在代理内层、事务在代理外层，
+   锁先释放、事务后提交，两个请求都能走到「没有行 → 插入」分支。改为依赖数据库
+   UNIQUE 约束 + 事务内重读仲裁。
+3. **异常会污染共享事务**——类级 `@Transactional(readOnly = true)` 下的 404
+   （`BusinessException`）会把事务标成 rollback-only，外层若也在事务里，提交时抛
+   `UnexpectedRollbackException`，真正的 404 变成 500。
+
+### 后端修复
+
+- **SQL LIKE 通配符泄漏（可注入式全表匹配）**：搜索关键词里的 `%` / `_` 被原样拼进
+  `LIKE`，`keyword=%` 返回全站数据。新增 `utils/SqlLikeUtils`，把 `!` 作为转义符
+  （`ESCAPE '!'`），21 处关键词查询全部改为 `LIKE {0} ESCAPE '!'` + 逐字符转义。
+  **转义符必须是 `!` 而不是反斜杠**：`'\'` 与 `'\\'` 在 MySQL 和 H2/SQLite 之间没有
+  通用字面量写法，各自只能覆盖一半方言；`!` 三方通用且 MySQL 允许任意单字符 ESCAPE。
+- **限流配额被路径变量绕过**：计数键是 `ip + ":" + path`，`/api/post/10`、`/api/post/11`
+  各占一个桶，换 id 即重置配额。改为按**命中的最长前缀**归桶，并用
+  `pathDepthAfter()` 保留「一级子路径」的区分度（`/api/guest-comments/post/{id}` 的读取
+  不能吃掉创建配额）。另加 `/api/admin/`（60/min）与 `/api/`（60/min）两条兜底前缀，
+  新接口不再默认不限流。
+- **`SiteSettingsServiceImpl` 自调用让缓存彻底失效**：类内 `this.getSettings()` 绕过
+  Spring 代理，`siteSettingsCache` 从不被填充——访客埋点每来一次就全表读一次
+  `site_setting`。加 `@Lazy SiteSettingsService self` 走代理。
+- **`FineGrainedLockManager` 会把手里的 monitor 淘汰掉（CRITICAL）**：`locks.size() >= 10000`
+  时 LRU 移除**正被 `synchronized` 持有**的条目，随后 `compute()` 为该 key 新建 `Object`，
+  两个线程拿到不同 monitor 同时进入临界区。改为不做淘汰（key 由数据库主键推导、规模有界）。
+- **`synchronized` 锁先于事务提交释放**：`BlogLike` / `BlogCollect` / `Follow` /
+  `AnonymousLike` 四处都是「锁在方法上、事务在代理外层」，并发下重复插入。
+  改为去掉 `synchronized`，依赖数据库 UNIQUE 约束 + 事务内重读仲裁，并把
+  `catch (DataIntegrityViolationException)` 放宽为 `catch (DataAccessException)`
+  （SQLite 抛的是 `UncategorizedSQLException`，原先漏接直接 500）。
+- **`updateById` 写不了 `is_deleted`**：`AnonymousPostLikeMapper` 新增显式
+  `logicalDeleteById` / `logicalRestoreById` / `selectRawByPostAndVisitor` 三条原生 SQL，
+  匿名点赞的「取消 / 恢复」才真正生效（此前 `findRow` 被自动追加 `is_deleted = 0`，
+  恢复分支永不可达）。
+- **举报核实不下架文章**：`ReportServiceImpl` 把举报标 RESOLVED 却只级联软删点赞/收藏、
+  递减话题计数、通知举报人「已核实」。改为用显式 `LambdaUpdateWrapper` 软删目标文章。
+- **软删除后清零计数器必然失效**：`removeById` 之后再 `update` 会被追加
+  `AND is_deleted = 0` 而匹配 0 行。`deletePost` / `adminDeletePost` 改为**先**清零五个
+  计数器、**再**软删，并抽出共享的 `cascadeSoftDeletePostChildren()` 级联评论/点赞/收藏/标签。
+- **部分更新清空全部标签**：`tagIds` 为 `null`（没传）与空列表（明确清空）原先不可区分，
+  且无条件删除在判空之前。改为 `tagPayloadPresent` 判定：`null` = 不改标签、空列表 = 清空。
+- **缓存从不失效 / 从不填充**：`adminDeletePost` / `approvePost` / `rejectPost` 补
+  `@CacheEvict`；`PostQueryServiceImpl` 的两个 `@Cacheable(CATEGORY_CACHE)` 因自调用从不填充，
+  加 `@Lazy PostQueryService self`；`NotificationServiceImpl` 的通知列表缓存四处驱逐全错，
+  新增第 9 个具名缓存 `notificationListCache` 并改用 `@Caching(evict = {...})`
+  （Spring 6 的 `@CacheEvict` 不是 `@Repeatable`，不能叠加两个）。
+- **Circle 读路径开写事务**：`getPostDetail` 是 `@Transactional(readOnly = true)` 却在里面
+  自增浏览数。浏览数自增拆到独立短写事务（`TransactionTemplate` + `REQUIRES_NEW`），
+  并修掉 `viewCount` 为 null 时的拆箱 NPE。
+- **`Page.total` 与 `records` 不同源**：评论（只取根评论却用含回复的 total）、点赞、
+  收藏、关注（过滤被封禁用户）、热门内容（过滤未发布）五处都是「分页后再在 Java 里过滤」，
+  客户端页数永远偏大、深页可能空页却仍报 total。改为让 total 与 records 走同一谓词。
+- **`TrendingServiceImpl` 的 total 被取数窗口封顶**：`fetchSize = max(pageSize*2, 100)` 之后再
+  内存合并，任何超出窗口的页码都空页。改为显式窗口 + 真实 total + 页码钳制，
+  并把 `.last("LIMIT " + fetchSize)` 的字符串拼接一并收口。
+- **Circle 点赞的 catch 分支会反转并发赢家的操作**：插入失败后重查若命中赢家的活跃行，
+  原实现把它逻辑删除并报 `unlike`，等于把别人的点赞取消掉。
+- **媒体删除/上传的事务边界**：`deleteMedia` 原先在事务内**先删文件再删行**，行删失败回滚后
+  文件已不可恢复。改为先删行、文件在 `afterCommit` 里删（`TransactionSynchronizationManager`），
+  删除失败记 WARN 而非静默。`uploadFiles` 原先把整批文件包在一个事务里，第 3 个失败会让
+  前两个的行回滚而字节留成孤儿；改为每个文件各自短事务 + `compensateUploaded()` 补偿清理。
+- **类级 `readOnly` + 内层 404 = 500**：`PageServiceImpl` 与 `SitemapService` 去掉类级
+  `@Transactional(readOnly = true)`，读方法完全不开启事务（照 `ReadingPageService` 的先例）。
+  反向验证：把注解加回去，`UnexpectedRollbackException: Transaction rolled back because it has
+  been marked as rollback-only` 立刻复现。
+- **`comment_count` 相对减法会静默漂移**：`UPDATE ... comment_count = comment_count - #{count}
+  WHERE comment_count >= #{count}` 在计数偏低时匹配 0 行，越漂越高。改为
+  `BlogCommentMapper.countActiveByPostId()` 取真实行数后**写绝对值**；相对减法语句标
+  `@Deprecated` 保留（接口是公开面，删除属 API 破坏）。
+- **H2 别名折叠导致统计接口 500**：`SELECT DATE(create_time) as date, COUNT(*) as count`
+  在 H2 下未加引号的别名被折成大写，`map.get("date")` 拿到 null → NPE。两处改为
+  `as "date"` / `as "count"`（SQLite/MySQL 保留小写，所以生产从未暴露）。
+- **其余**：控制器上的 `@Transactional` 全部移入 service（`AdminTopicController` 净删 63 行）；
+  点赞/收藏列表的分页参数拆箱与负偏移钳制；circle 计数器自增补 `CASE WHEN x < 100000000` 夹子。
+
+### 后端安全
+
+- **SVG 消毒器从黑名单反转为白名单**：原先只丢 `script/foreignobject/iframe/embed/object`
+  并拦 `on*`，`<style>` 文本、`<use href="https://evil/x.svg#y">`、SMIL
+  `<animate attributeName="onload">` 全部存活；而 SVG 由 `/uploads/site-assets/**` **同源**提供、
+  无 CSP、无 `Content-Disposition`，构成存储型 XSS 可读 `localStorage` 里的 JWT。
+  改为 `ALLOWED_SVG_ELEMENTS` / `ALLOWED_SVG_ATTRIBUTES` 白名单重建，`href` 只接受同文档
+  `#id`；并新增 `SiteAssetSecurityHeaderInterceptor` 对该前缀下发
+  `Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline'; sandbox` + `nosniff`。
+  **不做全局 CSP**：Vue SPA 依赖内联样式与构建脚本，全局 `default-src 'self'` 会白屏。
+- **`X-Forwarded-For` 可伪造（限流与审计同时失效）**：`LogUtils.getClientIp` 原先信任一切
+  私有网段（`10.*`、`192.168.*`、`172.16-31.*`），而 `backend/DEPLOY.md` 推荐的 Nginx 用
+  `$proxy_add_x_forwarded_for`（**追加**而非覆盖）、`docker run -p 8825:8825` 的直连对端是
+  网桥网关 `172.17.0.1`，两者都落在「可信」范围内，于是任何客户端都能自选 IP 绕过 10/min
+  登录桶并污染审计日志。改为显式 CIDR 白名单 `TrustedProxyMatcher`
+  （`app.trusted-proxies` / `TRUSTED_PROXY_CIDRS`，默认**只信任环回**），只做 IP 字面量匹配、
+  不做 DNS；无效条目跳过、全部无效时回退环回而非「全信任」。
+- **密码重置验证码明文写日志且发信失败后仍有效**：发信回退链末端
+  `log.info("📧 邮件发送失败，验证码已生成：{}", code)` 把码写进日志，而调用方只
+  `catch (MailException)`，抛出的 `BusinessException` 绕过清理 → 日志读者可用该码
+  `PUT /api/auth/password/reset-password` 接管管理员。改为 `catch (Exception)` 后
+  **先清 `verificationStore`/`sendTimeStore` 再重抛**，日志只留 `correlationId` 与掩码邮箱；
+  「把码打到控制台」的开发行为改为 `app.mail.dev-console-code` 显式开启（默认 false）。
+- **未认证邮箱枚举**：`sendCode` 对未注册邮箱回 400「该邮箱未注册」。改为恒返回中性文案、
+  只对已注册地址发信；同时补 `/api/user/send-code` 之外的限流覆盖（该路径原先落不到 3/min 桶）。
+- **重置密码不清登录锁定**：被锁定的账号重置成功后仍无法登录（且自助路径可用来探测账号状态）。
+  两条重置路径在 CAS 写事务内清锁，自助路径对 `status != 1` 与仍锁定账号统一回中性 403。
+- **图片解压缩炸弹**：上传只看前 12 字节 magic 与字节数。新增 `ImageDimensionUtils`
+  （`MAX_IMAGE_PIXELS = 50_000_000`）用 `ImageIO.getImageReaders` + `getWidth/getHeight`
+  读声明尺寸、**从不 `read`**，在 `ImageIO.read` 与落盘之前拒绝；相册原图另有一道头部检查。
+  已知限制：JDK 无 WebP reader，无 reader 时**放行**到既有 magic/字节上限检查（不是拒绝）。
+- **访客/IP 假名哈希复用 JWT 密钥**：原先是 `SHA-256(JWT_SECRET + "|" + value)` 单轮无盐，
+  且 `@Value("${JWT_SECRET:local-visitor-hash}")` 有静默默认值，管理端还展示前 12 位十六进制
+  作为离线枚举 IPv4 的 oracle。改为从 `VISITOR_HASH_SECRET`（缺省回落 `JWT_SECRET`）派生
+  HMAC-SHA256 子密钥再哈希，`VisitorHashKeyConfig` 启动时校验（缺失/空白即启动失败）。
+  无 schema 迁移：升级前的行保留旧哈希，老访客会被当作「新访客」一次，属有意接受。
+- **头像/封面 URL 接受协议相对地址**：`//evil.com/x` 以 `/` 开头能过校验。改为只接受单个
+  `/` 开头的同源相对路径，`//evil.com`、`/\evil.com`、`/%2F...` 一律 400。
+- **异常文本回显**：媒体/站点资源上传把底层异常 `getMessage()` 直接放进响应体。改为通用文案
+  并在服务端记原因。
+- **全局响应头**：补 HSTS（1 年 + `includeSubDomains`）与 `X-Content-Type-Options: nosniff`。
+- **只记录不修（已接受的限制）**：refresh/logout 吊销只在 JVM 内存（改密码路径是持久的）；
+  游客评论自动公开；私密相册令牌走查询串；`ENV_VALIDATION_ENABLED=false` 时的遗留默认口令；
+  视频分支按客户端 `Content-Type` 选路；多实例下的限流与锁语义。
+
+### 前端修复
+
+- **API 拦截器在无 request config 时抛 TypeError**：重试分支读 `originalRequest.url` 前加守卫，
+  无 config 时直接 reject 原错误。
+- **文章详情「加载更多」失败会清空已加载评论并推进页码**：改为仅在成功后推进游标。
+- 新增 `composables/useLatestRequest.ts`（单调 token 守卫），统一修掉搜索 / 首页 / 标签 /
+  归档 / 后台列表 / 访客页的「慢响应覆盖新响应」竞态；归档页另加按 id 去重。
+- **Toast 进度条永远停住**：`updateProgress` 停止重排时没把 `animFrame` 置 null，
+  `!animFrame` 守卫永久为假，后续 toast 渲染出冻结的 100% 进度条。
+- **启动失败时挂着没有 router 的 app 挂载**：`bootstrap()` 的 `.catch` 直接 `app.mount()`
+  导致 `<router-view>` 抛错、页面全白。改为回退前先装 router。
+- **后台删除后的分页错乱**：标签 / 文章 / 评论删除后不重算 `totalPages`，`changePage` 无边界守卫。
+- **`formatRelativeTime` 用 30 天当一个月**：改为真实日历月/年差值。
+- **主题持久化未校验**：非法 skin 值会写进 DOM；并修掉双 rAF id 只记一个的泄漏。
+- **登录/后台入口的 `redirect` 校验可被 `//evil.com` 绕过**：改用 `router.resolve()` 断言
+  解析后的路径确实在后台命名空间内，并 `await router.push`。
+- **`ErrorFallback()` 返回 `{ template: ... }`**：构建产物是 runtime-only 的 Vue，
+  该模板会渲染空白。改为 `h()` 渲染函数。
+- **`useMarkdownEnhance` 的 `revertTimer` 未在节点移除时清理**。
+- **`App.vue` 永久把根元素设为 `scroll-behavior: smooth`**：此后所有程序化滚动都变成动画，
+  即使 `prefers-reduced-motion`。改为只在路由过渡期间生效。
+- **路由守卫对同页 hash 跳转误报 WARN**：TOC 点击被记成「导航失败」，改为只在真正失败时告警。
+
+### 前端死代码清理
+
+零引用即删（每条都附 grep 证据）：
+
+- 整文件：`components/common/{Button,Input,Tag}.vue`、`views/post/{HotPosts,PostSearch}.vue`、
+  `api/{share,trending}.ts`。
+- 死导出：`utils/index.ts` 的 `formatNumber`/`copyToClipboard`/`generateId`/`debounce`/`storage`、
+  `useSeoMeta.ts` 的 `resetSeoMeta`、`constants/index.ts` 八个未用常量、
+  `stores/user.ts` 的 `detectTokenTheft` 与 unread 表面、`guards.ts` 的 `meta.guest` 死分支。
+- 死 CSS：`animations.css` 等全局样式表里能证明类名 token 零引用的规则；
+  动态拼接类名（`toast-${type}`、`level-${level}`、`status-${status}`）、Vue `<Transition>` name、
+  运行时注入的 `.code-block*`/`.heading-anchor` 一律保留。
+- **保留**：`api/message.ts`、`api/notification.ts`（后端社区接口的管理端入口，模块仍在用）、
+  `backend/src/main/resources/fix-counter-sync.sql`（CHANGELOG 记载的一次性运维脚本，非代码）。
+
+### 承重规则（改动前请先读）
+
+1. **`updateById` 永远写不了逻辑删除列。** MyBatis-Plus 执行 `UpdateById` 时把逻辑删除列从
+   SET 子句过滤掉，同时往 WHERE 追加 `is_deleted = 0`。所以
+   `entity.setIsDeleted(1); mapper.updateById(entity)` 是空操作；软删之后的
+   `update().set(...)` 也匹配 0 行。软删必须用 `LambdaUpdateWrapper` 或显式原生 SQL；
+   软删后要改的派生值必须在软删**之前**写完。
+2. **不要用 `synchronized` 保护带事务的写。** 锁在方法上、事务在代理外层，锁先释放、
+   事务后提交，两个请求都能进入「没有行 → 插入」分支。正确形状是数据库 UNIQUE 约束 +
+   事务内重读仲裁，并且 catch `DataAccessException` 而不是 `DataIntegrityViolationException`
+   （SQLite 抛 `UncategorizedSQLException`）。
+3. **不要给「会抛 404」的读服务加类级 `@Transactional`。** 任何 RuntimeException 都会把共享事务
+   标成 rollback-only，外层若也在事务里，提交时抛 `UnexpectedRollbackException`，404 变 500。
+   照 `ReadingPageService` / `PageServiceImpl` / `SitemapService` 的先例：读方法不开事务。
+4. **SQL LIKE 的关键词必须转义并显式 `ESCAPE`。** 统一用 `SqlLikeUtils.ESCAPE_CHAR = '!'`，
+   不要用反斜杠（方言字面量不通用），也不要省略 `ESCAPE` 子句（省略后转义静默失效）。
+5. **限流计数键按命中的前缀归桶，不按具体路径。** 按路径计数会让 `/api/post/{id}` 的每个 id
+   各占一个桶，配额形同虚设。
+6. **`X-Forwarded-For` 只在 TCP 对端位于 `app.trusted-proxies` 时才可信。** 该判断是限流、
+   审计日志与访客哈希的唯一共享来源，改动前先看 `LogUtilsTest`。
+7. **SVG 资产只走白名单。** 黑名单已被 `<style>` / `<use href>` / SMIL `<animate>` 证明可绕过。
+8. **媒体文件的磁盘 I/O 不要在事务内做。** 删除要 `afterCommit`，批量上传要每个文件各自事务 +
+   失败补偿，否则回滚后要么行指向不存在的文件、要么留下无主字节。
+
+### 影响文件
+
+| 文件 | 改动类型 |
+| --- | --- |
+| `backend/src/main/java/com/selfblog/utils/{SqlLikeUtils,TrustedProxyMatcher,ImageDimensionUtils}.java` | 新增 |
+| `backend/src/main/java/com/selfblog/config/{VisitorHashKeyConfig,web/TrustedProxyConfig,web/SiteAssetSecurityHeaderInterceptor}.java` | 新增 |
+| `backend/src/main/java/com/selfblog/config/{web/RateLimitInterceptor,web/RateLimitProperties,web/WebMvcConfig,security/SecurityConfig,cache/CaffeineCacheConfig}.java` | 修改 |
+| `backend/src/main/java/com/selfblog/utils/{FineGrainedLockManager,LogUtils,VisitorHashUtils}.java` | 修改 |
+| `backend/src/main/java/com/selfblog/service/**`（约 30 个 service impl） | 修改（正确性/并发/安全/事务边界） |
+| `backend/src/main/java/com/selfblog/mapper/**`（8 个 mapper） | 修改（显式逻辑删除、绝对值计数、计数夹子） |
+| `backend/src/main/resources/mapper/{BlogPost,BlogTrending,CirclePost,SysUser}Mapper.xml` | 修改（删死语句、别名加引号、计数夹子） |
+| `backend/src/main/resources/application.yml` | 修改（`app.trusted-proxies`、`app.mail.dev-console-code`、访客哈希密钥） |
+| `backend/.env.example`、`backend/DEPLOY.md` | 修改（新环境变量与可信代理说明） |
+| `backend/src/test/java/**`（约 25 个测试类，含 12 个新增） | 新增/修改（+131 tests） |
+| `frontend/src/api/index.ts`、`composables/useLatestRequest.ts` | 修改/新增（重试守卫、竞态 token） |
+| `frontend/src/views/**`（约 25 个视图与测试） | 修改（竞态、分页、错误路径） |
+| `frontend/src/{App.vue,main.ts,router/guards.ts,router/helpers.ts}` | 修改（滚动、启动顺序、redirect 校验、错误组件） |
+| `frontend/src/components/common/{Button,Input,Tag}.vue`、`views/post/{HotPosts,PostSearch}.vue`、`api/{share,trending}.ts` | 删除（零引用） |
+| `frontend/src/styles/*.css` | 修改（删除可证明零引用的规则） |
+| `docs/agents/backend.md`、`docs/agents/frontend.md`、`frontend/CLAUDE.md` | 修改（新增承重约定与基线） |
+| `AGENTS.md`、`CLAUDE.md` | 修改（测试基线更新） |
+
+### 验证
+
+- 后端全量：`Tests run: 878, Failures: 0, Errors: 0, Skipped: 0` + `BUILD SUCCESS`
+  （基线 747 → 878，+131；日志 `backend/target/gate-final.log`）。
+- 前端六闸门全绿：`lint:check` **0 errors / 39 warnings**（死代码清理后从 43 降）、
+  `format:check` 通过、`type-check` 0、`test:run` **45 files / 444 tests**、
+  `test:deployment` 27/27、`build` 通过。
+- 每一条 HIGH/CRITICAL 修复都配了**能失败的**回归测试；两处做了反向验证（把修复撤掉后
+  测试必须红）：
+  - `NotFoundInsideTransactionTest`：把类级 `@Transactional(readOnly = true)` 加回去，
+    `UnexpectedRollbackException: Transaction rolled back because it has been marked as
+    rollback-only` 复现（`PageServiceImpl` 3/4 用例、`SitemapService` 1/1）。
+  - `Toast`「重新起进度循环」：撤掉 `animFrame = null` 后断言失败
+    （`expected 2 to be greater than 2`）。
+- 关键行为的实机取证（后端跑在 :8825 上）：
+  - `GET /api/post/search/advanced?keyword=%25` 修复前 `total=15`（全站 15 篇）→ 修复后只命中
+    含字面 `%` 的文章；`keyword=_` 同理。
+  - 对 `/api/post/10`、`/api/post/11`、`/api/post/12` 各刷 12 次：修复前**每个 id 各自**
+    第 11、12 次才 429（换 id 即绕过），修复后按前缀桶累计。
+  - SQLite 3.50.4 上单独实证 `ESCAPE '!'` 语义：`'%'` 只命中字面百分号、`'_'` 只命中字面下划线、
+    `'!'` 命中 `a!b`、`'\\'` 命中 `back\slash`（反斜杠无需转义）；省略 `ESCAPE` 子句时
+    `%!%%` 仍 count=1，证明 `ESCAPE_CLAUSE` 必须随语句一起带。
+  - H2 2.1.214 / 2.2.224 / 2.3.232 七个 MODE 下验证未加引号的别名被折成大写（C7/F-9 的根因）。
+- **未验证**：CI 上的真实 MySQL 8 job 与 Docker 镜像 job 需要推送后由 GitHub Actions 实际跑；
+  多实例部署下的限流与锁语义仍是单实例设计（已在类注释与本文档标明）。
+
+---
+
 ## 未发布 — 首页封面面板与全站字阶收敛 (2026-10-20)
 
 ### 说明

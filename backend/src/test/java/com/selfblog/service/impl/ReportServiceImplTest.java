@@ -18,6 +18,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.context.ActiveProfiles;
@@ -46,6 +47,9 @@ class ReportServiceImplTest {
 
     @Autowired
     private SysUserMapper sysUserMapper;
+
+    @Autowired
+    private JdbcTemplate jdbc;
 
     private SysUser reporter;
     private SysUser postAuthor;
@@ -230,6 +234,27 @@ class ReportServiceImplTest {
         BlogReport updated = blogReportMapper.selectById(reportId);
         assertEquals(2, updated.getStatus());
         assertNotNull(updated.getHandleTime());
+    }
+
+    @Test
+    @DisplayName("处理举报 - 核实后文章必须真正下线")
+    void handleReport_Resolve_UnpublishesThePost() {
+        ReportRequest req = createReportRequest("post", testPost.getId(), "违规");
+        Long reportId = reportService.createReport(req, reporter.getId());
+
+        setUpAdminContext();
+        HandleReportRequest handleReq = new HandleReportRequest();
+        handleReq.setStatus(2); // 已核实
+        handleReq.setHandlerResult("确认违规");
+        reportService.handleReport(reportId, handleReq, admin.getId());
+
+        // 走正常读取路径：MyBatis-Plus 会给 selectById 追加 is_deleted = 0，
+        // 因此未真正落库软删除标记时这里仍能读到文章（旧实现的 updateById 静默丢弃该列）。
+        assertNull(blogPostMapper.selectById(testPost.getId()),
+                "举报核实后文章必须从公开读取路径消失");
+        assertEquals(1, jdbc.queryForObject(
+                "SELECT is_deleted FROM blog_post WHERE id = ?", Integer.class, testPost.getId()),
+                "is_deleted 必须真的写成 1");
     }
 
     @Test

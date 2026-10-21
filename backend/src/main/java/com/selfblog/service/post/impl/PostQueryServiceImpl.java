@@ -17,6 +17,7 @@ import com.selfblog.mapper.*;
 import com.selfblog.service.post.BlogTagService;
 import com.selfblog.service.post.PostQueryService;
 import com.selfblog.service.content.TopicService;
+import com.selfblog.utils.SqlLikeUtils;
 import com.selfblog.vo.post.AdjacentPostVO;
 import com.selfblog.vo.post.PostDetailResponse;
 import com.selfblog.vo.post.PostListResponse;
@@ -24,6 +25,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -42,6 +44,15 @@ public class PostQueryServiceImpl extends ServiceImpl<BlogPostMapper, BlogPost> 
     private String dbType;
 
     private boolean isSqlite() { return "sqlite".equalsIgnoreCase(dbType); }
+
+    /**
+     * 自身的代理引用：getTagsMapByPostIds / getTagsByPostId 上标了 @Cacheable，
+     * 但类内部直接调用属于自调用，不会经过缓存代理，那两个缓存区域永远不会被写入。
+     * 走 self 才能让注解真正生效；@Lazy 用来打破自引用造成的循环依赖。
+     */
+    @Autowired
+    @Lazy
+    private PostQueryService self;
 
     @Autowired
     private BlogPostTagMapper blogPostTagMapper;
@@ -127,7 +138,7 @@ public class PostQueryServiceImpl extends ServiceImpl<BlogPostMapper, BlogPost> 
             response.setAvatar(user.getAvatar());
         }
 
-        response.setTags(getTagsByPostId(post.getId()));
+        response.setTags(self.getTagsByPostId(post.getId()));
 
         if (post.getTopicIds() != null && !post.getTopicIds().isEmpty()) {
             try {
@@ -158,9 +169,10 @@ public class PostQueryServiceImpl extends ServiceImpl<BlogPostMapper, BlogPost> 
                 .ne(BlogPost::getIsDeleted, 1);
 
         if (request.getKeyword() != null && !request.getKeyword().isEmpty()) {
-            wrapper.and(w -> w.like(BlogPost::getTitle, request.getKeyword())
+            String pattern = SqlLikeUtils.containsPattern(request.getKeyword());
+            wrapper.and(w -> w.apply("title LIKE {0}" + SqlLikeUtils.ESCAPE_CLAUSE, pattern)
                     .or()
-                    .like(BlogPost::getContent, request.getKeyword()));
+                    .apply("content LIKE {0}" + SqlLikeUtils.ESCAPE_CLAUSE, pattern));
         }
 
         if (request.getCategory() != null && !request.getCategory().isEmpty()) {
@@ -219,7 +231,7 @@ public class PostQueryServiceImpl extends ServiceImpl<BlogPostMapper, BlogPost> 
         Map<Long, SysUser> userMap = sysUserMapper.selectBatchIds(userIds).stream()
                 .collect(Collectors.toMap(SysUser::getId, u -> u, (a, b) -> a));
 
-        Map<Long, List<PostDetailResponse.TagVO>> postTagsMap = getTagsMapByPostIds(postIds);
+        Map<Long, List<PostDetailResponse.TagVO>> postTagsMap = self.getTagsMapByPostIds(postIds);
 
         Map<Long, String> topicNameMap = getTopicNamesMapByPostIds(postIds, posts);
 
@@ -245,11 +257,12 @@ public class PostQueryServiceImpl extends ServiceImpl<BlogPostMapper, BlogPost> 
                 .ne(BlogPost::getIsDeleted, 1);
 
         if (request.getKeyword() != null && !request.getKeyword().trim().isEmpty()) {
-            wrapper.and(w -> w.like(BlogPost::getTitle, request.getKeyword())
+            String pattern = SqlLikeUtils.containsPattern(request.getKeyword().trim());
+            wrapper.and(w -> w.apply("title LIKE {0}" + SqlLikeUtils.ESCAPE_CLAUSE, pattern)
                     .or()
-                    .like(BlogPost::getContent, request.getKeyword())
+                    .apply("content LIKE {0}" + SqlLikeUtils.ESCAPE_CLAUSE, pattern)
                     .or()
-                    .like(BlogPost::getSummary, request.getKeyword()));
+                    .apply("summary LIKE {0}" + SqlLikeUtils.ESCAPE_CLAUSE, pattern));
         }
 
         if (request.getCategory() != null && !request.getCategory().trim().isEmpty()) {
@@ -307,7 +320,7 @@ public class PostQueryServiceImpl extends ServiceImpl<BlogPostMapper, BlogPost> 
 
         Map<Long, SysUser> userMap = sysUserMapper.selectBatchIds(userIds).stream()
                 .collect(Collectors.toMap(SysUser::getId, u -> u, (a, b) -> a));
-        Map<Long, List<PostDetailResponse.TagVO>> postTagsMap = getTagsMapByPostIds(postIds);
+        Map<Long, List<PostDetailResponse.TagVO>> postTagsMap = self.getTagsMapByPostIds(postIds);
         Map<Long, String> topicNameMap = getTopicNamesMapByPostIds(postIds, posts);
 
         IPage<PostListResponse> result = new Page<>(postPage.getCurrent(), postPage.getSize(), postPage.getTotal());
@@ -336,7 +349,7 @@ public class PostQueryServiceImpl extends ServiceImpl<BlogPostMapper, BlogPost> 
         LambdaQueryWrapper<BlogPost> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(BlogPost::getStatus, 1)
                 .ne(BlogPost::getIsDeleted, 1)
-                .like(BlogPost::getTitle, keyword.trim())
+                .apply("title LIKE {0}" + SqlLikeUtils.ESCAPE_CLAUSE, SqlLikeUtils.containsPattern(keyword.trim()))
                 .select(BlogPost::getTitle)
                 .orderByDesc(BlogPost::getViewCount);
 
@@ -370,7 +383,7 @@ public class PostQueryServiceImpl extends ServiceImpl<BlogPostMapper, BlogPost> 
                 .map(BlogPost::getId)
                 .collect(Collectors.toList());
 
-        Map<Long, List<PostDetailResponse.TagVO>> postTagsMap = getTagsMapByPostIds(postIds);
+        Map<Long, List<PostDetailResponse.TagVO>> postTagsMap = self.getTagsMapByPostIds(postIds);
 
         Map<Long, String> topicNameMap = getTopicNamesMapByPostIds(postIds, posts);
 
@@ -393,9 +406,10 @@ public class PostQueryServiceImpl extends ServiceImpl<BlogPostMapper, BlogPost> 
         wrapper.ne(BlogPost::getIsDeleted, 1);
 
         if (request.getKeyword() != null && !request.getKeyword().trim().isEmpty()) {
-            wrapper.and(w -> w.like(BlogPost::getTitle, request.getKeyword().trim())
+            String pattern = SqlLikeUtils.containsPattern(request.getKeyword().trim());
+            wrapper.and(w -> w.apply("title LIKE {0}" + SqlLikeUtils.ESCAPE_CLAUSE, pattern)
                     .or()
-                    .like(BlogPost::getContent, request.getKeyword().trim()));
+                    .apply("content LIKE {0}" + SqlLikeUtils.ESCAPE_CLAUSE, pattern));
         }
         if (request.getStatus() != null) {
             wrapper.eq(BlogPost::getStatus, request.getStatus());
@@ -428,7 +442,7 @@ public class PostQueryServiceImpl extends ServiceImpl<BlogPostMapper, BlogPost> 
         Map<Long, SysUser> userMap = sysUserMapper.selectBatchIds(userIds).stream()
                 .collect(Collectors.toMap(SysUser::getId, u -> u, (a, b) -> a));
 
-        Map<Long, List<PostDetailResponse.TagVO>> postTagsMap = getTagsMapByPostIds(postIds);
+        Map<Long, List<PostDetailResponse.TagVO>> postTagsMap = self.getTagsMapByPostIds(postIds);
 
         Map<Long, String> topicNameMap = getTopicNamesMapByPostIds(postIds, posts);
 
@@ -452,9 +466,10 @@ public class PostQueryServiceImpl extends ServiceImpl<BlogPostMapper, BlogPost> 
                 .ne(BlogPost::getIsDeleted, 1);
 
         if (keyword != null && !keyword.trim().isEmpty()) {
-            wrapper.and(w -> w.like(BlogPost::getTitle, keyword.trim())
+            String pattern = SqlLikeUtils.containsPattern(keyword.trim());
+            wrapper.and(w -> w.apply("title LIKE {0}" + SqlLikeUtils.ESCAPE_CLAUSE, pattern)
                     .or()
-                    .like(BlogPost::getContent, keyword.trim()));
+                    .apply("content LIKE {0}" + SqlLikeUtils.ESCAPE_CLAUSE, pattern));
         }
 
         wrapper.orderByDesc(BlogPost::getCreateTime);
@@ -478,7 +493,7 @@ public class PostQueryServiceImpl extends ServiceImpl<BlogPostMapper, BlogPost> 
         Map<Long, SysUser> userMap = sysUserMapper.selectBatchIds(userIds).stream()
                 .collect(Collectors.toMap(SysUser::getId, u -> u, (a, b) -> a));
 
-        Map<Long, List<PostDetailResponse.TagVO>> postTagsMap = getTagsMapByPostIds(postIds);
+        Map<Long, List<PostDetailResponse.TagVO>> postTagsMap = self.getTagsMapByPostIds(postIds);
 
         Map<Long, String> topicNameMap = getTopicNamesMapByPostIds(postIds, posts);
 
@@ -541,8 +556,16 @@ public class PostQueryServiceImpl extends ServiceImpl<BlogPostMapper, BlogPost> 
         return convertToSaveDraftRequest(draft);
     }
 
+    /**
+     * 标签映射按 postIds 缓存。缓存键必须是参数的纯函数：这里用列表的 toString()。
+     * 注意不能再写 `#postIds.![#this].sort().join(',')` —— 投影结果是没有无参 sort() 的
+     * java.util.ArrayList，一旦注解真正生效（走 self 代理后）就会抛
+     * SpelEvaluationException: Method sort() cannot be found on type java.util.ArrayList，
+     * 让所有列表接口 500。入参顺序不同只会多一次缓存未命中，不会返回错误数据。
+     */
     @Override
-    @Cacheable(value = CaffeineCacheConfig.CATEGORY_CACHE, key = "'postTags:' + #postIds.![#this].sort().join(',')")
+    @Cacheable(value = CaffeineCacheConfig.CATEGORY_CACHE,
+            key = "'postTags:' + (#postIds == null ? 'empty' : #postIds.toString())")
     public Map<Long, List<PostDetailResponse.TagVO>> getTagsMapByPostIds(List<Long> postIds) {
         if (postIds == null || postIds.isEmpty()) {
             return Collections.emptyMap();

@@ -166,6 +166,25 @@ public class RateLimitProperties {
     private int siteAssetUpload = 30;
 
     /**
+     * 后台接口兜底限流（次/分钟），S8。
+     *
+     * 后台命名空间里只有少数几个前缀有具名阈值（albums/site-assets/pages/page-navigation），
+     * 其余接口此前完全不限流。这里补一条 {@code /api/admin/} 兜底；
+     * 具名前缀仍然靠「最长前缀优先」生效，不会被这条兜底覆盖。
+     */
+    private int adminCatchAll = 60;
+
+    /**
+     * 未命中任何具名前缀的 {@code /api/**} 兜底限流（次/分钟），S8。
+     *
+     * 原实现里「没匹配到任何前缀」直接放行（{@code if (!matched) return true;}），
+     * 等于任何新增/未登记接口默认无限流。取 60/min 而不是更低，是因为既有用例
+     * {@code prefixMustEndAtAPathSegmentBoundary} 要求同一 IP 连续 35 次访问
+     * 未登记路径仍不被拦——兜底阈值必须高于它，否则会误伤正常浏览。
+     */
+    private int apiFallback = 60;
+
+    /**
      * 所有限流配置的 Map 形式（路径前缀 → 每分钟上限），便于动态查找。
      *
      * 热路径：每次请求都会调用，所以这里返回构造期一次性构建的**不可变**快照，
@@ -228,6 +247,12 @@ public class RateLimitProperties {
         limits.put("/api/site/pages", 120);
         limits.put("/api/admin/pages", 60);
         limits.put("/api/admin/page-navigation", 30);
+        // S8：后台命名空间兜底。具名 admin 前缀（albums/site-assets/pages/page-navigation）
+        // 更长，靠最长前缀优先继续生效。
+        limits.put("/api/admin/", adminCatchAll);
+        // S8：未命中任何具名前缀的 /api/** 兜底。放在最后加入，语义上仍是「最长前缀优先」，
+        // 所以它不会削弱上面任何一条具名阈值，只是把「默认放行」改成「默认有限流」。
+        limits.put("/api/", apiFallback);
         return Collections.unmodifiableMap(limits);
     }
 }

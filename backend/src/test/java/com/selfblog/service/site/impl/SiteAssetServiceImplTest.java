@@ -436,4 +436,153 @@ class SiteAssetServiceImplTest {
         assertTrue(written.contains("rect"));
         assertEquals(written.getBytes(StandardCharsets.UTF_8).length, vo.getSize());
     }
+
+    // ---------- S1：审计给出的真实绕过载荷，必须逐个被拦下 ----------
+
+    /**
+     * 审计（.audit/backend-security.md）用真实 jsoup 1.18.3 验证过：以下载荷能原样穿过
+     * 旧的五元素黑名单。这里逐个走完整的 store/sanitize 落盘路径，断言写出的字节里
+     * 不再出现该载荷的关键特征 —— 断言必须是"非平凡"的，因此每个用例都同时确认
+     * 合法图元（rect）仍在，避免"整个文件被清空"这种假通过。
+     */
+    @Test
+    @DisplayName("S1：<style>@import url(...)</style> 被丢弃")
+    void store_StripsStyleElementWithCssImport() throws Exception {
+        byte[] hostile = svg("<?xml version=\"1.0\"?><svg xmlns=\"http://www.w3.org/2000/svg\">"
+                + "<style>@import url(https://evil.example/payload.css);</style>"
+                + "<rect width=\"4\" height=\"4\"/></svg>");
+
+        String written = readStored(hostile);
+
+        assertFalse(written.toLowerCase().contains("<style"));
+        assertFalse(written.contains("@import"));
+        assertFalse(written.contains("evil.example"));
+        assertTrue(written.contains("rect"));
+    }
+
+    @Test
+    @DisplayName("S1：<style> 里的 javascript: url() 被丢弃")
+    void store_StripsStyleElementWithJavascriptUrl() throws Exception {
+        byte[] hostile = svg("<?xml version=\"1.0\"?><svg xmlns=\"http://www.w3.org/2000/svg\">"
+                + "<style>rect{background:url(javascript:alert(1))}</style>"
+                + "<rect width=\"4\" height=\"4\"/></svg>");
+
+        String written = readStored(hostile).toLowerCase();
+
+        assertFalse(written.contains("javascript:"));
+        assertFalse(written.contains("<style"));
+        assertTrue(written.contains("rect"));
+    }
+
+    @Test
+    @DisplayName("S1：style=\"...\" 属性被丢弃")
+    void store_StripsInlineStyleAttribute() throws Exception {
+        byte[] hostile = svg("<?xml version=\"1.0\"?><svg xmlns=\"http://www.w3.org/2000/svg\">"
+                + "<rect width=\"4\" height=\"4\" style=\"background:url(javascript:alert(1))\"/></svg>");
+
+        String written = readStored(hostile).toLowerCase();
+
+        assertFalse(written.contains("style="));
+        assertFalse(written.contains("javascript:"));
+        assertTrue(written.contains("rect"));
+    }
+
+    @Test
+    @DisplayName("S1：<use href> 拉取外部 SVG 被丢弃")
+    void store_StripsUseElementWithExternalHref() throws Exception {
+        byte[] hostile = svg("<?xml version=\"1.0\"?><svg xmlns=\"http://www.w3.org/2000/svg\" "
+                + "xmlns:xlink=\"http://www.w3.org/1999/xlink\">"
+                + "<use href=\"https://evil.example/payload.svg#x\"/>"
+                + "<use xlink:href=\"https://evil.example/payload.svg#y\"/>"
+                + "<rect width=\"4\" height=\"4\"/></svg>");
+
+        String written = readStored(hostile).toLowerCase();
+
+        assertFalse(written.contains("<use"));
+        assertFalse(written.contains("evil.example"));
+        assertTrue(written.contains("rect"));
+    }
+
+    @Test
+    @DisplayName("S1：<use href> 的 data: 内联 SVG 被丢弃")
+    void store_StripsUseElementWithDataHref() throws Exception {
+        byte[] hostile = svg("<?xml version=\"1.0\"?><svg xmlns=\"http://www.w3.org/2000/svg\">"
+                + "<use href=\"data:image/svg+xml;base64,PHN2Zy8+\"/>"
+                + "<rect width=\"4\" height=\"4\"/></svg>");
+
+        String written = readStored(hostile).toLowerCase();
+
+        assertFalse(written.contains("data:"));
+        assertFalse(written.contains("<use"));
+        assertTrue(written.contains("rect"));
+    }
+
+    @Test
+    @DisplayName("S1：<handler> CDATA 载荷被丢弃")
+    void store_StripsHandlerElementWithCdata() throws Exception {
+        byte[] hostile = svg("<?xml version=\"1.0\"?><svg xmlns=\"http://www.w3.org/2000/svg\">"
+                + "<handler><![CDATA[alert(1)]]></handler>"
+                + "<rect width=\"4\" height=\"4\"/></svg>");
+
+        String written = readStored(hostile);
+
+        assertFalse(written.toLowerCase().contains("<handler"));
+        assertFalse(written.contains("CDATA"));
+        assertTrue(written.contains("rect"));
+    }
+
+    @Test
+    @DisplayName("S1：<animate attributeName=\"onload\"> SMIL 载荷被丢弃")
+    void store_StripsSmilAnimateEventHandler() throws Exception {
+        byte[] hostile = svg("<?xml version=\"1.0\"?><svg xmlns=\"http://www.w3.org/2000/svg\">"
+                + "<rect width=\"4\" height=\"4\">"
+                + "<animate attributeName=\"onload\" values=\"alert(1)\"/></rect></svg>");
+
+        String written = readStored(hostile).toLowerCase();
+
+        assertFalse(written.contains("<animate"));
+        assertFalse(written.contains("onload"));
+        assertFalse(written.contains("attributeName".toLowerCase()));
+        assertTrue(written.contains("rect"));
+    }
+
+    @Test
+    @DisplayName("S1：<use> 整体丢弃，同文档片段引用在允许元素上保留")
+    void store_KeepsSameDocumentHrefFragment() throws Exception {
+        byte[] source = svg("<?xml version=\"1.0\"?><svg xmlns=\"http://www.w3.org/2000/svg\" "
+                + "xmlns:xlink=\"http://www.w3.org/1999/xlink\">"
+                + "<defs><linearGradient id=\"g\"><stop offset=\"0%\"/></linearGradient></defs>"
+                + "<use href=\"#g\" xlink:href=\"#g\"/>"
+                + "<text href=\"#g\" xlink:href=\"https://evil.example/x.svg#g\">hi</text>"
+                + "<rect width=\"4\" height=\"4\" fill=\"url(#g)\"/></svg>");
+
+        String written = readStored(source);
+
+        // <use> 会拉取外部 SVG，按 S1 直接丢弃整个元素（连同它的 href）。
+        assertFalse(written.contains("<use"), "<use> 必须被丢弃：" + written);
+        // 允许元素上的同文档片段引用保留，外部引用被去掉。
+        assertTrue(written.contains("href=\"#g\""), "同文档片段引用必须保留：" + written);
+        assertFalse(written.contains("evil.example"), "外部 href 必须被丢弃：" + written);
+        assertTrue(written.contains("fill=\"url(#g)\""), "本地 url(#id) 必须保留：" + written);
+        assertTrue(written.contains("linearGradient"));
+    }
+
+    @Test
+    @DisplayName("S1：非 SVG 命名空间的 xmlns 被丢弃")
+    void store_StripsForeignXmlnsDeclaration() throws Exception {
+        byte[] hostile = svg("<?xml version=\"1.0\"?><svg xmlns=\"http://www.w3.org/2000/svg\" "
+                + "xmlns:evil=\"https://evil.example/ns\"><rect width=\"4\" height=\"4\"/></svg>");
+
+        String written = readStored(hostile);
+
+        assertFalse(written.contains("evil.example"));
+        assertFalse(written.contains("xmlns:evil"));
+        assertTrue(written.contains("rect"));
+    }
+
+    /** 走完整 store 路径并把落盘内容读回来。 */
+    private String readStored(byte[] source) throws Exception {
+        SiteAssetVO vo = service.store(file("brand.svg", source), "logo");
+        return Files.readString(pathOf(vo), StandardCharsets.UTF_8);
+    }
 }

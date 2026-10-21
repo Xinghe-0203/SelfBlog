@@ -9,6 +9,7 @@ import com.selfblog.service.site.SiteSettingsService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -37,17 +38,34 @@ public class SiteSettingsServiceImpl implements SiteSettingsService {
 
     private final SiteSettingMapper settingMapper;
 
+    /**
+     * 自身代理：内部调用必须走它，否则会绕过 Spring 的缓存代理（自调用不经过代理）。
+     * `@Lazy` 用于打破自引用循环：Bean 在构造期尚未完成注册，直接注入自身会失败。
+     */
+    private final SiteSettingsService self;
+
     @Value("${ADMIN_PATH:admin}")
     private String configuredAdminPath;
 
-    public SiteSettingsServiceImpl(SiteSettingMapper settingMapper) {
+    public SiteSettingsServiceImpl(SiteSettingMapper settingMapper, @Lazy SiteSettingsService self) {
         this.settingMapper = settingMapper;
+        this.self = self;
     }
 
     @Override
     @Cacheable(value = CaffeineCacheConfig.SITE_SETTINGS_CACHE, key = "'all'")
     @Transactional(readOnly = true)
     public Map<String, String> getSettings() {
+        return loadSettings();
+    }
+
+    /**
+     * 真实查库读取（不带缓存）。{@code getSettings()} 经缓存代理调用它，
+     * 写入路径也直接用它取返回值——写入方法体内的 {@code self.getSettings()} 会命中
+     * 上一次写入留下的旧快照（{@code @CacheEvict} 默认在方法返回**之后**才执行），
+     * 导致「清空某项设置」的返回值仍是旧值。
+     */
+    private Map<String, String> loadSettings() {
         Map<String, String> settings = defaults();
         for (SiteSetting row : settingMapper.selectList(null)) {
             if (ALLOWED_KEYS.contains(row.getSettingKey()) && row.getSettingValue() != null) {
@@ -60,7 +78,9 @@ public class SiteSettingsServiceImpl implements SiteSettingsService {
     @Override
     @Transactional(readOnly = true)
     public Map<String, String> getPublicSettings() {
-        return getSettings();
+        // 必须经 self 调用：直接写 getSettings() 是自调用，不经过缓存代理，
+        // 会让这个公开热路径每次都真的查库。
+        return self.getSettings();
     }
 
     @Override
@@ -88,17 +108,20 @@ public class SiteSettingsServiceImpl implements SiteSettingsService {
                 settingMapper.updateById(row);
             }
         }
-        return getSettings();
+        // 直接读库返回最新值：此处不能走 self.getSettings()，那是缓存代理，
+        // 而 @CacheEvict 要等方法返回后才执行，写后立刻读会拿到旧快照。
+        return loadSettings();
     }
 
     @Override
     public boolean isCommentsEnabled() {
-        return Boolean.parseBoolean(getSettings().get("commentsEnabled"));
+        return Boolean.parseBoolean(self.getSettings().get("commentsEnabled"));
     }
 
     @Override
     public boolean isVisitorTrackingEnabled() {
-        return Boolean.parseBoolean(getSettings().get("visitorTrackingEnabled"));
+        // 每个访客埋点都会走到这里，必须命中缓存而不是每次查库。
+        return Boolean.parseBoolean(self.getSettings().get("visitorTrackingEnabled"));
     }
 
     private Map<String, String> defaults() {

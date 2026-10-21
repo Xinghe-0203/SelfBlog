@@ -89,6 +89,7 @@ import { useSiteStore } from '../../stores/site'
 import { useLogger } from '../../utils/logger'
 import { toast } from '../../utils/toast'
 import Icon from '@/components/common/Icon.vue'
+import { resolveAdminRedirect } from '@/router/helpers'
 import type { LoginRequest } from '../../types/user'
 
 const router = useRouter()
@@ -148,12 +149,14 @@ const handleLogin = async () => {
 
     if (result.success) {
       logger.info('Login successful')
-      const redirect = (route.query.redirect as string) || `${siteStore.adminRoot}/dashboard`
-      const safeRedirect =
-        redirect.startsWith(siteStore.adminRoot) && !redirect.startsWith('//')
-          ? redirect
-          : `${siteStore.adminRoot}/dashboard`
-      router.push(safeRedirect)
+      // 只放行已注册的后台路由：`?redirect=` 来自 URL，不能只看前缀
+      const safeRedirect = resolveAdminRedirect(
+        router,
+        siteStore.adminRoot,
+        route.query.redirect,
+        `${siteStore.adminRoot}/dashboard`
+      )
+      await router.push(safeRedirect).catch(() => undefined)
     } else {
       logger.warn('Login failed', { message: result.message })
       toast.error(result.message || '登录失败')

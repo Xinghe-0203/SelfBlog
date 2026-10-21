@@ -395,7 +395,7 @@ public class CircleServiceImpl extends ServiceImpl<CirclePostMapper, CirclePost>
     }
 
     @Override
-    @Transactional(rollbackFor = Exception.class)
+    @Transactional(readOnly = true)
     public CirclePostVO getPostDetail(Long postId, Long currentUserId) {
         return circleQueryService.getPostDetail(postId, currentUserId);
     }

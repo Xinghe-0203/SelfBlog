@@ -4,6 +4,7 @@ import { adminApi } from '@/api/admin'
 import { formatDate } from '@/utils'
 import { toast } from '@/utils/toast'
 import { useConfirm } from '@/composables/useConfirm'
+import { useLatestRequest } from '@/composables/useLatestRequest'
 import { useSiteStore } from '@/stores/site'
 import Icon from '@/components/common/Icon.vue'
 import type { Post } from '@/types'
@@ -18,8 +19,11 @@ const totalPages = ref(1)
 const loading = ref(true)
 const error = ref('')
 const pageSize = 20
+/** 翻页、筛选与删除后重载会并发发请求：只有最后一次的响应可以写回列表与 loading。 */
+const beginPostsRequest = useLatestRequest().begin
 
 const fetchPosts = async () => {
+  const isLatest = beginPostsRequest()
   loading.value = true
   error.value = ''
   try {
@@ -29,14 +33,16 @@ const fetchPosts = async () => {
       keyword: keyword.value.trim() || undefined,
       status: statusFilter.value || undefined
     })
+    if (!isLatest()) return
     const data = response.data || {}
     posts.value = data.records || []
     totalPages.value = Math.max(1, data.pages || 1)
   } catch {
+    if (!isLatest()) return
     posts.value = []
     error.value = '文章列表暂时无法加载。'
   } finally {
-    loading.value = false
+    if (isLatest()) loading.value = false
   }
 }
 
@@ -64,10 +70,11 @@ const deletePost = async (post: Post) => {
     await adminApi.deletePost(post.id)
     posts.value = posts.value.filter((item) => item.id !== post.id)
     toast.success('文章已删除')
+    // 本地过滤无法知道服务端剩余总数：回到上一页（若当前页已空）后重新拉取，totalPages 才会更新。
     if (posts.value.length === 0 && currentPage.value > 1) {
       currentPage.value -= 1
-      await fetchPosts()
     }
+    await fetchPosts()
   } catch {
     toast.error('删除失败，请稍后重试')
   }

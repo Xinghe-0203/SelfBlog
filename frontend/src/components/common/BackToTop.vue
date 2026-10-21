@@ -16,10 +16,12 @@ import Icon from './Icon.vue'
 
 const isVisible = ref(false)
 let ticking = false
+let frame = 0
 
 const handleScroll = () => {
   if (!ticking) {
-    requestAnimationFrame(() => {
+    frame = requestAnimationFrame(() => {
+      frame = 0
       isVisible.value = window.scrollY > 300
       ticking = false
     })
@@ -40,6 +42,12 @@ onMounted(() => {
 
 onUnmounted(() => {
   window.removeEventListener('scroll', handleScroll)
+  // 卸载前排队的帧仍会执行并写入已卸载组件的 ref，必须取消。
+  if (frame) {
+    cancelAnimationFrame(frame)
+    frame = 0
+  }
+  ticking = false
 })
 </script>
 

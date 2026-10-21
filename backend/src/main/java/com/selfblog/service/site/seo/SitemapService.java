@@ -13,7 +13,6 @@ import com.selfblog.service.post.PostQueryService;
 import com.selfblog.service.site.PageService;
 import com.selfblog.service.site.page.PageCatalog;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -26,9 +25,13 @@ import java.util.Map;
  *
  * <p>每片最多 {@value #SHARD_SIZE} 个 URL，只查询公开元数据；不读取草稿、
  * 不加载正文。协议上限（50000 条 / 50MiB）超限时明确失败而不是静默截断。
+ *
+ * <p>C7: 与 {@code PageServiceImpl} 同一原因，这里<b>不再</b>加类级 {@code @Transactional}。
+ * {@link #shard} 在分片不存在时会抛 404、{@link #index} 在超限时会抛 500，异常会把共享事务
+ * 标记为 rollback-only，外层若也开了事务，提交时就会变成 {@code UnexpectedRollbackException}
+ * 从而把 404 变成 500。读方法不开事务，Mapper 每次查询各自取连接即可。</p>
  */
 @Service
-@Transactional(readOnly = true)
 public class SitemapService {
     static final int SHARD_SIZE = 1000;
     private static final int MAX_INDEX_ENTRIES = 50_000;

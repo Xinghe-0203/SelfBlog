@@ -5,8 +5,8 @@
         <h1>访客记录</h1>
         <p>匿名统计访问趋势，不保存访客的真实 IP 地址。</p>
       </div>
-      <button class="refresh" type="button" @click="load">
-        <Icon name="refresh" :size="16" />刷新数据
+      <button class="refresh" type="button" :disabled="loading" @click="load">
+        <Icon name="refresh" :size="16" />{{ loading ? '加载中…' : '刷新数据' }}
       </button>
     </header>
     <p v-if="error" class="error" role="alert">{{ error }}</p>
@@ -115,33 +115,44 @@
 import { computed, onMounted, ref } from 'vue'
 import { formatDate } from '@/utils'
 import { siteApi, type VisitorRecord, type VisitorSummary } from '@/api/site'
+import { useLatestRequest } from '@/composables/useLatestRequest'
 import Icon from '@/components/common/Icon.vue'
 
 const summary = ref<VisitorSummary | null>(null)
 const records = ref<VisitorRecord[]>([])
 const page = ref(1)
 const pages = ref(1)
+const loading = ref(false)
 const error = ref('')
+/** 翻页与刷新都会发请求：只有最后一次的响应可以写回表格。 */
+const beginVisitorRequest = useLatestRequest().begin
 const maxVisitors = computed(() =>
   Math.max(1, ...(summary.value?.daily || []).map((day) => day.visitors))
 )
 
 async function load() {
+  const isLatest = beginVisitorRequest()
+  loading.value = true
   error.value = ''
   try {
     const [summaryResponse, recordsResponse] = await Promise.all([
       siteApi.getVisitorSummary(),
       siteApi.getVisitorRecords({ pageNum: page.value, pageSize: 20 })
     ])
+    if (!isLatest()) return
     summary.value = summaryResponse.data || null
     records.value = recordsResponse.data?.records || []
     pages.value = Math.max(1, recordsResponse.data?.pages || 1)
   } catch {
+    if (!isLatest()) return
     error.value = '访客数据暂时无法加载，请稍后重试。'
+  } finally {
+    if (isLatest()) loading.value = false
   }
 }
 
 function changePage(next: number) {
+  if (next < 1 || next > pages.value) return
   page.value = next
   void load()
 }

@@ -7,7 +7,7 @@
     </select>
 
     <update id="incrementViewCount">
-        UPDATE blog_circle_post SET view_count = view_count + 1 WHERE id = #{id} AND is_deleted = 0
+        UPDATE blog_circle_post SET view_count = CASE WHEN view_count &lt; 100000000 THEN view_count + 1 ELSE view_count END WHERE id = #{id} AND is_deleted = 0
     </update>
 
     <update id="incrementLikeCount">
@@ -19,7 +19,7 @@
     </update>
 
     <update id="incrementCommentCount">
-        UPDATE blog_circle_post SET comment_count = comment_count + 1 WHERE id = #{id} AND is_deleted = 0
+        UPDATE blog_circle_post SET comment_count = CASE WHEN comment_count &lt; 100000000 THEN comment_count + 1 ELSE comment_count END WHERE id = #{id} AND is_deleted = 0
     </update>
 
     <update id="decrementCommentCount">
@@ -27,7 +27,7 @@
     </update>
 
     <update id="incrementRepostCount">
-        UPDATE blog_circle_post SET repost_count = repost_count + 1 WHERE id = #{id} AND is_deleted = 0
+        UPDATE blog_circle_post SET repost_count = CASE WHEN repost_count &lt; 100000000 THEN repost_count + 1 ELSE repost_count END WHERE id = #{id} AND is_deleted = 0
     </update>
 
     <update id="decrementRepostCount">

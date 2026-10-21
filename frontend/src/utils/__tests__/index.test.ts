@@ -1,11 +1,9 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import {
   formatRelativeTime,
   formatDate,
-  formatNumber,
   truncateText,
   getSafeImageUrl,
-  debounce,
   checkPasswordStrength
 } from '../index'
 
@@ -38,6 +36,21 @@ describe('formatRelativeTime', () => {
     const date = new Date(Date.now() - 5 * 24 * 60 * 60 * 1000)
     expect(formatRelativeTime(date)).toBe('5天前')
   })
+
+  it('should count real calendar months instead of 30-day buckets', () => {
+    vi.useFakeTimers()
+    try {
+      vi.setSystemTime(new Date(2026, 9, 20))
+      // 2025-10-25 距 2026-10-20 是 360 天（还差 5 天才满一年）：旧算法 floor(360/30)=12 会
+      // 谎报「1年前」，真实日历差只有 11 个月。
+      expect(formatRelativeTime(new Date(2025, 9, 25))).toBe('11个月前')
+      // 同年内满 30 天但不足一个完整日历月时，仍退回天数表述。
+      vi.setSystemTime(new Date(2026, 2, 31))
+      expect(formatRelativeTime(new Date(2026, 2, 1))).toBe('30天前')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
 })
 
 describe('formatDate', () => {
@@ -58,29 +71,6 @@ describe('formatDate', () => {
     const date = new Date(2024, 0, 15, 10, 30, 45)
     const result = formatDate(date, 'YYYY/MM/DD')
     expect(result).toBe('2024/01/15')
-  })
-})
-
-describe('formatNumber', () => {
-  it('should return "0" for null/undefined', () => {
-    expect(formatNumber(null)).toBe('0')
-    expect(formatNumber(undefined)).toBe('0')
-  })
-
-  it('should format small numbers', () => {
-    expect(formatNumber(999)).toBe('999')
-  })
-
-  it('should format thousands as k', () => {
-    expect(formatNumber(1500)).toBe('1.5k')
-  })
-
-  it('should format ten thousands as 万', () => {
-    expect(formatNumber(15000)).toBe('1.5万')
-  })
-
-  it('should format hundred millions as 亿', () => {
-    expect(formatNumber(150000000)).toBe('1.5亿')
   })
 })
 
@@ -115,51 +105,6 @@ describe('getSafeImageUrl', () => {
 
   it('should return fallback for invalid URL', () => {
     expect(getSafeImageUrl('not-a-url')).toBe('/default-image.png')
-  })
-})
-
-describe('debounce', () => {
-  beforeEach(() => {
-    vi.useFakeTimers()
-  })
-
-  afterEach(() => {
-    vi.useRealTimers()
-  })
-
-  it('should delay function execution', () => {
-    const fn = vi.fn()
-    const debounced = debounce(fn, 300)
-
-    debounced()
-    expect(fn).not.toHaveBeenCalled()
-
-    vi.advanceTimersByTime(300)
-    expect(fn).toHaveBeenCalledOnce()
-  })
-
-  it('should reset timer on subsequent calls', () => {
-    const fn = vi.fn()
-    const debounced = debounce(fn, 300)
-
-    debounced()
-    vi.advanceTimersByTime(200)
-    debounced()
-    vi.advanceTimersByTime(200)
-    expect(fn).not.toHaveBeenCalled()
-
-    vi.advanceTimersByTime(100)
-    expect(fn).toHaveBeenCalledOnce()
-  })
-
-  it('should support cancel', () => {
-    const fn = vi.fn()
-    const debounced = debounce(fn, 300)
-
-    debounced()
-    debounced.cancel()
-    vi.advanceTimersByTime(300)
-    expect(fn).not.toHaveBeenCalled()
   })
 })
 

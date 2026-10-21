@@ -33,6 +33,7 @@ public class CaffeineCacheConfig {
     public static final String STATUS_CACHE = "statusCache";
     public static final String SITE_SETTINGS_CACHE = "siteSettingsCache";
     public static final String VISITOR_SUMMARY_CACHE = "visitorSummaryCache";
+    public static final String NOTIFICATION_LIST_CACHE = "notificationListCache";
 
     @Bean
     public CacheManager cacheManager() {
@@ -45,7 +46,8 @@ public class CaffeineCacheConfig {
                 new CaffeineCache(STATS_CACHE, statsCache().build()),
                 new CaffeineCache(STATUS_CACHE, statusCache().build()),
                 new CaffeineCache(SITE_SETTINGS_CACHE, siteSettingsCache().build()),
-                new CaffeineCache(VISITOR_SUMMARY_CACHE, visitorSummaryCache().build())
+                new CaffeineCache(VISITOR_SUMMARY_CACHE, visitorSummaryCache().build()),
+                new CaffeineCache(NOTIFICATION_LIST_CACHE, notificationListCache().build())
         ));
         return cacheManager;
     }
@@ -98,5 +100,16 @@ public class CaffeineCacheConfig {
 
     public Caffeine<Object, Object> visitorSummaryCache() {
         return Caffeine.newBuilder().maximumSize(10).expireAfterWrite(30, TimeUnit.SECONDS);
+    }
+
+    /**
+     * 通知列表缓存：按用户/分页维度缓存，发送通知与标记已读时整体失效。
+     * 与 userCache 分开，避免为了失效列表而清掉用户数据行缓存。
+     */
+    public Caffeine<Object, Object> notificationListCache() {
+        return Caffeine.newBuilder()
+                .maximumSize(5000)
+                .expireAfterWrite(2, TimeUnit.MINUTES)
+                .recordStats();
     }
 }

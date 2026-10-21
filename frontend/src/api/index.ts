@@ -45,7 +45,11 @@ function verifyTokenFingerprint(token: string): boolean {
     if (!savedFingerprint) {
       const fingerprint = getTokenFingerprint(token)
       if (fingerprint) {
-        safeSetItem(STORAGE_KEY_PREFIX + 'token_fingerprint', fingerprint)
+        // 指纹必须写进 token 所在的存储：仅 sessionStorage 登录时写 localStorage 会让下次读取落空。
+        const storage: 'localStorage' | 'sessionStorage' = safeGetItem(STORAGE_KEY_PREFIX + 'token')
+          ? 'localStorage'
+          : 'sessionStorage'
+        safeSetItem(STORAGE_KEY_PREFIX + 'token_fingerprint', fingerprint, storage)
       }
       return true
     }
@@ -58,7 +62,10 @@ function verifyTokenFingerprint(token: string): boolean {
 
 // XSRF Token管理（防止CSRF攻击）
 function getXsrfToken(): string | null {
-  return safeGetItem(STORAGE_KEY_PREFIX + 'xsrf_token')
+  return (
+    safeGetItem(STORAGE_KEY_PREFIX + 'xsrf_token') ||
+    safeGetItem(STORAGE_KEY_PREFIX + 'xsrf_token', 'sessionStorage')
+  )
 }
 
 function generateXsrfToken(): string | null {
@@ -68,18 +75,24 @@ function generateXsrfToken(): string | null {
     const token = Array.from(array)
       .map((b) => b.toString(16).padStart(2, '0'))
       .join('')
-    safeSetItem(STORAGE_KEY_PREFIX + 'xsrf_token', token)
+    const storage: 'localStorage' | 'sessionStorage' = safeGetItem(STORAGE_KEY_PREFIX + 'token')
+      ? 'localStorage'
+      : 'sessionStorage'
+    safeSetItem(STORAGE_KEY_PREFIX + 'xsrf_token', token, storage)
     return token
   } catch {
     return null
   }
 }
 
-// 清除安全相关存储
+// 清除安全相关存储（两个存储都要清，否则会话态残留会与新登录的指纹冲突）
 function clearSecurityStorage(): void {
   safeRemoveItem(STORAGE_KEY_PREFIX + 'token_fingerprint')
+  safeRemoveItem(STORAGE_KEY_PREFIX + 'token_fingerprint', 'sessionStorage')
   safeRemoveItem(STORAGE_KEY_PREFIX + 'xsrf_token')
+  safeRemoveItem(STORAGE_KEY_PREFIX + 'xsrf_token', 'sessionStorage')
   safeRemoveItem(STORAGE_KEY_PREFIX + 'remember')
+  safeRemoveItem(STORAGE_KEY_PREFIX + 'remember', 'sessionStorage')
 }
 
 // 请求队列（用于Token刷新时暂存请求）
@@ -192,7 +205,9 @@ api.interceptors.response.use(
     })
 
     // 网络错误重试（无响应、超时等）
-    if (isRetryableError(error)) {
+    // 请求可能还没进到 dispatch 就被拦下（error.config 不存在）：没有可重放的
+    // config，也就没有重试计数可读，直接落到下面的兜底分支。
+    if (originalRequest && isRetryableError(error)) {
       originalRequest._networkRetryCount = (originalRequest._networkRetryCount || 0) + 1
       if (originalRequest._networkRetryCount <= MAX_RETRIES) {
         logger.warn('Retrying request', {
@@ -250,7 +265,7 @@ api.interceptors.response.use(
     // 无响应的网络错误
     if (
       !error.response &&
-      originalRequest._networkRetryCount &&
+      originalRequest?._networkRetryCount &&
       originalRequest._networkRetryCount > MAX_RETRIES
     ) {
       const message = error.message || '网络异常，请检查网络连接'
@@ -271,7 +286,7 @@ api.interceptors.response.use(
     }
 
     // 401错误处理（Token过期）
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    if (error.response?.status === 401 && !originalRequest?._retry) {
       // 如果是刷新Token的请求失败，直接跳转登录
       if (originalRequest.url === '/user/refresh') {
         await handleAuthError()

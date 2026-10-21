@@ -47,78 +47,14 @@
         UPDATE blog_post SET share_count = CASE WHEN share_count &lt; 100000000 THEN share_count + 1 ELSE share_count END WHERE id = #{id} AND is_deleted = 0
     </update>
 
-    <!-- 分享数-1 -->
-    <update id="decrementShareCount">
-        UPDATE blog_post SET share_count = share_count - 1 WHERE id = #{id} AND is_deleted = 0 AND share_count &gt; 0
-    </update>
-
-    <!-- 统计每日新增文章数 -->
+    <!-- 统计每日新增文章数。
+         别名必须双引号：H2（测试 profile）会把不带引号的别名折叠成大写，Map 的键就变成
+         DATE/COUNT，StatisticsServiceImpl 里 row.get("date")/row.get("count") 直接 NPE，
+         后台统计接口在 H2 上 500。SQLite/MySQL 保留原样，所以生产环境看不到这个问题。 -->
     <select id="countPostsGroupByDate" resultType="java.util.Map">
-        SELECT DATE(create_time) as date, COUNT(*) as count FROM blog_post
+        SELECT DATE(create_time) as "date", COUNT(*) as "count" FROM blog_post
         WHERE create_time &gt;= #{since} AND is_deleted = 0
-        GROUP BY DATE(create_time) ORDER BY date
-    </select>
-
-    <!-- MySQL: 全文搜索（按时间排序） -->
-    <select id="fullTextSearch" resultType="java.lang.Long" databaseId="mysql">
-        SELECT id FROM blog_post
-        WHERE is_deleted = #{isDeleted} AND status = #{status}
-        AND MATCH(title, content) AGAINST(#{keyword} IN NATURAL LANGUAGE MODE)
-        ORDER BY create_time DESC LIMIT #{limit} OFFSET #{offset}
-    </select>
-
-    <!-- SQLite: 全文搜索（按时间排序） -->
-    <select id="fullTextSearch" resultType="java.lang.Long" databaseId="sqlite">
-        SELECT id FROM blog_post
-        WHERE is_deleted = #{isDeleted} AND status = #{status}
-        AND (title LIKE '%' || #{keyword} || '%' OR content LIKE '%' || #{keyword} || '%')
-        ORDER BY create_time DESC LIMIT #{limit} OFFSET #{offset}
-    </select>
-
-    <!-- MySQL: 全文搜索（按浏览量排序） -->
-    <select id="fullTextSearchByView" resultType="java.lang.Long" databaseId="mysql">
-        SELECT id FROM blog_post
-        WHERE is_deleted = #{isDeleted} AND status = #{status}
-        AND MATCH(title, content) AGAINST(#{keyword} IN NATURAL LANGUAGE MODE)
-        ORDER BY view_count DESC LIMIT #{limit} OFFSET #{offset}
-    </select>
-
-    <!-- SQLite: 全文搜索（按浏览量排序） -->
-    <select id="fullTextSearchByView" resultType="java.lang.Long" databaseId="sqlite">
-        SELECT id FROM blog_post
-        WHERE is_deleted = #{isDeleted} AND status = #{status}
-        AND (title LIKE '%' || #{keyword} || '%' OR content LIKE '%' || #{keyword} || '%')
-        ORDER BY view_count DESC LIMIT #{limit} OFFSET #{offset}
-    </select>
-
-    <!-- MySQL: 全文搜索（按点赞数排序） -->
-    <select id="fullTextSearchByLike" resultType="java.lang.Long" databaseId="mysql">
-        SELECT id FROM blog_post
-        WHERE is_deleted = #{isDeleted} AND status = #{status}
-        AND MATCH(title, content) AGAINST(#{keyword} IN NATURAL LANGUAGE MODE)
-        ORDER BY like_count DESC LIMIT #{limit} OFFSET #{offset}
-    </select>
-
-    <!-- SQLite: 全文搜索（按点赞数排序） -->
-    <select id="fullTextSearchByLike" resultType="java.lang.Long" databaseId="sqlite">
-        SELECT id FROM blog_post
-        WHERE is_deleted = #{isDeleted} AND status = #{status}
-        AND (title LIKE '%' || #{keyword} || '%' OR content LIKE '%' || #{keyword} || '%')
-        ORDER BY like_count DESC LIMIT #{limit} OFFSET #{offset}
-    </select>
-
-    <!-- MySQL: 全文搜索计数 -->
-    <select id="countFullTextSearch" resultType="java.lang.Long" databaseId="mysql">
-        SELECT COUNT(*) FROM blog_post
-        WHERE is_deleted = #{isDeleted} AND status = #{status}
-        AND MATCH(title, content) AGAINST(#{keyword} IN NATURAL LANGUAGE MODE)
-    </select>
-
-    <!-- SQLite: 全文搜索计数 -->
-    <select id="countFullTextSearch" resultType="java.lang.Long" databaseId="sqlite">
-        SELECT COUNT(*) FROM blog_post
-        WHERE is_deleted = #{isDeleted} AND status = #{status}
-        AND (title LIKE '%' || #{keyword} || '%' OR content LIKE '%' || #{keyword} || '%')
+        GROUP BY DATE(create_time) ORDER BY "date"
     </select>
 
 </mapper>

@@ -169,6 +169,19 @@ cors:
 app:
   api-prefix: /api
   single-author-mode: true
+  # 可信代理白名单（S2）：只有直连对端落在这些 IP/CIDR 内才采用 X-Forwarded-For 等代理头。
+  # 默认只信任环回地址。前置宿主机反向代理时必须把代理地址登记进来；用 docker -p 直接发布
+  # 端口时对端是网桥网关（如 172.17.0.1），未登记则客户端 IP 退化为该网关地址——安全的失败方向。
+  trusted-proxies: ${TRUSTED_PROXY_CIDRS:127.0.0.1/32,::1/128}
+  # 访客/IP 伪名化密钥（S7）：用于匿名点赞、游客评论与访客埋点的去重哈希。
+  # 与 jwt.secret 分开，避免同一密钥承担两个用途（HMAC 里还会再按标签派生子密钥）。
+  # 未设置时回落到 JWT_SECRET；两者都缺失则启动即失败，不再有 local-visitor-hash 这类公开默认值。
+  visitor-hash-secret: ${VISITOR_HASH_SECRET:${JWT_SECRET:}}
+  # 开发期「把验证码打到日志里」开关（S2）。默认 false：生产环境若为 true，
+  # 任何能读日志的人都能用日志里的验证码重置后台密码。
+  # 开启后 EmailServiceImpl 跳过真实发信，只打印 correlationId + 脱敏邮箱 + 验证码。
+  mail:
+    dev-console-code: ${MAIL_DEV_CONSOLE_CODE:false}
 
 # ==================== Actuator 运维监控配置 ====================
 management:

@@ -56,6 +56,14 @@ public class EmailServiceImpl implements EmailService {
     @Value("${mail.verification.send-interval-seconds:60}")
     private int sendIntervalSeconds;
 
+    /**
+     * 是否把验证码明文打印到控制台（S2）。默认关闭：
+     * 生产环境任何人只要有日志读取权限就能拿它直接重置管理员密码，
+     * 所以「开发期看控制台取码」必须是显式开启的行为。
+     */
+    @Value("${app.mail.dev-console-code:false}")
+    private boolean devConsoleCode;
+
     // 验证码存储: type:email -> VerificationData (分开存储注册和密码重置验证码)
     private final Map<String, VerificationData> verificationStore = new ConcurrentHashMap<>();
 
@@ -164,18 +172,25 @@ public class EmailServiceImpl implements EmailService {
             sendTimeStore.put(key, System.currentTimeMillis());
         }
 
+        String correlationId = generateCorrelationId();
         try {
             String subject = type == VerificationType.REGISTER
                     ? "SelfBlog - 注册验证码"
                     : "SelfBlog - 密码找回验证码";
-            sendHtmlEmail(to, code, subject);
+            sendHtmlEmail(to, code, subject, correlationId);
             incrementDailySendCount(to);
-            log.info("验证码已发送至: {}, type={}", StringMaskUtils.maskEmail(to), type);
+            log.info("验证码已发送至: {}, type={}, correlationId={}", StringMaskUtils.maskEmail(to), type, correlationId);
             return true;
-        } catch (MailException e) {
-            log.error("发送验证码失败: {}", e.getMessage());
+        } catch (Exception e) {
+            // S2：任何发送失败（MailException、BusinessException、MessagingException 逃逸……）
+            // 都必须在抛出前把验证码作废，否则一个已进日志/异常链的码还能在 5 分钟内被兑换。
+            // 这里捕获 Exception 而不是只捕 MailException，正是原缺陷的根因。
+            log.error("发送验证码失败: type={}, correlationId={}, error={}", type, correlationId, e.getMessage());
             verificationStore.remove(key);
             sendTimeStore.remove(key);
+            if (e instanceof BusinessException businessException) {
+                throw businessException;
+            }
             throw new BusinessException(500, "邮件发送失败，请稍后重试");
         }
     }
@@ -215,25 +230,33 @@ public class EmailServiceImpl implements EmailService {
             sendTimeStore.put(key, System.currentTimeMillis());
         }
 
+        String correlationId = generateCorrelationId();
         try {
-            sendHtmlEmail(to, code, "SelfBlog - 注册验证码");
+            sendHtmlEmail(to, code, "SelfBlog - 注册验证码", correlationId);
             incrementDailySendCount(to);
-            log.info("注册验证码已发送至: {}, username={}", StringMaskUtils.maskEmail(to), username);
+            log.info("注册验证码已发送至: {}, username={}, correlationId={}", StringMaskUtils.maskEmail(to), username, correlationId);
             return true;
-        } catch (BusinessException e) {
-            // sendHtmlEmail 内部已经打印验证码到控制台
-            // 不删除 verificationStore，允许用户在开发模式使用控制台打印的验证码
-            log.info("邮件发送失败但验证码仍有效（可用于开发测试）: {} -> {}", to, code);
-            throw e;
         } catch (Exception e) {
-            // 捕获其他异常（如 MailException、MessagingException 逃逸或运行时异常）
-            log.error("发送邮件时发生未预期异常: {}", e.getMessage());
-            // 清理验证码存储，防止内存泄漏
+            // S2：注册路径同样「失败即作废」。原实现故意保留验证码并在日志里打印明文，
+            // 等于把一条可用的注册凭据写进日志；注册已由单人作者模式关闭，这条路径
+            // 生产不可达，但不能留一个会写明文凭据的日志分支。
+            log.error("发送注册验证码失败: username={}, correlationId={}, error={}", username, correlationId, e.getMessage());
             verificationStore.remove(key);
             sendTimeStore.remove(key);
-            log.info("邮件发送失败但验证码仍有效（可用于开发测试）: {} -> {}", to, code);
-            throw new BusinessException(500, "邮件发送失败，请检查SMTP配置。开发模式验证码已打印在控制台。");
+            if (e instanceof BusinessException businessException) {
+                throw businessException;
+            }
+            throw new BusinessException(500, "邮件发送失败，请稍后重试");
         }
+    }
+
+    /**
+     * 生成一次发送尝试的关联 id，用于在不记录验证码/完整邮箱的前提下串联日志。
+     */
+    private String generateCorrelationId() {
+        byte[] bytes = new byte[8];
+        SECURE_RANDOM.nextBytes(bytes);
+        return java.util.HexFormat.of().formatHex(bytes);
     }
 
     @Override
@@ -332,7 +355,15 @@ public class EmailServiceImpl implements EmailService {
     /**
      * 发送HTML格式邮件
      */
-    private void sendHtmlEmail(String to, String code, String subject) {
+    private void sendHtmlEmail(String to, String code, String subject, String correlationId) {
+        if (devConsoleCode) {
+            // S2：仅本地开发使用。SMTP 通常没有配置，这里不发信、只把验证码打到控制台，
+            // 并且该分支由 app.mail.dev-console-code 显式开启（默认 false），
+            // 因此生产环境不存在「验证码进日志」的路径。
+            log.warn("[DEV ONLY] 跳过邮件发送（app.mail.dev-console-code=true）: correlationId={}, email={}, subject={}, code={}",
+                    correlationId, StringMaskUtils.maskEmail(to), subject, code);
+            return;
+        }
         try {
             MimeMessage message = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
@@ -346,7 +377,7 @@ public class EmailServiceImpl implements EmailService {
 
             mailSender.send(message);
         } catch (MailException | MessagingException e) {
-            log.warn("HTML邮件发送失败，尝试发送纯文本邮件: {}", e.getMessage());
+            log.warn("HTML邮件发送失败，尝试发送纯文本邮件: correlationId={}, error={}", correlationId, e.getMessage());
             try {
                 SimpleMailMessage simpleMessage = new SimpleMailMessage();
                 simpleMessage.setFrom(fromEmail);
@@ -355,14 +386,11 @@ public class EmailServiceImpl implements EmailService {
                 simpleMessage.setText("您的验证码是: " + code + "\n验证码 " + expireMinutes + " 分钟内有效，请勿泄露给他人。\n\n如非本人操作，请忽略此邮件。");
                 mailSender.send(simpleMessage);
             } catch (MailException ex) {
-                log.error("纯文本邮件发送也失败: {}", ex.getMessage());
-                log.info("============================================");
-                log.info("📧 邮件发送失败，验证码已生成：{}", code);
-                log.info("   收件人: {}", to);
-                log.info("   有效期: {} 分钟", expireMinutes);
-                log.info("   请在开发环境中使用此验证码完成注册");
-                log.info("============================================");
-                throw new BusinessException(500, "邮件发送失败，请检查SMTP配置。开发模式验证码已打印在控制台。");
+                // S2：这里绝不打印验证码与完整收件人地址——日志读取者拿到验证码即可重置管理员密码。
+                // 只留一个关联 id 与脱敏地址，便于按 correlationId 追查同一次发送。
+                log.error("纯文本邮件发送也失败: correlationId={}, email={}, error={}",
+                        correlationId, StringMaskUtils.maskEmail(to), ex.getMessage());
+                throw new BusinessException(500, "邮件发送失败，请稍后重试");
             }
         }
     }

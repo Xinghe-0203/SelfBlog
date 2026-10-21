@@ -98,6 +98,7 @@ function statusName(status: number) {
   return status === 1 ? '展示中' : status === 2 ? '垃圾评论' : '已隐藏'
 }
 function changePage(next: number) {
+  if (next < 1 || next > pages.value) return
   page.value = next
   void load()
 }
@@ -116,6 +117,11 @@ async function remove(comment: GuestComment) {
     await publicInteractionApi.deleteComment(comment.id)
     comments.value = comments.value.filter((item) => item.id !== comment.id)
     toast.success('评论已删除')
+    // 本地过滤不会更新服务端页数：删空当前页时退回上一页并重新拉取。
+    if (comments.value.length === 0 && page.value > 1) {
+      page.value -= 1
+    }
+    await load()
   } catch {
     toast.error('删除失败，请重试')
   }

@@ -58,6 +58,22 @@ class PostTagLifecycleTest {
     }
 
     @Test
+    void partialUpdateWithoutTagPayloadKeepsExistingTags() {
+        Long postId = posts.createPost(request("局部更新", "正文", List.of("保留标签")), 1L, true);
+        assertEquals(List.of("保留标签"), visibleTags(postId));
+
+        // 只改标题，两个标签字段都不提交（null）——必须视为“不修改标签”。
+        var partial = new PostCreateRequest();
+        partial.setId(postId);
+        partial.setTitle("局部更新（只改标题）");
+        partial.setContent("正文");
+        partial.setCategory("测试");
+        posts.updatePost(partial, 1L, true);
+
+        assertEquals(List.of("保留标签"), visibleTags(postId), "省略标签字段的局部更新不得清空已有标签");
+    }
+
+    @Test
     void aNewTagNameIsNotDroppedWhenAnExistingTagIdIsAlsoSent() {
         Long existingId = tags.getOrCreateTag("已有标签");
         var request = request("混合标签文章", "正文", List.of("全新标签"));
@@ -73,13 +89,20 @@ class PostTagLifecycleTest {
         return request(title, content, tagNames, null);
     }
 
+    /**
+     * 标签载荷必须区分“没提交”与“提交了空列表”。
+     *
+     * <p>{@code null} 表示本次不修改标签，空列表表示清空全部标签（前端保存时两个字段
+     * 都必然非 null）。旧 helper 把空列表折成 null，会让“移除标签”一步变成“不修改标签”，
+     * 从而掩盖 F-5 那个“局部更新清空全部标签”的缺陷。这里保留显式空列表。
+     */
     private PostCreateRequest request(String title, String content, List<String> tagNames, Long id) {
         var request = new PostCreateRequest();
         request.setId(id);
         request.setTitle(title);
         request.setContent(content);
         request.setCategory("测试");
-        request.setTagNames(tagNames.isEmpty() ? null : tagNames);
+        request.setTagNames(tagNames);
         return request;
     }
 

@@ -8,6 +8,7 @@ import com.selfblog.mapper.BlogTagMapper;
 import com.selfblog.service.post.BlogTagService;
 import com.selfblog.utils.HtmlSanitizer;
 import com.selfblog.utils.SecurityUtils;
+import com.selfblog.utils.SqlLikeUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Service;
@@ -134,7 +135,7 @@ public class BlogTagServiceImpl extends ServiceImpl<BlogTagMapper, BlogTag> impl
             return Collections.emptyList();
         }
         LambdaQueryWrapper<BlogTag> wrapper = new LambdaQueryWrapper<>();
-        wrapper.like(BlogTag::getName, keyword.trim())
+        wrapper.apply("name LIKE {0}" + SqlLikeUtils.ESCAPE_CLAUSE, SqlLikeUtils.containsPattern(keyword.trim()))
                .orderByAsc(BlogTag::getName);
         return this.list(wrapper);
     }

@@ -201,4 +201,82 @@ class TopicServiceImplTest {
         assertTrue(topicService.getTopicNamesByIds(List.of()).isEmpty());
         assertTrue(topicService.getTopicNamesByIds(null).isEmpty());
     }
+
+    // ==================== 管理员操作（事务边界已从控制器移到服务层） ====================
+
+    @Test
+    @DisplayName("更新话题 - 名称/描述/状态均生效")
+    void updateTopic_Success() {
+        Topic created = createTopic("Java", "描述", 10);
+
+        Topic updated = topicService.updateTopic(created.getId(), "JavaSE", "新描述", 0);
+
+        assertEquals("JavaSE", updated.getName());
+        assertEquals("新描述", updated.getDescription());
+        assertEquals(0, updated.getStatus());
+        Topic reloaded = topicMapper.selectById(created.getId());
+        assertEquals("JavaSE", reloaded.getName());
+        assertEquals(0, reloaded.getStatus());
+    }
+
+    @Test
+    @DisplayName("更新话题 - 重名抛400")
+    void updateTopic_DuplicateName_ThrowsException() {
+        createTopic("Java", "描述", 10);
+        Topic other = createTopic("Vue", "描述", 20);
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> topicService.updateTopic(other.getId(), "Java", null, null));
+        assertEquals(400, ex.getCode());
+        assertTrue(ex.getMessage().contains("已存在"));
+    }
+
+    @Test
+    @DisplayName("更新话题 - 不存在抛404")
+    void updateTopic_NotFound_ThrowsException() {
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> topicService.updateTopic(99999L, "任意", null, null));
+        assertEquals(404, ex.getCode());
+    }
+
+    @Test
+    @DisplayName("更新话题 - 非法状态抛400")
+    void updateTopic_InvalidStatus_ThrowsException() {
+        Topic created = createTopic("Java", "描述", 10);
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> topicService.updateTopic(created.getId(), null, null, 7));
+        assertEquals(400, ex.getCode());
+    }
+
+    @Test
+    @DisplayName("删除话题 - 成功且不存在时抛404")
+    void deleteTopic_SuccessAndNotFound() {
+        Topic created = createTopic("Java", "描述", 10);
+
+        topicService.deleteTopic(created.getId());
+        assertNull(topicMapper.selectById(created.getId()));
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> topicService.deleteTopic(created.getId()));
+        assertEquals(404, ex.getCode());
+    }
+
+    @Test
+    @DisplayName("切换话题状态 - 生效且非法值抛400")
+    void toggleStatus_SuccessAndInvalid() {
+        Topic created = createTopic("Java", "描述", 10);
+
+        topicService.toggleStatus(created.getId(), 0);
+        assertEquals(0, topicMapper.selectById(created.getId()).getStatus());
+
+        topicService.toggleStatus(created.getId(), 1);
+        assertEquals(1, topicMapper.selectById(created.getId()).getStatus());
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> topicService.toggleStatus(created.getId(), null));
+        assertEquals(400, ex.getCode());
+        BusinessException ex2 = assertThrows(BusinessException.class,
+                () -> topicService.toggleStatus(99999L, 1));
+        assertEquals(404, ex2.getCode());
+    }
 }

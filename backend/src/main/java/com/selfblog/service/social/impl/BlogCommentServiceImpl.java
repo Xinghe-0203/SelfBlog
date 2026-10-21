@@ -138,17 +138,32 @@ public class BlogCommentServiceImpl extends ServiceImpl<BlogCommentMapper, BlogC
             throw new BusinessException(403, "文章未发布或已下架");
         }
 
-        // 分页查询该文章的评论
+        // C21：分页只针对根评论。旧实现按「全部评论」分页、再在 Java 里丢掉回复，
+        // 于是 DB 的 total 把回复也算进页数（records.size() < total，深页返回空数组却仍宣称有数据）。
+        // 把过滤条件下推到查询里，DB total 天然等于根评论数，records 与 total 同一谓词。
         Page<BlogComment> pageParam = new Page<>(pageNum, pageSize);
         LambdaQueryWrapper<BlogComment> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(BlogComment::getPostId, postId)
+               .isNull(BlogComment::getParentId)
                .orderByDesc(BlogComment::getCreateTime);
         IPage<BlogComment> commentPage = this.page(pageParam, wrapper);
 
-        List<BlogComment> comments = commentPage.getRecords();
-        if (comments.isEmpty()) {
-            return new Page<>(pageNum, pageSize, 0);
+        List<BlogComment> pageRootComments = commentPage.getRecords();
+        if (pageRootComments.isEmpty()) {
+            return new Page<>(pageNum, pageSize, commentPage.getTotal());
         }
+
+        // 回复不属于分页单位：单独取本页根评论下的直接回复，保证树形结构不因下推过滤而丢失。
+        List<Long> pageRootIds = pageRootComments.stream()
+                .map(BlogComment::getId)
+                .collect(Collectors.toList());
+        List<BlogComment> replies = this.list(new LambdaQueryWrapper<BlogComment>()
+                .eq(BlogComment::getPostId, postId)
+                .in(BlogComment::getParentId, pageRootIds)
+                .orderByAsc(BlogComment::getCreateTime));
+
+        List<BlogComment> comments = new ArrayList<>(pageRootComments);
+        comments.addAll(replies);
 
         // 获取所有评论者用户ID
         List<Long> userIds = comments.stream()
@@ -205,7 +220,8 @@ public class BlogCommentServiceImpl extends ServiceImpl<BlogCommentMapper, BlogC
             }
         }
 
-        IPage<CommentVO> result = new Page<>(commentPage.getCurrent(), commentPage.getSize(), commentPage.getTotal());
+        // C21：total 直接取根评论分页的 DB 计数（谓词已下推，与 records 同源），不再用本页数量冒充总数。
+        Page<CommentVO> result = new Page<>(commentPage.getCurrent(), commentPage.getSize(), commentPage.getTotal());
         result.setRecords(rootComments);
         return result;
     }
@@ -251,8 +267,9 @@ public class BlogCommentServiceImpl extends ServiceImpl<BlogCommentMapper, BlogC
 
         log.info("[AUDIT] 评论删除: commentId={}, userId={}, deletedCount={}", commentId, userId, commentIdsToDelete.size());
 
-        // 更新文章评论数（减去实际删除的数量）
-        blogPostService.decrementCommentCount(comment.getPostId(), commentIdsToDelete.size());
+        // C8: 用真实行数回写绝对值。原实现传 commentIdsToDelete.size() 走相对减法，且不检查
+        // removeByIds 的实际影响行数——并发删除同一棵子树时两次都减，计数直接变负；历史漂移也无法自愈。
+        blogPostService.syncCommentCount(comment.getPostId());
         // 更新热门趋势数据
         trendingService.updatePostTrending(comment.getPostId());
     }
@@ -391,8 +408,8 @@ public class BlogCommentServiceImpl extends ServiceImpl<BlogCommentMapper, BlogC
 
         log.info("[AUDIT] 管理员删除评论: commentId={}, adminId={}, deletedCount={}", commentId, adminId, commentIdsToDelete.size());
 
-        // 更新文章评论数（减去实际删除的数量）
-        blogPostService.decrementCommentCount(comment.getPostId(), commentIdsToDelete.size());
+        // C8: 同 deleteComment —— 写回真实行数，不再用相对减法（并发删除会重复减，历史漂移无法自愈）
+        blogPostService.syncCommentCount(comment.getPostId());
         // 更新热门趋势数据
         trendingService.updatePostTrending(comment.getPostId());
     }

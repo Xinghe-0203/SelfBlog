@@ -5,12 +5,7 @@
     <Navbar v-if="!isAdminPage" />
     <main id="main-content" class="app-main" :class="{ 'app-main--admin': isAdminPage }">
       <router-view v-slot="{ Component, route }">
-        <Transition
-          :name="transitionName"
-          mode="out-in"
-          @before-enter="onBeforeEnter"
-          @after-enter="onAfterEnter"
-        >
+        <Transition :name="transitionName" mode="out-in" @before-enter="onBeforeEnter">
           <div :key="route.path" class="page-wrapper">
             <component :is="Component" />
           </div>
@@ -65,14 +60,11 @@ watch(
   }
 )
 
-// Scroll to top on route change (smooth for same-depth, instant for deep navigation)
+// 路由切换时回到顶部：这里必须是 instant，滚动动画交给 `scroll-behavior` 与
+// `prefers-reduced-motion` 决定，不要在运行时改写 documentElement 的行内样式
+// （那会覆盖 a11y.css 的 reduced-motion 规则且永远不会被还原）。
 const onBeforeEnter = () => {
   window.scrollTo({ top: 0, behavior: 'instant' })
-}
-
-const onAfterEnter = () => {
-  // Restore smooth scroll after transition
-  document.documentElement.style.scrollBehavior = 'smooth'
 }
 
 onMounted(async () => {
@@ -119,7 +111,13 @@ function applySiteTheme() {
 }
 
 function recordVisitor() {
-  const referrer = document.referrer ? new URL(document.referrer).href : ''
+  // document.referrer 可能是非绝对地址（about:client、部分 WebView），new URL 会抛错。
+  let referrer = ''
+  try {
+    referrer = document.referrer ? new URL(document.referrer).href : ''
+  } catch {
+    referrer = ''
+  }
   return siteApi.trackVisitor(route.fullPath, referrer).catch(() => undefined)
 }
 

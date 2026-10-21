@@ -4,8 +4,6 @@
 
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { notificationApi } from '@/api/notification'
-import { messageApi } from '@/api/message'
 import { userApi } from '@/api/user'
 import { useLogger } from '@/utils/logger'
 import { encodeData, decodeData } from '@/utils/crypto'
@@ -152,28 +150,6 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  // 检查Token是否可能已被窃取
-  function detectTokenTheft(): boolean {
-    try {
-      const savedLocalToken = localStorage.getItem(STORAGE_KEY_PREFIX + 'token')
-      const savedSessionToken = sessionStorage.getItem(STORAGE_KEY_PREFIX + 'token')
-      const currentToken = token.value
-      const encodedCurrent = encodeData(currentToken)
-      // 检查两端存储是否与内存token不一致
-      if (savedLocalToken && currentToken && savedLocalToken !== encodedCurrent) {
-        logger.error('Token mismatch in localStorage - possible theft attempt')
-        return true
-      }
-      if (savedSessionToken && currentToken && savedSessionToken !== encodedCurrent) {
-        logger.error('Token mismatch in sessionStorage - possible theft attempt')
-        return true
-      }
-      return false
-    } catch {
-      return false
-    }
-  }
-
   // 用户登录
   async function login(credentials: LoginRequest): Promise<{ success: boolean; message?: string }> {
     loading.value = true
@@ -312,9 +288,6 @@ export const useAuthStore = defineStore('auth', () => {
       logger.warn('Backend logout failed', { error: (e as Error).message })
     }
     resetState()
-    // 重置通知计数
-    unreadNotifications.value = 0
-    unreadMessages.value = 0
     logger.info('User logged out', { userId })
   }
 
@@ -420,35 +393,6 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  // 通知未读计数 (Navbar 等直接通过 userStore 访问)
-  const unreadNotifications = ref(0)
-  const unreadMessages = ref(0)
-  const totalUnread = computed(() => unreadNotifications.value + unreadMessages.value)
-
-  async function fetchUnreadCounts(): Promise<void> {
-    if (!isLoggedIn.value) return
-    try {
-      const [notifResult, msgResult] = await Promise.allSettled([
-        notificationApi.getUnreadCount(),
-        messageApi.getUnreadCount()
-      ])
-      unreadNotifications.value =
-        (notifResult.status === 'fulfilled' ? (notifResult.value as { data?: number }).data : 0) ||
-        0
-      unreadMessages.value =
-        (msgResult.status === 'fulfilled' ? (msgResult.value as { data?: number }).data : 0) || 0
-    } catch (error) {
-      logger.warn('Failed to fetch unread counts', { error: (error as Error).message })
-    }
-  }
-
-  function incrementNotifications(count = 1): void {
-    unreadNotifications.value += count
-  }
-  function incrementMessages(count = 1): void {
-    unreadMessages.value += count
-  }
-
   return {
     token,
     refreshToken,
@@ -463,16 +407,11 @@ export const useAuthStore = defineStore('auth', () => {
     avatar,
     nickname,
 
-    unreadNotifications,
-    unreadMessages,
-    totalUnread,
-
     saveToStorage,
     clearStorage,
     restoreFromStorage,
     resetState,
     validateToken,
-    detectTokenTheft,
     login,
     register,
     logout,
@@ -481,10 +420,7 @@ export const useAuthStore = defineStore('auth', () => {
     updateAvatar,
     updateCoverImage,
     updateProfile,
-    changePassword,
-    fetchUnreadCounts,
-    incrementNotifications,
-    incrementMessages
+    changePassword
   }
 })
 

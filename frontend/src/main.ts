@@ -53,5 +53,14 @@ async function bootstrap() {
 
 void bootstrap().catch((error: unknown) => {
   logger.error('Application bootstrap failed', { error: (error as Error).message })
+  // 兜底挂载也必须先装路由：App.vue 的 <router-view> 在缺少路由插件时会抛错，
+  // 用户只会看到空白页而不是错误外壳。
+  try {
+    app.use(router)
+  } catch (routerError: unknown) {
+    logger.error('Router install failed during fallback mount', {
+      error: (routerError as Error).message
+    })
+  }
   app.mount('#app')
 })

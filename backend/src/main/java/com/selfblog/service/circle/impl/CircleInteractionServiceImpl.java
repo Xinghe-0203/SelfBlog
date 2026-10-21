@@ -13,6 +13,7 @@ import com.selfblog.utils.TimeUtils;
 import com.selfblog.utils.UserConverter;
 import com.selfblog.vo.circle.CircleCommentVO;
 import com.selfblog.vo.circle.CircleLikeResultVO;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Service;
@@ -25,6 +26,7 @@ import java.util.stream.Collectors;
  * 校友圈交互服务实现 — 负责点赞、评论、转发
  */
 @Service
+@Slf4j
 public class CircleInteractionServiceImpl implements CircleInteractionService {
 
     @Autowired
@@ -53,6 +55,21 @@ public class CircleInteractionServiceImpl implements CircleInteractionService {
 
     // ==================== 点赞相关方法 ====================
 
+    /**
+     * 切换点赞状态。
+     *
+     * <p><b>C19 修复说明</b>：旧实现是「先 selectOne 判断有无活跃点赞，再 delete/insert」，
+     * 并发时两个请求都会读到「无活跃点赞」，一方 insert 成功、另一方撞唯一键进入 catch；
+     * 旧 catch 又查出对手刚插入的活跃行并调用 logicalDeleteById + decrementLikeCount，
+     * 等于把赢家的点赞悄悄取消掉（结果 action=unlike，用户以为点了赞实际被取消）。</p>
+     *
+     * <p>现在改为「单条原子语句仲裁」：先尝试原子地取消活跃点赞（UPDATE ... WHERE is_deleted = 0），
+     * 受影响行数为 1 才算本次请求真的翻转成 unlike；为 0 说明当前没有活跃点赞，才进入点赞分支
+     * （表上有 UNIQUE(user_id, post_id)，所以优先恢复逻辑删除的旧行，恢复不到才插入）。
+     * 点赞分支里如果 insert 撞唯一键，说明并发的对手刚刚点赞成功，本请求是输家：
+     * <b>不碰对手的行、不动计数</b>，直接把结果回读成「已点赞」（幂等成功），
+     * 这样赢家的点赞一定存活。action 与 likeCount 全部来自受影响行数 + 重新读取。</p>
+     */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public CircleLikeResultVO toggleLike(Long postId, Long userId) {
@@ -67,25 +84,30 @@ public class CircleInteractionServiceImpl implements CircleInteractionService {
             throw new BusinessException(403, "无权操作此动态");
         }
 
-        LambdaQueryWrapper<CircleLike> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(CircleLike::getUserId, userId)
-               .eq(CircleLike::getPostId, postId)
-               .eq(CircleLike::getIsDeleted, 0);
-
-        CircleLike existingLike = circleLikeMapper.selectOne(wrapper);
-
-        if (existingLike != null) {
-            circleLikeMapper.logicalDeleteById(existingLike.getId());
+        int removed = circleLikeMapper.logicalDeleteActiveByUserAndPost(userId, postId);
+        if (removed > 0) {
+            // 原子取消成功：本次请求确实把「已点赞」翻成「未点赞」
             circlePostMapper.decrementLikeCount(postId);
             result.setAction("unlike");
         } else {
-            CircleLike newLike = new CircleLike();
-            newLike.setUserId(userId);
-            newLike.setPostId(postId);
-            try {
-                circleLikeMapper.insert(newLike);
+            // 没有活跃点赞 → 走点赞分支；先恢复旧行（唯一键要求复用同一行），恢复不到再插入
+            int restored = circleLikeMapper.logicalRestoreByUserAndPost(userId, postId);
+            boolean counted = restored > 0;
+            if (!counted) {
+                CircleLike newLike = new CircleLike();
+                newLike.setUserId(userId);
+                newLike.setPostId(postId);
+                try {
+                    circleLikeMapper.insert(newLike);
+                    counted = true;
+                } catch (DataAccessException e) {
+                    // 并发对手已插入同一行（唯一键冲突）→ 本请求是输家：
+                    // 不改对手的行、不改计数，直接回读为「已点赞」，保证赢家的点赞存活。
+                    log.info("[CircleLike] 并发点赞冲突，按幂等成功处理: postId={}, userId={}", postId, userId);
+                }
+            }
+            if (counted) {
                 circlePostMapper.incrementLikeCount(postId);
-                result.setAction("like");
                 Long postAuthorId = post.getUserId();
                 if (postAuthorId != null && !postAuthorId.equals(userId)) {
                     notificationService.sendNotification(
@@ -98,38 +120,13 @@ public class CircleInteractionServiceImpl implements CircleInteractionService {
                             postId
                     );
                 }
-            } catch (DataAccessException e) {
-                CircleLike concurrentLike = circleLikeMapper.selectOne(wrapper);
-                if (concurrentLike != null) {
-                    circleLikeMapper.logicalDeleteById(concurrentLike.getId());
-                    circlePostMapper.decrementLikeCount(postId);
-                    result.setAction("unlike");
-                } else {
-                    try {
-                        circleLikeMapper.insert(newLike);
-                        circlePostMapper.incrementLikeCount(postId);
-                        result.setAction("like");
-                    } catch (DataAccessException e2) {
-                        // 二次并发冲突：重新查询确认实际状态并执行对应操作
-                        CircleLike finalLike = circleLikeMapper.selectOne(wrapper);
-                        if (finalLike != null) {
-                            // 活跃点赞存在 → 取消点赞
-                            circleLikeMapper.logicalDeleteById(finalLike.getId());
-                            circlePostMapper.decrementLikeCount(postId);
-                            result.setAction("unlike");
-                        } else {
-                            // 无活跃点赞 → 重新插入
-                            circleLikeMapper.insert(newLike);
-                            circlePostMapper.incrementLikeCount(postId);
-                            result.setAction("like");
-                        }
-                    }
-                }
             }
+            result.setAction("like");
         }
 
         CirclePost updatedPost = circlePostMapper.selectById(postId);
-        result.setLikeCount(updatedPost != null ? updatedPost.getLikeCount() : 0);
+        result.setLikeCount(updatedPost != null && updatedPost.getLikeCount() != null
+                ? updatedPost.getLikeCount() : 0);
         return result;
     }
 

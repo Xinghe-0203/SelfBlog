@@ -2,6 +2,7 @@
  * 路由守卫
  */
 import type { Router } from 'vue-router'
+import { isNavigationFailure, NavigationFailureType } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { useLogger } from '@/utils/logger'
 import { toast } from '@/utils/toast'
@@ -41,18 +42,9 @@ export function setupGuards(router: Router): void {
       }
     }
 
-    if (to.meta.requiresAdmin) {
-      if (!userStore.isLoggedIn)
-        return { path: siteStore.adminRoot, query: { redirect: to.fullPath } }
-      if (!userStore.isAdmin) {
-        logger.warn('Admin access denied', { userId: userStore.user?.id })
-        toast.error('无管理员权限')
-        return { name: 'Home' }
-      }
-    }
-
-    if (to.meta.guest && userStore.isLoggedIn) {
-      toast.info('您已登录')
+    if (to.meta.requiresAdmin && !userStore.isAdmin) {
+      logger.warn('Admin access denied', { userId: userStore.user?.id })
+      toast.error('无管理员权限')
       return { name: 'Home' }
     }
   })
@@ -69,11 +61,11 @@ export function setupGuards(router: Router): void {
     toast.error('页面导航失败，请重试')
   })
 
-  router.afterEach((to, from) => {
+  // afterEach 的成功导航是常态；只有真正的导航失败（重复导航除外）才值得告警。
+  router.afterEach((to, _from, failure) => {
     logger.debug('Navigation completed', { to: to.path })
-
-    if (from.name && to.path === from.path && to.hash !== from.hash) {
-      logger.warn('Navigation aborted or failed', { from: from.fullPath, to: to.fullPath })
+    if (failure && !isNavigationFailure(failure, NavigationFailureType.duplicated)) {
+      logger.warn('Navigation failed', { to: to.fullPath, failure: String(failure) })
     }
   })
 }

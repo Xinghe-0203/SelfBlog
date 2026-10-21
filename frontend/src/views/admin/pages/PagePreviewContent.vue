@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { computed, defineAsyncComponent, onMounted, provide, ref, toRef } from 'vue'
+import { computed, defineAsyncComponent, onMounted, provide, ref, toRef, watch } from 'vue'
 import { pagePreviewKey } from '@/composables/usePageConfig'
 import { postApi } from '@/api/post'
 import { tagApi } from '@/api/tag'
+import { useLatestRequest } from '@/composables/useLatestRequest'
 import ContentPageView from '@/components/pages/ContentPageView.vue'
 import type { PageConfig } from '@/types/page'
 const props = defineProps<{
@@ -15,6 +16,8 @@ const articleId = ref('')
 const tagId = ref('')
 const ready = ref(props.id !== 'post' && props.id !== 'tag')
 const error = ref('')
+/** 切换预览目标会让上一次的示例数据请求过期，只有最后一次的响应可以写回。 */
+const beginExampleRequest = useLatestRequest().begin
 provide(pagePreviewKey, { id: props.id, config: toRef(props, 'config'), articleId, tagId })
 const views = {
   home: defineAsyncComponent(() => import('@/views/Home.vue')),
@@ -28,18 +31,23 @@ const views = {
 }
 const view = computed(() => views[props.id as keyof typeof views])
 async function loadExample() {
+  const isLatest = beginExampleRequest()
   error.value = ''
   try {
     if (props.id === 'post') {
-      const post = (await postApi.getPostList({ pageNum: 1, pageSize: 1, sort: 'latest' })).data
-        .records[0]
+      const records = (await postApi.getPostList({ pageNum: 1, pageSize: 1, sort: 'latest' })).data
+        ?.records
+      const post = (records ?? [])[0]
+      if (!isLatest()) return
       if (!post) {
         error.value = '还没有公开文章，发布一篇文章后即可预览这个模板。'
         return
       }
       articleId.value = String(post.id)
     } else if (props.id === 'tag') {
-      const tag = (await tagApi.getTagList()).data[0]
+      const tags = (await tagApi.getTagList()).data ?? []
+      const tag = tags[0]
+      if (!isLatest()) return
       if (!tag) {
         error.value = '还没有标签，创建标签后即可预览这个模板。'
         return
@@ -48,9 +56,21 @@ async function loadExample() {
     }
     ready.value = true
   } catch {
+    if (!isLatest()) return
     error.value = '真实预览数据暂时无法加载，请重试。'
   }
 }
+// 预览目标一旦切换，必须丢弃上一次的示例数据与 ready 标记，否则会复用旧文章/旧标签。
+watch(
+  () => props.id,
+  (id) => {
+    articleId.value = ''
+    tagId.value = ''
+    error.value = ''
+    ready.value = id !== 'post' && id !== 'tag'
+    if (!ready.value) void loadExample()
+  }
+)
 onMounted(() => {
   if (!ready.value) void loadExample()
 })

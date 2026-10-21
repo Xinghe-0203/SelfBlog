@@ -221,6 +221,11 @@ const deleteTag = async (tag: any) => {
     await adminApi.deleteTag(tag.id)
     tags.value = tags.value.filter((t) => t.id !== tag.id)
     toast.success('删除成功')
+    // 删掉当前页最后一条后必须回到上一页并重新拉取，否则分页器会停在一个已不存在的页码上。
+    if (tags.value.length === 0 && currentPage.value > 1) {
+      currentPage.value -= 1
+    }
+    await fetchTags()
   } catch (err: any) {
     logger.error('Failed to delete tag', { error: err.message })
     toast.error('删除失败')
@@ -228,6 +233,7 @@ const deleteTag = async (tag: any) => {
 }
 
 const changePage = (page: number) => {
+  if (page < 1 || page > totalPages.value) return
   currentPage.value = page
   fetchTags()
 }

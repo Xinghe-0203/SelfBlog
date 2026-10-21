@@ -159,8 +159,10 @@ public class BlogPostServiceImpl extends ServiceImpl<BlogPostMapper, BlogPost> i
     }
 
     @Override
+    @CacheEvict(value = {CaffeineCacheConfig.TRENDING_CACHE, CaffeineCacheConfig.STATS_CACHE}, allEntries = true)
     @Transactional(rollbackFor = Exception.class)
     public Long createPost(PostCreateRequest request, Long userId) {
+        // 两参重载若只靠三参方法上的注解，内部调用属于自调用，注解不会生效，故此处同样声明驱逐
         return createPost(request, userId, false);
     }
 
@@ -180,6 +182,11 @@ public class BlogPostServiceImpl extends ServiceImpl<BlogPostMapper, BlogPost> i
         String sanitizedTitle = htmlSanitizer.sanitizeRichText(request.getTitle());
         String sanitizedSummary = htmlSanitizer.sanitizeRichText(request.getSummary());
         String sanitizedContent = htmlSanitizer.sanitizeMarkdown(request.getContent());
+
+        // 是否提交了标签载荷：null 表示“本次不修改标签”，空列表表示“清空全部标签”。
+        // 必须与“没提交”区分开——旧实现无条件先删 blog_post_tag 再判断 tagIds 是否为空，
+        // 于是任何省略标签的局部更新（例如只改标题）都会静默清掉该文章的全部标签。
+        boolean tagPayloadPresent = request.getTagIds() != null || request.getTagNames() != null;
 
         List<Long> tagIds = resolveTagIds(request.getTagIds(), request.getTagNames());
         if (tagIds != null && !tagIds.isEmpty()) {
@@ -231,18 +238,23 @@ public class BlogPostServiceImpl extends ServiceImpl<BlogPostMapper, BlogPost> i
 
         this.updateById(post);
 
-        LambdaQueryWrapper<BlogPostTag> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(BlogPostTag::getPostId, post.getId());
-        blogPostTagMapper.delete(wrapper);
+        if (tagPayloadPresent) {
+            // 只有请求确实带了标签载荷才重建关联：null = 保持原标签不变，[] = 清空。
+            LambdaQueryWrapper<BlogPostTag> wrapper = new LambdaQueryWrapper<>();
+            wrapper.eq(BlogPostTag::getPostId, post.getId());
+            blogPostTagMapper.delete(wrapper);
 
-        if (tagIds != null && !tagIds.isEmpty()) {
-            savePostTags(post.getId(), tagIds);
+            if (tagIds != null && !tagIds.isEmpty()) {
+                savePostTags(post.getId(), tagIds);
+            }
         }
     }
 
     @Override
+    @CacheEvict(value = {CaffeineCacheConfig.TRENDING_CACHE, CaffeineCacheConfig.STATS_CACHE, CaffeineCacheConfig.CATEGORY_CACHE}, allEntries = true)
     @Transactional(rollbackFor = Exception.class)
     public void updatePost(PostCreateRequest request, Long userId) {
+        // 两参重载若只靠三参方法上的注解，内部调用属于自调用，注解不会生效，故此处同样声明驱逐
         updatePost(request, userId, false);
     }
 
@@ -261,20 +273,15 @@ public class BlogPostServiceImpl extends ServiceImpl<BlogPostMapper, BlogPost> i
             throw new BusinessException(403, "无权删除此文章");
         }
 
+        // 先重置计数再软删除：MyBatis-Plus 的逻辑删除会给 UPDATE 追加 AND is_deleted = 0，
+        // 软删除之后再更新这些列会匹配 0 行（静默失效）。文章即将删除，五个计数一并清零。
+        this.update().set("like_count", 0).set("collect_count", 0)
+                .set("comment_count", 0).set("share_count", 0).set("view_count", 0)
+                .eq("id", postId).update();
+
         this.removeById(postId);
 
-        // 清理点赞和收藏记录，并重置计数
-        blogLikeMapper.update(null, new LambdaUpdateWrapper<BlogLike>()
-                .eq(BlogLike::getPostId, postId)
-                .set(BlogLike::getIsDeleted, 1));
-        blogCollectMapper.update(null, new LambdaUpdateWrapper<BlogCollect>()
-                .eq(BlogCollect::getPostId, postId)
-                .set(BlogCollect::getIsDeleted, 1));
-        this.update().set("like_count", 0).set("collect_count", 0).eq("id", postId).update();
-
-        LambdaQueryWrapper<BlogPostTag> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(BlogPostTag::getPostId, postId);
-        blogPostTagMapper.delete(wrapper);
+        cascadeSoftDeletePostChildren(postId);
 
         // 更新关联话题的计数
         if (post.getTopicIds() != null && !post.getTopicIds().isEmpty()) {
@@ -286,9 +293,36 @@ public class BlogPostServiceImpl extends ServiceImpl<BlogPostMapper, BlogPost> i
         log.info("文章删除成功: postId={}, userId={}, title={}", postId, userId, post.getTitle());
     }
 
+    /**
+     * 级联软删除文章的子表行：标签关联、评论、点赞、收藏。
+     *
+     * <p>作者删除与管理员删除必须走同一条级联：旧实现只有 {@code adminDeletePost} 清理
+     * {@code blog_comment}，作者自删的文章会留下指向已删除文章的活跃评论行，
+     * 统计类查询会一直把它们算进去（F-14）。
+     */
+    private void cascadeSoftDeletePostChildren(Long postId) {
+        LambdaQueryWrapper<BlogPostTag> tagWrapper = new LambdaQueryWrapper<>();
+        tagWrapper.eq(BlogPostTag::getPostId, postId);
+        blogPostTagMapper.delete(tagWrapper);
+
+        blogCommentMapper.update(null, new LambdaUpdateWrapper<BlogComment>()
+                .eq(BlogComment::getPostId, postId)
+                .set(BlogComment::getIsDeleted, 1));
+
+        blogLikeMapper.update(null, new LambdaUpdateWrapper<BlogLike>()
+                .eq(BlogLike::getPostId, postId)
+                .set(BlogLike::getIsDeleted, 1));
+
+        blogCollectMapper.update(null, new LambdaUpdateWrapper<BlogCollect>()
+                .eq(BlogCollect::getPostId, postId)
+                .set(BlogCollect::getIsDeleted, 1));
+    }
+
     @Override
+    @CacheEvict(value = {CaffeineCacheConfig.TRENDING_CACHE, CaffeineCacheConfig.STATS_CACHE, CaffeineCacheConfig.CATEGORY_CACHE}, allEntries = true)
     @Transactional(rollbackFor = Exception.class)
     public void deletePost(Long postId, Long userId) {
+        // 两参重载若只靠三参方法上的注解，内部调用属于自调用，注解不会生效，故此处同样声明驱逐
         deletePost(postId, userId, false);
     }
 
@@ -385,12 +419,14 @@ public class BlogPostServiceImpl extends ServiceImpl<BlogPostMapper, BlogPost> i
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void deleteDraft(Long draftId, Long userId) {
+        // 草稿不参与任何具名缓存，三参重载也没有 @CacheEvict，这里无需重复声明
         deleteDraft(draftId, userId, false);
     }
 
     // ==================== 管理员操作 ====================
 
     @Override
+    @CacheEvict(value = {CaffeineCacheConfig.TRENDING_CACHE, CaffeineCacheConfig.STATS_CACHE, CaffeineCacheConfig.CATEGORY_CACHE}, allEntries = true)
     @Transactional(rollbackFor = Exception.class)
     public void adminDeletePost(Long postId, Long adminId) {
         BlogPost post = this.getById(postId);
@@ -401,26 +437,17 @@ public class BlogPostServiceImpl extends ServiceImpl<BlogPostMapper, BlogPost> i
             throw new BusinessException(404, "文章不存在");
         }
 
+        // 先重置计数再软删除：MyBatis-Plus 的逻辑删除会给 UPDATE 追加 AND is_deleted = 0，
+        // 软删除之后再更新这些列会匹配 0 行（静默失效）。文章即将删除，五个计数一并清零。
+        this.update().set("like_count", 0).set("collect_count", 0)
+                .set("comment_count", 0).set("share_count", 0).set("view_count", 0)
+                .eq("id", postId).update();
+
         this.update().set("is_deleted", 1).eq("id", postId).update();
 
-        LambdaQueryWrapper<BlogPostTag> tagWrapper = new LambdaQueryWrapper<>();
-        tagWrapper.eq(BlogPostTag::getPostId, postId);
-        blogPostTagMapper.delete(tagWrapper);
+        cascadeSoftDeletePostChildren(postId);
 
-        blogCommentMapper.update(null, new LambdaUpdateWrapper<BlogComment>()
-                .eq(BlogComment::getPostId, postId)
-                .set(BlogComment::getIsDeleted, 1));
-
-        blogLikeMapper.update(null, new LambdaUpdateWrapper<BlogLike>()
-                .eq(BlogLike::getPostId, postId)
-                .set(BlogLike::getIsDeleted, 1));
-
-        blogCollectMapper.update(null, new LambdaUpdateWrapper<BlogCollect>()
-                .eq(BlogCollect::getPostId, postId)
-                .set(BlogCollect::getIsDeleted, 1));
-
-        // 重置文章的点赞和收藏计数
-        this.update().set("like_count", 0).set("collect_count", 0).eq("id", postId).update();
+        // 计数已在软删除之前清零（见上），此处不再重复更新：软删除后的 UPDATE 会被追加 is_deleted = 0 而匹配 0 行
 
         // 更新关联话题的计数
         if (post.getTopicIds() != null && !post.getTopicIds().isEmpty()) {
@@ -433,6 +460,7 @@ public class BlogPostServiceImpl extends ServiceImpl<BlogPostMapper, BlogPost> i
     }
 
     @Override
+    @CacheEvict(value = {CaffeineCacheConfig.TRENDING_CACHE, CaffeineCacheConfig.STATS_CACHE, CaffeineCacheConfig.CATEGORY_CACHE}, allEntries = true)
     @Transactional(rollbackFor = Exception.class)
     public void approvePost(Long postId, Long reviewerId) {
         BlogPost post = this.getById(postId);
@@ -462,6 +490,7 @@ public class BlogPostServiceImpl extends ServiceImpl<BlogPostMapper, BlogPost> i
     }
 
     @Override
+    @CacheEvict(value = {CaffeineCacheConfig.TRENDING_CACHE, CaffeineCacheConfig.STATS_CACHE, CaffeineCacheConfig.CATEGORY_CACHE}, allEntries = true)
     @Transactional(rollbackFor = Exception.class)
     public void rejectPost(Long postId, Long reviewerId, String reason) {
         if (reason == null || reason.trim().isEmpty()) {
@@ -599,6 +628,12 @@ public class BlogPostServiceImpl extends ServiceImpl<BlogPostMapper, BlogPost> i
     @Transactional(rollbackFor = Exception.class)
     public void decrementCommentCount(Long postId, int count) {
         postInteractionService.decrementCommentCount(postId, count);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void syncCommentCount(Long postId) {
+        postInteractionService.syncCommentCount(postId);
     }
 
     @Override

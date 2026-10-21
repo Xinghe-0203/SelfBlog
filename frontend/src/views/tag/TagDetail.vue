@@ -9,6 +9,7 @@ import type { Post, Tag } from '@/types'
 import PageFrame from '@/components/pages/PageFrame.vue'
 import { usePageConfig } from '@/composables/usePageConfig'
 import { usePageSeo } from '@/composables/usePageSeo'
+import { useLatestRequest } from '@/composables/useLatestRequest'
 const { config, text, module: showModule, preview } = usePageConfig('tag')
 
 const route = useRoute()
@@ -28,8 +29,11 @@ usePageSeo('tag', () => ({
 const pageSize = 12
 
 const hasMore = computed(() => currentPage.value < totalPages.value)
+/** 切换标签与「加载更多」都会发请求：只有最后一次的响应可以写状态。 */
+const beginTagRequest = useLatestRequest().begin
 
 const fetchTag = async () => {
+  const isLatest = beginTagRequest()
   loading.value = true
   error.value = ''
   try {
@@ -38,6 +42,7 @@ const fetchTag = async () => {
       tagApi.getTagById(tagId),
       postApi.advancedSearch({ tagId, pageNum: 1, pageSize })
     ])
+    if (!isLatest()) return
     tag.value = tagResponse.data || null
     const data = postResponse.data || {}
     posts.value = data.records || []
@@ -45,16 +50,18 @@ const fetchTag = async () => {
     totalPages.value = Math.max(1, data.pages || 1)
     totalPosts.value = data.total || 0
   } catch {
+    if (!isLatest()) return
     tag.value = null
     posts.value = []
     error.value = '标签不存在，或文章列表暂时无法加载。'
   } finally {
-    loading.value = false
+    if (isLatest()) loading.value = false
   }
 }
 
 const loadMore = async () => {
   if (!hasMore.value || loading.value) return
+  const isLatest = beginTagRequest()
   loading.value = true
   try {
     const nextPage = currentPage.value + 1
@@ -63,15 +70,17 @@ const loadMore = async () => {
       pageNum: nextPage,
       pageSize
     })
+    if (!isLatest()) return
     const data = response.data || {}
     posts.value.push(...(data.records || []))
     currentPage.value = nextPage
     totalPages.value = Math.max(1, data.pages || totalPages.value)
     totalPosts.value = data.total || totalPosts.value
   } catch {
+    if (!isLatest()) return
     error.value = '更多文章暂时无法加载，请重试。'
   } finally {
-    loading.value = false
+    if (isLatest()) loading.value = false
   }
 }
 

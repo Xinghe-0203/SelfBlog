@@ -36,10 +36,16 @@ export function useScrollState(threshold = 16): ScrollState {
     lastY = y
   }
 
+  /** 已排队的帧 id；0 表示没有待处理的帧。 */
+  let frame = 0
+
   const onScroll = (): void => {
     if (ticking) return
     ticking = true
-    requestAnimationFrame(update)
+    frame = requestAnimationFrame(() => {
+      frame = 0
+      update()
+    })
   }
 
   onMounted(() => {
@@ -50,6 +56,12 @@ export function useScrollState(threshold = 16): ScrollState {
 
   onUnmounted(() => {
     window.removeEventListener('scroll', onScroll)
+    // 卸载时可能还有一帧没跑：不取消就会在组件销毁后继续读 scrollY 并写 ref。
+    if (frame) {
+      cancelAnimationFrame(frame)
+      frame = 0
+    }
+    ticking = false
   })
 
   return { scrolled, direction }

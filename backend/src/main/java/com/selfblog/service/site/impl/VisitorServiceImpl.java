@@ -12,6 +12,7 @@ import com.selfblog.mapper.BlogPostMapper;
 import com.selfblog.mapper.VisitorEventMapper;
 import com.selfblog.service.site.SiteSettingsService;
 import com.selfblog.service.site.VisitorService;
+import com.selfblog.utils.LogUtils;
 import com.selfblog.utils.VisitorHashUtils;
 import com.selfblog.vo.site.VisitorRecordVO;
 import com.selfblog.vo.site.VisitorSummaryVO;
@@ -40,7 +41,12 @@ public class VisitorServiceImpl implements VisitorService {
     private final BlogPostMapper postMapper;
     private final SiteSettingsService settingsService;
 
-    @Value("${JWT_SECRET:local-visitor-hash}")
+    /**
+     * 访客/IP 伪名化密钥（S7）。此前是 {@code ${JWT_SECRET:local-visitor-hash}}：既复用 JWT
+     * 签名密钥，又在缺失时静默退化成一个人人可见的常量。现在由
+     * {@code app.visitor-hash-secret}（默认回落 JWT_SECRET）提供。
+     */
+    @Value("${app.visitor-hash-secret:}")
     private String hashSecret;
 
     public VisitorServiceImpl(VisitorEventMapper visitorMapper, BlogPostMapper postMapper, SiteSettingsService settingsService) {
@@ -57,7 +63,10 @@ public class VisitorServiceImpl implements VisitorService {
         String pagePath = cleanPath(request.getPath());
         String clientId = request.getVisitorId().trim();
         if (!clientId.matches("[A-Za-z0-9_-]{8,80}")) throw new BusinessException(400, "访客标识无效");
-        String ip = httpRequest.getRemoteAddr() == null ? "unknown" : httpRequest.getRemoteAddr();
+        // 与限流/审计同源：只用 LogUtils.getClientIp，它在可信代理下解析
+        // X-Forwarded-For，否则回退到 remoteAddr。此前直接用 getRemoteAddr()，
+        // 反向代理后记录到的是代理地址，与限流计数归属的 IP 不一致。
+        String ip = LogUtils.getClientIp(httpRequest);
         String visitorHash = VisitorHashUtils.hash(clientId, hashSecret);
 
         // Avoid writing duplicate events caused by fast refreshes or duplicate route hooks.

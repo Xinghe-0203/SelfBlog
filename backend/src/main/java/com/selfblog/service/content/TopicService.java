@@ -61,4 +61,27 @@ public interface TopicService extends IService<Topic> {
      * @return 匹配的话题列表
      */
     List<Topic> searchTopics(String keyword);
+
+    /**
+     * 更新话题（仅管理员）
+     * @param id 话题ID
+     * @param name 新名称，null 表示不修改
+     * @param description 新描述，null 表示不修改
+     * @param status 新状态，null 表示不修改
+     * @return 更新后的话题
+     */
+    Topic updateTopic(Long id, String name, String description, Integer status);
+
+    /**
+     * 删除话题（仅管理员）
+     * @param id 话题ID
+     */
+    void deleteTopic(Long id);
+
+    /**
+     * 切换话题状态（仅管理员）
+     * @param id 话题ID
+     * @param status 目标状态，只能是 0 或 1
+     */
+    void toggleStatus(Long id, Integer status);
 }

@@ -2,7 +2,7 @@
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
-import { enhanceMarkdown } from '@/composables/useMarkdownEnhance'
+import { enhanceMarkdown, disposeMarkdownEnhance } from '@/composables/useMarkdownEnhance'
 const props = defineProps<{ source: string }>()
 const root = ref<HTMLElement | null>(null)
 let active = true
@@ -17,12 +17,16 @@ watch(
   html,
   async () => {
     await nextTick()
-    if (active && root.value) enhanceMarkdown(root.value)
+    if (!active || !root.value) return
+    // 旧正文的复制按钮即将随 v-html 一起被丢弃，先释放它排队的回退定时器
+    disposeMarkdownEnhance(root.value)
+    enhanceMarkdown(root.value)
   },
   { immediate: true }
 )
 onBeforeUnmount(() => {
   active = false
+  if (root.value) disposeMarkdownEnhance(root.value)
 })
 </script>
 <template><div ref="root" class="markdown-body page-markdown" v-html="html" /></template>

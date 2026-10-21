@@ -15,6 +15,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -44,6 +45,9 @@ class CircleQueryServiceImplTest {
 
     @Autowired
     private SysUserMapper sysUserMapper;
+
+    @Autowired
+    private JdbcTemplate jdbc;
 
     private SysUser userA;
     private CirclePost publicPost;
@@ -125,6 +129,18 @@ class CircleQueryServiceImplTest {
         assertNotNull(detail);
         assertEquals(publicPost.getId(), detail.getId());
         assertEquals("公开动态", detail.getContent());
+    }
+
+    @Test
+    @DisplayName("获取动态详情 - view_count 为 NULL 不抛 NPE 且计数递增")
+    void getPostDetail_NullViewCountDoesNotThrow() {
+        // view_count 列允许为 NULL，历史数据里存在 NULL；直接拆箱会 NPE
+        jdbc.update("UPDATE blog_circle_post SET view_count = NULL WHERE id = ?", publicPost.getId());
+
+        CirclePostVO detail = circleQueryService.getPostDetail(publicPost.getId(), userA.getId());
+
+        assertNotNull(detail, "NULL 浏览量不能让详情接口失败");
+        assertEquals(1L, detail.getViewCount(), "NULL 视为 0 后再 +1");
     }
 
     @Test

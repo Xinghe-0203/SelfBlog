@@ -14,7 +14,7 @@ import { estimateReadMinutes } from '@/utils/reading'
 import { useUserStore } from '@/stores/user'
 import { useSiteStore } from '@/stores/site'
 import { usePageSeo } from '@/composables/usePageSeo'
-import { enhanceMarkdown } from '@/composables/useMarkdownEnhance'
+import { enhanceMarkdown, disposeMarkdownEnhance } from '@/composables/useMarkdownEnhance'
 import { toast } from '@/utils/toast'
 import ImagePreview from '@/components/common/ImagePreview.vue'
 import MobileTocSheet from '@/components/post/MobileTocSheet.vue'
@@ -22,6 +22,8 @@ import Icon from '@/components/common/Icon.vue'
 import type { Post } from '@/types'
 import PageFrame from '@/components/pages/PageFrame.vue'
 import { usePageConfig } from '@/composables/usePageConfig'
+import { useLatestRequest } from '@/composables/useLatestRequest'
+import { STORAGE_KEY_PREFIX } from '@/constants'
 const { config, text, module: showModule, isPreview, preview } = usePageConfig('post')
 
 interface TocItem {
@@ -64,6 +66,8 @@ const likeInfo = ref<AnonymousLike>({ liked: false, likeCount: 0 })
 const comments = ref<GuestComment[]>([])
 const commentsTotal = ref(0)
 const commentPage = ref(1)
+const commentsLoading = ref(false)
+const commentsError = ref('')
 const commentNickname = ref('访客')
 const commentContent = ref('')
 const submittingComment = ref(false)
@@ -72,6 +76,11 @@ const liking = ref(false)
 const contentImages = ref<string[]>([])
 const previewVisible = ref(false)
 const previewIndex = ref(0)
+
+/** 正文及其附属数据（相邻文章 / 点赞状态）共用一条令牌：切换文章后旧响应不得写回。 */
+const beginPostRequest = useLatestRequest().begin
+/** 留言单独一条令牌：翻页与切换文章互不干扰。 */
+const beginCommentRequest = useLatestRequest().begin
 
 const renderedContent = computed(() => {
   if (!post.value?.content) return ''
@@ -111,11 +120,13 @@ const lastUpdated = computed(() => {
 })
 
 const fetchPost = async () => {
+  const isLatest = beginPostRequest()
   loading.value = true
   error.value = ''
   post.value = null
   try {
     const response = await postApi.getPostById(preview?.articleId?.value || String(route.params.id))
+    if (!isLatest()) return
     if (!response.data) {
       error.value = '文章不存在或已被删除。'
       return
@@ -124,38 +135,44 @@ const fetchPost = async () => {
     comments.value = []
     commentsTotal.value = 0
     commentPage.value = 1
+    commentsError.value = ''
     likeInfo.value = { liked: false, likeCount: response.data.likeCount || 0 }
-    void loadLikeStatus()
-    void loadAdjacent()
+    void loadLikeStatus(isLatest)
+    void loadAdjacent(isLatest)
     if (siteStore.isCommentsEnabled) void loadComments()
   } catch (err: unknown) {
+    if (!isLatest()) return
     const status = (err as { response?: { status?: number } }).response?.status
     if (status === 404) error.value = '文章不存在或已被删除。'
     else if (status === 403) error.value = '当前账号无权查看这篇文章。'
     else error.value = '文章暂时无法加载，请稍后重试。'
   } finally {
-    loading.value = false
+    if (isLatest()) loading.value = false
   }
 }
 
 /**
- * 相邻文章只是阅读辅助，取不到时不该影响正文展示，因此失败静默处理。
+ * 相邻文章 / 点赞状态跟着正文走：共用 fetchPost 的令牌，切换文章后旧响应不得写回；
+ * 取不到时静默处理，不影响正文展示。
  */
-async function loadAdjacent() {
+async function loadAdjacent(isLatest: () => boolean) {
   const id = post.value?.id
   if (!id) return
   try {
     const response = await postApi.getAdjacentPosts(id)
+    if (!isLatest()) return
     adjacent.value = response.data || { prev: null, next: null }
   } catch {
+    if (!isLatest()) return
     adjacent.value = { prev: null, next: null }
   }
 }
 
-async function loadLikeStatus() {
+async function loadLikeStatus(isLatest: () => boolean) {
   if (!post.value) return
   try {
     const response = await publicInteractionApi.getLikeStatus(Number(post.value.id))
+    if (!isLatest()) return
     if (response.data) likeInfo.value = response.data
   } catch {
     // Keep the article's existing like total visible if anonymous state is unavailable.
@@ -177,21 +194,32 @@ async function toggleAnonymousLike() {
 
 async function loadComments(append = false) {
   if (!post.value || !siteStore.isCommentsEnabled) return
+  const requestPage = append ? commentPage.value + 1 : commentPage.value
+  const isLatest = beginCommentRequest()
+  commentsLoading.value = true
+  commentsError.value = ''
   try {
     const response = await publicInteractionApi.getComments(Number(post.value.id), {
-      pageNum: commentPage.value,
+      pageNum: requestPage,
       pageSize: 10
     })
+    if (!isLatest()) return
     const records = response.data?.records || []
     comments.value = append ? [...comments.value, ...records] : records
     commentsTotal.value = response.data?.total || 0
+    // 只有新一页真的到手才推进页码；失败时停留原页，重试不会跳过这一页。
+    commentPage.value = requestPage
   } catch {
-    comments.value = []
+    if (!isLatest()) return
+    // 失败时保留已加载的留言：清空列表会把「加载更多失败」变成「留言全没了」。
+    commentsError.value = '留言暂时无法加载，请稍后重试。'
+  } finally {
+    if (isLatest()) commentsLoading.value = false
   }
 }
 
 async function loadMoreComments() {
-  commentPage.value += 1
+  if (commentsLoading.value) return
   await loadComments(true)
 }
 
@@ -207,7 +235,7 @@ async function submitComment() {
   try {
     await publicInteractionApi.createComment({ postId: Number(post.value.id), nickname, content })
     try {
-      localStorage.setItem('selfblog-comment-name', nickname)
+      localStorage.setItem(STORAGE_KEY_PREFIX + 'comment-name', nickname)
     } catch {
       /* storage is optional */
     }
@@ -277,7 +305,11 @@ watch(
     await setHeadingIds()
     // 标题 id 必须先落地：锚点 href 指向 #section-N，灯箱索引也依赖增强后的结构。
     // 增强加工的是真实 DOM，所以放在 v-html 渲染完成（nextTick）之后。
-    if (contentRef.value) contentImages.value = enhanceMarkdown(contentRef.value)
+    if (contentRef.value) {
+      // 旧正文的复制按钮随 v-html 一起被丢弃，先释放它排队的回退定时器
+      disposeMarkdownEnhance(contentRef.value)
+      contentImages.value = enhanceMarkdown(contentRef.value)
+    }
     observeHeadings()
   }
 )
@@ -336,7 +368,11 @@ watch(() => route.params.id, fetchPost)
 
 onMounted(() => {
   try {
-    commentNickname.value = localStorage.getItem('selfblog-comment-name') || '访客'
+    // 旧版本用的是无前缀的裸键：一次性回退读取，避免老访客丢掉已保存的昵称。
+    commentNickname.value =
+      localStorage.getItem(STORAGE_KEY_PREFIX + 'comment-name') ||
+      localStorage.getItem('selfblog-comment-name') ||
+      '访客'
   } catch {
     /* storage is optional */
   }
@@ -348,6 +384,7 @@ onUnmounted(() => {
   window.removeEventListener('scroll', scheduleReadingProgress)
   if (progressFrame) cancelAnimationFrame(progressFrame)
   headingObserver?.disconnect()
+  if (contentRef.value) disposeMarkdownEnhance(contentRef.value)
 })
 </script>
 
@@ -501,14 +538,18 @@ onUnmounted(() => {
               </div>
             </article>
           </div>
-          <p v-else class="no-comments">还没有留言，欢迎成为第一个留言的人。</p>
+          <p v-if="commentsError" class="comments-error" role="alert">{{ commentsError }}</p>
+          <p v-else-if="!comments.length" class="no-comments">
+            还没有留言，欢迎成为第一个留言的人。
+          </p>
           <button
             v-if="comments.length < commentsTotal"
             class="load-more-comments"
             type="button"
+            :disabled="commentsLoading"
             @click="loadMoreComments"
           >
-            加载更多留言
+            {{ commentsLoading ? '正在加载…' : '加载更多留言' }}
           </button>
         </section>
 
@@ -721,13 +762,6 @@ onUnmounted(() => {
 .comments-heading {
   margin-bottom: 18px;
 }
-.comments-heading .eyebrow {
-  margin: 0 0 6px;
-  color: var(--primary);
-  font-size: var(--text-2xs);
-  font-weight: 700;
-  letter-spacing: 0.15em;
-}
 .comments-heading h2 {
   margin: 0;
   font: 700 1.5rem var(--font-display);
@@ -833,6 +867,13 @@ onUnmounted(() => {
 .no-comments {
   padding: 23px 0;
   color: var(--text-muted);
+  font-size: var(--text-sm);
+  text-align: center;
+}
+.comments-error {
+  margin: 0;
+  padding: 12px 0;
+  color: var(--danger);
   font-size: var(--text-sm);
   text-align: center;
 }
@@ -1125,9 +1166,6 @@ onUnmounted(() => {
   padding: 17px 0;
   border-top: 1px solid var(--border-solid);
   border-bottom: 1px solid var(--border-solid);
-}
-.toc-card .eyebrow {
-  margin-bottom: 6px;
 }
 .toc-card h2 {
   margin: 0 0 11px;

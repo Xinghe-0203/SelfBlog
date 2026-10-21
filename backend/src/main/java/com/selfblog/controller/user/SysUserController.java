@@ -283,6 +283,12 @@ public class SysUserController {
         }
         // 允许相对路径（本地上传）和绝对URL（CDN）
         if (url.startsWith("/")) {
+            // S13：只接受站内绝对路径。「//evil.com/x」是协议相对 URL，浏览器会把它当作
+            // 指向 evil.com 的外部地址；「/\evil.com」在部分解析器里等价。两者都必须拒绝，
+            // 否则前面的 http(s) 校验与域名白名单可以被完全绕过。
+            if (url.startsWith("//") || url.startsWith("/\\") || url.startsWith("/%2F") || url.startsWith("/%2f")) {
+                throw new BusinessException(400, fieldName + "格式无效");
+            }
             return;
         }
         if (!url.startsWith("http://") && !url.startsWith("https://")) {

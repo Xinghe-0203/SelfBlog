@@ -13,6 +13,7 @@ import com.selfblog.mapper.CirclePostMapper;
 import com.selfblog.mapper.SysUserMapper;
 import com.selfblog.service.circle.CircleService;
 import com.selfblog.utils.SecurityUtils;
+import com.selfblog.utils.SqlLikeUtils;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.constraints.Max;
@@ -52,7 +53,8 @@ public class AdminCircleController {
         LambdaQueryWrapper<CirclePost> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(CirclePost::getIsDeleted, 0);
         if (StrUtil.isNotBlank(keyword)) {
-            wrapper.like(CirclePost::getContent, keyword.trim());
+            wrapper.apply("content LIKE {0}" + SqlLikeUtils.ESCAPE_CLAUSE,
+                    SqlLikeUtils.containsPattern(keyword.trim()));
         }
         if (userId != null) {
             wrapper.eq(CirclePost::getUserId, userId);

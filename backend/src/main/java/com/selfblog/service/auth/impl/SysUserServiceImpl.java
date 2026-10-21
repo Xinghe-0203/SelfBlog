@@ -42,6 +42,12 @@ import java.util.function.Supplier;
 @Service
 public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> implements SysUserService {
 
+    /**
+     * S4：账号不可用（已禁用或仍处于锁定）时统一使用的中性文案。
+     * 不区分两种原因，避免向调用方泄露账号状态。
+     */
+    private static final String ACCOUNT_UNAVAILABLE_MESSAGE = "该账号当前不可用，请联系管理员";
+
     @Autowired
     private SecurityProperties securityProperties;
 
@@ -82,6 +88,18 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
             this.transactionTemplate = template;
         }
         return template.execute(status -> action.get());
+    }
+
+    /**
+     * S4：清空登录失败计数与锁定时间。必须在调用方的写事务内执行（本方法不加事务注解）。
+     *
+     * @param userId 目标用户
+     */
+    private void clearLoginLockout(Long userId) {
+        this.update(new LambdaUpdateWrapper<SysUser>()
+                .eq(SysUser::getId, userId)
+                .set(SysUser::getLoginFailCount, 0)
+                .set(SysUser::getLockUntil, null));
     }
 
     /**
@@ -404,10 +422,10 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
         wrapper.eq(SysUser::getStatus, 1);
         // 关键词搜索：支持 username 和 nickname 模糊匹配
         if (request.getKeyword() != null && !request.getKeyword().trim().isEmpty()) {
-            String keyword = request.getKeyword().trim();
-            wrapper.and(w -> w.like(SysUser::getUsername, keyword)
+            String pattern = SqlLikeUtils.containsPattern(request.getKeyword().trim());
+            wrapper.and(w -> w.apply("username LIKE {0}" + SqlLikeUtils.ESCAPE_CLAUSE, pattern)
                     .or()
-                    .like(SysUser::getNickname, keyword));
+                    .apply("nickname LIKE {0}" + SqlLikeUtils.ESCAPE_CLAUSE, pattern));
         }
 
         // 按创建时间倒序
@@ -438,12 +456,12 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
         wrapper.ne(SysUser::getIsDeleted, 1);
         // 关键词搜索：支持 username、nickname 和 email 模糊匹配
         if (request.getKeyword() != null && !request.getKeyword().trim().isEmpty()) {
-            String keyword = request.getKeyword().trim();
-            wrapper.and(w -> w.like(SysUser::getUsername, keyword)
+            String pattern = SqlLikeUtils.containsPattern(request.getKeyword().trim());
+            wrapper.and(w -> w.apply("username LIKE {0}" + SqlLikeUtils.ESCAPE_CLAUSE, pattern)
                     .or()
-                    .like(SysUser::getNickname, keyword)
+                    .apply("nickname LIKE {0}" + SqlLikeUtils.ESCAPE_CLAUSE, pattern)
                     .or()
-                    .like(SysUser::getEmail, keyword));
+                    .apply("email LIKE {0}" + SqlLikeUtils.ESCAPE_CLAUSE, pattern));
         }
         // 状态筛选
         if (request.getStatus() != null) {
@@ -643,6 +661,8 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
             if (baseMapper.updatePasswordIfUnchanged(userId, currentHash, newHash) != 1) {
                 throw new BusinessException(409, "密码已发生变化，请重新登录后重试");
             }
+            // S4：管理员重置成功同样清掉登录失败计数与锁定，否则刚被重置的账号仍被锁在门外。
+            clearLoginLockout(userId);
             jwtUtils.revokeAllUserTokens(userId);
             return null;
         });
@@ -704,6 +724,18 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
         if (user == null) {
             throw new BusinessException(404, "用户不存在");
         }
+        // S4：自助重置必须拒绝已禁用或仍处于锁定状态的账号。两种原因共用同一句中性文案，
+        // 不向调用方透露账号究竟处于哪种状态（与 S3 的"统一信封"同一思路）。
+        if (user.getStatus() == null || user.getStatus() != UserStatus.NORMAL.getValue()) {
+            log.warn("邮箱重置被拒: userId={}, email={}, 原因=账号非正常状态", user.getId(),
+                    StringMaskUtils.maskEmail(email));
+            throw new BusinessException(403, ACCOUNT_UNAVAILABLE_MESSAGE);
+        }
+        if (user.getLockUntil() != null && user.getLockUntil().isAfter(LocalDateTime.now())) {
+            log.warn("邮箱重置被拒: userId={}, email={}, 原因=账号仍处于锁定中", user.getId(),
+                    StringMaskUtils.maskEmail(email));
+            throw new BusinessException(403, ACCOUNT_UNAVAILABLE_MESSAGE);
+        }
         final String currentHash = user.getPassword();
         final Long userId = user.getId();
 
@@ -715,6 +747,8 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
             if (baseMapper.updatePasswordIfUnchanged(userId, currentHash, newHash) != 1) {
                 throw new BusinessException(409, "密码已发生变化，请重新登录后重试");
             }
+            // S4：重置成功即解锁，否则用户刚拿到新密码却仍被旧锁定时间拒绝登录。
+            clearLoginLockout(userId);
             jwtUtils.revokeAllUserTokens(userId);
             return null;
         });

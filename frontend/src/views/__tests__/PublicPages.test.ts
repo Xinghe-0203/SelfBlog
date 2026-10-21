@@ -115,4 +115,26 @@ describe('public reading pages', () => {
     await flushPromises()
     expect(router.currentRoute.value.query.q).toBe('笔记')
   })
+  it('drops a slow response that lands after a newer search has already rendered', async () => {
+    let resolveOld: ((value: ReturnType<typeof page>) => void) | undefined
+    const old = new Promise<ReturnType<typeof page>>((resolve) => {
+      resolveOld = resolve
+    })
+    vi.mocked(postApi.advancedSearch)
+      .mockReturnValueOnce(old)
+      .mockResolvedValueOnce(page([{ ...post, id: 2, title: '新结果' }]))
+
+    const { wrapper, router } = await setup(Search, '/search')
+    await router.push('/search?q=old')
+    await flushPromises()
+    await router.push('/search?q=new')
+    await flushPromises()
+    expect(wrapper.get('a[href="/post/2"]').text()).toBe('新结果')
+
+    // 先发的旧请求最后才返回：它不许覆盖已经渲染的新结果。
+    resolveOld?.(page([{ ...post, id: 3, title: '旧结果' }]))
+    await flushPromises()
+    expect(wrapper.find('a[href="/post/3"]').exists()).toBe(false)
+    expect(wrapper.get('a[href="/post/2"]').text()).toBe('新结果')
+  })
 })

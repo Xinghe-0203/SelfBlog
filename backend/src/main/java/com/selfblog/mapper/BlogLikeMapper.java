@@ -63,4 +63,30 @@ public interface BlogLikeMapper extends BaseMapper<BlogLike> {
      */
     @Select("SELECT COUNT(*) FROM blog_like WHERE user_id = #{userId} AND (is_deleted = 0 OR is_deleted IS NULL)")
     Long countByUserId(@Param("userId") Long userId);
+
+    /**
+     * C21：分页查询用户点赞记录，且只保留「已发布且未删除」的文章。
+     *
+     * <p>与 {@link #selectPageByUserId} 的区别是把文章可见性谓词下推到 SQL：
+     * records 与 total 使用同一个谓词，分页才不会出现「本页条数 &lt; total」或深页返回空。
+     * 手写 SQL 必须自己带上 {@code is_deleted} 条件（MyBatis-Plus 不会为注解 SQL 追加逻辑删除）。</p>
+     */
+    @Select("<script>" +
+            "SELECT l.* FROM blog_like l JOIN blog_post p ON p.id = l.post_id " +
+            "WHERE l.user_id = #{userId} AND (l.is_deleted = 0 OR l.is_deleted IS NULL) " +
+            "AND p.status = 1 AND (p.is_deleted = 0 OR p.is_deleted IS NULL) " +
+            "ORDER BY l.create_time DESC " +
+            "LIMIT #{offset}, #{limit}" +
+            "</script>")
+    List<BlogLike> selectPublishedPageByUserId(@Param("userId") Long userId,
+                                               @Param("offset") int offset,
+                                               @Param("limit") int limit);
+
+    /**
+     * C21：与 {@link #selectPublishedPageByUserId} 完全相同的谓词，用于取真实总数。
+     */
+    @Select("SELECT COUNT(*) FROM blog_like l JOIN blog_post p ON p.id = l.post_id " +
+            "WHERE l.user_id = #{userId} AND (l.is_deleted = 0 OR l.is_deleted IS NULL) " +
+            "AND p.status = 1 AND (p.is_deleted = 0 OR p.is_deleted IS NULL)")
+    Long countPublishedByUserId(@Param("userId") Long userId);
 }

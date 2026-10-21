@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch, onBeforeUnmount } from 'vue'
+import { computed, ref, watch, onMounted, onBeforeUnmount } from 'vue'
 import { overlayTarget, useDialog } from '@/composables/useDialog'
 import Icon from './Icon.vue'
 
@@ -44,7 +44,17 @@ function handleKeydown(event: KeyboardEvent): void {
     next()
   }
 }
-document.addEventListener('keydown', handleKeydown)
+// 只在打开时监听：setup 作用域注册会让每个挂载实例都加一个 document 监听器（关闭状态也加）。
+watch(open, (isOpen) => {
+  if (isOpen) {
+    document.addEventListener('keydown', handleKeydown)
+  } else {
+    document.removeEventListener('keydown', handleKeydown)
+  }
+})
+onMounted(() => {
+  if (open.value) document.addEventListener('keydown', handleKeydown)
+})
 onBeforeUnmount(() => document.removeEventListener('keydown', handleKeydown))
 </script>
 

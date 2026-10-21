@@ -12,7 +12,6 @@ import com.selfblog.event.FollowCreatedEvent;
 import com.selfblog.mapper.BlogFollowMapper;
 import com.selfblog.mapper.SysUserMapper;
 import com.selfblog.service.social.FollowService;
-import com.selfblog.utils.FineGrainedLockManager;
 import com.selfblog.utils.UserConverter;
 import com.selfblog.vo.social.FollowStatusVO;
 import com.selfblog.vo.user.UserVO;
@@ -47,8 +46,6 @@ public class FollowServiceImpl extends ServiceImpl<BlogFollowMapper, BlogFollow>
     @Autowired
     private BlogFollowMapper blogFollowMapper;
 
-    private final FineGrainedLockManager lockManager = FineGrainedLockManager.getInstance();
-
     @Override
     @Transactional(rollbackFor = Exception.class)
     public FollowStatusVO follow(Long targetUserId, Long currentUserId) {
@@ -72,9 +69,10 @@ public class FollowServiceImpl extends ServiceImpl<BlogFollowMapper, BlogFollow>
 
         FollowStatusVO result = new FollowStatusVO();
 
-        // 使用细粒度锁
-        String lockKey = currentUserId + "-" + targetUserId;
-        synchronized (lockManager.getLock(lockKey)) {
+        // 并发安全改由数据库唯一约束（follower_id, following_id）保证，不再使用 synchronized：
+        // JVM 监视器在方法返回时释放，而 Spring 事务提交发生在其后，两个并发请求都可能走到
+        // “无记录 → 插入”分支，第二个插入撞唯一键。冲突已在下面的 catch 中重新读取记录。
+        {
             // 检查是否已关注
             LambdaQueryWrapper<BlogFollow> wrapper = new LambdaQueryWrapper<>();
             wrapper.eq(BlogFollow::getFollowerId, currentUserId)
@@ -190,9 +188,10 @@ public class FollowServiceImpl extends ServiceImpl<BlogFollowMapper, BlogFollow>
 
         FollowStatusVO result = new FollowStatusVO();
 
-        // 使用细粒度锁
-        String lockKey = currentUserId + "-" + targetUserId;
-        synchronized (lockManager.getLock(lockKey)) {
+        // 并发安全改由数据库唯一约束（follower_id, following_id）保证，不再使用 synchronized：
+        // JVM 监视器在方法返回时释放，而 Spring 事务提交发生在其后，两个并发请求都可能走到
+        // “无记录 → 插入”分支，第二个插入撞唯一键。冲突已在下面的 catch 中重新读取记录。
+        {
             // 检查是否已关注
             LambdaQueryWrapper<BlogFollow> wrapper = new LambdaQueryWrapper<>();
             wrapper.eq(BlogFollow::getFollowerId, currentUserId)
@@ -325,34 +324,42 @@ public class FollowServiceImpl extends ServiceImpl<BlogFollowMapper, BlogFollow>
             throw new BusinessException(404, "用户不存在");
         }
 
-        // 分页查询粉丝
-        Page<BlogFollow> pageParam = new Page<>(page, pageSize);
-        LambdaQueryWrapper<BlogFollow> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(BlogFollow::getFollowingId, userId)
-              .orderByDesc(BlogFollow::getCreateTime);
-        IPage<BlogFollow> followPage = this.page(pageParam, wrapper);
+        // C21：records 与 total 必须来自同一个谓词。旧实现先按「全部粉丝关系」分页再在 Java 里
+        // 丢掉被封禁的粉丝，total 仍按原始行数统计，于是「本页条数 < total」且深页返回空数组。
+        // 现在把封禁谓词下推到 SQL（selectActiveFollowerPage / countActiveFollowers 谓词一致）。
+        int safePage = page == null || page < 1 ? 1 : page;
+        int safePageSize = pageSize == null || pageSize < 1 ? 10 : Math.min(pageSize, 100);
+        int offset = (safePage - 1) * safePageSize;
 
-        if (followPage.getRecords().isEmpty()) {
-            return new Page<>(page, pageSize, 0);
+        List<BlogFollow> records = blogFollowMapper.selectActiveFollowerPage(userId, offset, safePageSize);
+        Long total = blogFollowMapper.countActiveFollowers(userId);
+        long safeTotal = total != null ? total : 0L;
+
+        IPage<UserVO> resultPage = new Page<>(safePage, safePageSize, safeTotal);
+        if (records.isEmpty()) {
+            return resultPage;
         }
 
         // 获取粉丝用户信息
-        List<Long> followerIds = followPage.getRecords().stream()
+        List<Long> followerIds = records.stream()
                 .map(BlogFollow::getFollowerId)
                 .collect(java.util.stream.Collectors.toList());
         List<SysUser> followers = sysUserMapper.selectBatchIds(followerIds);
         Map<Long, SysUser> userMap = followers.stream()
                 .collect(java.util.stream.Collectors.toMap(SysUser::getId, u -> u, (a, b) -> a));
 
-        // 转换，过滤掉已封禁用户
-        IPage<UserVO> resultPage = followPage.convert(follow -> {
-            SysUser follower = userMap.get(follow.getFollowerId());
-            if (follower != null && (follower.getStatus() == null || follower.getStatus() != 0)) {
-                return UserConverter.toUserVO(follower);
-            }
-            return null;
-        });
-        resultPage.setRecords(resultPage.getRecords().stream().filter(Objects::nonNull).toList());
+        // 转换；SQL 已过滤封禁用户，这里仍按同一谓词兜底，避免查询间隙状态变化
+        List<UserVO> items = records.stream()
+                .map(follow -> {
+                    SysUser follower = userMap.get(follow.getFollowerId());
+                    if (follower != null && (follower.getStatus() == null || follower.getStatus() != 0)) {
+                        return UserConverter.toUserVO(follower);
+                    }
+                    return null;
+                })
+                .filter(Objects::nonNull)
+                .toList();
+        resultPage.setRecords(items);
         return resultPage;
     }
 
@@ -365,34 +372,40 @@ public class FollowServiceImpl extends ServiceImpl<BlogFollowMapper, BlogFollow>
             throw new BusinessException(404, "用户不存在");
         }
 
-        // 分页查询关注
-        Page<BlogFollow> pageParam = new Page<>(page, pageSize);
-        LambdaQueryWrapper<BlogFollow> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(BlogFollow::getFollowerId, userId)
-              .orderByDesc(BlogFollow::getCreateTime);
-        IPage<BlogFollow> followPage = this.page(pageParam, wrapper);
+        // C21：同 getFollowers，把封禁谓词下推到 SQL，records 与 total 同源
+        int safePage = page == null || page < 1 ? 1 : page;
+        int safePageSize = pageSize == null || pageSize < 1 ? 10 : Math.min(pageSize, 100);
+        int offset = (safePage - 1) * safePageSize;
 
-        if (followPage.getRecords().isEmpty()) {
-            return new Page<>(page, pageSize, 0);
+        List<BlogFollow> records = blogFollowMapper.selectActiveFollowingPage(userId, offset, safePageSize);
+        Long total = blogFollowMapper.countActiveFollowing(userId);
+        long safeTotal = total != null ? total : 0L;
+
+        IPage<UserVO> resultPage = new Page<>(safePage, safePageSize, safeTotal);
+        if (records.isEmpty()) {
+            return resultPage;
         }
 
         // 获取关注用户信息
-        List<Long> followingIds = followPage.getRecords().stream()
+        List<Long> followingIds = records.stream()
                 .map(BlogFollow::getFollowingId)
                 .collect(java.util.stream.Collectors.toList());
         List<SysUser> followings = sysUserMapper.selectBatchIds(followingIds);
         Map<Long, SysUser> userMap = followings.stream()
                 .collect(java.util.stream.Collectors.toMap(SysUser::getId, u -> u, (a, b) -> a));
 
-        // 转换，过滤掉已封禁用户
-        IPage<UserVO> resultPage = followPage.convert(follow -> {
-            SysUser following = userMap.get(follow.getFollowingId());
-            if (following != null && (following.getStatus() == null || following.getStatus() != 0)) {
-                return UserConverter.toUserVO(following);
-            }
-            return null;
-        });
-        resultPage.setRecords(resultPage.getRecords().stream().filter(Objects::nonNull).toList());
+        // 转换；SQL 已过滤封禁用户，这里仍按同一谓词兜底
+        List<UserVO> items = records.stream()
+                .map(follow -> {
+                    SysUser following = userMap.get(follow.getFollowingId());
+                    if (following != null && (following.getStatus() == null || following.getStatus() != 0)) {
+                        return UserConverter.toUserVO(following);
+                    }
+                    return null;
+                })
+                .filter(Objects::nonNull)
+                .toList();
+        resultPage.setRecords(items);
         return resultPage;
     }
 

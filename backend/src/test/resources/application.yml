@@ -67,6 +67,9 @@ server:
 app:
   api-prefix: ""
   single-author-mode: false
+  # S7：访客伪名化密钥不再有 local-visitor-hash 这种公开默认值，测试 profile 必须显式给出。
+  # 与 jwt.secret 分开，正好也覆盖「两个用途使用不同密钥」的路径。
+  visitor-hash-secret: test-visitor-hash-secret-for-unit-testing-only
 ADMIN_USERNAME: test-admin
 ADMIN_PASSWORD: Test-Admin-Password-1234
 

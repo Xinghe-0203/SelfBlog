@@ -31,17 +31,24 @@ export function safeGetItem(
   }
 }
 
-export function safeSetItem(key: string, value: string): void {
+export function safeSetItem(
+  key: string,
+  value: string,
+  storage: 'localStorage' | 'sessionStorage' = 'localStorage'
+): void {
   try {
-    localStorage.setItem(key, value)
+    window[storage].setItem(key, value)
   } catch {
     // storage unavailable
   }
 }
 
-export function safeRemoveItem(key: string): void {
+export function safeRemoveItem(
+  key: string,
+  storage: 'localStorage' | 'sessionStorage' = 'localStorage'
+): void {
   try {
-    localStorage.removeItem(key)
+    window[storage].removeItem(key)
   } catch {
     // storage unavailable
   }

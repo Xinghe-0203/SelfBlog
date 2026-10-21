@@ -34,6 +34,31 @@ export function enhanceMarkdown(root: HTMLElement, options?: MarkdownEnhanceOpti
   return collectImageSources(root)
 }
 
+/**
+ * root → 增强产物持有的资源清理函数（目前只有复制按钮的回退定时器）。
+ * 用 WeakMap 挂载：root 被回收时条目自动消失，不需要显式的全局登记表。
+ */
+const disposers = new WeakMap<HTMLElement, Array<() => void>>()
+
+function registerDisposer(root: HTMLElement, dispose: () => void): void {
+  const list = disposers.get(root)
+  if (list) list.push(dispose)
+  else disposers.set(root, [dispose])
+}
+
+/**
+ * 释放 root 上增强产物持有的资源。
+ *
+ * 正文被 v-html 重新渲染或组件卸载时调用：旧的复制按钮节点已经脱离文档，
+ * 它排队的回退定时器却还会在 1500ms 后写一次 textContent。幂等，可重复调用。
+ */
+export function disposeMarkdownEnhance(root: HTMLElement): void {
+  const list = disposers.get(root)
+  if (!list) return
+  list.forEach((dispose) => dispose())
+  disposers.delete(root)
+}
+
 function enhanceCodeBlocks(root: HTMLElement, collapseHeight: number): void {
   root.querySelectorAll<HTMLElement>('pre > code').forEach((code) => {
     const pre = code.parentElement
@@ -50,7 +75,7 @@ function enhanceCodeBlocks(root: HTMLElement, collapseHeight: number): void {
     const lang = document.createElement('span')
     lang.className = 'code-lang'
     lang.textContent = detectLanguage(code)
-    head.append(lang, createCopyButton(code))
+    head.append(lang, createCopyButton(root, code))
     wrapper.insertBefore(head, pre)
 
     applyCollapse(wrapper, pre, collapseHeight)
@@ -62,7 +87,7 @@ function detectLanguage(code: HTMLElement): string {
   return /language-([\w-]+)/.exec(code.className)?.[1] ?? '文本'
 }
 
-function createCopyButton(code: HTMLElement): HTMLButtonElement {
+function createCopyButton(root: HTMLElement, code: HTMLElement): HTMLButtonElement {
   const button = document.createElement('button')
   button.type = 'button'
   button.className = 'code-copy'
@@ -78,6 +103,11 @@ function createCopyButton(code: HTMLElement): HTMLButtonElement {
       revertTimer = null
     }, COPY_FEEDBACK_MS)
   }
+  registerDisposer(root, () => {
+    if (!revertTimer) return
+    clearTimeout(revertTimer)
+    revertTimer = null
+  })
 
   button.addEventListener('click', () => {
     void (async () => {

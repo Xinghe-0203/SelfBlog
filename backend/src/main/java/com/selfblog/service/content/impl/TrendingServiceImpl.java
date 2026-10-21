@@ -62,6 +62,16 @@ public class TrendingServiceImpl extends ServiceImpl<BlogTrendingMapper, BlogTre
      */
     private static final int TRENDING_DAYS = 7;
 
+    /**
+     * C22：热门内容聚合的抓取窗口。两个来源各取这么多条，在内存里合并排序后分页，
+     * 因此 total 描述的是「窗口内条数」。窗口必须显式且有硬上限，不能让调用方的
+     * pageSize 无限放大单次查询。
+     */
+    private static final int HOT_CONTENT_FETCH_SIZE = 100;
+    private static final int HOT_CONTENT_MAX_FETCH_SIZE = 1000;
+    private static final int DEFAULT_HOT_CONTENT_PAGE_SIZE = 10;
+    private static final int MAX_HOT_CONTENT_PAGE_SIZE = 100;
+
     @Override
     @Cacheable(value = CaffeineCacheConfig.TRENDING_CACHE, key = "'hotPosts:' + #pageNum + ':' + #pageSize")
     @Transactional(readOnly = true)
@@ -113,11 +123,22 @@ public class TrendingServiceImpl extends ServiceImpl<BlogTrendingMapper, BlogTre
         return resultPage;
     }
 
+    /**
+     * 热门内容聚合分页。
+     *
+     * <p>C22 契约：本方法在内存里合并「热门文章 + 热门动态」两个来源，两者都只取一个
+     * <b>抓取窗口</b>（{@link #HOT_CONTENT_FETCH_SIZE}，随 pageSize 放大但硬上限
+     * {@link #HOT_CONTENT_MAX_FETCH_SIZE}），所以 total 是窗口内条数，不是全库条数。
+     * 为保证调用方拿到的分页自洽：pageNum 会被钳制到窗口最后一页，而不是返回一个
+     * 「空 records + 非零 total」的幽灵页。</p>
+     */
     @Override
     @Cacheable(value = CaffeineCacheConfig.TRENDING_CACHE, key = "'hotContent:' + #pageNum + ':' + #pageSize")
     @Transactional(readOnly = true)
     public IPage<HotContentVO> getHotContent(int pageNum, int pageSize) {
-        int fetchSize = Math.max(pageSize * 2, 100);
+        int safePageSize = pageSize < 1 ? DEFAULT_HOT_CONTENT_PAGE_SIZE : Math.min(pageSize, MAX_HOT_CONTENT_PAGE_SIZE);
+        int safePageNum = pageNum < 1 ? 1 : pageNum;
+        int fetchSize = Math.min(Math.max(safePageSize * 2, HOT_CONTENT_FETCH_SIZE), HOT_CONTENT_MAX_FETCH_SIZE);
 
         // 1. 获取热门文章（已有热度表）
         LocalDateTime now = LocalDateTime.now();
@@ -127,30 +148,32 @@ public class TrendingServiceImpl extends ServiceImpl<BlogTrendingMapper, BlogTre
         List<HotContentVO> articleVOs = convertArticlesToHotContent(trendingPage.getRecords());
 
         // 2. 获取热门校友圈动态（按互动量排序，限制在最近7天内）
+        // C22：不再用 .last("LIMIT " + fetchSize) 拼接 SQL，交给分页插件生成 LIMIT。
         LambdaQueryWrapper<CirclePost> circleWrapper = new LambdaQueryWrapper<>();
         circleWrapper.eq(CirclePost::getStatus, 1)
                 .eq(CirclePost::getVisibility, 0)
                 .ge(CirclePost::getCreateTime, dateStart)
                 .orderByDesc(CirclePost::getLikeCount)
                 .orderByDesc(CirclePost::getCommentCount)
-                .orderByDesc(CirclePost::getRepostCount)
-                .last("LIMIT " + fetchSize);
-        List<CirclePost> hotCircles = circlePostMapper.selectList(circleWrapper);
-        List<HotContentVO> circleVOs = convertCirclesToHotContent(hotCircles);
+                .orderByDesc(CirclePost::getRepostCount);
+        IPage<CirclePost> circlePage = circlePostMapper.selectPage(new Page<>(1, fetchSize), circleWrapper);
+        List<HotContentVO> circleVOs = convertCirclesToHotContent(circlePage.getRecords());
 
         // 3. 合并并按热度评分降序排列
         List<HotContentVO> merged = new ArrayList<>(articleVOs);
         merged.addAll(circleVOs);
         merged.sort((a, b) -> Double.compare(b.getScore(), a.getScore()));
 
-        // 4. 内存分页
+        // 4. 内存分页：total 只描述窗口，pageNum 钳制到最后一页，避免幽灵页
         int total = merged.size();
-        int fromIndex = (pageNum - 1) * pageSize;
-        int toIndex = Math.min(fromIndex + pageSize, total);
+        int lastPage = total == 0 ? 1 : (total + safePageSize - 1) / safePageSize;
+        int clampedPageNum = Math.min(safePageNum, lastPage);
+        int fromIndex = (clampedPageNum - 1) * safePageSize;
+        int toIndex = Math.min(fromIndex + safePageSize, total);
 
-        Page<HotContentVO> resultPage = new Page<>(pageNum, pageSize, total);
-        if (fromIndex < merged.size()) {
-            resultPage.setRecords(merged.subList(fromIndex, toIndex));
+        Page<HotContentVO> resultPage = new Page<>(clampedPageNum, safePageSize, total);
+        if (fromIndex < total) {
+            resultPage.setRecords(new ArrayList<>(merged.subList(fromIndex, toIndex)));
         } else {
             resultPage.setRecords(new ArrayList<>());
         }

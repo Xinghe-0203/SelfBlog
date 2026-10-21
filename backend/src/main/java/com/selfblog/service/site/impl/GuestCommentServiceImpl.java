@@ -28,7 +28,12 @@ public class GuestCommentServiceImpl implements GuestCommentService {
     private final SiteSettingsService settingsService;
     private final HtmlSanitizer htmlSanitizer;
 
-    @Value("${JWT_SECRET:local-visitor-hash}")
+    /**
+     * 访客伪名化密钥（S7）。此前是 {@code ${JWT_SECRET:local-visitor-hash}}：既复用 JWT
+     * 签名密钥，又在缺失时静默退化成一个人人可见的常量。现在由
+     * {@code app.visitor-hash-secret}（默认回落 JWT_SECRET）提供。
+     */
+    @Value("${app.visitor-hash-secret:}")
     private String hashSecret;
 
     public GuestCommentServiceImpl(GuestCommentMapper commentMapper, BlogPostMapper postMapper,
@@ -56,6 +61,18 @@ public class GuestCommentServiceImpl implements GuestCommentService {
         return converted;
     }
 
+    /**
+     * 创建访客留言。
+     *
+     * <p><b>C15（已决策，非缺陷）</b>：访客留言<b>故意不计入</b> {@code blog_post.comment_count}。
+     * 该字段属于历史社区（登录用户评论 {@code blog_comment}）的计数器，由
+     * {@code BlogCommentServiceImpl} 维护；访客留言是独立表 {@code guest_comment}，
+     * 有自己的公开列表接口 {@code /guest-comments/post/{postId}} 与分页 total，
+     * 因此不需要也不应该去改动 {@code blog_post.comment_count}——两套计数混用会让
+     * 历史评论的增减与访客留言的增减互相干扰（同一条计数被两个来源做相对加减，
+     * 一旦任一方漂移就无法再对齐）。若前端要展示「留言数」，请直接用
+     * {@link #getPublicComments(Long, Integer, Integer)} 返回的 total，不要读 {@code comment_count}。</p>
+     */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public Long createComment(GuestCommentRequest request) {
@@ -93,6 +110,12 @@ public class GuestCommentServiceImpl implements GuestCommentService {
         return convertPage(result, posts);
     }
 
+    /**
+     * 审核/隐藏访客留言。
+     *
+     * <p>C15：同样不触碰 {@code blog_post.comment_count}——状态变化只影响
+     * {@link #getPublicComments(Long, Integer, Integer)} 的过滤结果，计数由该查询的 total 表达。</p>
+     */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void updateStatus(Long id, Integer status) {
@@ -103,6 +126,12 @@ public class GuestCommentServiceImpl implements GuestCommentService {
         commentMapper.updateById(comment);
     }
 
+    /**
+     * 删除访客留言。
+     *
+     * <p>C15：删除同样不递减 {@code blog_post.comment_count}，理由见
+     * {@link #createComment(GuestCommentRequest)} 的类注释。</p>
+     */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void delete(Long id) {

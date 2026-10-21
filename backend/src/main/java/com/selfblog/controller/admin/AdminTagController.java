@@ -10,6 +10,7 @@ import com.selfblog.entity.BlogTag;
 import com.selfblog.mapper.BlogPostTagMapper;
 import com.selfblog.service.post.BlogTagService;
 import com.selfblog.utils.HtmlSanitizer;
+import com.selfblog.utils.SqlLikeUtils;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.constraints.Max;
@@ -48,7 +49,8 @@ public class AdminTagController {
             @RequestParam(defaultValue = "20") @Min(1) @Max(100) Integer pageSize) {
         LambdaQueryWrapper<BlogTag> wrapper = new LambdaQueryWrapper<>();
         if (keyword != null && !keyword.trim().isEmpty()) {
-            wrapper.like(BlogTag::getName, keyword.trim());
+            wrapper.apply("name LIKE {0}" + SqlLikeUtils.ESCAPE_CLAUSE,
+                    SqlLikeUtils.containsPattern(keyword.trim()));
         }
         wrapper.orderByDesc(BlogTag::getId);
 

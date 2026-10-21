@@ -13,18 +13,6 @@ vi.mock('@/api/user', () => ({
   }
 }))
 
-vi.mock('@/api/notification', () => ({
-  notificationApi: {
-    getUnreadCount: vi.fn().mockResolvedValue({ data: 0 })
-  }
-}))
-
-vi.mock('@/api/message', () => ({
-  messageApi: {
-    getUnreadCount: vi.fn().mockResolvedValue({ data: 0 })
-  }
-}))
-
 vi.mock('@/utils/logger', () => ({
   useLogger: () => ({
     info: vi.fn(),
@@ -102,15 +90,6 @@ describe('Auth Store', () => {
     store.user = { id: 1, username: 'test', nickname: 'Test', role: 'user', avatar: '' } as any
     store.updateAvatar('http://example.com/avatar.jpg')
     expect(store.user!.avatar).toBe('http://example.com/avatar.jpg')
-  })
-
-  it('should track unread counts', () => {
-    const store = useAuthStore()
-    store.incrementNotifications(3)
-    store.incrementMessages(2)
-    expect(store.unreadNotifications).toBe(3)
-    expect(store.unreadMessages).toBe(2)
-    expect(store.totalUnread).toBe(5)
   })
 
   it('should validate expired token', async () => {

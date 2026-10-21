@@ -115,18 +115,8 @@ export function applySeoMeta(meta: SeoMeta): void {
   }
 }
 
-/** 离开文章页时把文章级标签降级回站点级，避免残留到其他页面。 */
-export function resetSeoMeta(siteDescription = ''): void {
-  document.head.querySelectorAll('meta[property^="article:"]').forEach((n) => n.remove())
-  applySeoMeta({
-    title: siteTitle || document.title,
-    description: siteDescription,
-    type: 'website'
-  })
-}
-
 export function useSeoMeta() {
-  return { applySeoMeta, resetSeoMeta, setSeoSiteTitle }
+  return { applySeoMeta, setSeoSiteTitle }
 }
 
 const JSONLD_ID = 'selfblog-article-jsonld'

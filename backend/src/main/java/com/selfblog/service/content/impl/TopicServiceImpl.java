@@ -8,6 +8,7 @@ import com.selfblog.entity.Topic;
 import com.selfblog.mapper.TopicMapper;
 import com.selfblog.service.content.TopicService;
 import com.selfblog.utils.HtmlSanitizer;
+import com.selfblog.utils.SqlLikeUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Service;
@@ -168,10 +169,83 @@ public class TopicServiceImpl extends ServiceImpl<TopicMapper, Topic> implements
             return Collections.emptyList();
         }
         LambdaQueryWrapper<Topic> wrapper = new LambdaQueryWrapper<>();
-        wrapper.like(Topic::getName, keyword.trim())
+        wrapper.apply("name LIKE {0}" + SqlLikeUtils.ESCAPE_CLAUSE, SqlLikeUtils.containsPattern(keyword.trim()))
                .eq(Topic::getStatus, 1)
                .orderByDesc(Topic::getTrendingScore)
                .last("LIMIT 20");
         return this.list(wrapper);
+    }
+
+    /**
+     * 更新话题。事务边界放在服务层：控制器只做参数校验与委托，不应持有事务注解。
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public Topic updateTopic(Long id, String name, String description, Integer status) {
+        Topic topic = this.getById(id);
+        if (topic == null) {
+            throw new BusinessException(404, "话题不存在");
+        }
+        if (name != null) {
+            String sanitizedName = htmlSanitizer.sanitizePlainText(name.trim());
+            if (sanitizedName.length() > 50) {
+                throw new BusinessException(400, "话题名称不能超过50个字符");
+            }
+            LambdaQueryWrapper<Topic> dupWrapper = new LambdaQueryWrapper<>();
+            dupWrapper.eq(Topic::getName, sanitizedName)
+                     .ne(Topic::getId, id)
+                     .eq(Topic::getIsDeleted, 0);
+            if (this.count(dupWrapper) > 0) {
+                throw new BusinessException(400, "话题名称已存在");
+            }
+            topic.setName(sanitizedName);
+        }
+        if (description != null) {
+            String sanitizedDesc = htmlSanitizer.sanitizePlainText(description.trim());
+            if (sanitizedDesc.length() > 500) {
+                throw new BusinessException(400, "话题描述不能超过500个字符");
+            }
+            topic.setDescription(sanitizedDesc);
+        }
+        if (status != null) {
+            if (status != 0 && status != 1) {
+                throw new BusinessException(400, "状态值无效");
+            }
+            topic.setStatus(status);
+        }
+        this.updateById(topic);
+        return topic;
+    }
+
+    /**
+     * 删除话题。事务边界放在服务层。
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void deleteTopic(Long id) {
+        Topic topic = this.getById(id);
+        if (topic == null) {
+            throw new BusinessException(404, "话题不存在");
+        }
+        this.removeById(id);
+    }
+
+    /**
+     * 切换话题状态。事务边界放在服务层。
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void toggleStatus(Long id, Integer status) {
+        if (status == null || (status != 0 && status != 1)) {
+            throw new BusinessException(400, "状态值无效，只能为0（禁用）或1（启用）");
+        }
+        Topic topic = this.getById(id);
+        if (topic == null) {
+            throw new BusinessException(404, "话题不存在");
+        }
+        Topic update = new Topic();
+        update.setId(id);
+        update.setStatus(status);
+        this.updateById(update);
     }
 }

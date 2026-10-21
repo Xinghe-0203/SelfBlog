@@ -138,4 +138,39 @@ describe('reader layout and preserved interactions', () => {
       content: '一段留言'
     })
   })
+
+  it('keeps loaded comments and the page cursor when loading more fails', async () => {
+    const first = {
+      id: 1,
+      postId: 1,
+      nickname: '甲',
+      content: '第一条',
+      status: 1,
+      createTime: '2026-10-16T10:00:00'
+    }
+    vi.mocked(publicInteractionApi.getComments)
+      .mockResolvedValueOnce(
+        response({ records: [first], total: 3, pages: 1, size: 10, current: 1 })
+      )
+      .mockRejectedValueOnce(new Error('network down'))
+
+    const wrapper = await setup()
+    expect(wrapper.findAll('.reader-comment')).toHaveLength(1)
+
+    await wrapper.get('.load-more-comments').trigger('click')
+    await flushPromises()
+
+    // 失败只提示错误：已加载的留言不能被清空。
+    expect(wrapper.findAll('.reader-comment')).toHaveLength(1)
+    expect(wrapper.get('.reader-comment').text()).toContain('第一条')
+    expect(wrapper.get('.comments-error').text()).toContain('留言暂时无法加载')
+
+    // 页码没有推进：重试仍然请求第 2 页，不会跳过失败的这一页。
+    await wrapper.get('.load-more-comments').trigger('click')
+    await flushPromises()
+    expect(publicInteractionApi.getComments).toHaveBeenLastCalledWith(1, {
+      pageNum: 2,
+      pageSize: 10
+    })
+  })
 })

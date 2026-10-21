@@ -742,6 +742,7 @@ import { useLogger } from '../../utils/logger'
 import { toast } from '../../utils/toast'
 import { useConfirm } from '../../composables/useConfirm'
 import { formatDate } from '../../utils'
+import { estimateReadMinutes } from '../../utils/reading'
 
 const route = useRoute()
 const router = useRouter()
@@ -810,9 +811,8 @@ const wordCount = computed(() => {
 })
 
 const readingTime = computed(() => {
-  const text = form.content || ''
-  const wc = text.replace(/\s/g, '').length
-  return Math.max(1, Math.ceil(wc / 500))
+  // 与已发布列表/详情页共用同一个估算函数，避免同一篇文章在编辑器与前台显示不同时长。
+  return estimateReadMinutes(form.content || '')
 })
 
 const saveStatusText = computed(() => {
