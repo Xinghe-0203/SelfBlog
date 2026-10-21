@@ -41,7 +41,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **发布即上线**：作者创建文章/动态直接 `status=1`，**不要引入待审核闸门**（`approvePost` 只对历史 `status=0` 数据生效）
 - 历史社区表（`blog_follow`/`blog_message`/`blog_notification`、`views/user/*`、`views/circle/*`）仍保留在代码与库中，但公开入口大多已下线；改动前先确认该路径是否仍被路由引用
 
-**两个独立工程，没有根构建清单**：`backend/`（Spring Boot 3.3.13 + Java 21 + MyBatis Plus）与 `frontend/`（Vue 3 + Vite 5 + Pinia）。命令都要在对应目录内执行。
+**两个独立工程，没有根构建清单**：`backend/`（Spring Boot 3.3.13 + Java 21 + MyBatis Plus）与 `frontend/`（Vue 3 + Vite 6 + Pinia）。命令都要在对应目录内执行。
 
 ---
 
@@ -58,7 +58,7 @@ export JAVA_HOME='C:\Program Files\Java\jdk-21'
 ```
 
 - **跑后端测试必须带 `-Dskip.npm=true -Dskip.installnodenpm=true`**。`pom.xml` 里的 `frontend-maven-plugin` 在 `initialize`/`generate-resources` 阶段会在 `../frontend` 执行 `npm ci` + `npm run build`：不带这两个开关，一次测试会先把整个前端重建一遍，并且**会改写前端构建产物**。带上后全套测试约 1 分钟。
-- 基线：**878 tests, 0 failures**（2026-10-21 实测；CI 还会用真实 MySQL 8 再跑一遍）。日志里大量 `[PERF] ... error:` 是 `PerformanceMonitoringAspect` 记录的正常负例断言，不是失败。
+- 基线：**881 tests, 0 failures**（2026-10-21 实测；CI 还会用真实 MySQL 8 再跑一遍）。日志里大量 `[PERF] ... error:` 是 `PerformanceMonitoringAspect` 记录的正常负例断言，不是失败。
 - 单测：`"$MVN" test -Dtest=AuthControllerTest -Dskip.npm=true -Dskip.installnodenpm=true`，加 `#方法名` 可只跑一条。
 - 打包：`"$MVN" clean package -DskipTests` → `target/selfblog.jar`（`finalName=selfblog`）。
 - 本地起服务：先把 `backend/.env.example` 复制为 `backend/.env`，填 `JWT_SECRET`（≥32 位）与 `ADMIN_PASSWORD`（≥12 位）。
@@ -125,7 +125,7 @@ Mapper XML 支持 `databaseId="mysql"` / `"sqlite"` 双语句（`MybatisPlusConf
 
 ### 缓存
 
-`config/cache/CaffeineCacheConfig.java` 用 `SimpleCacheManager` 注册 8 个具名缓存，各自独立 TTL：`hotTagsCache`(10m)、`categoryCache`(30m)、`userCache`(10m)、`trendingCache`(5m)、`statsCache`(15m)、`statusCache`(2m)、`siteSettingsCache`(10m)、`visitorSummaryCache`(30s)。测试 profile 关闭缓存。
+`config/cache/CaffeineCacheConfig.java` 用 `SimpleCacheManager` 注册 9 个具名缓存，各自独立 TTL：`hotTagsCache`(10m)、`categoryCache`(30m)、`userCache`(10m)、`trendingCache`(5m)、`statsCache`(15m)、`statusCache`(2m)、`siteSettingsCache`(10m)、`visitorSummaryCache`(30s)、`notificationListCache`(2m)。测试 profile 关闭缓存。
 
 ### 路由前缀、SPA 与可抓取 HTML
 
@@ -198,5 +198,5 @@ Mapper XML 支持 `databaseId="mysql"` / `"sqlite"` 双语句（`MybatisPlusConf
 
 - **Docker 镜像未在本机验证**：`backend/Dockerfile` 与两个 compose 文件已改为“仓库根上下文 + 真实 `selfblog.jar` + 数据/上传/相册卷”，但本机没有 Docker 守护进程，**镜像构建与运行仍未验证**；部署前请自行 `docker compose -f backend/docker-compose.yml up -d --build` 验证。
 - **真实 Vercel 部署未验证**：`frontend/vercel.json` 只做统一反向代理（`framework: null` + `scripts/build-vercel-proxy.mjs`），需要 `SELFBLOG_BACKEND_ORIGIN` 与 `SITE_BASE_URL` 两个环境变量；没有账号/域名时无法真机验证。
-- **MySQL 运行时未验证**：SQLite 与 H2 已覆盖，MySQL 只有 schema/迁移脚本与方言语句，未在真实实例上跑过。
+- **MySQL 运行时只在 CI 验证**：本机没有 MySQL/Docker 守护进程，全量套件只能在 H2 上跑；真实 MySQL 8 由 CI 的 `mysql` job 覆盖（从 `schema-fresh-install.sql` 初始化后跑全量）。**H2 会假绿**：跨连接的锁问题（如 `REQUIRES_NEW` 自增等待调用方未提交的行锁）在 H2 上不报错、在真实 MySQL 上等满 `innodb_lock_wait_timeout` 后抛 `CannotAcquireLockException`——改事务边界后必须等 MySQL job 的结论，别只看 H2 绿。
 - `views/user/*` 等历史社区页仍在仓库中（路由仍注册），但已无公开入口；`views/auth/Register.vue`、`views/circle/*`、`components/circle/*` 等死代码已于 2026-10-17 删除（见 CHANGELOG）。后端对应的社区/话题接口与数据表保留。

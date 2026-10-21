@@ -8,6 +8,7 @@ import com.selfblog.mapper.CircleLikeMapper;
 import com.selfblog.mapper.CirclePostMapper;
 import com.selfblog.mapper.CircleRepostMapper;
 import com.selfblog.mapper.SysUserMapper;
+import com.selfblog.service.circle.CircleInteractionService;
 import com.selfblog.service.circle.CircleQueryService;
 import com.selfblog.vo.circle.CirclePostVO;
 import org.junit.jupiter.api.BeforeEach;
@@ -33,6 +34,9 @@ class CircleQueryServiceImplTest {
 
     @Autowired
     private CircleQueryService circleQueryService;
+
+    @Autowired
+    private CircleInteractionService circleInteractionService;
 
     @Autowired
     private CirclePostMapper circlePostMapper;
@@ -123,24 +127,39 @@ class CircleQueryServiceImplTest {
     }
 
     @Test
-    @DisplayName("获取动态详情成功")
+    @DisplayName("获取动态详情成功 - 只读路径不自增浏览量")
     void getPostDetail_Success() {
         CirclePostVO detail = circleQueryService.getPostDetail(publicPost.getId(), userA.getId());
         assertNotNull(detail);
         assertEquals(publicPost.getId(), detail.getId());
         assertEquals("公开动态", detail.getContent());
+        // 详情是纯只读事务：自增由 CircleController 在读取之前单独完成。
+        // 若这里又变成「读时 +1」，会重新引入 REQUIRES_NEW 自死锁（MySQL 上 50s 超时）。
+        assertEquals(0L, detail.getViewCount(), "只读详情不得自增浏览量");
     }
 
     @Test
-    @DisplayName("获取动态详情 - view_count 为 NULL 不抛 NPE 且计数递增")
+    @DisplayName("获取动态详情 - view_count 为 NULL 不抛 NPE，按 0 返回")
     void getPostDetail_NullViewCountDoesNotThrow() {
-        // view_count 列允许为 NULL，历史数据里存在 NULL；直接拆箱会 NPE
+        // view_count 列允许为 NULL（SQLite 历史数据），直接拆箱会 NPE
         jdbc.update("UPDATE blog_circle_post SET view_count = NULL WHERE id = ?", publicPost.getId());
 
         CirclePostVO detail = circleQueryService.getPostDetail(publicPost.getId(), userA.getId());
 
         assertNotNull(detail, "NULL 浏览量不能让详情接口失败");
-        assertEquals(1L, detail.getViewCount(), "NULL 视为 0 后再 +1");
+        assertEquals(0L, detail.getViewCount(), "NULL 视为 0");
+    }
+
+    @Test
+    @DisplayName("浏览量自增由交互服务负责，且不会因未提交行锁而阻塞")
+    void incrementViewCount_IsIndependentOfDetailRead() {
+        // 详情读取不写库，因此可以在同一个（未提交的）测试事务里安全调用；
+        // 自增走独立的交互服务方法，语义与 BlogPostController 一致。
+        circleInteractionService.incrementViewCount(publicPost.getId());
+
+        CirclePost reloaded = circlePostMapper.selectById(publicPost.getId());
+        assertNotNull(reloaded);
+        assertEquals(1L, reloaded.getViewCount(), "自增后 DB 值应为 1");
     }
 
     @Test

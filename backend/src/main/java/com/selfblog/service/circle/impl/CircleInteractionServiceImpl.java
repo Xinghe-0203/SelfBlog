@@ -362,6 +362,15 @@ public class CircleInteractionServiceImpl implements CircleInteractionService {
         return circleRepostMapper.selectCount(wrapper) > 0;
     }
 
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void incrementViewCount(Long postId) {
+        if (postId == null) {
+            return;
+        }
+        circlePostMapper.incrementViewCount(postId);
+    }
+
     // ==================== 私有辅助方法 ====================
 
     private boolean canViewPost(CirclePost post, Long currentUserId) {

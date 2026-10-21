@@ -21,10 +21,7 @@ import com.selfblog.vo.user.UserVO;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.PlatformTransactionManager;
-import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionTemplate;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -57,33 +54,6 @@ public class CircleQueryServiceImpl extends ServiceImpl<CirclePostMapper, Circle
 
     @Autowired
     private TopicMapper topicMapper;
-
-    /**
-     * 事务管理器：详情页的浏览量自增要在独立的短写事务中完成，不能混进只读的读取事务。
-     * required=false 是为了兼容手工 new 出来的实例（单元测试），此时退化为直接执行。
-     */
-    @Autowired(required = false)
-    private PlatformTransactionManager transactionManager;
-
-    private volatile TransactionTemplate viewCountTemplate;
-
-    /**
-     * 在独立短事务（REQUIRES_NEW）中自增浏览量：读详情本身是只读事务，
-     * 若把 UPDATE 放在同一个只读事务里，在 H2/MySQL 上会被忽略或直接报错。
-     */
-    private void incrementViewCountInNewTransaction(Long postId) {
-        if (transactionManager == null) {
-            baseMapper.incrementViewCount(postId);
-            return;
-        }
-        TransactionTemplate template = this.viewCountTemplate;
-        if (template == null) {
-            template = new TransactionTemplate(transactionManager);
-            template.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
-            this.viewCountTemplate = template;
-        }
-        template.executeWithoutResult(status -> baseMapper.incrementViewCount(postId));
-    }
 
     @Override
     @Transactional(readOnly = true)
@@ -137,6 +107,16 @@ public class CircleQueryServiceImpl extends ServiceImpl<CirclePostMapper, Circle
         return convertToVOList(posts, userId);
     }
 
+    /**
+     * 读取动态详情。**纯只读**：不写库、不开写事务。
+     *
+     * <p>浏览量自增由 {@code CircleController} 在调用本方法之前通过
+     * {@code CircleInteractionService.incrementViewCount} 完成（与文章详情
+     * {@code BlogPostController.getPostDetail} 同形）。历史实现曾在只读事务里用
+     * REQUIRES_NEW 另开写事务自增，调用方一旦持有该行的未提交写锁（真实 MySQL 上
+     * 可复现，测试事务里必现），内层事务就会阻塞到 innodb_lock_wait_timeout 后抛
+     * CannotAcquireLockException；同时每次详情请求会占用两条池连接。两点都已消除。</p>
+     */
     @Override
     @Transactional(readOnly = true)
     public CirclePostVO getPostDetail(Long postId, Long currentUserId) {
@@ -148,11 +128,6 @@ public class CircleQueryServiceImpl extends ServiceImpl<CirclePostMapper, Circle
         if (!canViewPost(post, currentUserId)) {
             throw new BusinessException(403, "无权查看此动态");
         }
-
-        // 详情是只读事务，浏览量自增放到独立的短写事务里，避免 GET 打开写事务
-        incrementViewCountInNewTransaction(postId);
-        // view_count 允许为 NULL，直接拆箱会 NPE
-        post.setViewCount((post.getViewCount() == null ? 0L : post.getViewCount()) + 1);
 
         List<CirclePost> posts = Collections.singletonList(post);
         List<CirclePostVO> voList = convertToVOList(posts, currentUserId);

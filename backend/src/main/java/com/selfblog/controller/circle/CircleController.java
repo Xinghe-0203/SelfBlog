@@ -6,6 +6,7 @@ import com.selfblog.common.result.Result;
 import com.selfblog.dto.circle.CircleCommentRequest;
 import com.selfblog.dto.circle.CirclePostCreateRequest;
 import com.selfblog.dto.circle.CirclePostUpdateRequest;
+import com.selfblog.service.circle.CircleInteractionService;
 import com.selfblog.service.circle.CircleService;
 import com.selfblog.utils.SecurityUtils;
 import com.selfblog.vo.circle.CircleCommentVO;
@@ -36,6 +37,8 @@ import java.util.List;
 public class CircleController {
 
     private final CircleService circleService;
+
+    private final CircleInteractionService circleInteractionService;
 
     /**
      * 发布动态
@@ -129,11 +132,22 @@ public class CircleController {
 
     /**
      * 获取动态详情
+     *
+     * <p>浏览量自增刻意放在读取之前、且在独立的写事务里（{@code incrementViewCount}），
+     * 与 {@code BlogPostController.getPostDetail} 保持同形：读取本身是只读事务，若在
+     * 只读事务内部另开写事务自增，调用方持有该行未提交写锁时会一直等到
+     * innodb_lock_wait_timeout 后抛 CannotAcquireLockException。计数失败不应影响详情
+     * 返回，故整体 try/catch 后继续。</p>
      */
     @Operation(summary = "获取动态详情")
     @GetMapping("/post/{postId}")
     public Result<CirclePostVO> getPostDetail(@PathVariable Long postId) {
         Long userId = SecurityUtils.getCurrentUserIdOrNull();
+        try {
+            circleInteractionService.incrementViewCount(postId);
+        } catch (Exception e) {
+            log.warn("Failed to increment view count for circle post {}", postId, e);
+        }
         CirclePostVO detail = circleService.getPostDetail(postId, userId);
         return Result.success(detail);
     }

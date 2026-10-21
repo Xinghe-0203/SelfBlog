@@ -44,4 +44,15 @@ public interface CircleInteractionService {
      * 检查是否已转发
      */
     Boolean checkRepostStatus(Long postId, Long userId);
+
+    /**
+     * 浏览量 +1。
+     *
+     * <p>刻意独立于详情读取：详情是只读事务，GET 请求不应该在只读事务里开写事务；
+     * 若在读事务内部用 REQUIRES_NEW 另开一个写事务，当调用方（或测试）已经持有该行的
+     * 未提交写锁时，内层写事务会一直等这把锁直到 innodb_lock_wait_timeout（实测 50s）
+     * 后抛 CannotAcquireLockException。改为「先读、提交后再单独自增」后不再有跨连接
+     * 持锁重叠。调用方应 best-effort 调用：失败不影响详情返回。</p>
+     */
+    void incrementViewCount(Long postId);
 }

@@ -11,7 +11,7 @@
 一次覆盖 `backend/` 与 `frontend/` 的全量缺陷排查，目标是「按证据修，不按猜测改」。
 先产出三份只读审计（后端正确性 319 行、后端安全 772 行、前端正确性 210 行），
 每一条发现都附「已尝试证伪」的过程；再由两轮修复批次落地，每项都补了能失败的回归测试。
-后端测试从 **747 → 878（+131）**，前端 **43 文件 / 438 → 45 文件 / 444 tests**。
+后端测试从 **747 → 881（+134）**，前端 **43 文件 / 438 → 45 文件 / 444 tests**。
 
 按严重度收敛出的根因有三类，值得单独记住（见下方「承重规则」）：
 
@@ -65,8 +65,13 @@
   新增第 9 个具名缓存 `notificationListCache` 并改用 `@Caching(evict = {...})`
   （Spring 6 的 `@CacheEvict` 不是 `@Repeatable`，不能叠加两个）。
 - **Circle 读路径开写事务**：`getPostDetail` 是 `@Transactional(readOnly = true)` 却在里面
-  自增浏览数。浏览数自增拆到独立短写事务（`TransactionTemplate` + `REQUIRES_NEW`），
-  并修掉 `viewCount` 为 null 时的拆箱 NPE。
+  自增浏览数。第一版把自增拆到独立短写事务（`TransactionTemplate` + `REQUIRES_NEW`），
+  **这个修法本身有缺陷**：调用方（或测试事务）持有该行未提交写锁时，内层新事务会一直等锁，
+  真实 MySQL 8 上 50s 后抛 `CannotAcquireLockException`（CI 的 MySQL job 因此红灯；H2 因
+  锁语义宽松而假绿），且每次详情请求占两条池连接。最终改为与文章详情同形——自增移出读路径，
+  由 `CircleController` 在读取之前 best-effort 调用新增的
+  `CircleInteractionService.incrementViewCount`，读取本身恢复为纯只读、不写库、不开写事务；
+  同时修掉 `viewCount` 为 null 时的拆箱 NPE。全仓 `REQUIRES_NEW` / `PROPAGATION_` 现为零。
 - **`Page.total` 与 `records` 不同源**：评论（只取根评论却用含回复的 total）、点赞、
   收藏、关注（过滤被封禁用户）、热门内容（过滤未发布）五处都是「分页后再在 Java 里过滤」，
   客户端页数永远偏大、深页可能空页却仍报 total。改为让 total 与 records 走同一谓词。
@@ -213,7 +218,9 @@
 | `backend/src/main/resources/mapper/{BlogPost,BlogTrending,CirclePost,SysUser}Mapper.xml` | 修改（删死语句、别名加引号、计数夹子） |
 | `backend/src/main/resources/application.yml` | 修改（`app.trusted-proxies`、`app.mail.dev-console-code`、访客哈希密钥） |
 | `backend/.env.example`、`backend/DEPLOY.md` | 修改（新环境变量与可信代理说明） |
-| `backend/src/test/java/**`（约 25 个测试类，含 12 个新增） | 新增/修改（+131 tests） |
+| `backend/src/main/java/com/selfblog/controller/circle/CircleController.java` | 修改（浏览量自增移出只读读路径，与文章详情同形） |
+| `backend/src/main/java/com/selfblog/service/circle/{CircleInteractionService,impl/CircleInteractionServiceImpl,impl/CircleQueryServiceImpl}.java` | 修改（新增 `incrementViewCount`；详情恢复纯只读，删除 `REQUIRES_NEW` 自增） |
+| `backend/src/test/java/**`（约 25 个测试类，含 13 个新增） | 新增/修改（+134 tests） |
 | `frontend/src/api/index.ts`、`composables/useLatestRequest.ts` | 修改/新增（重试守卫、竞态 token） |
 | `frontend/src/views/**`（约 25 个视图与测试） | 修改（竞态、分页、错误路径） |
 | `frontend/src/{App.vue,main.ts,router/guards.ts,router/helpers.ts}` | 修改（滚动、启动顺序、redirect 校验、错误组件） |
@@ -224,8 +231,8 @@
 
 ### 验证
 
-- 后端全量：`Tests run: 878, Failures: 0, Errors: 0, Skipped: 0` + `BUILD SUCCESS`
-  （基线 747 → 878，+131；日志 `backend/target/gate-final.log`）。
+- 后端全量：`Tests run: 881, Failures: 0, Errors: 0, Skipped: 0` + `BUILD SUCCESS`
+  （基线 747 → 881，+134；日志 `backend/target/gate-mysqlfix.log`）。
 - 前端六闸门全绿：`lint:check` **0 errors / 39 warnings**（死代码清理后从 43 降）、
   `format:check` 通过、`type-check` 0、`test:run` **45 files / 444 tests**、
   `test:deployment` 27/27、`build` 通过。
@@ -245,8 +252,14 @@
     `'!'` 命中 `a!b`、`'\\'` 命中 `back\slash`（反斜杠无需转义）；省略 `ESCAPE` 子句时
     `%!%%` 仍 count=1，证明 `ESCAPE_CLAUSE` 必须随语句一起带。
   - H2 2.1.214 / 2.2.224 / 2.3.232 七个 MODE 下验证未加引号的别名被折成大写（C7/F-9 的根因）。
-- **未验证**：CI 上的真实 MySQL 8 job 与 Docker 镜像 job 需要推送后由 GitHub Actions 实际跑；
-  多实例部署下的限流与锁语义仍是单实例设计（已在类注释与本文档标明）。
+- **真实 MySQL 8 复核过一次并抓到真缺陷**：首次推送后 CI 的 `Backend tests (MySQL 8)` job
+  红灯，唯一失败点是 `CircleQueryServiceImplTest` 两条详情用例各挂 50.03s / 50.02s 报
+  `MySQLTransactionRollbackException: Lock wait timeout exceeded`——即上面那条
+  `REQUIRES_NEW` 修法的自死锁。H2 job 同时是绿的（假阴性），说明**这类跨连接锁问题只有
+  真实 MySQL 会暴露**。修复后已重跑后端全量 881 tests 全绿。
+- **未验证**：Docker 镜像 job 与 MySQL job 的最终结论需推送后由 GitHub Actions 实际跑
+  （首轮已观察到 Docker job 绿、MySQL job 红）；多实例部署下的限流与锁语义仍是单实例设计
+  （已在类注释与本文档标明）。
 
 ---
 
