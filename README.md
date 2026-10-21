@@ -211,6 +211,22 @@ SelfBlog/
 | Node.js | 22.22+ / 24.15+ / 26+ | 仅构建时由 Maven 插件自动安装；单 JAR 运行无需 Node |
 | MySQL | 8.0+ | 可选数据库；默认 SQLite 无需安装 |
 
+### 直接取用预构建 JAR（无需构建环境）
+
+仓库的 `release/` 目录随源码提交了一次真实构建的 fat JAR，目标机器只需要 JDK 21，
+不需要 Maven、Node 或 npm：
+
+```bash
+# 从仓库取 JAR
+cp release/selfblog-2.0.26.jar /path/to/deployment/
+cd /path/to/deployment
+cp /path/to/repo/backend/.env.example .env   # 然后填写 JWT_SECRET 与 ADMIN_PASSWORD
+java -jar selfblog-2.0.26.jar
+```
+
+校验与重建方式见 [`release/README.md`](release/README.md)。该 JAR 与提交时的源码一一对应，
+源码变更后不会自动更新。
+
 ### 推荐：构建并运行单 JAR
 
 构建机需要 JDK 21、Maven 3.8+ 和网络访问。Maven 会自动安装 Node/npm、构建 Vue 前端并将静态文件打入 JAR。

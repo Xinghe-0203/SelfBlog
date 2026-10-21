@@ -4,6 +4,54 @@
 
 ---
 
+## 未发布 — 新增 `release/` 目录，随源码提交可运行 JAR (2026-10-21)
+
+### 说明
+
+此前 `backend/target/` 与 `*.jar` 都在 `.gitignore` 里（构建产物不进版本控制的默认策略），
+克隆仓库后必须自备 JDK 21 + Maven + Node 才能得到可运行产物。按需求新增 `release/` 目录，
+把一次真实构建的 fat JAR 与源码一起提交，使没有构建环境的机器也能直接取用。
+
+### 变更
+
+- **新增 `release/selfblog-2.0.26.jar`**（68,440,532 B，SHA-256
+  `81D2298713DA69B7634CCE7D8392E34F6D3C54B317EDDBE43D5DA006040DB247`）——Spring Boot 单 JAR，
+  内嵌 Tomcat、全部后端依赖与已构建的 Vue 前端（`BOOT-INF/classes/static/` 337 个条目、
+  8 个 mapper XML）。
+- **新增 `release/README.md`**：说明该 JAR 的内容、运行方式（须与 `.env` 同目录）、
+  与当前提交源码的对应关系、重建命令与 SHA-256 校验方式。
+- **`.gitignore` 未改动**：`backend/target/` 与 `*.jar` 仍被忽略，发布副本是**显式**放进
+  `release/` 的独立文件，不改变「构建产物默认不入库」的既有约定。
+
+### 验证
+
+重新走完整构建链后再复制，而非复用旧产物：
+
+1. `frontend`：`npm run build` → `✓ built in 3.39s`（75 个文件）。
+2. `backend`：`./mvnw package -DskipTests -Dskip.npm=true -Dskip.installnodenpm=true`
+   → BUILD SUCCESS，`backend/target/selfblog.jar` 68,440,532 B。
+3. **真机冒烟**（`java -jar` 起服务于 :18825，真实 SQLite 文件库，默认 profile）：
+   `/actuator/health` 200、`/` 200 且 HTML 含 `seo-reading`（6079 B）、`/feed.xml` 200
+   （5521 B）、`/api/post/list?page=1&size=3` 200（4227 B）、`/seo-reading.css` 200。
+4. 复制到 `release/` 后比对 SHA-256，与源产物**逐字节一致**。
+
+### 影响文件
+
+| 文件 | 改动类型 |
+|------|----------|
+| `release/selfblog-2.0.26.jar` | 新增（构建产物） |
+| `release/README.md` | 新增 |
+| `README.md` | 新增「直接取用预构建 JAR」小节 |
+| `CHANGELOG.md` | 新增条目 |
+
+### 注意
+
+JAR 与源码不会自动同步：源码变更后需重新构建并替换本目录下的文件，同时更新 `README.md`
+里的版本号、大小与 SHA-256。GitHub 单文件上限 100 MB，当前 68 MB 在限内；继续增长到接近
+上限时应改用 GitHub Releases 附件而非入库。
+
+---
+
 ## 未发布 — 全仓深度排查：后端正确性/并发/安全加固 + 前端正确性/死代码清理 (2026-10-21)
 
 ### 说明

@@ -35,6 +35,8 @@ progress.md
 **/target
 **/dist
 **/.vercel
+# 预构建 JAR 只供直接运行使用；镜像自己会从源码构建，无需把 68 MB 产物塞进上下文
+release/
 
 # 日志与临时文件
 **/*.log
