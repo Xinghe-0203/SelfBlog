@@ -638,13 +638,14 @@ onUnmounted(() => {
 }
 .reader-layout {
   display: grid;
-  grid-template-columns: minmax(0, 760px) 200px;
+  /* 阅读栏宽可由后台「外观深度自定义」调整；fallback 760px 是改造前的硬编码值。 */
+  grid-template-columns: minmax(0, var(--ap-reader-width, 760px)) 200px;
   justify-content: center;
   gap: var(--page-section-gap, 32px);
   align-items: start;
 }
 .reader-layout--no-toc {
-  grid-template-columns: minmax(0, 760px);
+  grid-template-columns: minmax(0, var(--ap-reader-width, 760px));
 }
 .article-column {
   min-width: 0;
@@ -1236,7 +1237,7 @@ onUnmounted(() => {
 }
 @media (max-width: 1020px) {
   .reader-layout {
-    grid-template-columns: minmax(0, 760px);
+    grid-template-columns: minmax(0, var(--ap-reader-width, 760px));
   }
   /* 窄屏改用 MobileTocSheet（左下浮动胶囊 + 底部抽屉），侧边目录整块隐藏 */
   .article-aside {

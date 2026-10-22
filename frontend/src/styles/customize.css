@@ -1,0 +1,379 @@
+/**
+ * 外观深度自定义（v2.0.29）
+ *
+ * 这里消费后台「外观深度自定义」面板的 11 个设置键。分两类：
+ *
+ * 1. 枚举键（fontFamily / radiusScale / shadowDepth / layoutDensity / homeHeroStyle /
+ *    postCoverStyle / motionIntensity）——由 stores/site.ts 写成 `#selfblog` 上的
+ *    `data-ap-*` 属性，本文件用属性选择器切换。用属性而不是逐值写内联变量，是因为
+ *    圆角/阴影/动效都要成组改十几个 token，写在 CSS 里才能一眼看完每档的取值。
+ * 2. 数值键（baseFontSize / bodyLineHeight / readerWidth / paragraphSpacing）——写成
+ *    `#selfblog` 上的内联 `--ap-*` 变量，因为它们是连续值。
+ *    **不写 `<html>`**（与 `--ap-bg-*` 不同）：背景变量要早于 `#selfblog` 挂载生效才写到根元素，
+ *    而数值键必须留在作用域内，否则会连导航栏一起改掉。
+ *
+ * ## 三条承重规则
+ *
+ * - **只作用于内容区**：所有规则都以 `#selfblog ... .app-main:not(.app-main--admin)`
+ *   开头。导航栏（`<header class="site-nav-wrap">`）与页脚都在 `.app-main` 之外，
+ *   因此圆角/阴影/字体/动效的覆盖天然碰不到它们——这是「导航栏不要动」的实现方式，
+ *   不要图省事把变量写到 `:root` 或 `variables.css` 里。
+ * - **fallback 必须等于改造前的硬编码值**：`var(--ap-reader-width, 760px)` 里的 760px
+ *   就是 PostDetail 原来的 760px。作者没配过时计算值逐像素相同，零回归靠的是这一点。
+ * - **不覆盖 `--radius-full` / `50%`**：胶囊导航、圆形头像、圆形图标按钮必须是真圆，
+ *   跟着圆角风格一起变会失真。
+ *
+ * 本文件必须排在 appearance.css 之后导入（见 main.css）：作者的表面/背景配置要压过
+ * 皮肤与深色模式里同优先级的声明。
+ */
+
+/* ==========================================================================
+ * 1. 字体族
+ * ========================================================================== */
+
+/* `--ap-font-default` 只在 `#selfblog` 上取一次值：此刻 `--font-sans` 还是
+ * variables.css 里的原始系统栈，所以它就等于「改造前的正文/标题字体」。
+ * 下面把它当 fallback 用，避免在自定义层再抄一份字体栈——抄一份必然与
+ * variables.css 漂移（本文件存在的意义之一就是让改字体只改一处）。 */
+#selfblog {
+  --ap-font-default: var(--font-sans);
+}
+
+/* 三档显式选择。**不要**写 `--ap-font-body: var(--font-sans)`：紧接着下面会在
+ * 同一个元素上把 `--font-sans` 重定向到 `--ap-font-body`，那样构成自引用环，
+ * 两条声明会一起失效。 */
+#selfblog[data-ap-font='sans'] .app-main:not(.app-main--admin) {
+  --ap-font-body: var(--ap-font-default);
+  --ap-font-heading: var(--ap-font-default);
+}
+
+#selfblog[data-ap-font='serif'] .app-main:not(.app-main--admin) {
+  --ap-font-body: var(--font-serif);
+  --ap-font-heading: var(--font-serif);
+}
+
+#selfblog[data-ap-font='mono'] .app-main:not(.app-main--admin) {
+  --ap-font-body: var(--font-mono);
+  --ap-font-heading: var(--font-mono);
+}
+
+/* 重定向 token 本身，而不是给每个元素补 `font-family`。
+ * 原因（真机复现过）：`PostDetail.vue` 里有大量 `font-family: var(--font-display)` 的
+ * **直接声明**（`.markdown-body`、`.article-header h1`、`.article-end p`、`.toc-card h2` …），
+ * 直接声明永远赢过继承。只在 `.app-main` 上写 `font-family` 只能改到没有直接声明的元素，
+ * 结果是「标题变了、正文没变」的半截效果。
+ * 把 `--font-sans` / `--font-display` 在这个作用域内改成自定义族，所有既有声明自动跟随，
+ * 不必逐条提高特异性、也不必改动各视图的 scoped 样式。
+ * `--font-mono` 刻意不动：代码块与行内 code 必须保持等宽，选「衬线」后不能变宋体。
+ * 作用域限定在 `.app-main:not(.app-main--admin)`：之外是导航栏与页脚（不得改动）。 */
+#selfblog .app-main:not(.app-main--admin) {
+  --font-sans: var(--ap-font-body, var(--ap-font-default));
+  --font-display: var(--ap-font-heading, var(--ap-font-default));
+  font-family: var(--font-sans);
+}
+
+#selfblog .app-main:not(.app-main--admin) :where(h1, h2, h3, h4, h5, h6) {
+  font-family: var(--font-display);
+}
+
+/* ==========================================================================
+ * 2. 正文字号 / 行高 / 段间距
+ * ========================================================================== */
+
+/* `.markdown-body` 原本是 `font-size:var(--text-base)` + `line-height:var(--leading-relaxed)`
+ * 即 16px / 1.75 —— fallback 逐字对齐，默认档零回归。 */
+#selfblog .app-main:not(.app-main--admin) .markdown-body {
+  font-size: var(--ap-base-font-size, 1rem);
+  line-height: var(--ap-body-line-height, 1.75);
+}
+
+/* `.page-markdown`（关于页等静态页）原本 line-height 硬编码 1.9，与 `.markdown-body`
+ * 的 1.75 是既有漂移。fallback 保留 1.9 以免默认档改到静态页；一旦作者调了行高，
+ * 两者统一用同一个值。规则放在 `.markdown-body` 之后：特异性相同，后写的赢。 */
+#selfblog .app-main:not(.app-main--admin) .page-markdown {
+  font-size: var(--ap-base-font-size, 1rem);
+  line-height: var(--ap-body-line-height, 1.9);
+}
+
+/* 段落间距只作用于正文段落，不碰标题的 `1.5em/0.75em` 节奏。 */
+#selfblog .app-main:not(.app-main--admin) .markdown-body p {
+  margin-bottom: var(--ap-paragraph-spacing, 1em);
+}
+
+/* ==========================================================================
+ * 3. 圆角风格
+ * ========================================================================== */
+
+/* 每档都显式覆盖 8 个档位 + 旧别名 `--radius`（variables.css:293，60+ 处仍在用）。
+ * 不覆盖 `--radius-none`(0) 与 `--radius-full`(9999)：前者本来就是 0，后者必须是真圆。 */
+#selfblog[data-ap-radius='none'] .app-main:not(.app-main--admin) {
+  --radius-xs: 0px;
+  --radius-sm: 0px;
+  --radius: 0px;
+  --radius-md: 0px;
+  --radius-lg: 0px;
+  --radius-xl: 0px;
+  --radius-2xl: 0px;
+  --radius-3xl: 0px;
+}
+
+#selfblog[data-ap-radius='sharp'] .app-main:not(.app-main--admin) {
+  --radius-xs: 2px;
+  --radius-sm: 3px;
+  --radius: 4px;
+  --radius-md: 4px;
+  --radius-lg: 6px;
+  --radius-xl: 7px;
+  --radius-2xl: 8px;
+  --radius-3xl: 10px;
+}
+
+#selfblog[data-ap-radius='soft'] .app-main:not(.app-main--admin) {
+  --radius-xs: 6px;
+  --radius-sm: 9px;
+  --radius: 12px;
+  --radius-md: 12px;
+  --radius-lg: 18px;
+  --radius-xl: 21px;
+  --radius-2xl: 24px;
+  --radius-3xl: 30px;
+}
+
+#selfblog[data-ap-radius='round'] .app-main:not(.app-main--admin) {
+  --radius-xs: 8px;
+  --radius-sm: 12px;
+  --radius: 16px;
+  --radius-md: 16px;
+  --radius-lg: 22px;
+  --radius-xl: 26px;
+  --radius-2xl: 28px;
+  --radius-3xl: 36px;
+}
+
+/* ==========================================================================
+ * 4. 阴影层次
+ * ========================================================================== */
+
+#selfblog[data-ap-shadow='flat'] .app-main:not(.app-main--admin) {
+  --shadow-xs: none;
+  --shadow-sm: none;
+  --shadow: none;
+  --shadow-md: none;
+  --shadow-lg: none;
+  --shadow-xl: none;
+  --shadow-2xl: none;
+  --shadow-inner: none;
+}
+
+/* 加深档用「同一色相、更大模糊半径 + 更高不透明度」，而不是换成纯黑：
+ * 亮色画布上纯黑投影会显脏。暗色画布另有一组（见下），否则浅墨投影在深底上几乎看不见。 */
+#selfblog[data-ap-shadow='deep'] .app-main:not(.app-main--admin) {
+  --shadow-xs: 0 2px 4px rgb(20 32 51 / 6%);
+  --shadow-sm: 0 4px 10px rgb(20 32 51 / 9%);
+  --shadow: 0 8px 22px rgb(20 32 51 / 13%);
+  --shadow-md: 0 12px 32px rgb(20 32 51 / 16%);
+  --shadow-lg: 0 16px 44px rgb(20 32 51 / 20%);
+  --shadow-xl: 0 22px 60px rgb(20 32 51 / 24%);
+  --shadow-2xl: 0 28px 76px rgb(20 32 51 / 32%);
+}
+
+/* 只重写 token 是不够的：真机逐元素枚举证明，内容区的**容器卡片**
+ * （`.article-list` / `.intro-shell` / `.sidebar-block` / `.author-profile` /
+ * `.album-card` / `.state-panel` / `.archive-callout`）全部只有 `border`、
+ * 没有任何 `box-shadow` 声明，所以「加深」档之前除了 `.toc-fab` 一个浮动按钮之外
+ * 什么都看不见——后台写「阴影层次」而页面纹丝不动，是承诺落空。
+ *
+ * 只给「加深」档接线，不给「默认」档接线，是刻意的：
+ *  - 「默认」档必须逐像素等于改造前（作者没配过时不能因为打开这个面板就换外观），
+ *    这是本文件头部第 2 条承重规则的直接后果；
+ *  - 「扁平」档靠上面的 `--shadow-*: none` 已经真的关掉了 `.toc-fab` / `.btn` /
+ *    `.toast` / `.back-to-top` 的既有投影，同样有可见差异。
+ * 三档于是各有真实差异：默认=系统原有层次、加深=内容卡片也浮起、扁平=全无投影。
+ *
+ * 不碰 `.page-frame`：它在 `appearance.css` 里的 `inset 0 0 0 1px` 是**描边**语义，
+ * 换成外投影会让纸面边缘糊掉。 */
+#selfblog[data-ap-shadow='deep']
+  .app-main:not(.app-main--admin)
+  :where(
+    .article-list,
+    .intro-shell,
+    .sidebar-block,
+    .author-profile,
+    .album-card,
+    .state-panel,
+    .archive-callout
+  ) {
+  box-shadow: var(--shadow-xs);
+}
+
+#selfblog.dark-mode[data-ap-shadow='deep'] .app-main:not(.app-main--admin),
+#selfblog[data-skin='midnight'][data-ap-shadow='deep'] .app-main:not(.app-main--admin) {
+  --shadow-xs: 0 2px 4px rgb(0 0 0 / 34%);
+  --shadow-sm: 0 4px 10px rgb(0 0 0 / 40%);
+  --shadow: 0 8px 22px rgb(0 0 0 / 46%);
+  --shadow-md: 0 12px 32px rgb(0 0 0 / 52%);
+  --shadow-lg: 0 16px 44px rgb(0 0 0 / 58%);
+  --shadow-xl: 0 22px 60px rgb(0 0 0 / 64%);
+  --shadow-2xl: 0 28px 76px rgb(0 0 0 / 72%);
+}
+
+/* ==========================================================================
+ * 5. 布局密度
+ * ========================================================================== */
+
+/* 这两个变量原本由 PageFrame 的 `data-page-density` 属性在 `.page-frame` 元素上写。
+ * 全局设置写在祖先 `.app-main` 上：元素自身的声明永远赢过继承来的值，所以
+ * 「页面管理里单独设了密度」的页面依然优先，全局档只填没有页面级配置的空缺。 */
+#selfblog[data-ap-density='compact'] .app-main:not(.app-main--admin) {
+  --page-section-gap: 18px;
+  --page-padding-block: 18px;
+}
+
+#selfblog[data-ap-density='comfortable'] .app-main:not(.app-main--admin) {
+  --page-section-gap: 40px;
+  --page-padding-block: 36px;
+}
+
+/* ==========================================================================
+ * 6. 首页头图
+ * ========================================================================== */
+
+/* 紧凑：压低高度、收窄封面比例，首屏能多露出一张文章卡片。 */
+#selfblog[data-ap-hero='compact'] .intro-shell {
+  min-height: 168px;
+  padding: 24px 28px;
+}
+
+#selfblog[data-ap-hero='compact'] .intro-visual {
+  width: 34%;
+}
+
+#selfblog[data-ap-hero='compact'] .intro-copy h1 {
+  font-size: var(--text-3xl);
+}
+
+/* 极简：去掉封面图，只留文字卡。遮罩层也要撤掉——它是为压在照片上才存在的。 */
+#selfblog[data-ap-hero='minimal'] .intro-visual,
+#selfblog[data-ap-hero='minimal'] .intro-shell::after {
+  display: none;
+}
+
+#selfblog[data-ap-hero='minimal'] .intro-shell {
+  min-height: 0;
+  padding: 22px 26px;
+}
+
+#selfblog[data-ap-hero='minimal'] .intro-copy h1 {
+  font-size: clamp(24px, 2.6vw, 30px);
+}
+
+/* 关闭：连外框一起撤掉，只留一个可见的标题。
+ * 刻意不 `display:none` 整段：那样页面会失去唯一的 h1，对读屏与 SEO 都是硬伤。 */
+#selfblog[data-ap-hero='off'] .intro-shell {
+  min-height: 0;
+  padding: 0;
+  border-color: transparent;
+  background: transparent;
+}
+
+#selfblog[data-ap-hero='off'] .intro-visual,
+#selfblog[data-ap-hero='off'] .intro-shell::after,
+#selfblog[data-ap-hero='off'] .intro-author,
+#selfblog[data-ap-hero='off'] .intro-description {
+  display: none;
+}
+
+#selfblog[data-ap-hero='off'] .intro-copy h1 {
+  font-size: clamp(26px, 2.8vw, 32px);
+}
+
+@media (max-width: 600px) {
+  /* 移动端 Home.vue 自己会把 `.intro-visual` 放到 69% 宽并降不透明度；
+   * 上面的紧凑档特异性更高，会把它压回 34%，所以这里补一组移动端取值。 */
+  #selfblog[data-ap-hero='compact'] .intro-shell {
+    min-height: 180px;
+    padding: 22px;
+  }
+
+  #selfblog[data-ap-hero='compact'] .intro-visual {
+    width: 55%;
+    opacity: 0.6;
+  }
+}
+
+/* ==========================================================================
+ * 7. 文章封面
+ * ========================================================================== */
+
+/* 通栏：向两侧各吃掉 `.reader-page` 的 24px 横向内边距，贴到纸面边缘。
+ * 安全边界：桌面端左栏与 TOC 之间有 32px gap，右侧只外扩 24px，不会压到 TOC；
+ * 窄屏（≤1020px）布局变单列，页面内边距仍是 24px，同样刚好贴边。 */
+#selfblog[data-ap-post-cover='wide'] .article-cover {
+  max-height: 560px;
+  margin-inline: -24px;
+  width: calc(100% + 48px);
+  border-radius: 0;
+}
+
+#selfblog[data-ap-post-cover='hidden'] .article-cover {
+  display: none;
+}
+
+@media (max-width: 600px) {
+  /* 移动端 `.reader-page` 的横向内边距是 18px（PostDetail.vue 的 600px 断点）。 */
+  #selfblog[data-ap-post-cover='wide'] .article-cover {
+    max-height: 260px;
+    margin-inline: -18px;
+    width: calc(100% + 36px);
+  }
+}
+
+/* ==========================================================================
+ * 8. 动效强度
+ * ========================================================================== */
+
+/* 轻微 / 活泼：只缩放时长 token，不动缓动曲线——曲线是设计决策，时长才是强度。
+ * 导航栏消费的 `--transition`/`--transition-fast` 也在这里被覆盖，但作用域限定在
+ * `.app-main` 内，所以导航栏自己的过渡不受影响。 */
+#selfblog[data-ap-motion='subtle'] .app-main:not(.app-main--admin) {
+  --duration-instant: 30ms;
+  --duration-fast: 90ms;
+  --duration-normal: 120ms;
+  --duration-slow: 180ms;
+  --duration-slower: 240ms;
+  --transition-fast: 90ms cubic-bezier(0.16, 1, 0.3, 1);
+  --transition: 120ms cubic-bezier(0.16, 1, 0.3, 1);
+  --transition-base: 120ms cubic-bezier(0.16, 1, 0.3, 1);
+  --transition-slow: 180ms cubic-bezier(0.16, 1, 0.3, 1);
+  --transition-spring: 240ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ap-page-enter: 180ms;
+  --ap-page-leave: 110ms;
+}
+
+#selfblog[data-ap-motion='lively'] .app-main:not(.app-main--admin) {
+  --duration-instant: 80ms;
+  --duration-fast: 220ms;
+  --duration-normal: 300ms;
+  --duration-slow: 440ms;
+  --duration-slower: 600ms;
+  --transition-fast: 220ms cubic-bezier(0.16, 1, 0.3, 1);
+  --transition: 300ms cubic-bezier(0.16, 1, 0.3, 1);
+  --transition-base: 300ms cubic-bezier(0.16, 1, 0.3, 1);
+  --transition-slow: 440ms cubic-bezier(0.16, 1, 0.3, 1);
+  --transition-spring: 600ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ap-page-enter: 380ms;
+  --ap-page-leave: 220ms;
+}
+
+/* 关闭：与 a11y.css 的 `prefers-reduced-motion` 用同一套写法（同样的三条 !important）。
+ * 这是作者主动选择的无动效档，不是对系统偏好的覆盖——系统偏好档位更高，两者同时
+ * 生效时结果一致（都是无动效），不会互相打架。 */
+#selfblog[data-ap-motion='off'] .app-main:not(.app-main--admin),
+#selfblog[data-ap-motion='off'] .app-main:not(.app-main--admin) *,
+#selfblog[data-ap-motion='off'] .app-main:not(.app-main--admin) *::before,
+#selfblog[data-ap-motion='off'] .app-main:not(.app-main--admin) *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  transition-property: none !important;
+}

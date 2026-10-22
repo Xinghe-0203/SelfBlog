@@ -46,6 +46,7 @@ public class RateLimitInterceptor implements HandlerInterceptor {
 
         int longestMatch = -1;
         String matchedBase = null;
+        boolean readRule = false;
         for (Map.Entry<String, Integer> entry : allLimits.entrySet()) {
             String prefix = entry.getKey();
             String base = prefix.endsWith("/") ? prefix.substring(0, prefix.length() - 1) : prefix;
@@ -55,6 +56,31 @@ public class RateLimitInterceptor implements HandlerInterceptor {
                 matched = true;
                 longestMatch = base.length();
                 matchedBase = base;
+                readRule = false;
+            }
+        }
+
+        // 只读方法（GET/HEAD/OPTIONS）优先命中读路径阈值表。
+        //
+        // 为什么需要这一步：限流按路径前缀匹配，但同一前缀下同时挂着读与写——
+        // `PUT /api/post/{id}` 更新（10/min 合理）与 `GET /api/post/{id}` 详情（10/min 是硬伤）
+        // 落在同一个 `/api/post/` 前缀里。实测同一 IP 连读 12 篇文章，第 11 次起 429；
+        // `GET /api/guest-comments/post/{id}` 更严重，5/min 的发表配额让读者看到第 6 个
+        // 评论区就被拦。因此读方法再查一次读阈值表，**等长或更长**的读前缀胜出：
+        // 等长覆盖「同前缀的 GET 用读阈值、写方法仍用写阈值」，更长覆盖
+        // `/api/guest-comments/post` 这种比写前缀更深的读路径；
+        // 更长的具名写前缀（如 `/api/post/list`）仍然胜出，语义不变。
+        if (isReadMethod(request.getMethod())) {
+            for (Map.Entry<String, Integer> entry : rateLimitProperties.getReadLimits().entrySet()) {
+                String prefix = entry.getKey();
+                String base = prefix.endsWith("/") ? prefix.substring(0, prefix.length() - 1) : prefix;
+                if ((path.equals(base) || path.startsWith(base + "/")) && base.length() >= longestMatch) {
+                    maxRequests = entry.getValue();
+                    matched = true;
+                    longestMatch = base.length();
+                    matchedBase = base;
+                    readRule = true;
+                }
             }
         }
 
@@ -70,7 +96,10 @@ public class RateLimitInterceptor implements HandlerInterceptor {
         // 创建配额（既有用例 readingCommentsDoesNotConsumeCreationQuota 明确要求互不消耗）。
         // 取「前缀 + 层数」后：同一层上的路径变量（换 id）共享一份配额，
         // 层数不同的路径各占一桶；最长前缀语义不变，`/api/post/list` 仍走自己的 60/min。
-        String key = ip + ":" + matchedBase + "#" + pathDepthAfter(path, matchedBase);
+        // 读/写规则再分桶（`:read`/`:write`）：同一路径层上 GET 与 PUT 用不同阈值，
+        // 若共用计数器，读者刷满 60 次读额度后作者改这篇文章就会被 429。
+        String key = ip + ":" + matchedBase + "#" + pathDepthAfter(path, matchedBase)
+                + (readRule ? ":read" : ":write");
         AtomicInteger count = requestCounts.get(key, k -> new AtomicInteger(0));
         int current = count.incrementAndGet();
 
@@ -87,6 +116,14 @@ public class RateLimitInterceptor implements HandlerInterceptor {
             return false;
         }
         return true;
+    }
+
+    /**
+     * 只读 HTTP 方法。只有这类方法才允许用宽松的读路径阈值；
+     * 写方法（POST/PUT/DELETE/PATCH）永远走写前缀的严格阈值。
+     */
+    private boolean isReadMethod(String method) {
+        return "GET".equals(method) || "HEAD".equals(method) || "OPTIONS".equals(method);
     }
 
     /**

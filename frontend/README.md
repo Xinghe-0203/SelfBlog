@@ -2,7 +2,7 @@
 
 Vue 3 frontend for a single-author personal blog. Public pages focus on reading, search, archives, about, and tags; writing and content management are protected by administrator-only routes.
 
-**Version**: v2.0.28 | **Vue**: 3.5.44 | **Vite**: 6.4.4
+**Version**: v2.0.29 | **Vue**: 3.5.44 | **Vite**: 6.4.4
 
 ## Tech Stack
 
@@ -201,6 +201,42 @@ KV table, so this needs **no schema migration**.
   again client-side.
 - `SiteAssetField.vue`'s client-side size pre-check must **not** be stricter than the
   server: `KIND_RULES.background.maxBytes` is 8MB, matching `SiteAssetKind.BACKGROUND`.
+
+### Deep appearance customization (2026-10-22, v2.0.29)
+
+Eleven more author settings, in four dimensions — typography (`fontFamily`, `baseFontSize`,
+`bodyLineHeight`, `readerWidth`, `paragraphSpacing`), layout (`radiusScale`, `shadowDepth`,
+`layoutDensity`), presentation (`homeHeroStyle`, `postCoverStyle`) and motion
+(`motionIntensity`). Every rule lives in the new `styles/customize.css`, which is imported
+**after** `appearance.css` so author choices beat same-specificity skin/dark-mode declarations.
+
+- **Navigation and the admin UI must not change.** Every selector is scoped to
+  `#selfblog .app-main:not(.app-main--admin)`; `Navbar` (`.site-nav-wrap`) and `Footer` sit
+  outside `.app-main`, so they are unreachable by construction. The verification record asserts
+  this by reading their computed styles in every tier and comparing the strings byte for byte.
+- **The default tier must equal the pre-change rendering, pixel for pixel.** Each rule's
+  fallback *is* the old hard-coded value (`var(--ap-reader-width, 760px)` where 760px was
+  `PostDetail.vue`'s original), and `applyCustomizations()` deletes the hook
+  (`delete root.dataset[...]` / `removeProperty`) when the value equals the default. Never
+  "improve" the default tier with a slightly nicer shadow or gap — zero regression depends on it.
+- **Fonts must be redirected at the token, not inherited.** `PostDetail.vue` (and several other
+  views) declare `font-family: var(--font-display)` directly, which always beats inheritance;
+  the first implementation therefore changed headings but not body text. `customize.css`
+  reassigns `--font-sans` / `--font-display` inside the scope (headings get `--ap-font-heading`),
+  so existing declarations follow automatically. `--font-mono` is deliberately untouched: code
+  blocks and inline code must stay monospaced.
+- **Only the `deep` shadow tier wires content cards** (`.article-list`, `.intro-shell`,
+  `.sidebar-block`, `.author-profile`, `.album-card`, `.state-panel`, `.archive-callout` →
+  `box-shadow: var(--shadow-xs)`). Wiring `default` is deliberately skipped for zero regression.
+  `.page-frame`'s `inset 0 0 0 1px` is a *border* semantic and must not become an outer shadow.
+- Do not override `--radius-full` (9999px) or `50%`: capsule navigation and circular
+  avatars/buttons must stay truly round.
+- The eleven keys stay **out of `PREPAINT_APPEARANCE_VARS`**: they depend on the `#selfblog`
+  scope, and pre-painting them onto `<html>` would bypass the scope and alter the navbar.
+- `App.vue`'s appearance `watch` dependency array must list all eleven keys (14 entries today),
+  or changing a setting will not re-apply it.
+- The admin panel is the 7th section of `views/admin/Settings.vue`; its "restore defaults"
+  button only edits the form and does **not** save, so a mis-click cannot change the live site.
 
 ### LLM-assisted SEO admin UI (2026-10-22)
 

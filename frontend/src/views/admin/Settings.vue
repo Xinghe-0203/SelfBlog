@@ -500,6 +500,142 @@
         </div>
       </section>
 
+      <section class="settings-panel appearance-panel">
+        <div class="panel-heading panel-heading-row">
+          <div>
+            <h2>外观深度自定义</h2>
+            <p>
+              这些设置只影响前台内容区（正文、卡片、列表与首页头图），导航栏与后台界面保持不变。「恢复默认外观」只改本页表单，仍需点底部保存才会生效。
+            </p>
+          </div>
+          <button
+            class="btn btn-ghost btn-sm"
+            type="button"
+            data-action="reset-appearance"
+            @click="resetAppearance"
+          >
+            恢复默认外观
+          </button>
+        </div>
+        <div class="appearance-grid">
+          <label
+            >正文字体<select v-model="form.fontFamily" data-setting="fontFamily">
+              <option value="system">系统默认</option>
+              <option value="sans">无衬线</option>
+              <option value="serif">衬线（宋体）</option>
+              <option value="mono">等宽</option>
+            </select></label
+          >
+          <label
+            >正文字号
+            <div class="range-row">
+              <input
+                type="range"
+                min="14"
+                max="19"
+                step="1"
+                data-setting="baseFontSize"
+                :value="appearanceNumber('baseFontSize')"
+                @input="setAppearanceNumber('baseFontSize', $event)"
+              /><code>{{ appearanceReadout('baseFontSize') }}</code>
+            </div>
+            <small>14–19 px，只作用于文章与页面正文。</small></label
+          >
+          <label
+            >正文行高
+            <div class="range-row">
+              <input
+                type="range"
+                min="1.5"
+                max="2.2"
+                step="0.05"
+                data-setting="bodyLineHeight"
+                :value="appearanceNumber('bodyLineHeight')"
+                @input="setAppearanceNumber('bodyLineHeight', $event)"
+              /><code>{{ appearanceReadout('bodyLineHeight') }}</code>
+            </div>
+            <small>1.5–2.2 倍行距，越大越松散。</small></label
+          >
+          <label
+            >阅读栏宽
+            <div class="range-row">
+              <input
+                type="range"
+                min="640"
+                max="960"
+                step="10"
+                data-setting="readerWidth"
+                :value="appearanceNumber('readerWidth')"
+                @input="setAppearanceNumber('readerWidth', $event)"
+              /><code>{{ appearanceReadout('readerWidth') }}</code>
+            </div>
+            <small>640–960 px，正文可读性与宽屏留白的取舍。</small></label
+          >
+          <label
+            >段落间距
+            <div class="range-row">
+              <input
+                type="range"
+                min="0"
+                max="2"
+                step="0.1"
+                data-setting="paragraphSpacing"
+                :value="appearanceNumber('paragraphSpacing')"
+                @input="setAppearanceNumber('paragraphSpacing', $event)"
+              /><code>{{ appearanceReadout('paragraphSpacing') }}</code>
+            </div>
+            <small>0–2 em，正文段落之间的额外留白。</small></label
+          >
+          <label
+            >圆角风格<select v-model="form.radiusScale" data-setting="radiusScale">
+              <option value="none">无圆角</option>
+              <option value="sharp">锐利</option>
+              <option value="default">默认</option>
+              <option value="soft">柔和</option>
+              <option value="round">圆润</option>
+            </select></label
+          >
+          <label
+            >阴影层次<select v-model="form.shadowDepth" data-setting="shadowDepth">
+              <option value="flat">扁平 · 无阴影</option>
+              <option value="default">默认</option>
+              <option value="deep">加深 · 更强悬浮感</option>
+            </select></label
+          >
+          <label
+            >布局密度<select v-model="form.layoutDensity" data-setting="layoutDensity">
+              <option value="compact">紧凑</option>
+              <option value="default">默认</option>
+              <option value="comfortable">宽松</option>
+            </select></label
+          >
+          <label
+            >首页头图<select v-model="form.homeHeroStyle" data-setting="homeHeroStyle">
+              <option value="default">默认</option>
+              <option value="compact">紧凑</option>
+              <option value="minimal">极简</option>
+              <option value="off">关闭</option>
+            </select></label
+          >
+          <label
+            >文章封面<select v-model="form.postCoverStyle" data-setting="postCoverStyle">
+              <option value="default">默认</option>
+              <option value="wide">通栏</option>
+              <option value="hidden">隐藏</option>
+            </select></label
+          >
+          <label
+            >动效强度<select v-model="form.motionIntensity" data-setting="motionIntensity">
+              <option value="off">关闭</option>
+              <option value="subtle">轻微</option>
+              <option value="default">默认</option>
+              <option value="lively">活泼</option>
+            </select>
+            <small>关闭后前台不再播放入场与滚动动效。</small></label
+          >
+        </div>
+      </section>
+
       <div class="form-footer">
         <p>更改后台路径后将自动跳转到新地址。</p>
         <button class="save-button btn btn-primary" type="submit" :disabled="saving">
@@ -614,6 +750,64 @@ const backgroundType = computed<'solid' | 'gradient' | 'image'>(() => {
 const backgroundOverlay = computed(() => clampInt(form.backgroundOverlay, 0, 90, 0))
 const surfaceOpacity = computed(() => clampInt(form.surfaceOpacity, 60, 100, 100))
 const surfaceBlur = computed(() => clampInt(form.surfaceBlur, 0, 40, 0))
+
+/** 外观深度自定义里四个数值型设置键；其余七个是枚举字符串。 */
+type AppearanceNumberKey = 'baseFontSize' | 'bodyLineHeight' | 'readerWidth' | 'paragraphSpacing'
+
+/** 数值键的默认值与读数单位；默认值必须与 `stores/site.ts` 的 defaults 一致。 */
+const APPEARANCE_NUMBER_META: Record<AppearanceNumberKey, { fallback: number; unit: string }> = {
+  baseFontSize: { fallback: 16, unit: ' px' },
+  bodyLineHeight: { fallback: 1.75, unit: '' },
+  readerWidth: { fallback: 760, unit: ' px' },
+  paragraphSpacing: { fallback: 1, unit: ' em' }
+}
+
+/**
+ * 「恢复默认外观」要写回的 11 个键。
+ *
+ * <p>只重置本地表单、**不自动保存**：作者仍要点底部保存才落库，避免一次误点
+ * 就把线上外观改掉。取值与 `stores/site.ts` 的 defaults / 后端 defaults() 一致。</p>
+ */
+const APPEARANCE_DEFAULTS = {
+  fontFamily: 'system',
+  baseFontSize: '16',
+  bodyLineHeight: '1.75',
+  readerWidth: '760',
+  paragraphSpacing: '1',
+  radiusScale: 'default',
+  shadowDepth: 'default',
+  layoutDensity: 'default',
+  homeHeroStyle: 'default',
+  postCoverStyle: 'default',
+  motionIntensity: 'default'
+} as const
+
+/**
+ * 读数值型设置。
+ *
+ * <p>契约里字段全是字符串，range 的 `v-model` 直接绑会与 `SiteSettings` 的类型冲突，
+ * 所以这里只把「读」做一次安全解析（脏数据不渲染成 NaN），写回仍是字符串。</p>
+ */
+function appearanceNumber(key: AppearanceNumberKey): number {
+  const parsed = Number.parseFloat(form[key] ?? '')
+  return Number.isFinite(parsed) ? parsed : APPEARANCE_NUMBER_META[key].fallback
+}
+
+/** 滑杆旁读数，例如「16 px」「1.75」「760 px」「1 em」。 */
+function appearanceReadout(key: AppearanceNumberKey): string {
+  return `${appearanceNumber(key)}${APPEARANCE_NUMBER_META[key].unit}`
+}
+
+/** range 的 input 事件：把浏览器给的字符串原样写回表单，保持后端契约的 string 类型。 */
+function setAppearanceNumber(key: AppearanceNumberKey, event: Event): void {
+  const target = event.target as HTMLInputElement | null
+  if (target) form[key] = target.value
+}
+
+/** 把 11 个外观键重置为默认值；只改表单，不触发保存。 */
+function resetAppearance(): void {
+  Object.assign(form, APPEARANCE_DEFAULTS)
+}
 
 /**
  * 预览用的背景图地址：剥掉服务端同样拒绝的字符（引号/括号/反斜杠/空白），
@@ -1125,6 +1319,27 @@ label small {
   background: var(--bg-secondary);
   color: var(--text-muted);
 }
+/* 外观深度自定义：面板跨两列，11 个控件走两列网格；range 读数复用 .range-row。 */
+.appearance-panel {
+  grid-column: 1 / -1;
+}
+.appearance-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 15px 18px;
+  align-items: start;
+}
+.appearance-grid > label {
+  display: grid;
+  gap: 7px;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+}
+.appearance-grid > label small {
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  line-height: 1.6;
+}
 .form-footer {
   grid-column: 1 / -1;
   display: flex;
@@ -1177,6 +1392,9 @@ label small {
     grid-template-columns: 1fr;
   }
   .llm-fields {
+    grid-template-columns: 1fr;
+  }
+  .appearance-grid {
     grid-template-columns: 1fr;
   }
   .llm-provider {

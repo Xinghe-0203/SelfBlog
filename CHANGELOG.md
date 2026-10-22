@@ -4,6 +4,166 @@
 
 ---
 
+## v2.0.29 — 外观深度自定义（11 个视觉维度）+ 只读路径限流修复 (2026-10-22)
+
+### 说明
+
+用户诉求（原话）：「让前端自定义程度更加高，仔细搜索github上这些项目的前端样式对我这个前端进行改造，导航栏不要动。仔细检查程序，确保没有问题。」
+
+此前作者能调的只有**背景与表面透明度**（v2.0.27 的三级表面），排版、圆角、密度、阴影、动效
+全部是写死的。本版参考 Hexo NexT / Butterfly / Fluid、Hugo PaperMod / Stack、AstroPaper /
+Fuwari、Ghost Casper 等成熟主题暴露的配置项，落地 **11 个新设置键**，分四个维度：
+
+- **排版**：`fontFamily`（系统/无衬线/衬线/等宽）、`baseFontSize`（14–19px）、
+  `bodyLineHeight`（1.5–2.2）、`readerWidth`（640–960px）、`paragraphSpacing`（0–2em）。
+- **布局**：`radiusScale`（无/锐/默认/柔/圆）、`shadowDepth`（扁平/默认/加深）、
+  `layoutDensity`（紧凑/默认/宽松）。
+- **呈现**：`homeHeroStyle`（默认/紧凑/极简/关闭）、`postCoverStyle`（默认/加宽/隐藏）。
+- **动效**：`motionIntensity`（关闭/轻微/默认/活泼）。
+
+三条硬约束贯穿实现：**导航栏与后台界面完全不动**（所有规则限定在
+`.app-main:not(.app-main--admin)` 内，而导航栏与页脚都在 `.app-main` 之外）、
+**默认值逐像素等于改造前观感**（老站点升级零视觉回归）、**WCAG 对比度不回退**。
+
+同时修掉一个真实缺陷：**访客正常阅读会被限流拦**。限流按路径前缀匹配，而同一前缀下
+同时挂着读与写——`GET /api/post/{id}`（详情）与 `PUT /api/post/{id}`（更新）共用
+`/api/post/` 的 10/min，实测同一 IP 连读第 11 篇文章即 429；
+`GET /api/guest-comments/post/{id}` 更严重，5/min 的发表配额让读者看到第 6 个评论区就被拦。
+
+### 新增（外观深度自定义）
+
+- **11 个新设置键**（`site_setting` KV 表，零 schema 迁移）：`ALLOWED_KEYS` / `defaults()` /
+  `validateValue()` 三处同改。默认值 `system` / `16` / `1.75` / `760` / `1` / `default` × 6，
+  逐项等于改造前的硬编码值。
+- **新增 `requireDecimalInRange(String, double, double, String)`**：行高与段距这类无单位倍数
+  的统一校验。正则 `-?\d{1,3}(\.\d{1,3})?` 刻意拒绝科学计数法、前导正号与 `.5` 这种省略整数位
+  的写法——这些值前端会原样拼进 CSS，校验侧与消费侧必须对同一份文法达成一致。
+- **`frontend/src/styles/customize.css`（377 行，新建）**，八节：字体族 / 字号·行高·段距 /
+  圆角五档 / 阴影三档 / 密度 / 首页头图四档 / 文章封面三档 / 动效四档。在 `main.css` 里排在
+  `appearance.css` **之后**导入（作者配置要压过皮肤与深色模式里同优先级的声明）。
+- **`frontend/src/stores/site.ts`**：`applyCustomizations(root, settings)` 把 7 个枚举键写成
+  `#selfblog` 上的 `data-ap-*` 属性（等于默认值即 `delete`，不留下无意义的钩子），
+  4 个数值键写成 `#selfblog` 上的内联 `--ap-*` 变量（等于默认值即 `removeProperty`）。
+  **不写 `<html>`**：数值键同样依赖 `#selfblog` 作用域，写到根元素会连同导航栏一起改掉。
+  另加 `pickEnum` / `clampNumber` 两个容错函数：服务端下发了非法值时静默回落到默认档，
+  绝不让脏值进 CSS。
+- **后台「外观深度自定义」面板**（`Settings.vue` 第 7 个 section）：7 个 select + 4 个 range，
+  每个控件带 `data-setting`，附「恢复默认外观」按钮（**只改表单、仍需保存**，避免误触）。
+- **`App.vue` 的页面转场**改读 `var(--ap-page-enter, 280ms)` / `var(--ap-page-leave, 160ms)`，
+  watch 依赖从 3 项扩到 **14 项**（否则改新键不重新应用外观）。
+- **`PostDetail.vue`** 的三处 `minmax(0, 760px)` 改 `minmax(0, var(--ap-reader-width, 760px))`。
+
+### 修复（只读路径限流）
+
+- **`RateLimitProperties` 新增读路径阈值表**：`postRead`（60/min，前缀 `/api/post`，与写前缀
+  `/api/post/` 去掉尾斜杠后完全相同）、`guestCommentRead`（60/min，前缀
+  `/api/guest-comments/post`，比写前缀更长）。`getReadLimits()` 与 `getAllLimits()` 各自独立
+  的 volatile 不可变快照，`refreshLimits()` 一并重建。
+- **`RateLimitInterceptor` 按 HTTP 方法分流**：`GET`/`HEAD`/`OPTIONS` 再查一次读阈值表，
+  **等长或更长**的读前缀胜出——等长覆盖「同一前缀的 GET 用读阈值、PUT/DELETE 仍用写阈值」，
+  更长覆盖 `/api/guest-comments/post` 这类更深的读路径。更长的具名写前缀（如
+  `/api/post/list`）仍然胜出，语义不变。
+- **计数器再按读/写分桶**（`:read` / `:write`）：同一路径层上 GET 与 PUT 阈值不同，若共用
+  计数器，读者刷满 60 次读额度后作者改这篇文章就会被 429。
+
+### 修复（真机验证发现的两个 UI 缺陷）
+
+这两处都是**后台写了选项、页面纹丝不动**的「承诺落空」，只有真浏览器逐元素读
+computed style 才能发现，单元测试与 CSS 静态检查都抓不到：
+
+- **正文字体族不跟随**。`customize.css` 最初只在 `.app-main` 上写 `font-family` 靠**继承**，
+  而 `PostDetail.vue` 里有 11 处 `font-family: var(--font-display)` 的**直接声明**
+  （`.markdown-body`、`.article-header h1`、`.markdown-body h2/h3`、`.article-end p`、
+  `.toc-card h2` …），直接声明永远赢过继承 → 结果是「标题变了、正文没变」的半截效果。
+  修法：在该作用域内**重定向 token 本身**（`--font-sans` → `--ap-font-body`、
+  `--font-display` → `--ap-font-heading`），既有声明全部自动跟随，不必逐条提高特异性、
+  也不必改动各视图的 scoped 样式。`--font-mono` 刻意不动：代码块与行内 code 必须保持等宽，
+  选「衬线」后不能变宋体。
+- **阴影「加深」档几乎不可见**。真机逐元素枚举证明，内容区的**容器卡片**
+  （`.article-list` / `.intro-shell` / `.sidebar-block` / `.author-profile` / `.album-card` /
+  `.state-panel` / `.archive-callout`）全部只有 `border`、没有任何 `box-shadow` 声明，
+  所以整页只有 `.toc-fab` 一个浮动按钮真正消费 `--shadow-*`。
+  修法：只给「加深」档接线这 7 个容器（`box-shadow: var(--shadow-xs)`）。
+  **不给「默认」档接线是刻意的**——默认档必须逐像素等于改造前。三档于是各有真实差异：
+  默认=系统原有层次、加深=内容卡片也浮起、扁平=全无投影（`--shadow-*: none` 关掉既有投影）。
+  不碰 `.page-frame`：它的 `inset 0 0 0 1px` 是**描边**语义，换成外投影会让纸面边缘糊掉。
+
+### 承重规则（后续改动必须遵守）
+
+1. **标志挂在 `<html>` 上时，选择器必须以 `html[data-*]` 开头**（v2.0.27 的 `data-wallpaper`
+   踩过这个坑：CSS 写成 `#selfblog[data-wallpaper]` 永不匹配）。
+2. **不要依赖继承改字体**：`PostDetail.vue` 等视图有大量 `font-family` 直接声明，
+   必须重定向 `--font-sans` / `--font-display` token。
+3. **`--font-mono` 不能被字体族设置改到**：代码块与行内 code 必须等宽。
+4. **默认档 fallback 必须等于改造前的硬编码值**（`var(--ap-reader-width, 760px)` 里的 760px
+   就是 PostDetail 原来的 760px）。零回归靠的是这一点，不是靠「记得改回来」。
+5. **不覆盖 `--radius-full`（9999px）与 `50%`**：胶囊导航、圆形头像、圆形图标按钮必须是真圆。
+6. **11 个新键不进 `PREPAINT_APPEARANCE_VARS`**：它们依赖 `#selfblog` 作用域，预置到 `<html>`
+   会绕过作用域把导航栏一起改掉。
+7. **限流读/写阈值必须分表**：同一路径前缀下同时挂读与写时，单靠路径无法区分，
+   必须再看 HTTP 方法；读前缀与写前缀等长时读优先。
+8. **`.markdown-body` 的 fallback 是 1.75、`.page-markdown` 是 1.9**（既有漂移）：
+   未配置时各自保留原值，一旦作者调了行高两者统一。
+
+### 验证
+
+1. **后端全量**：**1254 tests, 0 failures, 0 errors, 0 skipped, BUILD SUCCESS**
+   （基线 1140，+114 条实际执行的测试；新增测试方法 34 个：`SiteSettingsServiceImplTest`
+   26 → 51 个（11 个新键的默认值冻结、公开下发、7 组枚举双向参数化、4 组数值区间参数化、
+   11 键同时写入，实跑 180 条），`RateLimitPropertiesTest` 6 → 9 个，`RateLimitInterceptorTest`
+   18 → 24 个；参数化展开使实际执行条数多于方法数）。
+2. **前端六闸门**：`lint:check` 0 errors / 42 warnings、`format:check` 通过、`type-check` 0、
+   `test:run` **51 files / 504 tests**、`test:deployment` 27/27、`build` ✓（dist 81 文件）。
+3. **真机浏览器验证**（Playwright 1.59.1 + Chromium，Vite :3000 + jar :8825 +
+   开发库副本 `.tmp-gate/verify.db`，1440×900 与 390×844 两个视口）：
+   - **默认档零回归**：7 个 `data-ap-*` 属性全为 null、4 个 `--ap-*` 变量全为空串；
+     hero 213px / padding `31px 34px` / radius 16px / visual 459px / h1 38px；
+     `.reader-layout` grid `760px 200px`；`.markdown-body` 16px / 28px；段距 16px。
+     改到非默认档再**复原默认后逐项读数相同**。
+   - **字体族**：serif 档下正文、h1、`.markdown-body h2`、`.article-end p`、`.toc-card h2`、
+     评论区标题**全部**变成衬线栈；`code` 与行内 code 保持等宽（逐字符相同）；
+     导航栏与页脚字体栈三档**逐字符相同**。
+   - **阴影层次**：default 档 7 个容器全 `none`；deep 档 7 个全变成
+     `rgba(20, 32, 51, 0.06) 0px 2px 4px`、`.toc-fab` 从 `0 8px 28px /10%` 加深到
+     `0 16px 44px /20%`；flat 档 `.toc-fab` 变 `none`、容器仍无投影。
+     导航栏阴影三档**逐字符相同**（这是「导航栏不要动」的机器判据）。
+   - **其余维度**：圆角 round 档卡片 26px、sharp 档 0–8px；密度 compact 档 gap 18px /
+     comfortable 40px；首页头图 compact 183px / visual 34% / h1 30px，minimal 隐藏 visual
+     与遮罩但**保留 h1**（整段 `display:none` 会让页面失去唯一 h1，对读屏与 SEO 是硬伤）；
+     文章封面 wide 档 `margin-inline:-24px` 出血、hidden 档 `display:none`；
+     动效 off 档 `transitionDuration 1e-05s`、lively 档 380/220ms。
+   - **移动端 390×844**：`documentElement.scrollWidth === 390`（无横向溢出），
+     `PAGE_ERRORS=[]`（无 console error / pageerror）。
+   - **限流修复对照**：修复前 `GET /api/post/1..12` 第 11 次 429；修复后同一 IP 连读
+     **60 次全 200、第 61 次才 429**；`GET /api/guest-comments/post/{id}` 同样 60/min；
+     对照 `GET /api/gallery/albums` 60 次全 200（读路径合理值未被改动），
+     `POST /api/guest-comments` 仍 5/min（写路径配额未放宽）。
+4. **截图**：`docs/reviews/assets/` 下 8 张（default/max/min × home/post @1440×900 + 移动端 2 张）。
+
+### 影响文件
+
+| 文件 | 改动类型 |
+|------|----------|
+| `backend/src/main/java/com/selfblog/service/site/impl/SiteSettingsServiceImpl.java` | 修改（11 个新键 + `requireDecimalInRange` + 11 个校验分支） |
+| `backend/src/main/java/com/selfblog/config/web/RateLimitProperties.java` | 修改（`postRead`/`guestCommentRead` + 读阈值表） |
+| `backend/src/main/java/com/selfblog/config/web/RateLimitInterceptor.java` | 修改（只读方法分流 + 读/写分桶） |
+| `backend/src/test/java/com/selfblog/service/site/impl/SiteSettingsServiceImplTest.java` | 修改（+25 个测试方法，314 → 547 行） |
+| `backend/src/test/java/com/selfblog/config/web/RateLimitPropertiesTest.java` | 修改（+3 个测试方法） |
+| `backend/src/test/java/com/selfblog/config/web/RateLimitInterceptorTest.java` | 修改（+6 个测试方法） |
+| `frontend/src/styles/customize.css` | 新增（377 行，八节） |
+| `frontend/src/styles/main.css` | 修改（导入 `customize.css`，排在 `appearance.css` 之后） |
+| `frontend/src/stores/site.ts` | 修改（11 个键 + `applyCustomizations` + `pickEnum`/`clampNumber`） |
+| `frontend/src/stores/__tests__/site.test.ts` | 修改（+测试） |
+| `frontend/src/App.vue` | 修改（转场读 `--ap-page-*`，watch 依赖 3 → 14 项） |
+| `frontend/src/views/admin/Settings.vue` | 修改（第 7 个 section「外观深度自定义」） |
+| `frontend/src/views/admin/__tests__/Settings.test.ts` | 修改（groupTitles 7 项 + 4 用例） |
+| `frontend/src/views/post/PostDetail.vue` | 修改（阅读栏宽改读 `--ap-reader-width`） |
+| `README.md`、`backend/README.md`、`frontend/README.md`、`CLAUDE.md`、`frontend/CLAUDE.md`、`AGENTS.md`、`docs/agents/{backend,frontend}.md` | 修改（新功能文档 + 测试基线） |
+| `docs/reviews/2026-10-22-appearance-customization-verification.md` | 新增（真机验证记录） |
+| `CHANGELOG.md` | 新增条目 |
+
+---
+
 ## v2.0.28 — DeepSeek 原生支持 + AI 写作/审核/校对/图片描述/站点体检 (2026-10-22)
 
 ### 说明

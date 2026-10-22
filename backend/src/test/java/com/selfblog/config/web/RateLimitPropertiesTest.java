@@ -87,4 +87,50 @@ class RateLimitPropertiesTest {
         assertEquals(5, limits.get("/api/guest-comments/"));
         assertEquals(120, limits.get("/api/site/pages"));
     }
+
+    // ==================== 只读路径专用阈值表 ====================
+
+    @Test
+    @DisplayName("getReadLimits 同样缓存为不可变快照，且 refreshLimits 会一并重建")
+    void readLimitsIsCachedAndRefreshed() {
+        RateLimitProperties properties = new RateLimitProperties();
+
+        Map<String, Integer> first = properties.getReadLimits();
+        assertSame(first, properties.getReadLimits(), "热路径必须复用同一个读阈值快照");
+        assertThrows(UnsupportedOperationException.class,
+                () -> first.put("/api/post", 100000), "读阈值快照必须不可变");
+
+        properties.setPostRead(77);
+        properties.refreshLimits();
+
+        assertNotSame(first, properties.getReadLimits());
+        assertEquals(77, properties.getReadLimits().get("/api/post"));
+    }
+
+    @Test
+    @DisplayName("文章详情读阈值 60/min 与写前缀 /api/post/ 的 10/min 同前缀但更宽松")
+    void postReadPathIsRegisteredOnTheSamePrefixAsTheWriteRule() {
+        RateLimitProperties properties = new RateLimitProperties();
+        Map<String, Integer> write = properties.getAllLimits();
+        Map<String, Integer> read = properties.getReadLimits();
+
+        assertEquals(10, write.get("/api/post/"), "写路径保持 10/min");
+        assertEquals(60, read.get("/api/post"),
+                "读前缀必须与写前缀去掉尾斜杠后完全相同，才能靠「等长时读优先」覆盖它");
+        assertTrue(read.get("/api/post") > write.get("/api/post/"),
+                "读路径必须比写路径宽松，否则访客连读第 11 篇文章就被 429");
+    }
+
+    @Test
+    @DisplayName("访客评论列表读阈值是更长的前缀，直接靠最长前缀胜出")
+    void guestCommentReadPathIsTheLongerPrefix() {
+        RateLimitProperties properties = new RateLimitProperties();
+        Map<String, Integer> write = properties.getAllLimits();
+        Map<String, Integer> read = properties.getReadLimits();
+
+        assertEquals(5, write.get("/api/guest-comments/"), "发表评论保持 5/min");
+        assertEquals(60, read.get("/api/guest-comments/post"));
+        assertTrue("/api/guest-comments/post".length() > "/api/guest-comments".length(),
+                "读前缀必须比写前缀更长，否则 5/min 的发表配额会让读者看到第 6 个评论区就被拦");
+    }
 }

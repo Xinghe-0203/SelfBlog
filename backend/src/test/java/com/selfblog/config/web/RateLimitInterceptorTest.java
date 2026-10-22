@@ -171,6 +171,84 @@ class RateLimitInterceptorTest {
         assertFalse(call("/api/post/list/featured", "203.0.113.42", new MockHttpServletResponse()));
     }
 
+    // ==================== 只读方法不得吃写路径的严格配额 ====================
+
+    @Test
+    void readingManyPostsInARowIsNotThrottledAtTheWriteThreshold() throws Exception {
+        // 回归（实测）：同一 IP 连读 12 篇文章，GET /api/post/1..12 前 10 次 200、
+        // 第 11 次起 429——文章详情是个人博客的主阅读路径，10/min 是按写路径定的。
+        for (int id = 1; id <= 60; id++) {
+            assertTrue(callWithMethod("GET", "/api/post/" + id, "203.0.113.70", new MockHttpServletResponse()),
+                    "第 " + id + " 篇连续阅读不应被 429");
+        }
+        assertFalse(callWithMethod("GET", "/api/post/61", "203.0.113.70", new MockHttpServletResponse()),
+                "读路径自己的 60/min 仍然生效");
+    }
+
+    @Test
+    void writingAPostStillUsesTheStrictWriteThreshold() throws Exception {
+        // 读路径放宽不得削弱写入防护：同一前缀下的 PUT/DELETE 仍是 10/min。
+        for (int id = 1; id <= 10; id++) {
+            assertTrue(callWithMethod("PUT", "/api/post/" + id, "203.0.113.71", new MockHttpServletResponse()));
+        }
+        assertFalse(callWithMethod("PUT", "/api/post/11", "203.0.113.71", new MockHttpServletResponse()),
+                "写路径必须保持 postGeneral=10/min");
+    }
+
+    @Test
+    void readsAndWritesUnderTheSamePrefixHaveIndependentCounters() throws Exception {
+        // 同一路径层上 GET 用读阈值、PUT 用写阈值；若共用一个计数器，
+        // 读者刷满 60 次读额度后作者改这篇文章就会被 429（反之亦然）。
+        for (int id = 1; id <= 60; id++) {
+            assertTrue(callWithMethod("GET", "/api/post/" + id, "203.0.113.72", new MockHttpServletResponse()));
+        }
+        for (int id = 1; id <= 10; id++) {
+            assertTrue(callWithMethod("PUT", "/api/post/" + id, "203.0.113.72", new MockHttpServletResponse()),
+                    "读额度用尽不应牵连同一 IP 的写操作");
+        }
+        assertFalse(callWithMethod("PUT", "/api/post/11", "203.0.113.72", new MockHttpServletResponse()));
+        // 反向：写额度用尽后，读仍然放行（第 61 次读才拦）。
+        assertTrue(callWithMethod("GET", "/api/post/62", "203.0.113.73", new MockHttpServletResponse()));
+    }
+
+    @Test
+    void readingGuestCommentListsIsNotThrottledAtTheCreationThreshold() throws Exception {
+        // 回归（实测）：GET /api/guest-comments/post/{id} 前 5 次 200、第 6 次起 429——
+        // 读者翻看第 6 篇文章的评论区就被拦，因为读列表与发表评论共用 5/min。
+        for (int id = 1; id <= 60; id++) {
+            assertTrue(callWithMethod("GET", "/api/guest-comments/post/" + id,
+                            "203.0.113.74", new MockHttpServletResponse()),
+                    "第 " + id + " 篇文章的评论列表不应被 429");
+        }
+        assertFalse(callWithMethod("GET", "/api/guest-comments/post/61",
+                        "203.0.113.74", new MockHttpServletResponse()),
+                "读列表自己的 60/min 仍然生效");
+    }
+
+    @Test
+    void creatingGuestCommentsStillUsesTheStrictCreationThreshold() throws Exception {
+        for (int i = 0; i < 5; i++) {
+            assertTrue(callWithMethod("POST", "/api/guest-comments", "203.0.113.75", new MockHttpServletResponse()));
+        }
+        assertFalse(callWithMethod("POST", "/api/guest-comments", "203.0.113.75", new MockHttpServletResponse()),
+                "发表评论必须保持 guestComment=5/min");
+        // 发表配额用尽后，读列表仍独立放行。
+        assertTrue(callWithMethod("GET", "/api/guest-comments/post/1",
+                        "203.0.113.75", new MockHttpServletResponse()),
+                "读列表与发表评论必须是两个独立配额");
+    }
+
+    @Test
+    void readRulesNeverShortenAnAlreadyLongerNamedPrefix() throws Exception {
+        // /api/post/list 有自己更长的具名前缀（60/min），读规则的前缀更短，不得顶掉它。
+        for (int i = 0; i < 60; i++) {
+            assertTrue(callWithMethod("GET", "/api/post/list", "203.0.113.76", new MockHttpServletResponse()));
+        }
+        assertFalse(callWithMethod("GET", "/api/post/list", "203.0.113.76", new MockHttpServletResponse()));
+        // 且它不消耗 /api/post 读桶：换篇文章仍可读。
+        assertTrue(callWithMethod("GET", "/api/post/1", "203.0.113.76", new MockHttpServletResponse()));
+    }
+
     // ==================== 路径变量不得各自成桶 ====================
 
     @Test
@@ -256,6 +334,13 @@ class RateLimitInterceptorTest {
 
     private boolean call(String path, String ip, MockHttpServletResponse response) throws Exception {
         var request = new MockHttpServletRequest("POST", path);
+        request.setRemoteAddr(ip);
+        return interceptor.preHandle(request, response, new Object());
+    }
+
+    private boolean callWithMethod(String method, String path, String ip, MockHttpServletResponse response)
+            throws Exception {
+        var request = new MockHttpServletRequest(method, path);
         request.setRemoteAddr(ip);
         return interceptor.preHandle(request, response, new Object());
     }

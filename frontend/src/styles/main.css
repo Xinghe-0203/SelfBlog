@@ -13,3 +13,6 @@
 @import './skins.css';
 /* 必须最后导入：作者配置的背景/不透明度要能压过皮肤与深色模式里同优先级的声明。 */
 @import './appearance.css';
+/* 外观深度自定义（排版/圆角/阴影/密度/头图/封面/动效）排在 appearance 之后：
+ * 它覆盖的是 variables.css 里的 token，必须晚于所有消费这些 token 的模块。 */
+@import './customize.css';

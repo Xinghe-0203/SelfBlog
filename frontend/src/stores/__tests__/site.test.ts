@@ -432,3 +432,96 @@ describe('wallpaper flag', () => {
     expect(document.documentElement.dataset.wallpaper).toBe('')
   })
 })
+
+describe('appearance customizations', () => {
+  let root: HTMLDivElement
+
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    localStorage.clear()
+    document.documentElement.removeAttribute('style')
+    delete document.documentElement.dataset.wallpaper
+    root = document.createElement('div')
+    root.id = 'selfblog'
+    document.body.appendChild(root)
+  })
+
+  afterEach(() => {
+    root.remove()
+    document.documentElement.removeAttribute('style')
+    delete document.documentElement.dataset.wallpaper
+    localStorage.clear()
+  })
+
+  it('leaves every hook unset on a default site', () => {
+    // 承重：默认档必须是「一条覆盖规则都不命中」。数值变量若无条件写死，
+    // .page-markdown 原本的 line-height:1.9 会被 1.75 静默盖掉。
+    useSiteStore().applySettings({})
+    expect(root.dataset.apFont).toBeUndefined()
+    expect(root.dataset.apRadius).toBeUndefined()
+    expect(root.dataset.apShadow).toBeUndefined()
+    expect(root.dataset.apDensity).toBeUndefined()
+    expect(root.dataset.apHero).toBeUndefined()
+    expect(root.dataset.apPostCover).toBeUndefined()
+    expect(root.dataset.apMotion).toBeUndefined()
+    expect(root.style.getPropertyValue('--ap-base-font-size')).toBe('')
+    expect(root.style.getPropertyValue('--ap-body-line-height')).toBe('')
+    expect(root.style.getPropertyValue('--ap-reader-width')).toBe('')
+    expect(root.style.getPropertyValue('--ap-paragraph-spacing')).toBe('')
+  })
+
+  it('maps enum settings onto data attributes and numeric ones onto variables', () => {
+    useSiteStore().applySettings({
+      fontFamily: 'serif',
+      radiusScale: 'soft',
+      shadowDepth: 'deep',
+      layoutDensity: 'compact',
+      homeHeroStyle: 'minimal',
+      postCoverStyle: 'wide',
+      motionIntensity: 'subtle',
+      baseFontSize: '18',
+      bodyLineHeight: '1.9',
+      readerWidth: '820',
+      paragraphSpacing: '0.5'
+    })
+    expect(root.dataset.apFont).toBe('serif')
+    expect(root.dataset.apRadius).toBe('soft')
+    expect(root.dataset.apShadow).toBe('deep')
+    expect(root.dataset.apDensity).toBe('compact')
+    expect(root.dataset.apHero).toBe('minimal')
+    expect(root.dataset.apPostCover).toBe('wide')
+    expect(root.dataset.apMotion).toBe('subtle')
+    expect(root.style.getPropertyValue('--ap-base-font-size')).toBe('18px')
+    expect(root.style.getPropertyValue('--ap-body-line-height')).toBe('1.9')
+    expect(root.style.getPropertyValue('--ap-reader-width')).toBe('820px')
+    expect(root.style.getPropertyValue('--ap-paragraph-spacing')).toBe('0.5em')
+  })
+
+  it('clamps out-of-range numbers and drops unknown enum values', () => {
+    useSiteStore().applySettings({
+      baseFontSize: '99',
+      bodyLineHeight: '0.2',
+      readerWidth: '10',
+      paragraphSpacing: '8',
+      fontFamily: 'comic-sans',
+      motionIntensity: ''
+    })
+    expect(root.style.getPropertyValue('--ap-base-font-size')).toBe('19px')
+    expect(root.style.getPropertyValue('--ap-body-line-height')).toBe('1.5')
+    expect(root.style.getPropertyValue('--ap-reader-width')).toBe('640px')
+    expect(root.style.getPropertyValue('--ap-paragraph-spacing')).toBe('2em')
+    expect(root.dataset.apFont).toBeUndefined()
+    expect(root.dataset.apMotion).toBeUndefined()
+  })
+
+  it('removes a hook again when the author returns to the default', () => {
+    const store = useSiteStore()
+    store.applySettings({ fontFamily: 'mono', readerWidth: '900' })
+    expect(root.dataset.apFont).toBe('mono')
+    expect(root.style.getPropertyValue('--ap-reader-width')).toBe('900px')
+
+    store.applySettings({ fontFamily: 'system', readerWidth: '760' })
+    expect(root.dataset.apFont).toBeUndefined()
+    expect(root.style.getPropertyValue('--ap-reader-width')).toBe('')
+  })
+})

@@ -166,7 +166,8 @@ describe('Settings brand asset fields', () => {
       '评论与音乐',
       'AI 辅助与 SEO',
       '视觉主题',
-      '页面背景'
+      '页面背景',
+      '外观深度自定义'
     ])
     expect(wrapper.findAll('form')).toHaveLength(1)
   })
@@ -231,11 +232,12 @@ describe('Settings brand asset fields', () => {
 
     it('appends the panel after 视觉主题 and lists every control across the three types', async () => {
       const wrapper = await mountSettings()
-      // tsconfig 的 lib 是 ES2020，没有 Array.prototype.at；用长度取最后一节。
-      const panels = wrapper.findAll('section.settings-panel')
-      const panel = panels[panels.length - 1]
-      expect(panel?.find('.panel-heading h2').text()).toBe('页面背景')
-      expect(panel?.find('.panel-desc').text()).toContain('卡片的不透明度与模糊')
+      // 后面的「外观深度自定义」也会追加面板，因此按标题定位而不是取最后一个。
+      const panel = wrapper
+        .findAll('section.settings-panel')
+        .find((candidate) => candidate.find('.panel-heading h2').text() === '页面背景')
+      if (!panel) throw new Error('missing 页面背景 panel')
+      expect(panel.find('.panel-desc').text()).toContain('卡片的不透明度与模糊')
 
       // 类型选择 + 两个卡片表面控制（渐变/背景图分支之外始终可见）
       expect(control(wrapper, 'backgroundType').exists()).toBe(true)
@@ -575,6 +577,197 @@ describe('Settings brand asset fields', () => {
       expect(control(wrapper, 'llmModel').exists()).toBe(true)
       // 探测失败不该把设置页标成错误
       expect(wrapper.find('[role="alert"]').exists()).toBe(false)
+    })
+  })
+
+  describe('appearance panel', () => {
+    /** 11 个外观键，顺序与面板里的渲染顺序一致。 */
+    const APPEARANCE_KEYS = [
+      'fontFamily',
+      'baseFontSize',
+      'bodyLineHeight',
+      'readerWidth',
+      'paragraphSpacing',
+      'radiusScale',
+      'shadowDepth',
+      'layoutDensity',
+      'homeHeroStyle',
+      'postCoverStyle',
+      'motionIntensity'
+    ] as const
+
+    /** 与 stores/site.ts 的 defaults、后端 defaults() 三处对齐的重置目标值。 */
+    const APPEARANCE_DEFAULTS: Record<(typeof APPEARANCE_KEYS)[number], string> = {
+      fontFamily: 'system',
+      baseFontSize: '16',
+      bodyLineHeight: '1.75',
+      readerWidth: '760',
+      paragraphSpacing: '1',
+      radiusScale: 'default',
+      shadowDepth: 'default',
+      layoutDensity: 'default',
+      homeHeroStyle: 'default',
+      postCoverStyle: 'default',
+      motionIntensity: 'default'
+    }
+
+    function control(wrapper: Awaited<ReturnType<typeof mountSettings>>, name: string) {
+      const found = wrapper.find(`[data-setting="${name}"]`)
+      if (!found.exists()) throw new Error(`missing control: ${name}`)
+      return found
+    }
+
+    function appearancePanel(wrapper: Awaited<ReturnType<typeof mountSettings>>) {
+      const panel = wrapper
+        .findAll('section.settings-panel')
+        .find((candidate) => candidate.find('.panel-heading h2').text() === '外观深度自定义')
+      if (!panel) throw new Error('missing 外观深度自定义 panel')
+      return panel
+    }
+
+    function value(wrapper: Awaited<ReturnType<typeof mountSettings>>, name: string): string {
+      return (control(wrapper, name).element as HTMLInputElement | HTMLSelectElement).value
+    }
+
+    it('renders all eleven appearance controls with server-side bounds', async () => {
+      const wrapper = await mountSettings()
+      const panel = appearancePanel(wrapper)
+      expect(panel.find('.panel-heading p').text()).toContain('只影响前台内容区')
+
+      for (const key of APPEARANCE_KEYS) {
+        expect(control(wrapper, key).exists()).toBe(true)
+      }
+      // 数值控件的区间与步长必须与后端 validateValue 的校验范围一致
+      expect(control(wrapper, 'baseFontSize').attributes('min')).toBe('14')
+      expect(control(wrapper, 'baseFontSize').attributes('max')).toBe('19')
+      expect(control(wrapper, 'baseFontSize').attributes('step')).toBe('1')
+      expect(control(wrapper, 'bodyLineHeight').attributes('min')).toBe('1.5')
+      expect(control(wrapper, 'bodyLineHeight').attributes('max')).toBe('2.2')
+      expect(control(wrapper, 'bodyLineHeight').attributes('step')).toBe('0.05')
+      expect(control(wrapper, 'readerWidth').attributes('min')).toBe('640')
+      expect(control(wrapper, 'readerWidth').attributes('max')).toBe('960')
+      expect(control(wrapper, 'readerWidth').attributes('step')).toBe('10')
+      expect(control(wrapper, 'paragraphSpacing').attributes('min')).toBe('0')
+      expect(control(wrapper, 'paragraphSpacing').attributes('max')).toBe('2')
+      expect(control(wrapper, 'paragraphSpacing').attributes('step')).toBe('0.1')
+
+      // 7 个 select 的 option value 必须就是后端枚举的字面值
+      const enumOptions: Record<string, string[]> = {
+        fontFamily: ['system', 'sans', 'serif', 'mono'],
+        radiusScale: ['none', 'sharp', 'default', 'soft', 'round'],
+        shadowDepth: ['flat', 'default', 'deep'],
+        layoutDensity: ['compact', 'default', 'comfortable'],
+        homeHeroStyle: ['default', 'compact', 'minimal', 'off'],
+        postCoverStyle: ['default', 'wide', 'hidden'],
+        motionIntensity: ['off', 'subtle', 'default', 'lively']
+      }
+      for (const [key, values] of Object.entries(enumOptions)) {
+        expect(
+          control(wrapper, key)
+            .findAll('option')
+            .map((option) => option.attributes('value'))
+        ).toEqual(values)
+      }
+    })
+
+    it('shows the loaded appearance values and their readouts', async () => {
+      getSettings.mockResolvedValue({
+        code: 200,
+        message: 'OK',
+        data: {
+          ...useSiteStore().settings,
+          fontFamily: 'serif',
+          baseFontSize: '18',
+          bodyLineHeight: '2',
+          readerWidth: '820',
+          paragraphSpacing: '0.5',
+          radiusScale: 'soft',
+          shadowDepth: 'deep',
+          layoutDensity: 'compact',
+          homeHeroStyle: 'minimal',
+          postCoverStyle: 'wide',
+          motionIntensity: 'subtle'
+        }
+      })
+      const wrapper = await mountSettings()
+
+      expect(value(wrapper, 'fontFamily')).toBe('serif')
+      expect(value(wrapper, 'baseFontSize')).toBe('18')
+      expect(value(wrapper, 'motionIntensity')).toBe('subtle')
+      // 滑杆读数：px / em 单位只出现在读数上，不写回表单
+      expect(control(wrapper, 'baseFontSize').element.parentElement?.textContent).toContain('18 px')
+      expect(control(wrapper, 'readerWidth').element.parentElement?.textContent).toContain('820 px')
+      expect(control(wrapper, 'paragraphSpacing').element.parentElement?.textContent).toContain(
+        '0.5 em'
+      )
+      expect(control(wrapper, 'bodyLineHeight').element.parentElement?.textContent).toContain('2')
+    })
+
+    it('submits the edited font family and base font size in the save payload', async () => {
+      const wrapper = await mountSettings()
+
+      await control(wrapper, 'fontFamily').setValue('serif')
+      await control(wrapper, 'baseFontSize').setValue('18')
+
+      updateSettings.mockResolvedValue({
+        code: 200,
+        message: 'OK',
+        data: { ...useSiteStore().settings, fontFamily: 'serif', baseFontSize: '18' }
+      })
+      await wrapper.find('form').trigger('submit')
+      await flushPromises()
+
+      const payload = updateSettings.mock.calls[0]?.[0] as Record<string, string>
+      expect(payload.fontFamily).toBe('serif')
+      expect(payload.baseFontSize).toBe('18')
+      // 字符串契约：滑杆写回的仍是字符串，不是 number
+      expect(typeof payload.baseFontSize).toBe('string')
+    })
+
+    it('resets the eleven keys locally and never saves on its own', async () => {
+      getSettings.mockResolvedValue({
+        code: 200,
+        message: 'OK',
+        data: {
+          ...useSiteStore().settings,
+          fontFamily: 'mono',
+          baseFontSize: '19',
+          bodyLineHeight: '2.2',
+          readerWidth: '960',
+          paragraphSpacing: '2',
+          radiusScale: 'round',
+          shadowDepth: 'flat',
+          layoutDensity: 'comfortable',
+          homeHeroStyle: 'off',
+          postCoverStyle: 'hidden',
+          motionIntensity: 'lively'
+        }
+      })
+      const wrapper = await mountSettings()
+      const store = useSiteStore()
+      expect(value(wrapper, 'fontFamily')).toBe('mono')
+
+      // 重置前先给全局 store 快照：重置只能改本地表单，不得写 store。
+      const storeBefore = { ...store.settings }
+
+      await wrapper.get('[data-action="reset-appearance"]').trigger('click')
+      await flushPromises()
+
+      // 只改本地表单：既不自动保存，也不改全局 store
+      expect(updateSettings).not.toHaveBeenCalled()
+      expect({ ...store.settings }).toEqual(storeBefore)
+      for (const key of APPEARANCE_KEYS) {
+        expect(value(wrapper, key)).toBe(APPEARANCE_DEFAULTS[key])
+      }
+
+      // 重置后的值确实会随作者主动保存一起提交
+      updateSettings.mockResolvedValue({ code: 200, message: 'OK', data: { ...store.settings } })
+      await wrapper.find('form').trigger('submit')
+      await flushPromises()
+      const payload = updateSettings.mock.calls[0]?.[0] as Record<string, string>
+      for (const key of APPEARANCE_KEYS) {
+        expect(payload[key]).toBe(APPEARANCE_DEFAULTS[key])
+      }
     })
   })
 })

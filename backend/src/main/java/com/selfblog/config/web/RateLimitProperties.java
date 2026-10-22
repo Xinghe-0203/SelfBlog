@@ -75,6 +75,29 @@ public class RateLimitProperties {
     private int postList = 60;
 
     /**
+     * 文章**详情**等只读 GET 接口限流（次/分钟）。
+     *
+     * 为什么单列：`/api/post/` 的 10/min 是按写路径定的（PUT/DELETE 更新与删除），
+     * 但 `GET /api/post/{id}`（文章详情）同样落在这条前缀下，于是访客正常阅读
+     * 第 11 篇文章就会被 429。实测（`GET /api/post/1..12`，同一 IP）：
+     * 前 10 次 200、第 11 次起 429——对一个个人博客的主阅读路径是硬伤。
+     * 取值对齐同样面向匿名访客的 `postList=60`：正常连读 60 篇/分钟远高于人手点击速度，
+     * 而写路径仍走 `postGeneral=10`，不削弱写入防护。
+     */
+    private int postRead = 60;
+
+    /**
+     * 访客评论**列表**读取限流（次/分钟）。
+     *
+     * 为什么单列：`/api/guest-comments/` 的 5/min 是给「发表评论」定的，
+     * 但 `GET /api/guest-comments/post/{postId}`（公开评论列表）是纯只读浏览，
+     * 也落在这条前缀下。实测（`GET /api/guest-comments/post/1..8`，同一 IP）：
+     * 前 5 次 200、第 6 次起 429——读者翻看第 6 篇文章的评论区就被拦。
+     * 读路径放宽到 60/min，写路径（POST 创建评论）仍保持 5/min。
+     */
+    private int guestCommentRead = 60;
+
+    /**
      * 评论接口限流（次/分钟）
      */
     private int comment = 20;
@@ -194,6 +217,20 @@ public class RateLimitProperties {
      */
     private volatile Map<String, Integer> limitsSnapshot;
 
+    /**
+     * 只读路径（GET/HEAD/OPTIONS）专用阈值快照（路径前缀 → 每分钟上限）。
+     *
+     * 为什么需要单独一张表：限流是按**路径前缀**匹配的，同一个前缀下可能同时挂着
+     * 写路径与读路径（`PUT /api/post/{id}` 更新 vs `GET /api/post/{id}` 详情），
+     * 单靠路径无法区分，只能再看 HTTP 方法。写路径必须保持严格（更新/删除 10/min），
+     * 读路径必须宽松（正常阅读）。
+     *
+     * 命中规则：先按路径做最长前缀匹配；当只读方法命中的读前缀**不短于**写前缀时，
+     * 读前缀胜出（等长时读优先，即同一前缀的 GET 用读阈值、PUT/DELETE 用写阈值）。
+     * 更长的具名写前缀仍然胜出，所以 `/api/post/list` 依旧走自己那条 60/min 的桶。
+     */
+    private volatile Map<String, Integer> readLimitsSnapshot;
+
     public Map<String, Integer> getAllLimits() {
         Map<String, Integer> snapshot = limitsSnapshot;
         if (snapshot == null) {
@@ -204,11 +241,34 @@ public class RateLimitProperties {
     }
 
     /**
+     * 只读路径专用阈值（前缀 → 每分钟上限）。语义见 {@link #readLimitsSnapshot}。
+     */
+    public Map<String, Integer> getReadLimits() {
+        Map<String, Integer> snapshot = readLimitsSnapshot;
+        if (snapshot == null) {
+            snapshot = buildReadLimits();
+            readLimitsSnapshot = snapshot;
+        }
+        return snapshot;
+    }
+
+    /**
      * 供 Spring 绑定完成后（以及测试改值后）显式重建快照。
      */
     @PostConstruct
     public void refreshLimits() {
         this.limitsSnapshot = buildLimits();
+        this.readLimitsSnapshot = buildReadLimits();
+    }
+
+    private Map<String, Integer> buildReadLimits() {
+        Map<String, Integer> limits = new HashMap<>();
+        // 文章详情/相邻/搜索等 GET 读路径：与 /api/post/ 的写阈值（10/min）同前缀，
+        // 靠「等长时读优先」区分，因此这里的前缀必须与写前缀完全一致（不带尾斜杠）。
+        limits.put("/api/post", postRead);
+        // 公开评论列表：比写前缀 /api/guest-comments 更长，靠最长前缀直接胜出。
+        limits.put("/api/guest-comments/post", guestCommentRead);
+        return Collections.unmodifiableMap(limits);
     }
 
     private Map<String, Integer> buildLimits() {

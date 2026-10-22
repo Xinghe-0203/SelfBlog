@@ -1,7 +1,7 @@
 # SelfBlog — 个人博客
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Version](https://img.shields.io/badge/version-v2.0.28-blue)](https://github.com/Xinghe-0203)
+[![Version](https://img.shields.io/badge/version-v2.0.29-blue)](https://github.com/Xinghe-0203)
 [![Java](https://img.shields.io/badge/Java-21-orange)](https://www.oracle.com/java/)
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.3.13-green)](https://spring.io/projects/spring-boot)
 [![Vue](https://img.shields.io/badge/Vue-3.5.44-brightgreen)](https://vuejs.org/)
@@ -228,10 +228,10 @@ SelfBlog/
 
 ```bash
 # 从仓库取 JAR
-cp release/selfblog-2.0.28.jar /path/to/deployment/
+cp release/selfblog-2.0.29.jar /path/to/deployment/
 cd /path/to/deployment
 cp /path/to/repo/backend/.env.example .env   # 然后填写 JWT_SECRET 与 ADMIN_PASSWORD
-java -jar selfblog-2.0.28.jar
+java -jar selfblog-2.0.29.jar
 ```
 
 校验与重建方式见 [`release/README.md`](release/README.md)。该 JAR 与提交时的源码一一对应，
@@ -395,6 +395,14 @@ Controller（控制器）→ Service（服务）→ Mapper（数据访问）→ 
 ---
 
 ## 更新日志
+
+### v2.0.29 (2026-10-22)
+
+- 外观新增 **11 个深度自定义维度**，此前作者只能调背景与表面透明度：**排版**（字体族 `system|sans|serif|mono`、字号 14–19px、行高 1.5–2.2、阅读栏宽 640–960px、段间距 0–2em）、**布局**（圆角五档、阴影三档、密度三档）、**呈现**（首页头图四档、文章封面三档）、**动效**（四档）。三条硬约束：**导航栏与后台界面完全不动**（规则限定在 `.app-main:not(.app-main--admin)`）、**默认值逐像素等于改造前观感**（老站点升级零回归）、WCAG 对比度不回退
+- 修复 **正文字体族不跟随设置**：`customize.css` 原先只在 `.app-main` 上写 `font-family` 靠继承，而 `PostDetail.vue` 有 11 处 `font-family: var(--font-display)` 的直接声明，直接声明永远赢过继承 → 「标题变了、正文没变」的半截效果。改为在该作用域内**重定向 `--font-sans` / `--font-display` token**，既有声明自动跟随；`--font-mono` 刻意不动（代码块必须保持等宽）
+- 修复 **阴影「加深」档几乎不可见**：真机逐元素枚举证明内容区容器卡片（`.article-list` / `.intro-shell` / `.sidebar-block` / `.author-profile` / `.album-card` / `.state-panel` / `.archive-callout`）全部只有 `border`、无 `box-shadow`，整页只有 `.toc-fab` 一个按钮真正消费 `--shadow-*`。改为只给「加深」档接线这 7 个容器——**不给默认档接线是刻意的**，默认档必须逐像素等于改造前
+- 修复 **访客正常阅读会被限流拦**：限流按路径前缀匹配，同一前缀下同时挂读与写——`GET /api/post/{id}`（详情）与 `PUT /api/post/{id}`（更新）共用 `/api/post/` 的 10/min，实测同一 IP 连读第 11 篇文章即 429；`GET /api/guest-comments/post/{id}` 更严重，5/min 的发表配额让读者看到第 6 个评论区就被拦。改为**读/写阈值分表 + 按 HTTP 方法分流 + 计数器分桶**（读 60/min，写配额不变）
+- 门禁：后端 **1254 测试**（本地 H2 + CI 真实 MySQL 8），前端 **51 文件 / 504 测试** + lint/format/type/build/部署契约 27/27；真机 Playwright 逐元素读 computed style 验证默认档零回归、非默认档逐项生效、导航栏逐字符恒定、移动端无横向溢出
 
 ### v2.0.28 (2026-10-22)
 

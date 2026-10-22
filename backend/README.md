@@ -2,7 +2,7 @@
 
 Spring Boot 3 backend for a single-author personal blog. Public visitors can read and search published posts; author operations require an administrator account.
 
-**Version**: v2.0.28 | **Java**: 21 | **Spring Boot**: 3.3.13
+**Version**: v2.0.29 | **Java**: 21 | **Spring Boot**: 3.3.13
 
 ## Tech Stack
 
@@ -136,7 +136,7 @@ The site runs in single-author mode: registration is disabled and password authe
 | Token blacklist | Process-local for logout/rotation; separate from persistent password-change invalidation |
 | Login lock | 5 failures → 15 min lock (atomic update) |
 | XSS | HtmlSanitizer (Jsoup) for server-side purification |
-| Rate limiting | Segment-boundary matching, longest rule wins; guest-comment creation: 5 requests/min per IP; site-asset uploads: 30 requests/min |
+| Rate limiting | Segment-boundary matching, longest rule wins; **read and write use separate tables** (`GET`/`HEAD`/`OPTIONS` consult the read table, an equal-or-longer read prefix wins, and counters are bucketed per read/write). Article reads and guest-comment list reads: 60 requests/min per IP; guest-comment creation: 5 requests/min; site-asset uploads: 30 requests/min. The 10/min `/api/post/` rule is a **write** budget — before v2.0.29 it also throttled `GET /api/post/{id}`, so a normal visitor hit 429 on the 11th article |
 | IP protection | Format validation against IP spoofing |
 | Validation | Spring Validation (`@Valid`, `@NotBlank`) |
 | CORS | Configurable whitelist, `*` forbidden in production |
@@ -244,6 +244,38 @@ SVG opened as a top-level document can carry scripts and a background fills the 
 smaller limit would force authors to re-compress until quality degrades. The frontend's
 client-side pre-check must stay at the same 8MB, since a stricter check would make the
 server's allowance unreachable.
+
+### Typography, layout, presentation and motion (v2.0.29)
+
+Eleven more `site_setting` keys, again with **zero schema migration**:
+
+| Dimension | Keys | Allowed values | Default |
+|---|---|---|---|
+| Typography | `fontFamily` | `system \| sans \| serif \| mono` | `system` |
+| | `baseFontSize` | 14–19 (integer, px) | `16` |
+| | `bodyLineHeight` | 1.5–2.2 (decimal) | `1.75` |
+| | `readerWidth` | 640–960 (integer, px) | `760` |
+| | `paragraphSpacing` | 0–2 (decimal, em) | `1` |
+| Layout | `radiusScale` | `none \| sharp \| default \| soft \| round` | `default` |
+| | `shadowDepth` | `flat \| default \| deep` | `default` |
+| | `layoutDensity` | `compact \| default \| comfortable` | `default` |
+| Presentation | `homeHeroStyle` | `default \| compact \| minimal \| off` | `default` |
+| | `postCoverStyle` | `default \| wide \| hidden` | `default` |
+| Motion | `motionIntensity` | `off \| subtle \| default \| lively` | `default` |
+
+Every default is **the value the frontend previously hard-coded**, so upgrading an existing
+site is a pixel-for-pixel no-op; the frontend relies on this to emit no hook attribute/variable
+at the default (see `frontend/src/stores/site.ts`'s `applyCustomizations`).
+
+`validateValue` gains one branch per key. The two decimal-valued keys go through
+`requireDecimalInRange(String, double, double, String)`, whose grammar is
+`-?\d{1,3}(\.\d{1,3})?` — scientific notation, a leading `+` and `.5`-style values with no
+integer part are all rejected on purpose: the frontend splices these strings straight into CSS,
+so validator and consumer must agree on exactly one grammar. Integer keys keep using
+`requireIntegerInRange`.
+
+These keys **are** returned by `GET /api/site/public` (they are cosmetic and public pages need
+them); `LLM_SETTING_KEYS` remains the only filtered group.
 
 ## Page management
 

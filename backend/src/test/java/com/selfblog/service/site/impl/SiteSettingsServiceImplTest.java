@@ -311,4 +311,253 @@ class SiteSettingsServiceImplTest {
         assertEquals("72", updated.get("surfaceOpacity"));
         assertEquals("12", updated.get("surfaceBlur"));
     }
+
+    // ---------- 外观深度自定义（11 个新键：排版 / 布局 / 呈现 / 动效） ----------
+
+    /**
+     * 默认值必须与改造前的硬编码取值逐字相同，否则老站点升级后观感会变。
+     * 这里的断言就是「零回归」的可执行定义：16px 正文字号、1.75 行高、760px 阅读栏宽、
+     * 1em 段间距、默认圆角/阴影/密度/头图/封面/动效。
+     */
+    @Test
+    @DisplayName("deepAppearanceKeys_ArePresentInDefaultsWithFrozenDefaults")
+    void deepAppearanceKeys_ArePresentInDefaultsWithFrozenDefaults() {
+        Map<String, String> settings = siteSettingsService.getSettings();
+        assertEquals("system", settings.get("fontFamily"));
+        assertEquals("16", settings.get("baseFontSize"));
+        assertEquals("1.75", settings.get("bodyLineHeight"));
+        assertEquals("760", settings.get("readerWidth"));
+        assertEquals("1", settings.get("paragraphSpacing"));
+        assertEquals("default", settings.get("radiusScale"));
+        assertEquals("default", settings.get("shadowDepth"));
+        assertEquals("default", settings.get("layoutDensity"));
+        assertEquals("default", settings.get("homeHeroStyle"));
+        assertEquals("default", settings.get("postCoverStyle"));
+        assertEquals("default", settings.get("motionIntensity"));
+    }
+
+    /**
+     * 前台渲染依赖这些键：公开设置必须下发它们，否则前端只能永远用默认值。
+     * 同时确认它们**没有**被误加进 LLM 过滤组（那组整组不进公开设置）。
+     */
+    @Test
+    @DisplayName("deepAppearanceKeys_AreAllExposedByPublicSettings")
+    void deepAppearanceKeys_AreAllExposedByPublicSettings() {
+        Map<String, String> publicSettings = siteSettingsService.getPublicSettings();
+        assertTrue(publicSettings.keySet().containsAll(java.util.List.of(
+                "fontFamily", "baseFontSize", "bodyLineHeight", "readerWidth", "paragraphSpacing",
+                "radiusScale", "shadowDepth", "layoutDensity",
+                "homeHeroStyle", "postCoverStyle", "motionIntensity")));
+        assertEquals("760", publicSettings.get("readerWidth"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"system", "sans", "serif", "mono"})
+    @DisplayName("fontFamily_AcceptsEveryDocumentedFamily")
+    void fontFamily_AcceptsEveryDocumentedFamily(String family) {
+        assertEquals(family, siteSettingsService.updateSettings(Map.of("fontFamily", family)).get("fontFamily"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"", "SANS", "serif-sans", "sans-serif", "kai"})
+    @DisplayName("fontFamily_RejectsAnythingElse")
+    void fontFamily_RejectsAnythingElse(String family) {
+        var error = assertThrows(BusinessException.class,
+                () -> siteSettingsService.updateSettings(Map.of("fontFamily", family)), family);
+        assertEquals(400, error.getCode(), family);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"none", "sharp", "default", "soft", "round"})
+    @DisplayName("radiusScale_AcceptsEveryDocumentedScale")
+    void radiusScale_AcceptsEveryDocumentedScale(String scale) {
+        assertEquals(scale, siteSettingsService.updateSettings(Map.of("radiusScale", scale)).get("radiusScale"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"", "DEFAULT", "pill", "square", "0"})
+    @DisplayName("radiusScale_RejectsAnythingElse")
+    void radiusScale_RejectsAnythingElse(String scale) {
+        var error = assertThrows(BusinessException.class,
+                () -> siteSettingsService.updateSettings(Map.of("radiusScale", scale)), scale);
+        assertEquals(400, error.getCode(), scale);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"flat", "default", "deep"})
+    @DisplayName("shadowDepth_AcceptsEveryDocumentedDepth")
+    void shadowDepth_AcceptsEveryDocumentedDepth(String depth) {
+        assertEquals(depth, siteSettingsService.updateSettings(Map.of("shadowDepth", depth)).get("shadowDepth"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"", "FLAT", "heavy", "none", "light"})
+    @DisplayName("shadowDepth_RejectsAnythingElse")
+    void shadowDepth_RejectsAnythingElse(String depth) {
+        var error = assertThrows(BusinessException.class,
+                () -> siteSettingsService.updateSettings(Map.of("shadowDepth", depth)), depth);
+        assertEquals(400, error.getCode(), depth);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"compact", "default", "comfortable"})
+    @DisplayName("layoutDensity_AcceptsEveryDocumentedDensity")
+    void layoutDensity_AcceptsEveryDocumentedDensity(String density) {
+        assertEquals(density, siteSettingsService.updateSettings(Map.of("layoutDensity", density)).get("layoutDensity"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"", "COMPACT", "wide", "tight", "loose"})
+    @DisplayName("layoutDensity_RejectsAnythingElse")
+    void layoutDensity_RejectsAnythingElse(String density) {
+        var error = assertThrows(BusinessException.class,
+                () -> siteSettingsService.updateSettings(Map.of("layoutDensity", density)), density);
+        assertEquals(400, error.getCode(), density);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"default", "compact", "minimal", "off"})
+    @DisplayName("homeHeroStyle_AcceptsEveryDocumentedStyle")
+    void homeHeroStyle_AcceptsEveryDocumentedStyle(String style) {
+        assertEquals(style, siteSettingsService.updateSettings(Map.of("homeHeroStyle", style)).get("homeHeroStyle"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"", "DEFAULT", "hidden", "full", "none"})
+    @DisplayName("homeHeroStyle_RejectsAnythingElse")
+    void homeHeroStyle_RejectsAnythingElse(String style) {
+        var error = assertThrows(BusinessException.class,
+                () -> siteSettingsService.updateSettings(Map.of("homeHeroStyle", style)), style);
+        assertEquals(400, error.getCode(), style);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"default", "wide", "hidden"})
+    @DisplayName("postCoverStyle_AcceptsEveryDocumentedStyle")
+    void postCoverStyle_AcceptsEveryDocumentedStyle(String style) {
+        assertEquals(style, siteSettingsService.updateSettings(Map.of("postCoverStyle", style)).get("postCoverStyle"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"", "DEFAULT", "full", "banner", "off"})
+    @DisplayName("postCoverStyle_RejectsAnythingElse")
+    void postCoverStyle_RejectsAnythingElse(String style) {
+        var error = assertThrows(BusinessException.class,
+                () -> siteSettingsService.updateSettings(Map.of("postCoverStyle", style)), style);
+        assertEquals(400, error.getCode(), style);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"off", "subtle", "default", "lively"})
+    @DisplayName("motionIntensity_AcceptsEveryDocumentedLevel")
+    void motionIntensity_AcceptsEveryDocumentedLevel(String level) {
+        assertEquals(level, siteSettingsService.updateSettings(Map.of("motionIntensity", level)).get("motionIntensity"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"", "OFF", "fast", "slow", "none"})
+    @DisplayName("motionIntensity_RejectsAnythingElse")
+    void motionIntensity_RejectsAnythingElse(String level) {
+        var error = assertThrows(BusinessException.class,
+                () -> siteSettingsService.updateSettings(Map.of("motionIntensity", level)), level);
+        assertEquals(400, error.getCode(), level);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"14", "16", "19"})
+    @DisplayName("baseFontSize_AcceptsInclusiveRange")
+    void baseFontSize_AcceptsInclusiveRange(String value) {
+        assertEquals(value, siteSettingsService.updateSettings(Map.of("baseFontSize", value)).get("baseFontSize"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"13", "20", "16.5", "+16", "16px", "", "sixteen"})
+    @DisplayName("baseFontSize_RejectsOutOfRangeAndNonIntegers")
+    void baseFontSize_RejectsOutOfRangeAndNonIntegers(String value) {
+        var error = assertThrows(BusinessException.class,
+                () -> siteSettingsService.updateSettings(Map.of("baseFontSize", value)), value);
+        assertEquals(400, error.getCode(), value);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"1.5", "1.75", "2", "2.2"})
+    @DisplayName("bodyLineHeight_AcceptsInclusiveRange")
+    void bodyLineHeight_AcceptsInclusiveRange(String value) {
+        assertEquals(value, siteSettingsService.updateSettings(Map.of("bodyLineHeight", value)).get("bodyLineHeight"));
+    }
+
+    /**
+     * 拒绝面必须包含科学计数法与省略整数位的写法：这两个值会被前端原样拼进 CSS，
+     * 校验与消费两侧对文法的理解必须一致（见 requireDecimalInRange 的 javadoc）。
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"1.4", "2.21", "1e1", ".5", "+1.75", "1.75em", "", "loose"})
+    @DisplayName("bodyLineHeight_RejectsOutOfRangeAndNonPlainDecimals")
+    void bodyLineHeight_RejectsOutOfRangeAndNonPlainDecimals(String value) {
+        var error = assertThrows(BusinessException.class,
+                () -> siteSettingsService.updateSettings(Map.of("bodyLineHeight", value)), value);
+        assertEquals(400, error.getCode(), value);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"640", "760", "960"})
+    @DisplayName("readerWidth_AcceptsInclusiveRange")
+    void readerWidth_AcceptsInclusiveRange(String value) {
+        assertEquals(value, siteSettingsService.updateSettings(Map.of("readerWidth", value)).get("readerWidth"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"639", "961", "760.5", "760px", "0", ""})
+    @DisplayName("readerWidth_RejectsOutOfRangeAndNonIntegers")
+    void readerWidth_RejectsOutOfRangeAndNonIntegers(String value) {
+        var error = assertThrows(BusinessException.class,
+                () -> siteSettingsService.updateSettings(Map.of("readerWidth", value)), value);
+        assertEquals(400, error.getCode(), value);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"0", "0.5", "1", "2"})
+    @DisplayName("paragraphSpacing_AcceptsInclusiveRange")
+    void paragraphSpacing_AcceptsInclusiveRange(String value) {
+        assertEquals(value, siteSettingsService.updateSettings(Map.of("paragraphSpacing", value)).get("paragraphSpacing"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"-0.1", "2.1", "1e0", ".5", "1em", ""})
+    @DisplayName("paragraphSpacing_RejectsOutOfRangeAndNonPlainDecimals")
+    void paragraphSpacing_RejectsOutOfRangeAndNonPlainDecimals(String value) {
+        var error = assertThrows(BusinessException.class,
+                () -> siteSettingsService.updateSettings(Map.of("paragraphSpacing", value)), value);
+        assertEquals(400, error.getCode(), value);
+    }
+
+    @Test
+    @DisplayName("deepAppearanceKeys_AreAcceptedTogether")
+    void deepAppearanceKeys_AreAcceptedTogether() {
+        // Map.of 最多支持 10 对键值，这里有 11 个键，必须用 ofEntries。
+        Map<String, String> updated = siteSettingsService.updateSettings(Map.ofEntries(
+                Map.entry("fontFamily", "serif"),
+                Map.entry("baseFontSize", "18"),
+                Map.entry("bodyLineHeight", "1.9"),
+                Map.entry("readerWidth", "820"),
+                Map.entry("paragraphSpacing", "1.4"),
+                Map.entry("radiusScale", "soft"),
+                Map.entry("shadowDepth", "deep"),
+                Map.entry("layoutDensity", "comfortable"),
+                Map.entry("homeHeroStyle", "minimal"),
+                Map.entry("postCoverStyle", "wide"),
+                Map.entry("motionIntensity", "subtle")));
+
+        assertEquals("serif", updated.get("fontFamily"));
+        assertEquals("18", updated.get("baseFontSize"));
+        assertEquals("1.9", updated.get("bodyLineHeight"));
+        assertEquals("820", updated.get("readerWidth"));
+        assertEquals("1.4", updated.get("paragraphSpacing"));
+        assertEquals("soft", updated.get("radiusScale"));
+        assertEquals("deep", updated.get("shadowDepth"));
+        assertEquals("comfortable", updated.get("layoutDensity"));
+        assertEquals("minimal", updated.get("homeHeroStyle"));
+        assertEquals("wide", updated.get("postCoverStyle"));
+        assertEquals("subtle", updated.get("motionIntensity"));
+    }
 }

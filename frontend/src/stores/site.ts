@@ -63,6 +63,28 @@ export interface SiteSettings {
   llmMaxTokens: string
   /** 访客评论提交后是否自动用模型审核（不通过则落为待审）。 */
   llmCommentModeration: string
+  /** 正文字体族：`system` | `sans` | `serif` | `mono`。 */
+  fontFamily: string
+  /** 正文基准字号 14–19（px）；默认 16 = 改造前观感。 */
+  baseFontSize: string
+  /** 正文行高倍数 1.5–2.2；默认 1.75。 */
+  bodyLineHeight: string
+  /** 文章阅读栏宽 640–960（px）；默认 760。 */
+  readerWidth: string
+  /** 正文段间距倍数 0–2（em）；默认 1。 */
+  paragraphSpacing: string
+  /** 圆角风格：`none` | `sharp` | `default` | `soft` | `round`。 */
+  radiusScale: string
+  /** 阴影层次：`flat` | `default` | `deep`。 */
+  shadowDepth: string
+  /** 布局密度：`compact` | `default` | `comfortable`。 */
+  layoutDensity: string
+  /** 首页头图样式：`default` | `compact` | `minimal` | `off`。 */
+  homeHeroStyle: string
+  /** 文章封面样式：`default` | `wide` | `hidden`。 */
+  postCoverStyle: string
+  /** 动效强度：`off` | `subtle` | `default` | `lively`。 */
+  motionIntensity: string
 }
 
 const defaults: SiteSettings = {
@@ -102,7 +124,19 @@ const defaults: SiteSettings = {
   llmThinking: 'disabled',
   llmReasoningEffort: 'low',
   llmMaxTokens: '0',
-  llmCommentModeration: 'false'
+  llmCommentModeration: 'false',
+  // 外观深度自定义的默认值 = 改造前的硬编码取值，保证升级零回归。
+  fontFamily: 'system',
+  baseFontSize: '16',
+  bodyLineHeight: '1.75',
+  readerWidth: '760',
+  paragraphSpacing: '1',
+  radiusScale: 'default',
+  shadowDepth: 'default',
+  layoutDensity: 'default',
+  homeHeroStyle: 'default',
+  postCoverStyle: 'default',
+  motionIntensity: 'default'
 }
 
 /** 运行时注入的 favicon 节点标记，用来和 index.html 里的静态兜底区分。 */
@@ -176,6 +210,83 @@ export function isDarkCanvas(skin: string): boolean {
   if (typeof document === 'undefined') return false
   if (document.documentElement.classList.contains('dark-mode')) return true
   return skin === 'midnight'
+}
+
+/* ==========================================================================
+ * 外观深度自定义（v2.0.29）
+ *
+ * 11 个设置键分两类，落点不同：
+ *
+ * - 枚举键（字体族/圆角/阴影/密度/头图/封面/动效）写成 `#selfblog` 上的 `data-ap-*`
+ *   属性，由 styles/customize.css 用属性选择器整组切换 token。
+ * - 数值键（字号/行高/栏宽/段间距）写成 `#selfblog` 上的 `--ap-*` 变量。
+ *
+ * 为什么不写到 `:root`：导航栏（`<header class="site-nav-wrap">`）是 `#selfblog` 的
+ * 子元素但不在 `.app-main` 里，customize.css 的规则全部限定在
+ * `.app-main:not(.app-main--admin)` 内，因此这些覆盖碰不到导航栏与后台界面 ——
+ * 这是「导航栏不要动」的落实方式。
+ * ========================================================================== */
+
+/** 与后端 SiteSettingsServiceImpl.validateValue 的取值集合逐字对应。 */
+const FONT_FAMILY_VALUES = ['system', 'sans', 'serif', 'mono'] as const
+const RADIUS_SCALE_VALUES = ['none', 'sharp', 'default', 'soft', 'round'] as const
+const SHADOW_DEPTH_VALUES = ['flat', 'default', 'deep'] as const
+const LAYOUT_DENSITY_VALUES = ['compact', 'default', 'comfortable'] as const
+const HERO_STYLE_VALUES = ['default', 'compact', 'minimal', 'off'] as const
+const POST_COVER_VALUES = ['default', 'wide', 'hidden'] as const
+const MOTION_VALUES = ['off', 'subtle', 'default', 'lively'] as const
+
+/** 取白名单内的枚举值；脏数据（服务端被绕过、旧缓存）一律回落 fallback。 */
+function pickEnum(raw: string | undefined, allowed: readonly string[], fallback: string): string {
+  const value = String(raw ?? '').trim()
+  return allowed.includes(value) ? value : fallback
+}
+
+/** 数值型外观设置：夹到区间；非法输入回落 fallback。不保留小数尾零以外的格式。 */
+function clampNumber(raw: string | undefined, min: number, max: number, fallback: number): number {
+  const parsed = Number.parseFloat(String(raw ?? '').trim())
+  if (!Number.isFinite(parsed)) return fallback
+  return Math.min(max, Math.max(min, parsed))
+}
+
+/**
+ * 把 11 个外观键写到 `#selfblog`。
+ *
+ * 两类键都只在**非默认档**时落地：默认档等于改造前的观感，不挂属性/不写变量意味着
+ * CSS 里一条覆盖规则都不命中，零回归是结构性的而不是靠取值凑巧相同。
+ * 数值键尤其重要：`.page-markdown` 原本硬编码 `line-height:1.9`、`.markdown-body`
+ * 是 1.75，两者是既有漂移；若默认档也写死 `--ap-body-line-height:1.75`，静态页
+ * 会被静默改成 1.75。
+ */
+function applyCustomizations(root: HTMLElement, settings: SiteSettings): void {
+  // 数值键：仅当与默认值不同才写；CSS 侧 fallback 保留各元素改造前的原值。
+  const numericVars: [string, string, number, number, number, string][] = [
+    ['--ap-base-font-size', settings.baseFontSize, 14, 19, 16, 'px'],
+    ['--ap-body-line-height', settings.bodyLineHeight, 1.5, 2.2, 1.75, ''],
+    ['--ap-reader-width', settings.readerWidth, 640, 960, 760, 'px'],
+    ['--ap-paragraph-spacing', settings.paragraphSpacing, 0, 2, 1, 'em']
+  ]
+  for (const [name, raw, min, max, fallback, unit] of numericVars) {
+    const value = clampNumber(raw, min, max, fallback)
+    if (value === fallback) root.style.removeProperty(name)
+    else root.style.setProperty(name, `${value}${unit}`)
+  }
+
+  // 枚举键：默认档 = 不挂属性。属性名由 dataset 驼峰自动转成 data-ap-xxx。
+  const enumAttrs: [string, string, readonly string[], string][] = [
+    ['apFont', settings.fontFamily, FONT_FAMILY_VALUES, 'system'],
+    ['apRadius', settings.radiusScale, RADIUS_SCALE_VALUES, 'default'],
+    ['apShadow', settings.shadowDepth, SHADOW_DEPTH_VALUES, 'default'],
+    ['apDensity', settings.layoutDensity, LAYOUT_DENSITY_VALUES, 'default'],
+    ['apHero', settings.homeHeroStyle, HERO_STYLE_VALUES, 'default'],
+    ['apPostCover', settings.postCoverStyle, POST_COVER_VALUES, 'default'],
+    ['apMotion', settings.motionIntensity, MOTION_VALUES, 'default']
+  ]
+  for (const [attr, raw, allowed, fallback] of enumAttrs) {
+    const value = pickEnum(raw, allowed, fallback)
+    if (value === fallback) delete root.dataset[attr]
+    else root.dataset[attr] = value
+  }
 }
 
 /**
@@ -376,6 +487,9 @@ export const useSiteStore = defineStore('site', () => {
     if (!root) return
 
     root.dataset.skin = skin
+    // 外观深度自定义：必须在 root 早退之后写，且要在 surface* 之前/之后都无依赖，
+    // 放在这里是为了与其它 #selfblog 变量同一个写入点，方便排查。
+    applyCustomizations(root, settings.value)
     root.style.setProperty('--site-primary', settings.value.themePrimaryColor || '#165DFF')
     root.style.setProperty(
       '--accent',

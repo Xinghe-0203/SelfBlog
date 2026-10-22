@@ -29,7 +29,12 @@ public class SiteSettingsServiceImpl implements SiteSettingsService {
             "backgroundImageUrl", "backgroundOverlay", "backgroundFixed",
             "surfaceOpacity", "surfaceBlur",
             "llmEnabled", "llmBaseUrl", "llmApiKey", "llmModel", "llmTimeoutSeconds", "llmAutoOnPublish",
-            "llmProvider", "llmThinking", "llmReasoningEffort", "llmMaxTokens", "llmCommentModeration"
+            "llmProvider", "llmThinking", "llmReasoningEffort", "llmMaxTokens", "llmCommentModeration",
+            // 外观深度自定义（v2.0.29）：排版 / 布局 / 呈现 / 动效四个维度。
+            // 默认值全部等于「改造前的观感」，因此老站点升级后零视觉回归。
+            "fontFamily", "baseFontSize", "bodyLineHeight", "readerWidth", "paragraphSpacing",
+            "radiusScale", "shadowDepth", "layoutDensity",
+            "homeHeroStyle", "postCoverStyle", "motionIntensity"
     );
 
     /**
@@ -203,6 +208,19 @@ public class SiteSettingsServiceImpl implements SiteSettingsService {
         values.put("backgroundFixed", "true");
         values.put("surfaceOpacity", "100");
         values.put("surfaceBlur", "0");
+        // 外观深度自定义：默认值刻意等于改造前的硬编码取值（16px / 1.75 / 760px / 1em 段距、
+        // 默认圆角与阴影、标准密度、完整 hero 与文章封面、默认动效），保证升级零回归。
+        values.put("fontFamily", "system");
+        values.put("baseFontSize", "16");
+        values.put("bodyLineHeight", "1.75");
+        values.put("readerWidth", "760");
+        values.put("paragraphSpacing", "1");
+        values.put("radiusScale", "default");
+        values.put("shadowDepth", "default");
+        values.put("layoutDensity", "default");
+        values.put("homeHeroStyle", "default");
+        values.put("postCoverStyle", "default");
+        values.put("motionIntensity", "default");
         // LLM（SEO 自动生成）：默认全关，作者在后台显式打开并填入密钥后才生效。
         values.put("llmEnabled", "false");
         values.put("llmBaseUrl", "");
@@ -235,6 +253,25 @@ public class SiteSettingsServiceImpl implements SiteSettingsService {
         int number;
         try {
             number = Integer.parseInt(value);
+        } catch (NumberFormatException e) {
+            throw new BusinessException(400, message);
+        }
+        if (number < min || number > max) throw new BusinessException(400, message);
+    }
+
+    /**
+     * 小数型设置的统一校验（行高、段落间距这类无单位的倍数）。
+     *
+     * <p>只接受 {@code 1} / {@code 1.75} 这类普通十进制写法：拒绝科学计数法（{@code 1e1}）、
+     * 前导正号、{@code .5} 这种省略整数位的写法 —— 这些值前端会直接拼进 CSS，
+     * 校验与消费两侧必须对同一份文法达成一致。比较用 {@code double} 是安全的：
+     * 这里只做区间判断，不需要精确算术。</p>
+     */
+    private void requireDecimalInRange(String value, double min, double max, String message) {
+        if (!value.matches("-?\\d{1,3}(\\.\\d{1,3})?")) throw new BusinessException(400, message);
+        double number;
+        try {
+            number = Double.parseDouble(value);
         } catch (NumberFormatException e) {
             throw new BusinessException(400, message);
         }
@@ -305,6 +342,45 @@ public class SiteSettingsServiceImpl implements SiteSettingsService {
             }
             case "surfaceOpacity" -> requireIntegerInRange(value, 60, 100, "卡片不透明度需为 60-100 之间的整数");
             case "surfaceBlur" -> requireIntegerInRange(value, 0, 40, "卡片模糊半径需为 0-40 之间的整数");
+            case "fontFamily" -> {
+                if (!Set.of("system", "sans", "serif", "mono").contains(value)) {
+                    throw new BusinessException(400, "字体族必须为 system、sans、serif 或 mono");
+                }
+            }
+            case "baseFontSize" -> requireIntegerInRange(value, 14, 19, "正文字号需为 14-19 之间的整数（px）");
+            case "bodyLineHeight" -> requireDecimalInRange(value, 1.5, 2.2, "正文行高需为 1.5-2.2 之间的数值");
+            case "readerWidth" -> requireIntegerInRange(value, 640, 960, "阅读栏宽需为 640-960 之间的整数（px）");
+            case "paragraphSpacing" -> requireDecimalInRange(value, 0, 2, "段落间距需为 0-2 之间的数值（em）");
+            case "radiusScale" -> {
+                if (!Set.of("none", "sharp", "default", "soft", "round").contains(value)) {
+                    throw new BusinessException(400, "圆角风格必须为 none、sharp、default、soft 或 round");
+                }
+            }
+            case "shadowDepth" -> {
+                if (!Set.of("flat", "default", "deep").contains(value)) {
+                    throw new BusinessException(400, "阴影层次必须为 flat、default 或 deep");
+                }
+            }
+            case "layoutDensity" -> {
+                if (!Set.of("compact", "default", "comfortable").contains(value)) {
+                    throw new BusinessException(400, "布局密度必须为 compact、default 或 comfortable");
+                }
+            }
+            case "homeHeroStyle" -> {
+                if (!Set.of("default", "compact", "minimal", "off").contains(value)) {
+                    throw new BusinessException(400, "首页头图样式必须为 default、compact、minimal 或 off");
+                }
+            }
+            case "postCoverStyle" -> {
+                if (!Set.of("default", "wide", "hidden").contains(value)) {
+                    throw new BusinessException(400, "文章封面样式必须为 default、wide 或 hidden");
+                }
+            }
+            case "motionIntensity" -> {
+                if (!Set.of("off", "subtle", "default", "lively").contains(value)) {
+                    throw new BusinessException(400, "动效强度必须为 off、subtle、default 或 lively");
+                }
+            }
             case "llmEnabled", "llmAutoOnPublish" -> {
                 if (!"true".equalsIgnoreCase(value) && !"false".equalsIgnoreCase(value)) throw new BusinessException(400, "开关值必须为 true 或 false");
             }

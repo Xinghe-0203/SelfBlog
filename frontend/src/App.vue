@@ -97,11 +97,24 @@ watch(
 
 watch(
   // isDarkMode 也在依赖里：深色画布要撤掉作者的浅色背景，否则浅底浅字不可读。
+  // 外观深度自定义的 11 个键同样要进依赖：它们由 applyAppearance() 写成
+  // #selfblog 的 data-ap-* 属性，不进依赖数组的话后台保存后要刷新才看得到。
   () =>
     [
       siteStore.settings.themeSkin,
       siteStore.settings.themePrimaryColor,
-      themeStore.isDarkMode
+      themeStore.isDarkMode,
+      siteStore.settings.fontFamily,
+      siteStore.settings.baseFontSize,
+      siteStore.settings.bodyLineHeight,
+      siteStore.settings.readerWidth,
+      siteStore.settings.paragraphSpacing,
+      siteStore.settings.radiusScale,
+      siteStore.settings.shadowDepth,
+      siteStore.settings.layoutDensity,
+      siteStore.settings.homeHeroStyle,
+      siteStore.settings.postCoverStyle,
+      siteStore.settings.motionIntensity
     ] as const,
   applySiteTheme
 )
@@ -173,17 +186,19 @@ onUnmounted(() => {
    Enter duration > exit duration so the eye catches the arriving page.
    ============================================================================ */
 
-/* Standard page transition */
+/* Standard page transition — 时长走 --ap-page-*，由后台「动效强度」写入
+   （customize.css 在 #selfblog[data-ap-motion=…] 的 .app-main 上定义，
+   转场元素是 .app-main 的后代，继承得到）。fallback 就是原来的 280/160ms。 */
 .page-enter-active {
   transition:
-    opacity 280ms cubic-bezier(0.16, 1, 0.3, 1),
-    transform 280ms cubic-bezier(0.16, 1, 0.3, 1);
+    opacity var(--ap-page-enter, 280ms) cubic-bezier(0.16, 1, 0.3, 1),
+    transform var(--ap-page-enter, 280ms) cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .page-leave-active {
   transition:
-    opacity 160ms ease-out,
-    transform 160ms ease-out;
+    opacity var(--ap-page-leave, 160ms) ease-out,
+    transform var(--ap-page-leave, 160ms) ease-out;
 }
 
 .page-enter-from {
@@ -199,14 +214,14 @@ onUnmounted(() => {
 /* Forward navigation (deeper) — slide from right */
 .page-forward-enter-active {
   transition:
-    opacity 300ms cubic-bezier(0.16, 1, 0.3, 1),
-    transform 300ms cubic-bezier(0.16, 1, 0.3, 1);
+    opacity var(--ap-page-enter, 300ms) cubic-bezier(0.16, 1, 0.3, 1),
+    transform var(--ap-page-enter, 300ms) cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .page-forward-leave-active {
   transition:
-    opacity 200ms ease-out,
-    transform 200ms ease-out;
+    opacity var(--ap-page-leave, 200ms) ease-out,
+    transform var(--ap-page-leave, 200ms) ease-out;
 }
 
 .page-forward-enter-from {
@@ -222,14 +237,14 @@ onUnmounted(() => {
 /* Back navigation (shallower) — slide from left */
 .page-back-enter-active {
   transition:
-    opacity 300ms cubic-bezier(0.16, 1, 0.3, 1),
-    transform 300ms cubic-bezier(0.16, 1, 0.3, 1);
+    opacity var(--ap-page-enter, 300ms) cubic-bezier(0.16, 1, 0.3, 1),
+    transform var(--ap-page-enter, 300ms) cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .page-back-leave-active {
   transition:
-    opacity 200ms ease-out,
-    transform 200ms ease-out;
+    opacity var(--ap-page-leave, 200ms) ease-out,
+    transform var(--ap-page-leave, 200ms) ease-out;
 }
 
 .page-back-enter-from {

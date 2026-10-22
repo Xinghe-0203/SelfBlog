@@ -4,7 +4,7 @@
 
 | 文件 | 版本 | 大小 | SHA-256 |
 |---|---|---|---|
-| `selfblog-2.0.28.jar` | 2.0.28 | 67,723,618 B | `FFA68A3C2E2DF1B651FAC6EAC4D360B813F219E9F7203CF6EE8011BE73356C05` |
+| `selfblog-2.0.29.jar` | 2.0.29 | 67,729,037 B | `9835BBB6FC5304AEB6DE92EB649E17408B4838AE83BE51DAD11857EC1736DF48` |
 
 ## 这个 JAR 是什么
 
@@ -17,7 +17,7 @@ JAR 与配置好的 `.env` 放在**同一运行目录**，并从该目录启动�
 都依赖工作目录）：
 
 ```bash
-java -jar selfblog-2.0.28.jar
+java -jar selfblog-2.0.29.jar
 ```
 
 默认端口 8825：博客 `http://localhost:8825/`，后台 `http://localhost:8825/admin`，
@@ -43,8 +43,8 @@ rm -rf target/classes/static
 所以发布用的副本放在本目录并显式提交。校验：
 
 ```bash
-sha256sum selfblog-2.0.28.jar
-# ffa68a3c2e2df1b651fac6eac4d360b813f219e9f7203cf6ee8011be73356c05
+sha256sum selfblog-2.0.29.jar
+# 9835bbb6fc5304aeb6de92eb649e17408b4838ae83be51dad11857ec1736df48
 ```
 
 ## 注意

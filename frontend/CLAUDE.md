@@ -1,8 +1,8 @@
-# CLAUDE.md - 个人博客 Vue 3 前端 (v2.0.28)
+# CLAUDE.md - 个人博客 Vue 3 前端 (v2.0.29)
 
 ## 项目概述
 
-这是单人作者个人博客的前端项目，基于 Vue 3 + Vite 构建。访客只读、搜索，作者通过管理员后台写作管理。当前版本 v2.0.28。
+这是单人作者个人博客的前端项目，基于 Vue 3 + Vite 构建。访客只读、搜索，作者通过管理员后台写作管理。当前版本 v2.0.29。
 
 ## 常用命令
 
@@ -13,7 +13,7 @@ npm run build          # 构建生产版本（先 vue-tsc --noEmit，再 Vite）
 npm run preview        # 预览生产版本
 npm run lint:check     # 只读 ESLint 检查（npm run lint 会改写文件）
 npm run type-check     # vue-tsc --noEmit（必过闸门）
-npm run test:run       # Vitest 单次运行（当前 51 文件 / 496 tests；原始基线 210）
+npm run test:run       # Vitest 单次运行（当前 51 文件 / 504 tests；原始基线 210）
 npm run test:deployment # node:test：Vercel 代理生成器 + Docker/Compose 源契约（27 项）
 ```
 
@@ -55,7 +55,7 @@ src/
 ├── composables/    # useDialog / useConfirm / useLatestRequest / useScrollState / useMarkdownEnhance / useSeoMeta / usePageConfig / usePageSeo / useScrollReveal
 ├── router/         # 路由配置（modules/ + guards）
 ├── stores/         # Pinia 状态管理 (site / theme / user / music / pages)
-├── styles/         # 样式文件（入口 main.css，appearance.css 必须最后导入）
+├── styles/         # 样式文件（入口 main.css，customize.css 必须最后导入）
 ├── types/          # TypeScript 类型定义（含 seo.ts 与 axios-augment.d.ts）
 ├── utils/          # 工具函数 (crypto / logger / toast / visitor / reading / navigationFit / pageCatalog)
 └── views/          # 页面组件（Home/About/Archives、post、pages、admin(+pages)、gallery、search、tag、user、auth、common）
@@ -75,7 +75,7 @@ src/
 
 ## 设计系统
 
-- 入口 `src/styles/main.css`，按顺序 `@import` 13 个模块；设计 token 在 `variables.css`，深色模式覆盖在 `dark-mode.css`，皮肤在 `skins.css`。**`appearance.css` 必须最后导入**（作者配置的背景/不透明度要压过皮肤与深色模式里同优先级的声明）
+- 入口 `src/styles/main.css`，按顺序 `@import` **14** 个模块；设计 token 在 `variables.css`，深色模式覆盖在 `dark-mode.css`，皮肤在 `skins.css`。**`appearance.css` 与 `customize.css` 必须排在最后且 `customize.css` 更后**（作者配置的背景/不透明度/排版要压过皮肤与深色模式里同优先级的声明）
 - 深色模式通过 `.dark-mode` 类生效（`stores/theme.ts` 加在 `<html>`，`App.vue` 同时绑在 `#selfblog` 上）
 - 皮肤通过 `#selfblog[data-skin='...']` 生效：`ocean`(默认)/`forest`/`lavender`/`sunset`/`midnight`
 - 动画工具类: `.fade-in`, `.slide-up`, `.pulse`
@@ -108,6 +108,19 @@ src/
 - 页面编辑/导航写入必须携带revision；只把提交快照标记为保存成功，跨页/卸载后忽略迟到响应。恢复默认只改草稿，发布需明确操作
 - 服务端阅读HTML由JAR按请求组装（`backend/.../service/site/seo/`），Vue挂载会整体替换`#app`内的`.seo-reading`：不要给它加跨页面依赖或期望它存活。`useSeoMeta`优先读取`meta[name=selfblog-site-origin]`确定canonical/分享图origin，Vite本地开发无标记时才回落浏览器origin
 - `vercel.json`不再部署第二份静态前端：`framework:null` + `scripts/build-vercel-proxy.mjs`生成Build Output v3转发到同一源站。不要恢复Vite自动预设、独立`dist`发布或写死域名；部署契约测试用`npm run test:deployment`
+
+## 外观深度自定义（2026-10-22，v2.0.29）
+
+- 11 个新设置键分四个维度：**排版**（`fontFamily` `system|sans|serif|mono`、`baseFontSize` 14–19、`bodyLineHeight` 1.5–2.2、`readerWidth` 640–960、`paragraphSpacing` 0–2）、**布局**（`radiusScale` `none|sharp|default|soft|round`、`shadowDepth` `flat|default|deep`、`layoutDensity` `compact|default|comfortable`）、**呈现**（`homeHeroStyle` `default|compact|minimal|off`、`postCoverStyle` `default|wide|hidden`）、**动效**（`motionIntensity` `off|subtle|default|lively`）
+- 全部规则在 `src/styles/customize.css`（**排在 `appearance.css` 之后**，作者配置要压过皮肤/深色模式同优先级声明）。7 个枚举键写成 `#selfblog` 上的 `data-ap-*` 属性，4 个数值键写成 `#selfblog` 上的内联 `--ap-*` 变量（**不是 `<html>`**，否则会绕过作用域改到导航栏）；等于默认值即删掉钩子（`delete root.dataset[...]` / `removeProperty`）
+- **硬约束一：导航栏与后台界面完全不动。** 所有选择器限定在 `#selfblog .app-main:not(.app-main--admin)` 内——`Navbar`（`.site-nav-wrap`）与 `Footer` 在 `.app-main` 之外，天然碰不到。改这些规则后必须跑「导航栏逐字符恒定」的真机判据（见 `docs/reviews/2026-10-22-appearance-customization-verification.md`）
+- **硬约束二：默认档必须逐像素等于改造前。** 每条规则的 fallback 就是原来的硬编码值（`var(--ap-reader-width, 760px)` 里的 760px 就是 `PostDetail.vue` 原来的 760px）。不要在默认档顺手加一点「更精致」的阴影或间距——零回归靠的是这一点
+- **改字体必须重定向 token，不能靠继承**：`PostDetail.vue` 等视图有 11 处 `font-family: var(--font-display)` 的**直接声明**，继承永远输。`customize.css` 在该作用域内重新赋值 `--font-sans` / `--font-display`（标题族用 `--ap-font-heading`），既有声明自动跟随。`--font-mono` **刻意不动**：代码块与行内 code 必须保持等宽
+- **阴影档只给「deep」接线内容卡片**（`.article-list` / `.intro-shell` / `.sidebar-block` / `.author-profile` / `.album-card` / `.state-panel` / `.archive-callout` → `box-shadow: var(--shadow-xs)`）。**不给 default 接线是刻意的**（默认档要零回归）。不碰 `.page-frame` 的 `inset 0 0 0 1px`：那是描边语义，换成外投影会让纸面边缘糊掉
+- 不覆盖 `--radius-full`（9999px）与 `50%`：胶囊导航、圆形头像/圆形按钮必须真圆
+- 11 个键**不进 `PREPAINT_APPEARANCE_VARS`**：它们依赖 `#selfblog` 作用域，预置到 `<html>` 会绕过作用域把导航栏一起改掉
+- `App.vue` 的外观 `watch` 依赖数组必须包含全部 11 个新键（当前 14 项），否则改设置不重新应用
+- 后台面板在 `views/admin/Settings.vue` 第 7 个 section「外观深度自定义」；「恢复默认外观」**只改表单不保存**（避免误触）
 
 ## LLM 辅助 SEO（2026-10-22）
 
@@ -156,7 +169,7 @@ src/
 VITE_APP_TITLE=个人博客                     # 应用标题（代码实际消费）
 VITE_API_TARGET=http://localhost:8825       # 开发环境代理目标（vite.config.ts 消费）
 VITE_API_BASE_URL=/api                      # 保留位：axios 在 src/api/index.ts 硬编码 /api，未被消费
-VITE_APP_VERSION=2.0.28                     # 保留位：当前未被代码消费；真实版本号由 vite.config.ts 从 package.json 注入 __APP_VERSION__
+VITE_APP_VERSION=2.0.29                     # 保留位：当前未被代码消费；真实版本号由 vite.config.ts 从 package.json 注入 __APP_VERSION__
 ```
 
 如需本地覆盖，创建 `.env.local`（不提交 git）。
