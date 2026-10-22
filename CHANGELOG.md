@@ -139,6 +139,9 @@ per-post SEO 元数据，且客户端是「通用 OpenAI 兼容」的，没有�
 
 ### 验证
 
+真机取证的完整记录（含两个必须预判的上游行为、安全性核对、一次开发库误写的处置与未覆盖项）见
+[验证记录](docs/reviews/2026-10-22-deepseek-ai-features-verification.md)。
+
 1. **后端全量**（`$env:JAVA_HOME='C:\Program Files\Java\jdk-21'` +
    `backend\mvnw.cmd -o test "-Dskip.npm=true" "-Dskip.installnodenpm=true"`）：
    **1140 tests, 0 failures, 0 errors, 0 skipped, BUILD SUCCESS**（基线 1004，+136）。
@@ -162,8 +165,8 @@ per-post SEO 元数据，且客户端是「通用 OpenAI 兼容」的，没有�
    - SEO 生成：`POST /api/admin/seo/posts/2/generate` 200 / `source=llm` / 真实 title+description+keywords。
    - 服务端渲染 `GET /post/2` 含自定义 `<title>`、`meta[name=description]`、`meta[name=keywords]`。
    - 公开设置 `GET /api/site/public` 的 `llm*` 键数为 **0**；管理端回读 `llmApiKey` 是 8 字符掩码哨兵。
-4. **JSON 模式反证**：`.tmp-llm/json-hint-real-result.txt` 记录 `RESPONSE_FORMAT_RETRY_LOG_LINES=0`、
-   `LOG_HAS_400=false`，同一提示词修复前必吃一次 400。
+4. **JSON 模式反证**：用真实 Key 跑同一提示词，日志里 `RESPONSE_FORMAT_RETRY_LOG_LINES=0`、
+   `LOG_HAS_400=false`；修复前该提示词必吃一次 400 并靠降级重试才拿到结果。
 5. **`post_seo` 清空反证**：退回 `updateById` 单跑 `save_ClearsPreviouslyStoredFields` → 立即失败。
 6. **图注写入反证**：退回 `photo.setCaption(x); updateById(photo)` 单跑
    `PhotoAlbumServiceImplCaptionTest` → `blankCaptionIsClearedViaUpdateWrapper` 与
@@ -191,6 +194,7 @@ per-post SEO 元数据，且客户端是「通用 OpenAI 兼容」的，没有�
 | `frontend/src/views/admin/{Settings,Comments,Seo,Albums,AdminLayout,Dashboard}.vue`、`views/post/PostEdit.vue`、`router/modules/admin.ts` | 修改（A–F 的 UI 落点） |
 | `frontend/src/**/__tests__/*`（`Settings`/`Seo`/`PostEdit`/`AdminLayout` 改 + `Albums`/`Comments`/`Dashboard`/`Health` 新） | 修改 / 新增 |
 | `README.md`、`backend/README.md`、`frontend/README.md`、`CLAUDE.md`、`frontend/CLAUDE.md`、`AGENTS.md`、`docs/agents/{backend,frontend}.md` | 修改（新功能文档 + 测试基线） |
+| `docs/reviews/2026-10-22-deepseek-ai-features-verification.md` | 新增（真机验证记录） |
 | `CHANGELOG.md` | 新增条目 |
 
 ---
