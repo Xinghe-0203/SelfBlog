@@ -7,6 +7,11 @@ backend/uploads/
 *.temp
 *.swp
 *~
+# 验证/取证用的临时工作目录（.tmp-gate、.tmp-llm、.tmp-fix、.tmp-cust、.tmp-vis 等）：
+# 里面是临时 DB 副本、jar 解包、Playwright 截图与探针脚本，从不入库。
+.tmp*/
+.audit/
+backend/tmp/
 # Environment
 .env
 .env.local
