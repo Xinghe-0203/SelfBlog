@@ -122,6 +122,7 @@ describe('index.html 首屏外观引导脚本', () => {
   afterEach(() => {
     localStorage.clear()
     document.documentElement.removeAttribute('style')
+    document.documentElement.removeAttribute('data-wallpaper')
     vi.unstubAllGlobals()
   })
 
@@ -171,6 +172,34 @@ describe('index.html 首屏外观引导脚本', () => {
       'linear-gradient(rgba(0,0,0,0.35), rgba(0,0,0,0.35)), url("/uploads/cover.webp")'
     runAppearanceScript(JSON.stringify({ '--ap-bg-image': composed }))
     expect(rootVar('--ap-bg-image')).toBe(composed)
+  })
+
+  /**
+   * 壁纸标记必须在首次绘制前就落到 <html> 上。
+   *
+   * `.page-frame` 的纸面是否不透明取决于「这一屏有没有作者配置的装饰画布」，而这个判据
+   * 在运行时由 applyAppearance() 写。若首屏不等它，读者会先看到一帧透明纸面 —— 正文
+   * 直接压在壁纸上的错位观感 —— 再跳变到正确外观。因此标记必须与 --ap-bg-image
+   * 同一次落地。
+   *
+   * 判据刻意与 stores/site.ts 的 buildBackgroundVars 保持同一个：「--ap-bg-image 非空」。
+   * 照片与作者自定义渐变都走这个键（见 buildBackgroundVars 的 gradient 分支），
+   * 两者都属于「画布不再是皮肤默认色」，正文都需要纸面兜底，所以不按 url() 再细分。
+   */
+  it('有背景图时首屏就打上 data-wallpaper 标记', () => {
+    runAppearanceScript(JSON.stringify({ '--ap-bg-image': 'url("/uploads/cover.webp")' }))
+    expect(document.documentElement.hasAttribute('data-wallpaper')).toBe(true)
+  })
+
+  it('只有纯色背景时不打标记（画布仍是皮肤色，无需纸面兜底）', () => {
+    runAppearanceScript(JSON.stringify({ '--ap-bg-color': '#1f2933' }))
+    expect(document.documentElement.hasAttribute('data-wallpaper')).toBe(false)
+  })
+
+  it('缓存为空串时清掉可能残留的标记', () => {
+    document.documentElement.setAttribute('data-wallpaper', '')
+    runAppearanceScript(JSON.stringify({ '--ap-bg-image': '' }))
+    expect(document.documentElement.hasAttribute('data-wallpaper')).toBe(false)
   })
 
   it('白名单之外的键一律忽略（安全断言）', () => {

@@ -15,7 +15,7 @@
     <!-- 项目基本信息 -->
     <groupId>com.selfblog</groupId>
     <artifactId>selfblog</artifactId>
-    <version>2.0.26</version>
+    <version>2.0.27</version>
     <name>SelfBlog</name>
     <description>SelfBlog - 后端</description>
 

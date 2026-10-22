@@ -443,3 +443,15 @@ CREATE TABLE IF NOT EXISTS album_photo (
     is_deleted INT DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS idx_album_photo_order ON album_photo (album_id, is_deleted, sort_order, create_time);
+
+CREATE TABLE IF NOT EXISTS post_seo (
+    post_id BIGINT PRIMARY KEY,
+    seo_title VARCHAR(200),
+    seo_description VARCHAR(400),
+    seo_keywords VARCHAR(300),
+    og_image_url VARCHAR(500),
+    source VARCHAR(20) NOT NULL DEFAULT 'manual',
+    generated_at TIMESTAMP NULL,
+    update_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_post_seo_generated_at ON post_seo (generated_at);

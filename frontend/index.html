@@ -66,6 +66,16 @@
             document.documentElement.style.setProperty(allowed[i], value)
           }
         }
+        // 壁纸标记必须与变量同一次绘制落地：`.page-frame` 的纸面是否不透明
+        // 取决于「这一屏有没有壁纸」，若等 Vue 挂载后再加，读者会先看到一帧
+        // 透明纸面（正文直接压在壁纸上的错位观感），再跳变成正确外观。
+        // 判据与 stores/site.ts 的 applyBackgroundVars 保持一致：只有背景图非空
+        // 才算壁纸；纯色/渐变由 background-color 兜底，不触发该标记。
+        if (typeof appearance['--ap-bg-image'] === 'string' && appearance['--ap-bg-image']) {
+          document.documentElement.setAttribute('data-wallpaper', '')
+        } else {
+          document.documentElement.removeAttribute('data-wallpaper')
+        }
       } catch (e) {}
     })()
   </script>

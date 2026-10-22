@@ -6,6 +6,7 @@ import PostEdit from '../PostEdit.vue'
 import { postApi } from '@/api/post'
 import { tagApi } from '@/api/tag'
 import { mediaApi } from '@/api/media'
+import { seoApi } from '@/api/seo'
 
 /**
  * 编辑器冒烟测试只覆盖已有动作（草稿 / 发布 / 封面 / 标签），
@@ -23,6 +24,9 @@ vi.mock('@/api/post', () => ({
 }))
 vi.mock('@/api/tag', () => ({ tagApi: { getTagList: vi.fn() } }))
 vi.mock('@/api/media', () => ({ mediaApi: { uploadFile: vi.fn() } }))
+vi.mock('@/api/seo', () => ({
+  seoApi: { getDetail: vi.fn(), update: vi.fn(), generate: vi.fn() }
+}))
 vi.mock('@/utils/toast', () => ({ toast: { success: vi.fn(), warning: vi.fn(), error: vi.fn() } }))
 enableAutoUnmount(afterEach)
 const response = <T>(data: T) => ({ code: 200, message: 'ok', data })
@@ -391,5 +395,101 @@ describe('author editor smoke coverage', () => {
     await flushPromises()
     expect(mediaApi.uploadFile).toHaveBeenCalledWith(file, 'cover')
     expect(wrapper.find('.cover-preview img').attributes('src')).toBe('/uploads/cover.jpg')
+  })
+
+  it('only offers the SEO panel for a saved post and loads its stored metadata', async () => {
+    vi.mocked(seoApi.getDetail).mockResolvedValue(
+      response({
+        postId: 9,
+        title: '已发布文章',
+        status: 1,
+        hasSeo: true,
+        seoTitle: '存过的搜索标题',
+        seoDescription: '存过的描述',
+        seoKeywords: 'a,b',
+        ogImageUrl: null,
+        source: 'manual',
+        generatedAt: null,
+        updateTime: null,
+        issues: [],
+        postSummary: null,
+        effectiveTitle: '存过的搜索标题',
+        effectiveDescription: '存过的描述'
+      })
+    )
+
+    const draft = (await setup()).wrapper
+    expect(draft.find('[data-action="seo-save"]').exists()).toBe(false)
+
+    const { wrapper } = await setup('/admin/edit/9')
+    await flushPromises()
+    expect(seoApi.getDetail).toHaveBeenCalledWith(9)
+    expect(wrapper.get<HTMLInputElement>('#seo-title').element.value).toBe('存过的搜索标题')
+  })
+
+  it('treats a missing SEO record as empty instead of an error, and saves blanks as null', async () => {
+    vi.mocked(seoApi.getDetail).mockRejectedValue({ response: { status: 404 } })
+    vi.mocked(seoApi.update).mockResolvedValue(response(null as unknown as never))
+    const { wrapper } = await setup('/admin/edit/9')
+    await flushPromises()
+
+    expect(wrapper.find('.seo-status').exists()).toBe(false)
+    await wrapper.get('#seo-title').setValue('  新标题 ')
+    await wrapper.get('#seo-description').setValue('  ')
+    await wrapper.get('[data-action="seo-save"]').trigger('click')
+    await flushPromises()
+
+    expect(seoApi.update).toHaveBeenCalledWith(9, {
+      seoTitle: '新标题',
+      seoDescription: null,
+      seoKeywords: null,
+      ogImageUrl: null
+    })
+    expect(wrapper.get('.seo-status').text()).toBe('SEO 元数据已保存')
+  })
+
+  /**
+   * 60/160 是搜索结果的**建议**长度，不是存储上限（服务端 200/400）。
+   *
+   * 若把 maxlength 直接设成建议值，作者粘贴一段更长的描述会被浏览器静默截断 ——
+   * 那正是「保存成功但内容被悄悄改掉」这类最难排查的缺陷。所以输入框按服务端上限
+   * 放行，超长只在计数上给出提示。
+   */
+  it('allows over-length SEO text up to the server cap and only warns on the counter', async () => {
+    vi.mocked(seoApi.getDetail).mockRejectedValue({ response: { status: 404 } })
+    vi.mocked(seoApi.update).mockResolvedValue(response(null as unknown as never))
+    const { wrapper } = await setup('/admin/edit/9')
+    await flushPromises()
+
+    const title = wrapper.get<HTMLInputElement>('#seo-title')
+    const description = wrapper.get<HTMLTextAreaElement>('#seo-description')
+    expect(title.attributes('maxlength')).toBe('200')
+    expect(description.attributes('maxlength')).toBe('400')
+
+    /** 摘要框也有一个 .char-hint，按所属 form-group 取，避免依赖全页序号。 */
+    const hintFor = (id: string) =>
+      wrapper.get(`#${id}`).element.closest('.form-group')?.querySelector('.char-hint') ?? null
+
+    expect(hintFor('seo-title')?.getAttribute('data-over')).toBe('false')
+    expect(hintFor('seo-title')?.textContent?.trim()).toBe('0/60')
+
+    await title.setValue('长'.repeat(72))
+    await description.setValue('长'.repeat(170))
+    await flushPromises()
+
+    expect(hintFor('seo-title')?.textContent?.trim()).toBe('72/60')
+    expect(hintFor('seo-title')?.getAttribute('data-over')).toBe('true')
+    expect(hintFor('seo-description')?.textContent?.trim()).toBe('170/160')
+    expect(hintFor('seo-description')?.getAttribute('data-over')).toBe('true')
+
+    // 超长只是提示，不拦保存：提交的仍是完整原文。
+    await wrapper.get('[data-action="seo-save"]').trigger('click')
+    await flushPromises()
+    expect(seoApi.update).toHaveBeenCalledWith(9, {
+      seoTitle: '长'.repeat(72),
+      seoDescription: '长'.repeat(170),
+      seoKeywords: null,
+      ogImageUrl: null
+    })
   })
 })

@@ -4,7 +4,172 @@
 
 ---
 
-## 未发布 — 新增 `release/` 目录，随源码提交可运行 JAR (2026-10-21)
+## v2.0.27 — 外观三级表面分层重构 + LLM 辅助 SEO (2026-10-22)
+
+### 说明
+
+两项独立的用户诉求：
+
+1. **重设计外观在自定义壁纸下的呈现。** 用户配置了一张照片壁纸后，文章详情页的正文、
+   标题与右侧目录**直接画在照片上**；关于页的作者卡片与站点链接是唯一两块不透明的实心色块，
+   与周围半透明元素割裂；首页封面面板在无封面时留一块 43% 宽的空灰矩形。
+2. **在后台接入 LLM 自动管理 SEO。** 仓库此前**没有任何 per-post SEO 字段**
+   （`BlogPost` 实体零 SEO 列、全 main grep `seoTitle|seoDescription` 零命中），
+   搜索标题/描述只能由 `ReadingPageService` 从摘要与正文首段派生，作者无法手工覆盖。
+
+两项都按「先取证、再改」执行：外观改动全部有真机 computed style 与像素差证据，
+SEO 改动有 10 个新测试类（含真 loopback HTTP 桩）与 8 端点的真机 curl 记录。
+
+### 修复（外观 / 真缺陷）
+
+- **文章详情正文压在壁纸照片上（最严重）。** `frontend/src/components/pages/PageFrame.vue`
+  渲染 `:data-page-background="config.style?.background"`，作者未配置背景时该属性
+  **整个不存在**，而 `.page-frame` 自己没有任何 `background` 声明 → 正文、标题、
+  右侧 TOC 全部透出壁纸。现在 `background` 是 `computed(() => props.config.style?.background ?? 'auto')`，
+  属性恒在，并由 `appearance.css` 给三档纸面兜底（`--surface-paper` + `--radius-2xl` + 1px 边框）。
+- **关于页风格割裂。** `.author-profile` 与 `.about-site a` 硬编码 `background: var(--surface-primary)`
+  实心，改为 `--surface-raised` / `--surface-control`（纯色画布下三者同值，像素不变）。
+- **首页封面面板留空灰矩形。** `.intro-visual` 自绘 `background: var(--bg-tertiary)`，
+  无封面时仍占 43% 宽度。删除该容器的自绘背景（配合此前已修的无封面不渲染）。
+- **壁纸模式下 TOC 悬空。** `.toc-card` 原只有上下 1px 分隔线，压在照片上是一片悬空蓝链接；
+  壁纸模式补 `padding` / 1px 边框 / `--radius-lg`。
+- **正文次级文字对白纸对比度不足。** 壁纸模式把「次级/弱化」两档收紧到
+  `#5f6875`（L=0.136，对白 5.65:1、对控件档 4.86:1）与 `#646d7b`（L=0.151，对白 5.22:1、
+  对浮起档 4.65:1），仍比 `--text-primary` 浅，层级未被压平。
+
+### 新增（三级表面分层体系）
+
+- **三个语义 token**：`--surface-paper` / `--surface-raised` / `--surface-control`，
+  定义在 `frontend/src/styles/appearance.css`（该文件必须在 `main.css` 最后导入）。
+  基线全部别名回 `--surface-primary`；**有壁纸**时分别取三档不同 alpha 的合成色。
+- **合成色取值刻意不用 `--surface-secondary`**：壁纸下纸面已是实心 `#ffffff`，
+  而 `--surface-secondary` 是 `#f9fafc`，压在纯白上只差 5/255，肉眼读不出台阶。
+  故 raised 用 `--bg-secondary`（差白 14/255）、control 用 `--bg-tertiary`（差白 20/255 + 1px 边框）。
+- **不透明度按档派生**（`frontend/src/stores/site.ts` 的 `effectiveSurfaceOpacities`）：
+  无壁纸 → 三档同值（= 改造前的单档半透明，零回归）；
+  有壁纸 → `paper=100`、`raised=max(base, 88 亮/94 暗)`、`control=min(raised, max(60, raised-6))`。
+- **控件档只在壁纸模式接管** 7 个选择器（`.btn-ghost` / `.archive-callout` / `.about-site a` /
+  `.load-more button` / `.load-more-comments` / `.like-action` / `.state-panel button`）。
+- **降级块**：`@media (prefers-reduced-transparency: reduce), (prefers-contrast: more),
+  (forced-colors: active)` 下三档退化为实心。
+- **首屏预置**：`frontend/index.html` 的内联脚本在转发白名单变量后补 `data-wallpaper` 判定，
+  消除「壁纸已铺开、纸面还没上色」的一帧闪烁。
+
+### 新增（LLM 辅助 SEO）
+
+- **`post_seo` 独立表**（`post_id` 主键 + 标题/描述/关键词/分享图 + `source` + `generated_at`）。
+  四个 schema 文件（`schema-sqlite.sql`、`schema-fresh-install.sql`、`migration-selfblog.sql`、
+  `src/test/resources/schema.sql`）全部用 `CREATE TABLE IF NOT EXISTS`，
+  **全仓零 `ALTER TABLE`** —— 仓库没有列级迁移机制，给 `blog_post` 加列会在既有安装上静默不生效。
+- **8 个 `/api/admin/seo/**` 端点**（类级 + 方法级 `@PreAuthorize("hasRole('admin')")`）：
+  概览、分页体检、单篇详情、手工保存、删除、单篇生成、批量生成、连接测试。
+- **OpenAI 兼容客户端**：JDK `java.net.http.HttpClient` 打 `/chat/completions`，
+  **不新增任何 Maven 依赖**（仓库无 RestTemplate/WebClient/RestClient）；
+  响应体封顶 1 MB、`Authorization` 与 key 永不进日志、401/403/429/404/5xx/timeout 映射为不同安全中文文案。
+- **自动生成**：`createPost` / `updatePost`（转为已发布）/ `approvePost` 三处在**事务提交后**
+  经独立 `@Async` Bean 派发（`SeoAutoGenerationTrigger`），异步线程才不会读到未提交的文章；
+  触发器任何异常都被吞掉，**SEO 绝不能让文章保存失败**。
+- **渲染**：`ReadingHtmlRenderer` 新增 `meta[name=keywords]` 与独立分享图
+  （OG/Twitter/JSON-LD），回落链 `post_seo.og_image_url` → `blog_post.cover_url` → 站点 Logo；
+  **不改正文头图**。`SeoFallback` 是 effective title/description/image 的唯一真源，
+  `ReadingPageService` 与 `SeoAuditService` 同调它，后台预览与前台渲染不会漂移。
+- **前端三处写域**：`Settings.vue` 配置连接（含「测试连接」）、`Seo.vue` 体检与批量生成、
+  `PostEdit.vue` 侧栏单篇编辑；后台导航与 Dashboard 快捷入口均已接线。
+- **密钥掩码哨兵**：`SECRET_MASK` = 8 个 U+2022。已存密钥时下发该字面串，
+  提交掩码 = 保留、提交 `""` = 清除、其它 = 替换；整个 `llm*` 组从匿名 `/api/site/public` 过滤。
+
+### 修复（LLM SEO 的静默缺陷）
+
+- **`SeoMetadataService.save` 的「清空」永不生效。** 原实现 `normalize(...)` 把空白转 `null`
+  后走 `postSeoMapper.updateById(row)`，而 MyBatis-Plus 默认更新策略 `NOT_NULL`
+  **把 null 字段整列从 SET 子句剔除** —— UPDATE 仍匹配 1 行、不报错，用户清空描述后回读还是旧值。
+  改为 `update(null, new LambdaUpdateWrapper<PostSeo>()...set(...))` 逐列显式赋值
+  （`update(null, wrapper)` 时 `MetaObjectHandler` 不填 `updateTime`，故手写）。
+  已补回归测试 `save_ClearsPreviouslyStoredFields`，并**反证**过：把实现退回 `updateById` 后该测试
+  报 `expected: <null> but was: <自定义描述>`，证明断言不是空转。
+- **LLM 生成请求被自动重试放大三倍。** `frontend/src/constants/index.ts` 的 `RETRYABLE_CODES`
+  含 `ECONNABORTED`，而这正是 axios 的**超时**错误码 → 一次 130s 超时会被重放成 3 次上游调用
+  （3× 模型额度 + 3× 等待），且 `/api/admin/**` 落在 60/min 兜底限流桶内。
+  新增 `_noRetry` 请求标记（`frontend/src/types/axios-augment.d.ts` 增补 axios config 类型），
+  `api/seo.ts` 的 generate/batch/test 三处退出重试。
+
+### 承重规则（改动前必读）
+
+1. **`data-wallpaper` 挂在 `document.documentElement`（`<html>`），不是 `#selfblog`。**
+   首屏预置脚本此刻 `#selfblog` 还不存在，只能写 `<html>`；运行时 `applyAppearance()` 为同源也写它。
+   ⇒ 所有壁纸相关选择器必须是 `html[data-wallpaper] #selfblog …`。
+   写成 `#selfblog[data-wallpaper] …` 会**永不匹配**，整套分层变死 CSS（本次重构中真实发生过一次）。
+2. **`appearance.css` 的基线块必须带 `.dark-mode` 与 `[data-skin='midnight']` 变体。**
+   `dark-mode.css` 与 `variables.css` 各有一条向后兼容别名 `--surface-raised: var(--surface-secondary)`，
+   而 `#selfblog.dark-mode`(0,1,1,0) 特异性高于 `#selfblog`(0,1,0,0) —— 不补齐则深色纯色画布下
+   卡片会从白变浅灰，正是像素红线要防的回归。
+3. **无壁纸 + `surfaceOpacity=100` 必须与改造前逐像素一致。** 任何一档在 `html` 无
+   `data-wallpaper` 时被换成别的 token，都是回归。
+4. **`PREPAINT_APPEARANCE_VARS` 不得扩展。** 该白名单既是安全边界，又被
+   `frontend/src/__tests__/indexHtml.test.ts` 断言逐字等于 `APPEARANCE_KEYS`。
+5. **`post_seo` 只能以新表形态出现，绝不 `ALTER TABLE blog_post`**（无列级迁移机制）。
+6. **`ReadingPageService` 与 `SeoGenerationService` 都刻意没有类级 `@Transactional`。**
+   前者读路径（详情页不能因 SEO 读失败而 500），后者跨数十秒网络 IO（不得占连接）。
+7. **`getPublicSettings()` 过滤 `llm*` 必须在缓存 map 的副本上做。**
+   `getSettings()` 返回的是缓存里的**同一个** Map 实例，就地 `remove` 会把缓存改脏、
+   密钥真的从后台消失；`SiteSettingsCacheTest` 同时钉住「缓存命中只打一次 mapper」。
+8. **默认更新策略 `NOT_NULL` + 全局 `logic-delete-field: isDeleted` 的后果都是静默的。**
+   清空列要 `update(null, LambdaUpdateWrapper.set(...))`；软删除要显式
+   `set(isDeleted, 1)`，`updateById` 两条都做不到且都不报错。
+
+### 验证
+
+1. **后端全量**（`$env:JAVA_HOME='C:\Program Files\Java\jdk-21'` +
+   `backend\mvnw.cmd test "-Dskip.npm=true" "-Dskip.installnodenpm=true"`）：
+   **1004 tests, 0 failures, 0 errors, 0 skipped, BUILD SUCCESS**（基线 881，+123）。
+2. **前端六闸门**（`frontend/`）：`lint:check` **0 errors / 42 warnings**、
+   `format:check` 通过、`type-check` **0**、`test:run` **47 files / 477 tests**、
+   `test:deployment` **27/27**、`build` ✓ 2.94s。
+3. **表面分层真机取证**（真 Chrome + Vite :3000 + 后端 :8825，读 `getComputedStyle`）：
+   - 壁纸 + opacity60（用户截图配置）：`html[data-wallpaper]` 为真、
+     paper `color-mix(#ffffff 100%)`、raised `#eef0f4 88%`、control `#e7eaf0 82%`、
+     `.page-frame` `color(srgb 1 1 1)` r16px —— 覆盖 `/`、`/about`、`/post/15`、`/archives`、`/gallery` 五页一致。
+   - 纯色 + opacity100：属性缺席、三档全 `#ffffff`、`.page-frame` `rgba(0,0,0,0)` r0px。
+   - 纯色 + opacity60：三档同为 `color-mix(#ffffff 60%)`（= 改造前单档形态）。
+   - 壁纸 + 深色：paper `#20242c 100%`、raised `#252a33 94%`、control `#2c323d 88%`。
+   - 390×844 移动端：五页 `scrollWidth == clientWidth == 390`，无横向溢出。
+   - 全程 `pageerror` 为 0。
+4. **纯色画布像素同一性实测**（`ImageChops.difference`，改造前 vs 改造后，1440×900 与 390×844）：
+   首页 **0** 差异像素 / 1,296,000、关于页 **0**、文章页 50 px 且 bbox 恰是
+   `.article-meta` 的阅读计数（`…6 次阅读` → `…9 次阅读`，取证时的自身访问造成）。
+5. **LLM SEO 真机端到端**（新 jar :8825 + SQLite 15 篇文章，真实 admin API 播种）：
+   概览 `totalPosts:15`；分页体检 3 条含 `noSeo`/`missingCover`；无记录详情 **404**；
+   手工保存 200 后 `hasSeo:true, source:"manual"`；未配置时生成 **400**（HTTP 400 非 500）；
+   `ogImageUrl:"//evil.com/x.png"` 与 201 字符标题均 **400** 且文案精确；
+   服务端渲染 `GET /post/15` 含自定义 `<title>`、`meta[name=description]`、`meta[name=keywords]`、
+   `og:title` 与 JSON-LD；密钥掩码往返（提交哨兵=保留 / 提交 `""`=清除）；
+   `POST /test-connection` 恒 200 + `ok:false`；`GET /api/site/public` 的 `llm*` 键数为 **0**。
+6. **部署契约**：`node --test scripts/__tests__/*.test.mjs` **27/27**。
+
+### 影响文件
+
+| 文件 | 改动类型 |
+|------|----------|
+| `frontend/src/styles/appearance.css` | 重写（三级表面分层、壁纸选择器、控件档、降级块） |
+| `frontend/src/components/pages/PageFrame.vue` | 修改（`data-page-background` 恒在 + 纸面兜底） |
+| `frontend/src/stores/site.ts` | 修改（`effectiveSurfaceOpacities`、`data-wallpaper`、6 个 `llm*` 键） |
+| `frontend/index.html` | 修改（首屏补 `data-wallpaper`） |
+| `frontend/src/views/{Home,About,Archives,Gallery,post/PostDetail}.vue`、`components/post/ArticleList.vue`、`views/common/NotFound.vue` | 修改（改用三级 token / 删空灰矩形） |
+| `frontend/src/api/{index.ts,seo.ts}`、`constants/index.ts`、`types/{axios-augment.d.ts,seo.ts,index.ts}` | 修改 / 新增（`_noRetry`、8 个 SEO 方法、类型增补） |
+| `frontend/src/views/admin/{Seo.vue,Settings.vue,AdminLayout.vue,Dashboard.vue,Posts.vue}`、`router/modules/admin.ts` | 新增 / 修改（SEO 管理页、LLM 设置面板、入口接线） |
+| `frontend/src/views/post/PostEdit.vue` | 修改（单篇 SEO 侧栏面板） |
+| `backend/src/main/java/com/selfblog/service/seo/*` | 新增（12 个类：客户端、提示词、解析、生成、体检、回落、触发器、配置） |
+| `backend/src/main/java/com/selfblog/{controller/admin/AdminSeoController,entity/PostSeo,mapper/PostSeoMapper}.java`、`dto/seo/*`、`vo/seo/*` | 新增（8 端点 + 实体 + 7 个 DTO/VO） |
+| `backend/src/main/java/com/selfblog/service/site/{impl/SiteSettingsServiceImpl,seo/ReadingPageService,seo/ReadingHtmlRenderer,seo/SeoModels}.java`、`service/post/impl/BlogPostServiceImpl.java`、`common/exception/GlobalExceptionHandler.java` | 修改（`llm*` 键与掩码、SEO 读取与渲染、发布钩子、502 状态） |
+| `backend/{schema-sqlite.sql,schema-fresh-install.sql,migration-selfblog.sql}`、`backend/src/test/resources/schema.sql` | 修改（`post_seo` 表） |
+| `backend/src/test/java/com/selfblog/**`（10 个新测试类 + 3 个改造） | 新增 / 修改 |
+| `frontend/src/**/__tests__/*`（6 个测试文件） | 新增 / 修改 |
+| `README.md`、`backend/README.md`、`frontend/README.md`、`frontend/CLAUDE.md`、`docs/agents/backend.md`、`CLAUDE.md`、`AGENTS.md`、`docs/agents/frontend.md` | 修改（新功能文档 + 测试基线） |
+| `CHANGELOG.md` | 新增条目 |
+
+---
+
+## v2.0.27 — 新增 `release/` 目录，随源码提交可运行 JAR (2026-10-21，2026-10-22 更新)
 
 ### 说明
 
@@ -12,34 +177,54 @@
 克隆仓库后必须自备 JDK 21 + Maven + Node 才能得到可运行产物。按需求新增 `release/` 目录，
 把一次真实构建的 fat JAR 与源码一起提交，使没有构建环境的机器也能直接取用。
 
+2026-10-22 的 v2.0.27 发版重建并替换了该产物，本节数字已同步为最新构建。
+
 ### 变更
 
-- **新增 `release/selfblog-2.0.26.jar`**（68,440,532 B，SHA-256
-  `81D2298713DA69B7634CCE7D8392E34F6D3C54B317EDDBE43D5DA006040DB247`）——Spring Boot 单 JAR，
-  内嵌 Tomcat、全部后端依赖与已构建的 Vue 前端（`BOOT-INF/classes/static/` 337 个条目、
-  8 个 mapper XML）。
+- **新增 `release/selfblog-2.0.27.jar`**（67,600,675 B，SHA-256
+  `FF82FC5DECFA8A6114D2C28A3726E5B56E3892F88C7DA5CFBB3E96A042A7BE32`）——Spring Boot 单 JAR，
+  内嵌 Tomcat、全部后端依赖与已构建的 Vue 前端（`BOOT-INF/classes/static/` 81 个条目、
+  8 个 mapper XML、`service/seo/` 18 个类）。取代 2026-10-21 的 `selfblog-2.0.26.jar`
+  （68,440,532 B），旧文件已删除。
 - **新增 `release/README.md`**：说明该 JAR 的内容、运行方式（须与 `.env` 同目录）、
   与当前提交源码的对应关系、重建命令与 SHA-256 校验方式。
 - **`.gitignore` 未改动**：`backend/target/` 与 `*.jar` 仍被忽略，发布副本是**显式**放进
   `release/` 的独立文件，不改变「构建产物默认不入库」的既有约定。
 
+### 修复（构建链上的一个真实缺陷）
+
+`backend/pom.xml` 的 `maven-resources-plugin` 把 `../frontend/dist` 复制到
+`backend/target/classes/static`，但该复制**只增不删**：`target/` 未清理时，历次构建的
+hash 文件名会不断累积。首次打包实测 jar 内 `static` 条目 **463 个**，而 `frontend/dist`
+只有 **78 个文件**（多出的全是上一轮的旧 bundle，白白让 jar 大 1.3 MB 并可能被浏览器命中旧
+资源）。修法：打包前先删 `backend/target/classes/static`。修正后 `static` 条目
+**461 → 81**、jar **68,962,529 → 67,600,675 B**，且逐字节与 `dist` 对齐（唯一的额外文件是
+仓库自带的 `seo-reading.css`）。`backend/Dockerfile` 用 `clean package`，天然规避该问题。
+
 ### 验证
 
 重新走完整构建链后再复制，而非复用旧产物：
 
-1. `frontend`：`npm run build` → `✓ built in 3.39s`（75 个文件）。
+1. `frontend` 六闸门全绿后 `vite build` → `✓ built in 2.02s`（`frontend/dist` 78 个文件）。
 2. `backend`：`./mvnw package -DskipTests -Dskip.npm=true -Dskip.installnodenpm=true`
-   → BUILD SUCCESS，`backend/target/selfblog.jar` 68,440,532 B。
-3. **真机冒烟**（`java -jar` 起服务于 :18825，真实 SQLite 文件库，默认 profile）：
-   `/actuator/health` 200、`/` 200 且 HTML 含 `seo-reading`（6079 B）、`/feed.xml` 200
-   （5521 B）、`/api/post/list?page=1&size=3` 200（4227 B）、`/seo-reading.css` 200。
-4. 复制到 `release/` 后比对 SHA-256，与源产物**逐字节一致**。
+   → BUILD SUCCESS，`backend/target/selfblog.jar` 67,600,675 B。
+3. **真机冒烟**（`java -jar` 起服务于 :18827，真实 SQLite 文件库，默认 profile）：
+   `/actuator/health` 200、`/` 200 且 HTML 含 `seo-reading`/`data-wallpaper`/`--ap-bg-image`
+   （6605 B）、`/feed.xml` 200（6793 B）、`/sitemap.xml` 200、`/robots.txt` 200、
+   `/api/site/public` 200（26 个键、`llm*` 键 **0** 个）、`/post/15` 200 且含
+   `seo-reading`/`meta name="keywords"`/`selfblog-article-jsonld`/`og:title`、
+   `/api/admin/seo/overview` 无 token 时 **401**；首页引用的
+   `assets/index-BwQeAfTu.js`（119,238 B）返回 200。
+4. **版本注入生效**：`dist/assets/index-BwQeAfTu.js` 内含 `2.0.27`，
+   来自 `frontend/vite.config.ts` 的 `define: { __APP_VERSION__ }`（读 `package.json`）。
+5. 复制到 `release/` 后比对 SHA-256，与源产物**逐字节一致**。
 
 ### 影响文件
 
 | 文件 | 改动类型 |
 |------|----------|
-| `release/selfblog-2.0.26.jar` | 新增（构建产物） |
+| `release/selfblog-2.0.27.jar` | 新增（构建产物，取代 2.0.26） |
+| `release/selfblog-2.0.26.jar` | 删除 |
 | `release/README.md` | 新增 |
 | `README.md` | 新增「直接取用预构建 JAR」小节 |
 | `CHANGELOG.md` | 新增条目 |
@@ -47,12 +232,12 @@
 ### 注意
 
 JAR 与源码不会自动同步：源码变更后需重新构建并替换本目录下的文件，同时更新 `README.md`
-里的版本号、大小与 SHA-256。GitHub 单文件上限 100 MB，当前 68 MB 在限内；继续增长到接近
+里的版本号、大小与 SHA-256。GitHub 单文件上限 100 MB，当前 67 MB 在限内；继续增长到接近
 上限时应改用 GitHub Releases 附件而非入库。
 
 ---
 
-## 未发布 — 全仓深度排查：后端正确性/并发/安全加固 + 前端正确性/死代码清理 (2026-10-21)
+## v2.0.27 — 全仓深度排查：后端正确性/并发/安全加固 + 前端正确性/死代码清理 (2026-10-21)
 
 ### 说明
 
@@ -311,7 +496,7 @@ JAR 与源码不会自动同步：源码变更后需重新构建并替换本目�
 
 ---
 
-## 未发布 — 首页封面面板与全站字阶收敛 (2026-10-20)
+## v2.0.27 — 首页封面面板与全站字阶收敛 (2026-10-20)
 
 ### 说明
 
@@ -407,7 +592,7 @@ JAR 与源码不会自动同步：源码变更后需重新构建并替换本目�
   后续若要防回退需自建断言。
 ---
 
-## 未发布 — 外观自定义：后台可换页面背景与组件不透明度 (2026-10-19)
+## v2.0.27 — 外观自定义：后台可换页面背景与组件不透明度 (2026-10-19)
 
 ### 说明
 
@@ -508,7 +693,7 @@ JAR 与源码不会自动同步：源码变更后需重新构建并替换本目�
 
 ---
 
-## 未发布 — 修复 CI 两处红灯：Dockerfile 探针语法与启动播种幂等 (2026-10-19)
+## v2.0.27 — 修复 CI 两处红灯：Dockerfile 探针语法与启动播种幂等 (2026-10-19)
 
 ### 说明
 
@@ -548,7 +733,7 @@ JAR 与源码不会自动同步：源码变更后需重新构建并替换本目�
 
 ---
 
-## 未发布 — 仓库清理：删除无用文件与无用文档 (2026-10-19)
+## v2.0.27 — 仓库清理：删除无用文件与无用文档 (2026-10-19)
 
 ### 说明
 
@@ -594,7 +779,7 @@ JAR 与源码不会自动同步：源码变更后需重新构建并替换本目�
 
 ---
 
-## 未发布 — 生产日志取证与缺陷修复批次 (2026-10-18)
+## v2.0.27 — 生产日志取证与缺陷修复批次 (2026-10-18)
 
 ### 说明
 
@@ -662,7 +847,7 @@ JAR 与源码不会自动同步：源码变更后需重新构建并替换本目�
 
 ---
 
-## 未发布 — 缓存正确性与无用代码清理 (2026-10-17)
+## v2.0.27 — 缓存正确性与无用代码清理 (2026-10-17)
 
 ### 修复
 

@@ -116,7 +116,11 @@ onBeforeUnmount(() => {
   padding: 34px;
   border: 1px solid var(--border-light);
   border-radius: var(--radius-xl);
-  background: var(--surface-primary);
+  /* 浮起档：原先这里写死 --surface-primary，于是壁纸模式下作者卡是唯一的
+     不透明白块，和周围半透明的卡片「风格割裂」（用户截图 2 的原话）。
+     改用档位变量后，纯色画布别名回 --surface-primary（逐像素不变），
+     壁纸画布则与 .card/.sidebar-block 落在同一档。 */
+  background: var(--surface-raised);
 }
 .profile-avatar {
   flex: 0 0 80px;
@@ -174,7 +178,9 @@ onBeforeUnmount(() => {
   padding: 8px 12px;
   border: 1px solid var(--border-light);
   border-radius: var(--radius);
-  background: var(--surface-primary);
+  /* 控件档：这三个芯片原先是不透明白块，和周围半透明表面「像另一套设计」。
+     档位变量让它们与首页的芯片/按钮共用同一档底色。 */
+  background: var(--surface-control);
   color: var(--text-secondary);
   font-size: var(--text-sm);
 }

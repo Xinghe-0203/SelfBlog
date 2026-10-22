@@ -1,25 +1,29 @@
 /* =============================================================================
-   作者可配置外观（页面背景 / 组件不透明度）
+   作者可配置外观（页面背景 / 表面层级 / 组件不透明度）
    =============================================================================
 
-   本文件里的变量全部由 `stores/site.ts` 的 `applyAppearance()` 写在 <html> 的内联样式上，
-   并在首屏由 index.html 的预置脚本按白名单转发（消闪烁）。
+   本文件里的变量全部由 `stores/site.ts` 的 `applyAppearance()` 写在 <html> / #selfblog
+   的内联样式上，并在首屏由 index.html 的预置脚本按白名单转发（消闪烁）。
    变量名统一用 `--ap-` 前缀，与设计系统 token 分开，便于一眼区分「作者配置」与「主题」。
 
-   三条承重规则：
+   四条承重规则：
 
    1. 消费点一律写成 `var(--ap-*, <原来的值>)`。作者没配置时变量**未设置**，
       CSS 取回落值 —— 于是皮肤（skins.css）与深色模式（dark-mode.css）继续说了算，
       升级后观感逐像素不变。绝不要把变量设成空串来「清除」：空串是「已设置」，会让回落失效。
 
    2. 不透明度只作用于**下面那份表面清单**，而不是全局改写 `--surface-primary`。
-     清单是刻意收窄的：半透明必须配合内容层次才有意义，把输入框、表格行、徽章
+      清单是刻意收窄的：半透明必须配合内容层次才有意义，把输入框、表格行、徽章
       一并变半透明只会让界面发灰。清单外的组件保持完全不透明。
 
    3. 本文件必须在 main.css 里**最后导入**：作者配置要能压过皮肤与深色模式中
       同优先级的声明，否则选 forest/sunset 皮肤时背景不会变。
 
-   表面清单（这两个类在仓库里同时被 DOM 与样式使用，改名等于静默失效）：
+   4. 表面分三级（见下方「表面三级」）：paper（页面纸面）/ raised（浮起卡片）/
+      control（控件）。**纯色画布下三级全部别名回原有 token**，所以「不透明度 100」
+      的观感逐像素不变；只有画布是照片/渐变时才启用真正的分层。
+
+   表面清单（这些类在仓库里同时被 DOM 与样式使用，改名等于静默失效）：
    .card .card-flat .card-elevated .functional-glass .article-list .sidebar-block
    .intro-shell .state-panel .modal-content .modal-footer .comment-card .album-card
    .workspace-card .welcome-panel .settings-panel .summary-grid article .panel
@@ -67,41 +71,156 @@ body {
 }
 
 /* ---------------------------------------------------------------
-   表面不透明度 / 背景模糊
+   表面三级：paper / raised / control
    --------------------------------------------------------------- */
 
-/* 半透明表面的统一取值。集中成变量而不是在每个组件里各写一遍 color-mix，
-   这样无障碍降级只需要改一处。 */
+/* 基线（纯色画布）：三级全部别名回改造前就在用的 token，观感逐像素不变。
+   paper 刻意与 `.page-frame[data-page-background='plain']` 取同一枚 token
+   （--surface-primary）：页面「自己声明 plain」与「没声明、走 auto 兜底」必须落在
+   同一张纸面上，否则两种写法会给出两种白。
+   control 也取 --surface-primary 而不是 --bg-secondary：改造前 `.like-action`、
+   `.about-site a` 这些控件写的就是 `background: var(--surface-primary)`，
+   基线若不是同一枚 token，纯色画布上它们会从白变成浅灰 —— 那是回归，不是改进。
+   真正的「控件比纸面深一档」只发生在壁纸模式（见下面的 [data-wallpaper] 段），
+   那里 control 换成 --bg-secondary 的合成色。 */
+/* 注意选择器要带上 .dark-mode / midnight：`--surface-raised` 这个名字在
+   dark-mode.css:100 与 variables.css:137 里已经作为「向后兼容别名」存在
+   （`--surface-raised: var(--surface-secondary)`），而 `#selfblog.dark-mode`
+   的特异性 (0,1,1,0) 高于 `#selfblog` (0,1,0,0)，会压过这里。若不补齐，
+   深色模式 + 纯色画布下卡片会从改造前的 --surface-primary 变成 --surface-secondary
+   —— 正是「纯色画布逐像素不变」红线要防的那种回归。补齐后特异性打平，
+   同优先级由后导入的 appearance.css 胜出。 */
+#selfblog,
+#selfblog.dark-mode,
+#selfblog[data-skin='midnight'] {
+  --surface-paper: var(--surface-primary);
+  --surface-raised: var(--surface-primary);
+  --surface-control: var(--surface-primary);
+}
+
+/* 半透明模式的三档合成色。alpha 由 stores/site.ts 的 effectiveSurfaceOpacities()
+   计算并夹紧（含壁纸对比度下限），写成内联变量；拿不到新变量时回落到旧的单档
+   --ap-surface-opacity，保证旧缓存/旧版本互操作。 */
 #selfblog[data-surface-translucent] {
   --ap-surface-tint: color-mix(
     in srgb,
-    var(--surface-primary) var(--ap-surface-opacity, 100%),
+    var(--surface-primary) var(--ap-surface-paper-opacity, var(--ap-surface-opacity, 100%)),
     transparent
   );
+  /* raised / control 刻意比「纸面那一档」深一级灰调（--bg-secondary / --bg-tertiary），
+     而不是用 --surface-secondary：壁纸模式下纸面已经是实心白，#f9fafc 压在 #ffffff 上
+     只差 5/255，肉眼读不出台阶（I3 要求「可见的一档」）。深一级灰调 + 1px 边框
+     才让「纸面 → 卡片 → 控件」三层真的读得出来，且仍在同一条灰阶上，不是新配色。 */
   --ap-surface-tint-soft: color-mix(
     in srgb,
-    var(--surface-secondary) var(--ap-surface-opacity, 100%),
+    var(--bg-secondary) var(--ap-surface-raised-opacity, var(--ap-surface-opacity, 100%)),
+    transparent
+  );
+  --ap-surface-tint-control: color-mix(
+    in srgb,
+    var(--bg-tertiary) var(--ap-surface-control-opacity, var(--ap-surface-opacity, 100%)),
     transparent
   );
 }
+
+/* 没有壁纸的半透明模式：三档同值 —— 也就是改造前那一档半透明，
+   这次改造对它零影响。 */
+html:not([data-wallpaper]) #selfblog[data-surface-translucent] {
+  --surface-paper: var(--ap-surface-tint);
+  --surface-raised: var(--ap-surface-tint);
+  --surface-control: var(--ap-surface-tint);
+}
+
+/* 有壁纸（照片 / 作者渐变）：真正的分层。paper 完全不透明（正文必须压在实心纸面上），
+   raised 比 paper 浅一档，control 再浅一档且换用更深的灰调 —— 三级在照片上
+   仍能读出「纸面 → 卡片 → 控件」的台阶（见 stores/site.ts 的合成数学）。
+
+   注意选择器形态：data-wallpaper 挂在 **documentElement** 上，不是 #selfblog 上。
+   预置脚本（index.html 第 2 段内联脚本）只能在 Vue 挂载前写 <html>，运行时
+   stores/site.ts 的 applyAppearance() 为了与它同源，也写 document.documentElement。
+   所以这里必须是 `html[data-wallpaper] #selfblog`，写成 `#selfblog[data-wallpaper]`
+   会永远不匹配（整套分层变成死 CSS）。 */
+html[data-wallpaper] #selfblog {
+  --surface-paper: var(--ap-surface-tint, var(--surface-primary));
+  --surface-raised: var(--ap-surface-tint-soft, var(--surface-primary));
+  --surface-control: var(--ap-surface-tint-control, var(--surface-primary));
+}
+
+/* 画布是照片/渐变时，页面必须自带纸面：任何正文都不许直接压在图上。
+   PageFrame 永远解析出 data-page-background（缺省 auto，见 PageFrame.vue），
+   只有作者显式写 'inherit' 的装饰性页面才豁免 —— 那是唯一的、有文档的退出开关。
+   纯色画布下这条不生效：纯色画布本身就是「纸」，保持改造前的透明观感。 */
+html[data-wallpaper] #selfblog .page-frame[data-page-background='auto'] {
+  background: var(--surface-paper);
+  border-radius: var(--radius-2xl);
+  box-shadow: inset 0 0 0 1px var(--border-light);
+}
+
+/* 显式声明了背景的页面：在壁纸模式下同样落进同一套纸面体系，不再各写各的白。 */
+html[data-wallpaper] #selfblog .page-frame[data-page-background='plain'] {
+  background: var(--surface-paper);
+  border-radius: var(--radius-2xl);
+  box-shadow: inset 0 0 0 1px var(--border-light);
+}
+
+html[data-wallpaper] #selfblog .page-frame[data-page-background='soft'] {
+  background: var(--surface-raised);
+  border-radius: var(--radius-2xl);
+  box-shadow: inset 0 0 0 1px var(--border-light);
+}
+
+html[data-wallpaper] #selfblog .page-frame[data-page-background='paper'] {
+  background: var(--surface-control);
+  border-radius: var(--radius-2xl);
+  box-shadow: inset 0 0 0 1px var(--border-light);
+}
+
+/* 目录卡：改造前它只有上下的 1px 分隔线、没有底色也没有圆角，压在照片上就是
+   一段悬空的蓝色链接（截图三最刺眼的一处）。壁纸模式下把它补成一张真正的卡片：
+   浮起档底色 + 四边 1px 边框 + 圆角。纯色画布不接管，保持原有的「书页侧栏」观感。 */
+html[data-wallpaper] #selfblog .toc-card {
+  padding: 17px 16px;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-lg);
+}
+
+/* ---------------------------------------------------------------
+   表面不透明度 / 背景模糊
+   --------------------------------------------------------------- */
 
 /* 模糊强度；无障碍降级时整体置为 none。 */
 #selfblog {
   --ap-surface-filter: blur(var(--ap-surface-blur, 8px)) saturate(1.05);
 }
 
-/* 表面清单 —— 只覆盖「大片、有边界」的表面。
+/* 纸面档 —— 页面级大面（整页框架、空态、首屏 Hero、浮层、页脚、登录卡）。
    刻意**不含**输入框、表格行、徽章、按钮：它们面积小、边界细，
    半透明后与背景糊在一起反而降低可读性。 */
-#selfblog[data-surface-translucent] .card,
-#selfblog[data-surface-translucent] .card-flat,
-#selfblog[data-surface-translucent] .card-elevated,
+#selfblog[data-surface-translucent] .page-frame[data-page-background='auto'],
+#selfblog[data-surface-translucent] .page-frame[data-page-background='plain'],
 #selfblog[data-surface-translucent] .functional-glass,
-#selfblog[data-surface-translucent] .article-list,
-#selfblog[data-surface-translucent] .sidebar-block,
 #selfblog[data-surface-translucent] .intro-shell,
 #selfblog[data-surface-translucent] .state-panel,
 #selfblog[data-surface-translucent] .modal-content,
+#selfblog[data-surface-translucent] .auth-card,
+#selfblog[data-surface-translucent] .site-footer {
+  background: var(--surface-paper);
+}
+
+/* 浮起档 —— 纸面上的卡片。与纸面同一色相、alpha 更低一档，
+   边界由各自的 1px 边框 / 阴影定义（照片上色阶差会被压缩，边界才是层次）。
+   这份清单把截图里「风格割裂」的那几个元素一并收了进来：About 的作者卡、
+   文章页的目录卡、相邻文章链接、评论表单 —— 它们原先在 scoped 样式里
+   各写一句 `background: var(--surface-primary)`，于是壁纸模式下只有它们是不透明的白块。 */
+#selfblog[data-surface-translucent] .card,
+#selfblog[data-surface-translucent] .card-flat,
+#selfblog[data-surface-translucent] .card-elevated,
+#selfblog[data-surface-translucent] .article-list,
+#selfblog[data-surface-translucent] .sidebar-block,
+#selfblog[data-surface-translucent] .author-profile,
+#selfblog[data-surface-translucent] .toc-card,
+#selfblog[data-surface-translucent] .adjacent-link,
+#selfblog[data-surface-translucent] .comment-form,
 #selfblog[data-surface-translucent] .comment-card,
 #selfblog[data-surface-translucent] .album-card,
 #selfblog[data-surface-translucent] .workspace-card,
@@ -115,18 +234,64 @@ body {
 #selfblog[data-surface-translucent] .editor-body,
 #selfblog[data-surface-translucent] .navigation-editor,
 #selfblog[data-surface-translucent] .page-preview,
-#selfblog[data-surface-translucent] .auth-card,
 #selfblog[data-surface-translucent] .not-found-content,
 #selfblog[data-surface-translucent] .archive-list,
-#selfblog[data-surface-translucent] .site-footer,
-#selfblog[data-surface-translucent] .page-frame[data-page-background='plain'] {
-  background: var(--ap-surface-tint);
+#selfblog[data-surface-translucent] .page-frame[data-page-background='soft'] {
+  background: var(--surface-raised);
 }
 
-/* 次级表面（弹窗页脚、soft 页面背景）用更浅的一档，保持原有层次差别。 */
-#selfblog[data-surface-translucent] .modal-footer,
-#selfblog[data-surface-translucent] .page-frame[data-page-background='soft'] {
+/* 次级表面（弹窗页脚）沿用更浅的一档，保持原有层次差别。 */
+#selfblog[data-surface-translucent] .modal-footer {
   background: var(--ap-surface-tint-soft);
+}
+
+/* 控件档 —— 芯片 / 幽灵按钮 / 次级导航。作者配了壁纸时，这类元素原本是
+   `background: transparent` + 虚线的「隐形按钮」，压在照片上等于没有。
+   只在壁纸模式下接管：纯色画布的幽灵按钮本来就压在自己的纸面上，不需要底色，
+   接管它反而会让「不透明度 100」的观感变样（回归红线）。 */
+html[data-wallpaper] #selfblog .btn-ghost,
+html[data-wallpaper] #selfblog .archive-callout,
+html[data-wallpaper] #selfblog .about-site a,
+html[data-wallpaper] #selfblog .load-more button,
+html[data-wallpaper] #selfblog .load-more-comments,
+html[data-wallpaper] #selfblog .like-action,
+html[data-wallpaper] #selfblog .state-panel button {
+  background: var(--surface-control);
+  border: 1px solid var(--border-light);
+  color: var(--text-primary);
+}
+
+/* 壁纸模式下的正文色阶：纸面是实心白，但**浅色模式的原始弱化档在这个画布上过不了 4.5:1**。
+   这不是「壁纸太亮」的问题，而是 token 本身的数值：
+     L(#262a31)=0.023 → 对纯白 14.4:1（正文，安全）
+     L(#67707e)=0.160 → 对纯白 4.45:1（差 0.05，压在任何半透明卡片上更低）
+     L(#707a88)=0.191 → 对纯白 4.35:1（连纯白都不到 4.5）
+   而壁纸模式下卡片是**压在实心白纸面上**的一档半透明灰（合成后 L≈0.884~0.955），
+   只会更低。所以这里把「次级 / 弱化」两档各收紧一级，让它们在**最深的那个表面**
+   （控件档合成色 L≈0.854）上仍然 ≥4.5:1：
+     #5f6875 L=0.136 → 对白 5.65:1，对控件档 4.86:1
+     #646d7b L=0.151 → 对白 5.22:1，对浮起档 4.65:1
+   两级都还比 --text-primary 浅，层级没有被压平。深色画布不接管：
+   #939dad / #a7afbc 在 94% 深色纸面上本来就有 4.9:1，改深反而掉到 2:1。 */
+html[data-wallpaper] #selfblog:not(.dark-mode):not([data-skin='midnight']) {
+  --text-secondary: #5f6875;
+  --text-muted: #646d7b;
+}
+
+/* 首屏 Hero 的遮罩渐变必须由**纸面**颜色构成，否则文案后面的渐变与它身后的
+   纸面不是同一种白，交界处会出现一道可见的色带。纯色画布下不接管：
+   .intro-shell 在那里本来就用 --surface-secondary，保持逐像素不变。 */
+html[data-wallpaper] #selfblog .intro-shell {
+  background: var(--surface-paper);
+}
+
+html[data-wallpaper] #selfblog .intro-shell::after {
+  background-image: linear-gradient(
+    90deg,
+    var(--surface-paper) 35%,
+    color-mix(in srgb, var(--surface-paper) 94%, transparent) 57%,
+    color-mix(in srgb, var(--surface-paper) 16%, transparent)
+  );
 }
 
 /* 背景模糊只加在真正「大片」的表面类上。
@@ -144,20 +309,35 @@ body {
 #selfblog[data-surface-blur] .comment-card,
 #selfblog[data-surface-blur] .album-card,
 #selfblog[data-surface-blur] .workspace-card,
+#selfblog[data-surface-blur] .toc-card,
+#selfblog[data-surface-blur] .author-profile,
 #selfblog[data-surface-blur] .page-frame[data-page-background] {
   backdrop-filter: var(--ap-surface-filter);
   -webkit-backdrop-filter: var(--ap-surface-filter);
 }
 
 /* 无障碍降级：代价是「没有毛玻璃」，而不是「读不清字」。
-   两条规则都写在 #selfblog 上、媒体查询里的更靠后，同优先级下由后者生效。 */
+   这里同样要补 `.dark-mode` / `[data-skin='midnight']` 变体：深色模式/午夜皮肤下
+   基线是 `#selfblog.dark-mode` (0,1,1,0)，若降级只写 `#selfblog` (0,1,0,0)，
+   它会输给基线，降级在深色模式下不生效（半透明仍在、只是没模糊）。 */
 @media (prefers-reduced-transparency: reduce), (prefers-contrast: more), (forced-colors: active) {
-  #selfblog {
+  #selfblog,
+  #selfblog.dark-mode,
+  #selfblog[data-skin='midnight'] {
     --ap-surface-filter: none;
   }
 
-  #selfblog[data-surface-translucent] {
+  #selfblog[data-surface-translucent],
+  #selfblog.dark-mode[data-surface-translucent],
+  #selfblog[data-skin='midnight'][data-surface-translucent],
+  html[data-wallpaper] #selfblog,
+  html[data-wallpaper] #selfblog.dark-mode,
+  html[data-wallpaper] #selfblog[data-skin='midnight'] {
     --ap-surface-tint: var(--surface-primary);
     --ap-surface-tint-soft: var(--surface-secondary);
+    --ap-surface-tint-control: var(--bg-secondary);
+    --surface-paper: var(--surface-primary);
+    --surface-raised: var(--surface-primary);
+    --surface-control: var(--bg-secondary);
   }
 }

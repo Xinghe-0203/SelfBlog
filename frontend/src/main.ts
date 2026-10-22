@@ -48,7 +48,7 @@ async function bootstrap() {
   app.mount('#app')
   // Optional published configuration must not delay identity restoration or initial navigation.
   void usePagesStore(pinia).loadManifest()
-  logger.info('Application initialized', { version: '2.0.25', mode: import.meta.env.MODE })
+  logger.info('Application initialized', { version: __APP_VERSION__, mode: import.meta.env.MODE })
 }
 
 void bootstrap().catch((error: unknown) => {

@@ -27,7 +27,28 @@ public class SiteSettingsServiceImpl implements SiteSettingsService {
             "faviconUrl", "siteLogoUrl", "siteBaseUrl",
             "backgroundType", "backgroundColor", "backgroundGradientFrom", "backgroundGradientTo",
             "backgroundImageUrl", "backgroundOverlay", "backgroundFixed",
-            "surfaceOpacity", "surfaceBlur"
+            "surfaceOpacity", "surfaceBlur",
+            "llmEnabled", "llmBaseUrl", "llmApiKey", "llmModel", "llmTimeoutSeconds", "llmAutoOnPublish"
+    );
+
+    /**
+     * 密钥型设置的读取哨兵：管理端拿到它表示「已保存但不回显」。
+     *
+     * <p>写入时收到这个字面值等于「保留原值」，因此前端可以安全地把整张设置表单
+     * 原样回传而不会把作者的密钥冲掉。用 8 个 U+2022 而不是星号：星号可能是
+     * 真实密钥的一部分，圆点是「不可见占位」的通用约定。</p>
+     */
+    public static final String SECRET_MASK = "\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022";
+
+    /** 需要掩码的键。只有这一组在管理端读取时被替换。 */
+    private static final Set<String> SECRET_SETTING_KEYS = Set.of("llmApiKey");
+
+    /**
+     * LLM 相关设置键。整组都不进公开设置 —— 不只是密钥，连模型名与接口地址
+     * 也不该让匿名访客读到（那等于泄露后端的出网目标）。
+     */
+    private static final Set<String> LLM_SETTING_KEYS = Set.of(
+            "llmEnabled", "llmBaseUrl", "llmApiKey", "llmModel", "llmTimeoutSeconds", "llmAutoOnPublish"
     );
     /** 背景图可选的取色模式。 */
     private static final Set<String> BACKGROUND_TYPES = Set.of("solid", "gradient", "image");
@@ -80,7 +101,29 @@ public class SiteSettingsServiceImpl implements SiteSettingsService {
     public Map<String, String> getPublicSettings() {
         // 必须经 self 调用：直接写 getSettings() 是自调用，不经过缓存代理，
         // 会让这个公开热路径每次都真的查库。
-        return self.getSettings();
+        //
+        // 过滤必须在**副本**上做：getSettings() 返回的是缓存里的同一个 Map 实例，
+        // 就地 remove 会把缓存也改脏（密钥就真的从后台消失了）。
+        Map<String, String> settings = new LinkedHashMap<>(self.getSettings());
+        settings.keySet().removeAll(LLM_SETTING_KEYS);
+        return settings;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Map<String, String> getAdminSettings() {
+        return getAdminSettings(self.getSettings());
+    }
+
+    /** 在副本上把密钥替换成掩码；入参可以是缓存里的 Map 实例，绝不修改它。 */
+    private Map<String, String> getAdminSettings(Map<String, String> source) {
+        Map<String, String> settings = new LinkedHashMap<>(source);
+        for (String key : SECRET_SETTING_KEYS) {
+            // 未配置 → 空串；已配置 → 掩码。绝不返回真实密钥。
+            String stored = settings.get(key);
+            settings.put(key, stored == null || stored.isBlank() ? "" : SECRET_MASK);
+        }
+        return settings;
     }
 
     @Override
@@ -96,6 +139,11 @@ public class SiteSettingsServiceImpl implements SiteSettingsService {
                 throw new BusinessException(400, "包含不支持的设置项");
             }
             String value = String.valueOf(entry.getValue()).trim();
+            if (SECRET_SETTING_KEYS.contains(key) && SECRET_MASK.equals(value)) {
+                // 前端把掩码原样回传 = 用户没有改这一项，保留库里已存的密钥。
+                // 少了这一条，后台任何一次「保存设置」都会静默清空作者的密钥。
+                continue;
+            }
             validateValue(key, value);
             SiteSetting row = settingMapper.selectById(key);
             if (row == null) {
@@ -110,7 +158,7 @@ public class SiteSettingsServiceImpl implements SiteSettingsService {
         }
         // 直接读库返回最新值：此处不能走 self.getSettings()，那是缓存代理，
         // 而 @CacheEvict 要等方法返回后才执行，写后立刻读会拿到旧快照。
-        return loadSettings();
+        return getAdminSettings(loadSettings());
     }
 
     @Override
@@ -153,6 +201,13 @@ public class SiteSettingsServiceImpl implements SiteSettingsService {
         values.put("backgroundFixed", "true");
         values.put("surfaceOpacity", "100");
         values.put("surfaceBlur", "0");
+        // LLM（SEO 自动生成）：默认全关，作者在后台显式打开并填入密钥后才生效。
+        values.put("llmEnabled", "false");
+        values.put("llmBaseUrl", "");
+        values.put("llmApiKey", "");
+        values.put("llmModel", "");
+        values.put("llmTimeoutSeconds", "30");
+        values.put("llmAutoOnPublish", "false");
         return values;
     }
 
@@ -240,6 +295,33 @@ public class SiteSettingsServiceImpl implements SiteSettingsService {
             }
             case "surfaceOpacity" -> requireIntegerInRange(value, 60, 100, "卡片不透明度需为 60-100 之间的整数");
             case "surfaceBlur" -> requireIntegerInRange(value, 0, 40, "卡片模糊半径需为 0-40 之间的整数");
+            case "llmEnabled", "llmAutoOnPublish" -> {
+                if (!"true".equalsIgnoreCase(value) && !"false".equalsIgnoreCase(value)) throw new BusinessException(400, "开关值必须为 true 或 false");
+            }
+            case "llmBaseUrl" -> {
+                // 留空 = 未配置（此时 llmConfigured=false，生成接口返回 400）。
+                if (value.isBlank()) return;
+                if (value.length() > 500) throw new BusinessException(400, "模型接口地址不能超过500个字符");
+                if (!(value.startsWith("https://") || value.startsWith("http://"))) {
+                    throw new BusinessException(400, "模型接口地址需以 http(s) 开头，例如 https://api.openai.com/v1");
+                }
+                // 只做格式校验，不在这里改值：存储保留用户原样输入（含可能的尾部斜杠），
+                // 由 SeoLlmConfigProvider 在读取时归一化，避免写入路径与读取路径不一致。
+                for (int i = 0; i < value.length(); i++) {
+                    char c = value.charAt(i);
+                    if (Character.isWhitespace(c) || Character.isISOControl(c)) {
+                        throw new BusinessException(400, "模型接口地址不能包含空白或控制字符");
+                    }
+                }
+            }
+            case "llmApiKey" -> {
+                // 允许为空（= 清除密钥）；不校验格式，各家 key 形态不同。
+                if (value.length() > 500) throw new BusinessException(400, "API Key 不能超过500个字符");
+            }
+            case "llmModel" -> {
+                if (value.length() > 100) throw new BusinessException(400, "模型名不能超过100个字符");
+            }
+            case "llmTimeoutSeconds" -> requireIntegerInRange(value, 5, 120, "模型超时时间需为 5-120 之间的整数秒");
             default -> { }
         }
     }

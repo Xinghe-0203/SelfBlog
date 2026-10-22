@@ -1,7 +1,7 @@
 # SelfBlog — 个人博客
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Version](https://img.shields.io/badge/version-v2.0.26-blue)](https://github.com/Xinghe-0203)
+[![Version](https://img.shields.io/badge/version-v2.0.27-blue)](https://github.com/Xinghe-0203)
 [![Java](https://img.shields.io/badge/Java-21-orange)](https://www.oracle.com/java/)
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.3.13-green)](https://spring.io/projects/spring-boot)
 [![Vue](https://img.shields.io/badge/Vue-3.5.44-brightgreen)](https://vuejs.org/)
@@ -100,6 +100,16 @@
 - 作者工作台、文章、标签、访客、评论、相册、页面和网站设置管理
 - 可调整后台路径、站点资料、主题皮肤、强调色和背景音乐；站点 Logo、浏览器图标、作者头像与背景音乐支持直接上传
 - 历史文章与社区数据表保留；作者写入与管理 API 仅管理员可访问
+
+### LLM 辅助 SEO（2026-10-22）
+- 后台新增「SEO 管理」页：全站收录体检（覆盖率、缺描述、标题过长、标题重复、缺封面）+ 逐篇编辑 + 批量生成
+- 后台「网站设置 → AI 辅助与 SEO」接入**任意 OpenAI 兼容接口**（地址 / 密钥 / 模型 / 超时），带「测试连接」；密钥在界面上永远只显示为掩码哨兵，不落明文回显
+- 单篇生成与发布后自动生成两种模式：自动生成挂在事务提交之后、跑在独立线程池，**任何模型故障都不会让文章保存失败**
+- 元数据存在**独立表 `post_seo`**（不是 `blog_post` 的列）—— 仓库没有列级迁移机制，加列会静默不生效
+- 前台渲染走统一回落：`post_seo` → 文章标题/摘要/封面 → 站点 Logo；`meta keywords` 优先用生成的关键词，缺省回落文章标签
+- 生成失败语义清晰：未配置是 400、上游失败是 502、测试连接恒 200 + `ok:false`；对外文案一律不含密钥与上游原文
+- 重试有副作用的请求（生成/批量/测试连接）在前端**显式禁用自动重试**，避免一次超时放大成三倍模型账单
+- 生成请求会真实消耗模型额度，是否需要、何时重来由作者决定；不在保存/发布路径上静默改写已填好的元数据
 
 ### 外观自定义（2026-10-19）
 - 后台「网站设置 → 页面背景」可换**页面背景**：纯色 / 渐变 / 背景图三种模式，背景图支持直接上传或填外链，另有遮罩浓度与固定背景开关
@@ -218,10 +228,10 @@ SelfBlog/
 
 ```bash
 # 从仓库取 JAR
-cp release/selfblog-2.0.26.jar /path/to/deployment/
+cp release/selfblog-2.0.27.jar /path/to/deployment/
 cd /path/to/deployment
 cp /path/to/repo/backend/.env.example .env   # 然后填写 JWT_SECRET 与 ADMIN_PASSWORD
-java -jar selfblog-2.0.26.jar
+java -jar selfblog-2.0.27.jar
 ```
 
 校验与重建方式见 [`release/README.md`](release/README.md)。该 JAR 与提交时的源码一一对应，
@@ -304,7 +314,9 @@ Controller（控制器）→ Service（服务）→ Mapper（数据访问）→ 
 
 ### 核心数据库表
 
-在原有文章和社区表之外，个人博客功能新增 `site_setting`、`visitor_event`、`anonymous_post_like`、`guest_comment`、`photo_album` 和 `album_photo`。SQLite 启动时增量初始化；现有 MySQL 数据库使用 `migration-selfblog.sql`。
+在原有文章和社区表之外，个人博客功能新增 `site_setting`、`visitor_event`、`anonymous_post_like`、`guest_comment`、`photo_album`、`album_photo` 和 `post_seo`。SQLite 启动时增量初始化；现有 MySQL 数据库使用 `migration-selfblog.sql`。
+
+> `post_seo` 是**独立表**而不是 `blog_post` 的新列，因为仓库没有列级迁移机制：`migration-selfblog.sql` 只有 `CREATE TABLE IF NOT EXISTS`，`ALTER TABLE` 全仓零出现，给既有库加列会静默不生效。
 
 ---
 
@@ -383,6 +395,16 @@ Controller（控制器）→ Service（服务）→ Mapper（数据访问）→ 
 ---
 
 ## 更新日志
+
+### v2.0.27 (2026-10-22)
+
+- 外观：新增 `--surface-paper` / `--surface-raised` / `--surface-control` 三级表面 token，修复自定义照片壁纸下文章正文、标题与右侧目录直接画在照片上的缺陷（`PageFrame.vue` 的背景属性此前在未配置时整个不渲染）；壁纸模式下 WCAG 对比度失败项 13→0、暗色 18→0、midnight 16→0，纯色画布与旧版像素一致
+- 外观：修复首页无封面时 `.intro-visual` 留一块 43% 宽空灰矩形、关于页作者卡片与站点链接实心色块与周围半透明风格割裂、壁纸下 TOC 卡片悬空
+- 后台新增 LLM 辅助 SEO：`post_seo` 独立表 + 8 个 `/api/admin/seo/**` 端点 + OpenAI 兼容客户端（JDK `HttpClient`，零新依赖），支持手工填写/模型生成/批量体检/发布后自动生成，服务端渲染输出 `meta[name=keywords]` 与独立分享图
+- 后端：全仓 LIKE 通配符注入、限流按路径变量绕过、缓存自调用失效、MyBatis-Plus 逻辑删除与 `NOT_NULL` 更新策略等一批静默缺陷修复；SVG 消毒器改白名单、可信代理白名单、密码重置 OTP 不再写日志等安全加固
+- 前端：清理 7 个零引用组件/模块与大批死 CSS、修复并发请求竞态与重定向校验、LLM 请求禁止自动重试
+- 构建：`release/selfblog-2.0.27.jar` 随源码提交；前端版本号改由 `package.json` 构建期注入（`main.ts` 曾硬编码 `2.0.25` 落后两个版本）
+- 门禁：后端 1004 测试（本地 H2 + CI 真实 MySQL 8），前端 47 文件 / 477 测试 + lint/format/type/build/部署契约 27/27；CI 四个 job 全绿
 
 ### v2.0.26 (2026-10-17)
 

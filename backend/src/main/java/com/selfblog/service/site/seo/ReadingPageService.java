@@ -7,8 +7,11 @@ import com.selfblog.dto.site.PageModels.PageConfig;
 import com.selfblog.dto.site.PageModels.PublicPage;
 import com.selfblog.entity.BlogPost;
 import com.selfblog.entity.BlogTag;
+import com.selfblog.entity.PostSeo;
+import com.selfblog.mapper.PostSeoMapper;
 import com.selfblog.service.post.BlogTagService;
 import com.selfblog.service.post.PostQueryService;
+import com.selfblog.service.seo.SeoFallback;
 import com.selfblog.service.site.PageService;
 import com.selfblog.service.site.PhotoAlbumService;
 import com.selfblog.service.site.SiteSettingsService;
@@ -55,15 +58,18 @@ public class ReadingPageService {
     private final PageService pages;
     private final PhotoAlbumService albums;
     private final SafeMarkdown markdown;
+    private final PostSeoMapper postSeoMapper;
 
     public ReadingPageService(SiteSettingsService settings, PostQueryService posts, BlogTagService tags,
-                              PageService pages, PhotoAlbumService albums, SafeMarkdown markdown) {
+                              PageService pages, PhotoAlbumService albums, SafeMarkdown markdown,
+                              PostSeoMapper postSeoMapper) {
         this.settings = settings;
         this.posts = posts;
         this.tags = tags;
         this.pages = pages;
         this.albums = albums;
         this.markdown = markdown;
+        this.postSeoMapper = postSeoMapper;
     }
 
     public SeoModels.ReadingPage resolve(String path, String rawQuery) {
@@ -170,20 +176,37 @@ public class ReadingPageService {
         PageConfig config = config("post");
         String body = markdown.render(detail.getContent());
         String author = firstNonBlank(detail.getNickname(), site.author(), detail.getUsername());
-        String description = detail.getSummary();
-        if (description == null || description.isBlank()) {
-            String text = Jsoup.parse(body).text();
-            description = text.length() > 140 ? text.substring(0, 140) : text;
-        }
+        PostSeo seo = loadSeo(detail.getId());
+        String plainBody = Jsoup.parse(body).text();
+        String description = SeoFallback.description(seo == null ? null : seo.getSeoDescription(),
+                detail.getSummary(), plainBody);
         List<String> tagNames = detail.getTags() == null ? List.of()
                 : detail.getTags().stream().map(PostDetailResponse.TagVO::getName).filter(n -> n != null && !n.isBlank()).toList();
-        String image = firstNonBlank(detail.getCoverImage(), seoImage(config));
+        List<String> keywords = SeoFallback.keywords(seo == null ? null : seo.getSeoKeywords(), tagNames);
+        String cover = firstNonBlank(detail.getCoverImage(), seoImage(config));
+        String shareImage = SeoFallback.ogImage(seo == null ? null : seo.getOgImageUrl(),
+                cover, settings.getSettings().get("siteLogoUrl"));
         String published = detail.getCreateTime() == null ? null : detail.getCreateTime().toString();
-        String title = suffix(detail.getTitle(), config);
+        String title = suffix(SeoFallback.title(seo == null ? null : seo.getSeoTitle(), detail.getTitle()), config);
         return page(200, SeoModels.Kind.POST, "post", config,
-                meta(documentTitle(title, site), description, image, "article", "/post/" + detail.getId(),
-                        published, author, tagNames, indexable(config, false)),
+                meta(documentTitle(title, site), description, cover, "article", "/post/" + detail.getId(),
+                        published, author, tagNames, indexable(config, false), keywords, shareImage),
                 detail.getTitle(), body, List.of(), navigation(), site);
+    }
+
+    /**
+     * 读取单篇 SEO 记录（单条 {@code selectById}，无 N+1）。
+     *
+     * <p>刻意吞掉异常：SEO 是装饰性数据，表缺失或读失败时公开页面必须继续按派生值渲染，
+     * 不能因为「后台 SEO」把文章页打成 500。</p>
+     */
+    private PostSeo loadSeo(Long postId) {
+        if (postId == null) return null;
+        try {
+            return postSeoMapper.selectById(postId);
+        } catch (RuntimeException e) {
+            return null;
+        }
     }
 
     private SeoModels.ReadingPage tag(String idText, SeoModels.SiteInfo site) {
@@ -249,7 +272,20 @@ public class ReadingPageService {
 
     private SeoModels.Meta meta(String title, String description, String image, String type, String path,
                                 String publishedTime, String author, List<String> tags, boolean indexable) {
-        return new SeoModels.Meta(title, description, image, type, path, publishedTime, author, tags, indexable);
+        return meta(title, description, image, type, path, publishedTime, author, tags, indexable, null, image);
+    }
+
+    /**
+     * 带关键词与分享图的 head 元数据。
+     *
+     * @param keywords   后台 SEO 关键词；为空时渲染层回落到 {@code tags}
+     * @param shareImage 社交分享封面；与阅读区头图 {@code image} 分开
+     */
+    private SeoModels.Meta meta(String title, String description, String image, String type, String path,
+                                String publishedTime, String author, List<String> tags, boolean indexable,
+                                List<String> keywords, String shareImage) {
+        return new SeoModels.Meta(title, description, image, type, path, publishedTime, author, tags, indexable,
+                keywords, shareImage);
     }
 
     private PageConfig config(String id) {

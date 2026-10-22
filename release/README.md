@@ -4,12 +4,12 @@
 
 | 文件 | 版本 | 大小 | SHA-256 |
 |---|---|---|---|
-| `selfblog-2.0.26.jar` | 2.0.26 | 68,440,532 B | `81D2298713DA69B7634CCE7D8392E34F6D3C54B317EDDBE43D5DA006040DB247` |
+| `selfblog-2.0.27.jar` | 2.0.27 | 67,600,675 B | `FF82FC5DECFA8A6114D2C28A3726E5B56E3892F88C7DA5CFBB3E96A042A7BE32` |
 
 ## 这个 JAR 是什么
 
 Spring Boot 单 JAR（fat jar）：内嵌 Tomcat、全部后端依赖、以及已构建的 Vue 前端产物
-（`BOOT-INF/classes/static/` 下 337 个条目）。运行它不需要 Node、npm、Nginx 或外挂 Tomcat。
+（`BOOT-INF/classes/static/` 下 81 个条目）。运行它不需要 Node、npm、Nginx 或外挂 Tomcat。
 
 ## 运行
 
@@ -17,7 +17,7 @@ JAR 与配置好的 `.env` 放在**同一运行目录**，并从该目录启动�
 都依赖工作目录）：
 
 ```bash
-java -jar selfblog-2.0.26.jar
+java -jar selfblog-2.0.27.jar
 ```
 
 默认端口 8825：博客 `http://localhost:8825/`，后台 `http://localhost:8825/admin`，
@@ -33,6 +33,8 @@ java -jar selfblog-2.0.26.jar
 ```bash
 cd frontend && npm ci && npm run build          # 产物进 frontend/dist
 cd ../backend
+# 先删上一轮的静态产物：copy-resources 只增不删，否则旧 bundle 会累积进 jar
+rm -rf target/classes/static
 ./mvnw package -DskipTests -Dskip.npm=true -Dskip.installnodenpm=true
 # 产物：backend/target/selfblog.jar
 ```
@@ -41,8 +43,8 @@ cd ../backend
 所以发布用的副本放在本目录并显式提交。校验：
 
 ```bash
-sha256sum selfblog-2.0.26.jar
-# 81d2298713da69b7634cce7d8392e34f6d3c54b317eddbe43d5da006040db247
+sha256sum selfblog-2.0.27.jar
+# ff82fc5decfa8a6114d2c28a3726e5b56e3892f88c7da5cfbb3e96a042a7be32
 ```
 
 ## 注意

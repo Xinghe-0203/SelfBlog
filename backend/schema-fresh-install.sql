@@ -1285,3 +1285,16 @@ CREATE TABLE IF NOT EXISTS `album_photo` (
     PRIMARY KEY (`id`),
     INDEX `idx_album_photo_order` (`album_id`, `is_deleted`, `sort_order`, `create_time`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='相册照片';
+
+CREATE TABLE IF NOT EXISTS `post_seo` (
+    `post_id` BIGINT NOT NULL,
+    `seo_title` VARCHAR(200) DEFAULT NULL,
+    `seo_description` VARCHAR(400) DEFAULT NULL,
+    `seo_keywords` VARCHAR(300) DEFAULT NULL,
+    `og_image_url` VARCHAR(500) DEFAULT NULL,
+    `source` VARCHAR(20) NOT NULL DEFAULT 'manual',
+    `generated_at` DATETIME DEFAULT NULL,
+    `update_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (`post_id`),
+    INDEX `idx_post_seo_generated_at` (`generated_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='文章 SEO 元数据';

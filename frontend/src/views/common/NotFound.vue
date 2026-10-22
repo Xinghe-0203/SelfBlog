@@ -62,7 +62,8 @@ function doSearch(): void {
   padding: 38px;
   border: 1px solid var(--border-light);
   border-radius: var(--radius-xl);
-  background: var(--surface-primary);
+  /* 浮起档：这层卡压在 PageFrame 的纸面之上，用纸面同一 token 会完全糊平。 */
+  background: var(--surface-raised);
 }
 .error-code {
   margin-bottom: 14px;

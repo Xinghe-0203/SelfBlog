@@ -158,6 +158,7 @@ onMounted(fetchPosts)
               <div class="row-actions">
                 <router-link :to="`/post/${post.id}`">查看</router-link>
                 <router-link :to="`${siteStore.adminRoot}/edit/${post.id}`">编辑</router-link>
+                <router-link :to="`${siteStore.adminRoot}/seo?postId=${post.id}`">SEO</router-link>
                 <button type="button" @click="deletePost(post)">删除</button>
               </div>
             </td>

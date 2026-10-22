@@ -25,6 +25,7 @@ class ReadingPageServiceTest {
     @Autowired com.fasterxml.jackson.databind.ObjectMapper json;
     @Autowired org.springframework.cache.CacheManager caches;
     @Autowired com.selfblog.mapper.SiteSettingMapper settingMapper;
+    @Autowired com.selfblog.mapper.PostSeoMapper postSeoMapper;
 
     /** 直接写 SQL 绕过服务层时缓存不会自动失效；与 PageServiceImplTest 相同，测试前后清缓存。 */
     void clearSiteCache() {
@@ -35,6 +36,7 @@ class ReadingPageServiceTest {
     @BeforeEach void data() {
         clearSiteCache();
         jdbc.update("DELETE FROM blog_post");
+        jdbc.update("DELETE FROM post_seo");
         jdbc.update("DELETE FROM blog_tag");
         jdbc.update("DELETE FROM blog_post_tag");
         jdbc.update("DELETE FROM photo_album");
@@ -161,4 +163,54 @@ class ReadingPageServiceTest {
     }
 
     private PageConfig config(Map<String, Object> values) { return json.convertValue(values, PageConfig.class); }
+
+    /** 自定义 SEO 优先于派生值：标题、描述、关键词、分享图都要生效。 */
+    @Test void postSeoOverridesDerivedMetadata() {
+        var seo = new com.selfblog.entity.PostSeo();
+        seo.setPostId(770001L);
+        seo.setSeoTitle("自定义 SEO 标题");
+        seo.setSeoDescription("自定义 SEO 描述，用于验证渲染优先级。");
+        seo.setSeoKeywords("关键词甲,关键词乙");
+        seo.setOgImageUrl("/uploads/share.png");
+        seo.setSource("manual");
+        postSeoMapper.insert(seo);
+
+        var post = reading.resolve("/post/770001", null);
+
+        assertTrue(post.meta().title().startsWith("自定义 SEO 标题"));
+        assertEquals("自定义 SEO 描述，用于验证渲染优先级。", post.meta().description());
+        assertEquals(List.of("关键词甲", "关键词乙"), post.meta().keywords());
+        assertEquals("/uploads/share.png", post.meta().shareImage());
+        // 正文标题仍是文章原标题，SEO 标题只影响 head
+        assertEquals("公开文章", post.displayTitle());
+
+        postSeoMapper.deleteById(770001L);
+    }
+
+    /** 没有 SEO 记录时回落到派生值，行为与改动前一致。 */
+    @Test void derivedMetadataStillUsedWhenNoSeoRow() {
+        var post = reading.resolve("/post/770001", null);
+
+        assertEquals("公开摘要", post.meta().description());
+        assertEquals(List.of("技术"), post.meta().keywords());
+        assertNull(post.meta().shareImage());
+        assertTrue(post.meta().title().startsWith("公开文章"));
+    }
+
+    /** 只填了部分字段时逐字段回落，不能因为有一条记录就整体放弃派生值。 */
+    @Test void blankSeoFieldsFallBackPerField() {
+        var seo = new com.selfblog.entity.PostSeo();
+        seo.setPostId(770001L);
+        seo.setSeoTitle("只改了标题");
+        seo.setSource("manual");
+        postSeoMapper.insert(seo);
+
+        var post = reading.resolve("/post/770001", null);
+
+        assertTrue(post.meta().title().startsWith("只改了标题"));
+        assertEquals("公开摘要", post.meta().description());
+        assertEquals(List.of("技术"), post.meta().keywords());
+
+        postSeoMapper.deleteById(770001L);
+    }
 }

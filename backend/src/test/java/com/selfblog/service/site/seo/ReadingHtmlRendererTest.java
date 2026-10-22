@@ -14,7 +14,8 @@ class ReadingHtmlRendererTest {
     private final String base = "https://blog.example.com";
 
     private SeoModels.Meta meta(String title, String path, boolean indexable) {
-        return new SeoModels.Meta(title, "页面描述", "/uploads/a.jpg", "website", path, null, null, List.of(), indexable);
+        return new SeoModels.Meta(title, "页面描述", "/uploads/a.jpg", "website", path, null, null, List.of(), indexable,
+                List.of(), null);
     }
     private SeoModels.ReadingPage page(SeoModels.Kind kind, String title, String path, String body, boolean indexable) {
         return new SeoModels.ReadingPage(200, kind, kind == SeoModels.Kind.POST ? "post" : "about", PageConfig.empty(),
@@ -39,7 +40,8 @@ class ReadingHtmlRendererTest {
     }
 
     @Test void structuredDataIsSafeJsonWithoutBreakingOutOfScript() {
-        var unsafe = new SeoModels.Meta("标题</script><script>alert(1)</script>", "描述", null, "article", "/post/2", "2026-10-16T10:00:00", "作者", List.of("技术"), true);
+        var unsafe = new SeoModels.Meta("标题</script><script>alert(1)</script>", "描述", null, "article", "/post/2", "2026-10-16T10:00:00", "作者", List.of("技术"), true,
+                List.of(), null);
         var post = new SeoModels.ReadingPage(200, SeoModels.Kind.POST, "post", PageConfig.empty(), unsafe, "标题</script>", "<p>x</p>", List.of(), List.of(),
                 new SeoModels.SiteInfo("示例博客", "站点说明", "示例作者", "作者简介"));
         Document doc = Jsoup.parse(renderer.render(post, base));
@@ -95,5 +97,55 @@ class ReadingHtmlRendererTest {
         var inline = doc.select("script:not([src]):not([type=application/ld+json])");
         assertEquals(1, inline.size());
         assertTrue(inline.first().data().contains("edu_theme"));
+    }
+
+    /** 自定义关键词优先，渲染为 meta[name=keywords]，逗号分隔。 */
+    @Test void keywordsMetaUsesCustomKeywords() {
+        var withKeywords = new SeoModels.Meta("标题", "描述", "/uploads/a.jpg", "article", "/post/3", null, null,
+                List.of("技术"), true, List.of("Spring Boot", "事务", "SEO"), null);
+        var post = new SeoModels.ReadingPage(200, SeoModels.Kind.POST, "post", PageConfig.empty(), withKeywords,
+                "标题", "<p>x</p>", List.of(), List.of(),
+                new SeoModels.SiteInfo("示例博客", "站点说明", "示例作者", "作者简介"));
+        Document doc = Jsoup.parse(renderer.render(post, base));
+        assertEquals(1, doc.select("meta[name=keywords]").size());
+        assertEquals("Spring Boot, 事务, SEO", doc.selectFirst("meta[name=keywords]").attr("content"));
+    }
+
+    /** 没有自定义关键词时回落到文章标签，保证老文章也有 keywords。 */
+    @Test void keywordsMetaFallsBackToTags() {
+        var withTags = new SeoModels.Meta("标题", "描述", "/uploads/a.jpg", "article", "/post/4", null, null,
+                List.of("技术", "后端"), true, List.of(), null);
+        var post = new SeoModels.ReadingPage(200, SeoModels.Kind.POST, "post", PageConfig.empty(), withTags,
+                "标题", "<p>x</p>", List.of(), List.of(),
+                new SeoModels.SiteInfo("示例博客", "站点说明", "示例作者", "作者简介"));
+        Document doc = Jsoup.parse(renderer.render(post, base));
+        assertEquals("技术, 后端", doc.selectFirst("meta[name=keywords]").attr("content"));
+    }
+
+    /** 两者都没有时不该输出空 keywords 标签。 */
+    @Test void keywordsMetaOmittedWhenEmpty() {
+        var empty = new SeoModels.Meta("标题", "描述", "/uploads/a.jpg", "article", "/post/5", null, null,
+                List.of(), true, List.of(), null);
+        var post = new SeoModels.ReadingPage(200, SeoModels.Kind.POST, "post", PageConfig.empty(), empty,
+                "标题", "<p>x</p>", List.of(), List.of(),
+                new SeoModels.SiteInfo("示例博客", "站点说明", "示例作者", "作者简介"));
+        Document doc = Jsoup.parse(renderer.render(post, base));
+        assertEquals(0, doc.select("meta[name=keywords]").size());
+    }
+
+    /** 分享图优先用 post_seo.og_image_url，正文封面（hero）不受影响。 */
+    @Test void shareImageOverridesOpenGraphImageOnly() {
+        var withShare = new SeoModels.Meta("标题", "描述", "/uploads/cover.jpg", "article", "/post/6", null, null,
+                List.of(), true, List.of(), "/uploads/share.png");
+        var post = new SeoModels.ReadingPage(200, SeoModels.Kind.POST, "post", PageConfig.empty(), withShare,
+                "标题", "<p>x</p>", List.of(), List.of(),
+                new SeoModels.SiteInfo("示例博客", "站点说明", "示例作者", "作者简介"));
+        Document doc = Jsoup.parse(renderer.render(post, base));
+        assertEquals("https://blog.example.com/uploads/share.png",
+                doc.selectFirst("meta[property=og:image]").attr("content"));
+        assertEquals("https://blog.example.com/uploads/share.png",
+                doc.selectFirst("meta[name=twitter:image]").attr("content"));
+        assertEquals("/uploads/cover.jpg",
+                doc.selectFirst("#app img").attr("src"));
     }
 }

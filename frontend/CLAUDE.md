@@ -1,8 +1,8 @@
-# CLAUDE.md - 个人博客 Vue 3 前端 (v2.0.25)
+# CLAUDE.md - 个人博客 Vue 3 前端 (v2.0.27)
 
 ## 项目概述
 
-这是单人作者个人博客的前端项目，基于 Vue 3 + Vite 构建。访客只读、搜索，作者通过管理员后台写作管理。当前版本 v2.0.25。
+这是单人作者个人博客的前端项目，基于 Vue 3 + Vite 构建。访客只读、搜索，作者通过管理员后台写作管理。当前版本 v2.0.27。
 
 ## 常用命令
 
@@ -13,7 +13,7 @@ npm run build          # 构建生产版本（先 vue-tsc --noEmit，再 Vite）
 npm run preview        # 预览生产版本
 npm run lint:check     # 只读 ESLint 检查（npm run lint 会改写文件）
 npm run type-check     # vue-tsc --noEmit（必过闸门）
-npm run test:run       # Vitest 单次运行（当前 45 文件 / 444 tests；原始基线 210）
+npm run test:run       # Vitest 单次运行（当前 47 文件 / 477 tests；原始基线 210）
 npm run test:deployment # node:test：Vercel 代理生成器 + Docker/Compose 源契约（27 项）
 ```
 
@@ -39,30 +39,25 @@ npm run test:deployment # node:test：Vercel 代理生成器 + Docker/Compose �
 
 ```
 src/
-├── api/            # API 接口（含 admin/site/post/media/pages 等模块）
+├── api/            # API 接口（admin/gallery/index/media/message/notification/pages/post/public-interactions/seo/site/tag/user）
 ├── components/     # Vue 组件
 │   ├── common/     # 通用组件
 │   │   ├── BackToTop.vue     # 返回顶部
-│   │   ├── Button.vue        # 通用按钮
-│   │   ├── CollectButton.vue # 收藏按钮
-│   │   ├── FollowButton.vue  # 关注按钮
 │   │   ├── Icon.vue          # 内置 SVG 图标（icons.ts 注册表）
 │   │   ├── ImagePreview.vue  # 图片预览灯箱
-│   │   ├── Input.vue         # 通用输入框
-│   │   ├── LikeButton.vue    # 点赞按钮
 │   │   ├── Modal.vue         # 通用模态框
-│   │   ├── Tag.vue           # 标签组件
-│   │   └── Toast.vue         # Toast 通知
+│   │   ├── Toast.vue         # Toast 通知
+│   │   └── icons.ts          # 图标注册表（新增图标改这里）
 │   ├── layout/     # Navbar / Footer / NavbarMusicControl / headless MusicPlayer
 │   ├── post/       # ArticleList / MobileTocSheet
 │   ├── pages/      # PageFrame / MarkdownContent / ContentPageView（逐页配置与安全正文）
 │   └── admin/      # SiteAssetField 等后台字段组件
-├── composables/    # useDialog / useConfirm / useScrollState / useMarkdownEnhance / useSeoMeta / usePageConfig / usePageSeo / useScrollReveal
+├── composables/    # useDialog / useConfirm / useLatestRequest / useScrollState / useMarkdownEnhance / useSeoMeta / usePageConfig / usePageSeo / useScrollReveal
 ├── router/         # 路由配置（modules/ + guards）
 ├── stores/         # Pinia 状态管理 (site / theme / user / music / pages)
-├── styles/         # 样式文件（入口 main.css）
-├── types/          # TypeScript 类型定义
-├── utils/          # 工具函数 (crypto / logger / toast / visitor / reading)
+├── styles/         # 样式文件（入口 main.css，appearance.css 必须最后导入）
+├── types/          # TypeScript 类型定义（含 seo.ts 与 axios-augment.d.ts）
+├── utils/          # 工具函数 (crypto / logger / toast / visitor / reading / navigationFit / pageCatalog)
 └── views/          # 页面组件（Home/About/Archives、post、pages、admin(+pages)、gallery、search、tag、user、auth、common）
 ```
 
@@ -80,7 +75,7 @@ src/
 
 ## 设计系统
 
-- 入口 `src/styles/main.css`，按顺序 `@import` 12 个模块；设计 token 在 `variables.css`，深色模式覆盖在 `dark-mode.css`，皮肤在 `skins.css`
+- 入口 `src/styles/main.css`，按顺序 `@import` 13 个模块；设计 token 在 `variables.css`，深色模式覆盖在 `dark-mode.css`，皮肤在 `skins.css`。**`appearance.css` 必须最后导入**（作者配置的背景/不透明度要压过皮肤与深色模式里同优先级的声明）
 - 深色模式通过 `.dark-mode` 类生效（`stores/theme.ts` 加在 `<html>`，`App.vue` 同时绑在 `#selfblog` 上）
 - 皮肤通过 `#selfblog[data-skin='...']` 生效：`ocean`(默认)/`forest`/`lavender`/`sunset`/`midnight`
 - 动画工具类: `.fade-in`, `.slide-up`, `.pulse`
@@ -114,6 +109,17 @@ src/
 - 服务端阅读HTML由JAR按请求组装（`backend/.../service/site/seo/`），Vue挂载会整体替换`#app`内的`.seo-reading`：不要给它加跨页面依赖或期望它存活。`useSeoMeta`优先读取`meta[name=selfblog-site-origin]`确定canonical/分享图origin，Vite本地开发无标记时才回落浏览器origin
 - `vercel.json`不再部署第二份静态前端：`framework:null` + `scripts/build-vercel-proxy.mjs`生成Build Output v3转发到同一源站。不要恢复Vite自动预设、独立`dist`发布或写死域名；部署契约测试用`npm run test:deployment`
 
+## LLM 辅助 SEO（2026-10-22）
+
+- 后台入口：侧边栏/工作台/文章列表的「SEO 管理」都指向 `${siteStore.adminRoot}/seo`；`Posts.vue` 的行操作带 `?postId=`，`Seo.vue` 的 `onMounted` 读到就直接打开编辑面板
+- 三个写域各管一段，不要互相复制：`views/admin/Settings.vue`（模型连接配置 + 测试连接）、`views/admin/Seo.vue`（体检列表/单篇编辑/批量生成）、`views/post/PostEdit.vue` 侧栏（作者在写文章时顺手改本篇 SEO）
+- **密钥掩码哨兵**：`SECRET_MASK = '••••••••'`（8 个 U+2022，无空格）。设置页把已存密钥原样提交回后端表示「保留」；提交空串才是清除。任何「清空输入框」的交互都必须显式写成空串，不能顺手 trim 成哨兵或反之
+- `getDetail` 的 **404 表示「这篇还没有 SEO 记录」**，不是错误：`PostEdit.vue` 与 `Seo.vue` 都按「空表单」处理，只有其它状态码才展示错误文案
+- 输入框 `maxlength` 用**服务端上限**（title 200 / description 400 / keywords 300 / ogImageUrl 500），不要用建议长度（60/160）当 `maxlength`——浏览器会静默截断作者的长文本。建议长度只用来在 `.char-hint` 上提示超长（`data-over` 上色）
+- `generate`/`batchGenerate` 的 axios `timeout` 是 130000（批量串行最多 50 篇），`testConnection` 是 60000。**这些请求绝不能被自动重试**：重试会重复消耗模型额度
+- `api/seo.ts` 的 8 个方法都返回 `ApiResponse<T>`，调用方读 `res.data`（信封）再取 `res.data.data`
+- SEO 类型只从 `types/seo.ts` 直 import（`types/index.ts` 也做了 re-export，但避免循环依赖时优先直 import）
+
 ## 路由约定
 
 - 本站为单人作者博客，访客只读：`authRoutes` 只有一条 `/login` 重定向，指向服务端下发的作者后台入口 `siteStore.adminRoot`（默认 `/admin`）。组件中访客需登录时统一 `router.push('/login')`，不要再指向硬编码路径
@@ -140,7 +146,7 @@ src/
 VITE_APP_TITLE=个人博客                     # 应用标题（代码实际消费）
 VITE_API_TARGET=http://localhost:8825       # 开发环境代理目标（vite.config.ts 消费）
 VITE_API_BASE_URL=/api                      # 保留位：axios 在 src/api/index.ts 硬编码 /api，未被消费
-VITE_APP_VERSION=2.0.25                     # 保留位：当前未被代码消费
+VITE_APP_VERSION=2.0.27                     # 保留位：当前未被代码消费；真实版本号由 vite.config.ts 从 package.json 注入 __APP_VERSION__
 ```
 
 如需本地覆盖，创建 `.env.local`（不提交 git）。
@@ -164,6 +170,8 @@ Vercel 只作为**统一反向代理**指向已部署的 JAR，不在平台侧�
 - `views/{topic/TopicDetail,trending/TrendingPage,auth/PasswordReset,auth/Register}.vue`
 - `components/home/*`（旧首页组件，现由 `views/Home.vue` 自行实现）
 - `components/common/Card.vue`、`composables/usePagination.ts`、`types/vo.ts`
+
+2026-10-21 又删了七个零引用整文件：`components/common/{Button,Input,Tag}.vue`、`views/post/{HotPosts,PostSearch}.vue`、`api/{share,trending}.ts`（另删了 `utils/index.ts` 的 `formatNumber`/`copyToClipboard`/`generateId`/`debounce`/`storage` 等死导出与约 200 行死 CSS）。`api/message.ts` 与 `api/notification.ts` **刻意保留**：它们对应仍存在的后端管理端接口，只是暂时没有前端入口。
 
 后端对应的社区/话题接口与数据表仍保留（管理员 API 未删除），只是不再有对应前端入口。
 

@@ -22,6 +22,7 @@ import com.selfblog.service.post.BlogTagService;
 import com.selfblog.service.post.PostInteractionService;
 import com.selfblog.service.post.PostQueryService;
 import com.selfblog.service.social.NotificationService;
+import com.selfblog.service.seo.SeoAutoGenerationTrigger;
 import com.selfblog.utils.HtmlSanitizer;
 import com.selfblog.vo.post.AdjacentPostVO;
 import com.selfblog.vo.post.PostDetailResponse;
@@ -93,6 +94,28 @@ public class BlogPostServiceImpl extends ServiceImpl<BlogPostMapper, BlogPost> i
     @Autowired
     private PostInteractionService postInteractionService;
 
+    /**
+     * 发布后自动生成 SEO 的异步触发器（独立 Bean，{@code @Async} 才能生效）。
+     * 只在「AI 辅助已启用 + 开启发布后自动生成 + 接口地址与 Key 齐全」时才真正派发。
+     */
+    @Autowired
+    private SeoAutoGenerationTrigger seoAutoGenerationTrigger;
+
+    /**
+     * 发布后补 SEO 的兜底调用：<b>吞掉一切异常</b>。
+     *
+     * <p>触发器本身已经做了异步与 try/catch，但这里再包一层是有意的：
+     * 「文章保存成功」是主流程，SEO 只是附属产物。哪怕将来有人把触发器改成
+     * 同步实现、或线程池拒绝策略抛异常，也不能让作者的文章保存失败。</p>
+     */
+    private void fireSeoAfterCommit(Long postId) {
+        try {
+            seoAutoGenerationTrigger.fireAfterCommit(postId);
+        } catch (Exception e) {
+            log.warn("发布后自动生成 SEO 派发失败，已忽略：postId={}, error={}", postId, e.getClass().getSimpleName());
+        }
+    }
+
     private void validatePostRequest(PostCreateRequest request) {
         if (request.getTitle() == null || request.getTitle().trim().isEmpty()) {
             throw new BusinessException(400, "文章标题不能为空");
@@ -155,6 +178,9 @@ public class BlogPostServiceImpl extends ServiceImpl<BlogPostMapper, BlogPost> i
         }
 
         log.info("文章创建成功: postId={}, userId={}, title={}", post.getId(), userId, post.getTitle());
+
+        // 发布即上线：事务提交后再异步补 SEO 元数据（失败静默回落到派生值，不影响本次保存）。
+        fireSeoAfterCommit(post.getId());
         return post.getId();
     }
 
@@ -247,6 +273,11 @@ public class BlogPostServiceImpl extends ServiceImpl<BlogPostMapper, BlogPost> i
             if (tagIds != null && !tagIds.isEmpty()) {
                 savePostTags(post.getId(), tagIds);
             }
+        }
+
+        // 仅对已发布文章补 SEO；事务提交后异步执行，失败静默回落，不影响保存结果。
+        if (PostStatus.PUBLISHED.getValue() == post.getStatus()) {
+            fireSeoAfterCommit(post.getId());
         }
     }
 
@@ -487,6 +518,9 @@ public class BlogPostServiceImpl extends ServiceImpl<BlogPostMapper, BlogPost> i
         notificationService.sendNotification("AUDIT", approveTitle, approveContent, reviewerId, post.getUserId(), "POST", post.getId());
 
         log.info("文章审核通过: postId={}, reviewerId={}, title={}", postId, reviewerId, post.getTitle());
+
+        // 审核通过 = 正式发布，同样补一次 SEO；事务提交后异步执行。
+        fireSeoAfterCommit(post.getId());
     }
 
     @Override

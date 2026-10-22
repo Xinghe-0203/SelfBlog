@@ -193,10 +193,9 @@ api.interceptors.response.use(
     return response.data
   },
   async (error) => {
-    const originalRequest = error.config as InternalAxiosRequestConfig & {
-      _retry?: boolean
-      _networkRetryCount?: number
-    }
+    // `_retry` / `_networkRetryCount` / `_noRetry` 由 `types/axios-augment.d.ts`
+    // 增补到 AxiosRequestConfig 上，这里不需要再手写交叉类型。
+    const originalRequest = error.config as InternalAxiosRequestConfig | undefined
 
     logger.error('Response error', {
       url: originalRequest?.url,
@@ -207,7 +206,7 @@ api.interceptors.response.use(
     // 网络错误重试（无响应、超时等）
     // 请求可能还没进到 dispatch 就被拦下（error.config 不存在）：没有可重放的
     // config，也就没有重试计数可读，直接落到下面的兜底分支。
-    if (originalRequest && isRetryableError(error)) {
+    if (originalRequest && !originalRequest._noRetry && isRetryableError(error)) {
       originalRequest._networkRetryCount = (originalRequest._networkRetryCount || 0) + 1
       if (originalRequest._networkRetryCount <= MAX_RETRIES) {
         logger.warn('Retrying request', {
@@ -286,7 +285,8 @@ api.interceptors.response.use(
     }
 
     // 401错误处理（Token过期）
-    if (error.response?.status === 401 && !originalRequest?._retry) {
+    // 没有 request config 就没有可重放的请求，刷新完也无从重放，直接落到兜底。
+    if (originalRequest && error.response?.status === 401 && !originalRequest._retry) {
       // 如果是刷新Token的请求失败，直接跳转登录
       if (originalRequest.url === '/user/refresh') {
         await handleAuthError()

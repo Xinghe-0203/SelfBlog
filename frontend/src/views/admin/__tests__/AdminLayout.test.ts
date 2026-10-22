@@ -90,7 +90,10 @@ describe('AdminLayout', () => {
     const wrapper = mountLayout()
 
     // 侧栏直接渲染内置图标，不再包一层 .nav-icon 文本容器。
-    expect(wrapper.findAll('.sidebar-nav .icon')).toHaveLength(8)
+    // 数量必须与 navLinks 对齐，否则新增后台页时会静默漏图标。
+    expect(wrapper.findAll('.sidebar-nav .icon')).toHaveLength(
+      wrapper.findAll('.sidebar-nav a').length
+    )
     expect(wrapper.findAll('.sidebar-nav a').every((node) => node.text().length > 0)).toBe(true)
     expect(wrapper.find('.menu-button .icon').exists()).toBe(true)
     expect(wrapper.find('.close-menu .icon').exists()).toBe(true)
@@ -147,6 +150,7 @@ describe('AdminLayout', () => {
       '/admin/comments',
       '/admin/albums',
       '/admin/pages',
+      '/admin/seo',
       '/admin/settings'
     ])
     const theme = useThemeStore()

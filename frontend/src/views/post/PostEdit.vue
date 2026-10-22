@@ -724,6 +724,106 @@
             </button>
           </div>
         </div>
+
+        <!-- SEO 元数据：只对已发布文章出现（新建时还没有 postId 可挂记录） -->
+        <div v-if="editingPostId" class="sidebar-section glass">
+          <h3 class="sidebar-title">
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <circle cx="11" cy="11" r="7" />
+              <path d="m16.5 16.5 4 4" />
+            </svg>
+            SEO 元数据
+          </h3>
+          <p class="seo-hint">
+            前台优先用这里的值；留空则回落到文章标题与摘要。搜索标题建议 60 字以内、描述 120–160
+            字，超出建议长度仍可保存，只是搜索结果里会被截断。
+          </p>
+
+          <div class="form-group">
+            <label class="form-label" for="seo-title">搜索标题</label>
+            <input
+              id="seo-title"
+              v-model="seoForm.seoTitle"
+              class="form-input"
+              type="text"
+              maxlength="200"
+              placeholder="留空则用文章标题"
+            />
+            <span class="char-hint" :data-over="seoForm.seoTitle.length > 60">
+              {{ seoForm.seoTitle.length }}/60
+            </span>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="seo-description">搜索描述</label>
+            <textarea
+              id="seo-description"
+              v-model="seoForm.seoDescription"
+              class="form-input seo-textarea"
+              maxlength="400"
+              rows="3"
+              placeholder="留空则用文章摘要"
+            ></textarea>
+            <span class="char-hint" :data-over="seoForm.seoDescription.length > 160">
+              {{ seoForm.seoDescription.length }}/160
+            </span>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="seo-keywords">关键词</label>
+            <input
+              id="seo-keywords"
+              v-model="seoForm.seoKeywords"
+              class="form-input"
+              type="text"
+              maxlength="300"
+              placeholder="逗号分隔，3–8 个"
+            />
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="seo-og-image">分享图地址</label>
+            <input
+              id="seo-og-image"
+              v-model="seoForm.ogImageUrl"
+              class="form-input"
+              type="text"
+              maxlength="500"
+              placeholder="留空则用封面图"
+            />
+          </div>
+
+          <p v-if="seoInfo.error" class="seo-status" data-state="error">{{ seoInfo.error }}</p>
+          <p v-else-if="seoInfo.notice" class="seo-status" data-state="ok">
+            {{ seoInfo.notice }}
+          </p>
+
+          <div class="seo-actions">
+            <button
+              class="btn btn-ghost btn-sm"
+              :disabled="seoInfo.busy"
+              data-action="seo-generate"
+              @click="generateSeo"
+            >
+              模型生成
+            </button>
+            <button
+              class="btn btn-primary btn-sm"
+              :disabled="seoInfo.busy || seoInfo.loading"
+              data-action="seo-save"
+              @click="saveSeo"
+            >
+              保存 SEO
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -738,6 +838,7 @@ import DOMPurify from 'dompurify'
 import { postApi } from '../../api/post'
 import { tagApi } from '../../api/tag'
 import { mediaApi } from '../../api/media'
+import { seoApi } from '../../api/seo'
 import { useLogger } from '../../utils/logger'
 import { toast } from '../../utils/toast'
 import { useConfirm } from '../../composables/useConfirm'
@@ -1069,6 +1170,87 @@ function removeCover() {
   form.coverImage = ''
 }
 
+// ========== SEO 元数据 ==========
+
+/**
+ * 侧栏 SEO 面板独立于文章表单：`post_seo` 是单独一张表、单独的接口，
+ * 保存文章不会顺带保存它，反之亦然（与后台「SEO 管理」页共用同一套后端）。
+ */
+const seoForm = reactive({ seoTitle: '', seoDescription: '', seoKeywords: '', ogImageUrl: '' })
+const seoInfo = reactive({ loading: false, busy: false, error: '', notice: '' })
+
+async function loadSeo() {
+  const postId = editingPostId.value
+  if (!postId) return
+  seoInfo.loading = true
+  seoInfo.error = ''
+  try {
+    const res = await seoApi.getDetail(Number(postId))
+    const data = res.data
+    seoForm.seoTitle = data?.seoTitle || ''
+    seoForm.seoDescription = data?.seoDescription || ''
+    seoForm.seoKeywords = data?.seoKeywords || ''
+    seoForm.ogImageUrl = data?.ogImageUrl || ''
+  } catch (err: any) {
+    // 没有 SEO 记录时后端返回 404，等同于「尚未填写」，不是错误。
+    if (err?.response?.status !== 404) {
+      seoInfo.error = err.userMessage || 'SEO 元数据加载失败'
+    }
+  } finally {
+    seoInfo.loading = false
+  }
+}
+
+/** 空白字符串要显式存成 null，否则后台会存下空串、前台判定「有 SEO」但内容为空。 */
+function seoPayload() {
+  const blank = (value: string) => (value.trim() ? value.trim() : null)
+  return {
+    seoTitle: blank(seoForm.seoTitle),
+    seoDescription: blank(seoForm.seoDescription),
+    seoKeywords: blank(seoForm.seoKeywords),
+    ogImageUrl: blank(seoForm.ogImageUrl)
+  }
+}
+
+async function saveSeo() {
+  const postId = editingPostId.value
+  if (!postId || seoInfo.busy) return
+  seoInfo.busy = true
+  seoInfo.error = ''
+  seoInfo.notice = ''
+  try {
+    await seoApi.update(Number(postId), seoPayload())
+    seoInfo.notice = 'SEO 元数据已保存'
+  } catch (err: any) {
+    seoInfo.error = err.userMessage || 'SEO 保存失败'
+  } finally {
+    seoInfo.busy = false
+  }
+}
+
+async function generateSeo() {
+  const postId = editingPostId.value
+  if (!postId || seoInfo.busy) return
+  seoInfo.busy = true
+  seoInfo.error = ''
+  seoInfo.notice = ''
+  try {
+    const res = await seoApi.generate(Number(postId))
+    const data = res.data
+    if (data) {
+      seoForm.seoTitle = data.seoTitle || ''
+      seoForm.seoDescription = data.seoDescription || ''
+      seoForm.seoKeywords = data.seoKeywords || ''
+      seoForm.ogImageUrl = data.ogImageUrl || ''
+    }
+    seoInfo.notice = '已由模型生成并保存'
+  } catch (err: any) {
+    seoInfo.error = err.userMessage || '模型生成失败'
+  } finally {
+    seoInfo.busy = false
+  }
+}
+
 // ========== 文章数据 ==========
 
 const fetchPost = async () => {
@@ -1236,6 +1418,9 @@ onMounted(async () => {
   history.value = [form.content]
   historyIndex.value = 0
   savedSnapshot.value = JSON.stringify(postData())
+
+  // SEO 面板要等 fetchPost 拿到 postId 之后才有 id 可查；编辑草稿的 postId 也可能来自草稿记录。
+  await loadSeo()
 
   autoSaveTimer = setInterval(() => {
     if (dirty.value) autoSave()
@@ -1648,6 +1833,11 @@ onBeforeRouteLeave((_to, _from) => {
   margin-top: 4px;
 }
 
+/* 超过建议长度只提示、不阻止保存：搜索引擎会自己截断，作者仍应能看到真实字数。 */
+.char-hint[data-over='true'] {
+  color: var(--warning);
+}
+
 .form-input {
   width: 100%;
   padding: 10px 12px;
@@ -1662,6 +1852,46 @@ onBeforeRouteLeave((_to, _from) => {
   border-color: var(--accent);
   outline: 2px solid var(--accent-light);
   outline-offset: 1px;
+}
+
+/* SEO 侧栏面板 */
+.seo-hint {
+  font-size: var(--text-xs);
+  line-height: 1.6;
+  color: var(--text-muted);
+  margin: 0 0 14px;
+}
+
+.seo-textarea {
+  resize: vertical;
+  line-height: 1.6;
+}
+
+.seo-status {
+  font-size: var(--text-xs);
+  line-height: 1.6;
+  margin: 0 0 12px;
+  padding: 8px 10px;
+  border-radius: var(--radius);
+}
+
+.seo-status[data-state='ok'] {
+  color: var(--success);
+  background: var(--success-light);
+}
+
+.seo-status[data-state='error'] {
+  color: var(--error);
+  background: var(--error-light);
+}
+
+.seo-actions {
+  display: flex;
+  gap: var(--spacing-sm);
+}
+
+.seo-actions .btn {
+  flex: 1;
 }
 
 /* 封面图上传 */

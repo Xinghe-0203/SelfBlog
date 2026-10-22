@@ -2,7 +2,7 @@
 
 Vue 3 frontend for a single-author personal blog. Public pages focus on reading, search, archives, about, and tags; writing and content management are protected by administrator-only routes.
 
-**Version**: v2.0.26 | **Vue**: 3.5.44 | **Vite**: 6.4.4
+**Version**: v2.0.27 | **Vue**: 3.5.44 | **Vite**: 6.4.4
 
 ## Tech Stack
 
@@ -201,6 +201,25 @@ KV table, so this needs **no schema migration**.
   again client-side.
 - `SiteAssetField.vue`'s client-side size pre-check must **not** be stricter than the
   server: `KIND_RULES.background.maxBytes` is 8MB, matching `SiteAssetKind.BACKGROUND`.
+
+### LLM-assisted SEO admin UI (2026-10-22)
+
+- Three write areas, kept separate on purpose: `views/admin/Settings.vue` (model connection +
+  "test connection"), `views/admin/Seo.vue` (audit list, per-post editor, batch generate), and
+  the sidebar panel in `views/post/PostEdit.vue` (fix the current post's metadata while writing).
+- The API key is never returned in plaintext: the settings endpoint sends the literal sentinel
+  `"••••••••"` (8 × U+2022) and submitting that exact value means "keep the stored key";
+  submitting `""` clears it. Do not trim or normalize between those two states.
+- `seoApi.getDetail()` **404 means "this post has no SEO record yet"** and is rendered as an
+  empty form; only other statuses are errors. Same contract in `PostEdit.vue` and `Seo.vue`.
+- Input `maxlength` uses the **server caps** (title 200 / description 400 / keywords 300 /
+  ogImageUrl 500), never the recommended lengths (60/160): a browser truncates silently, which
+  would save content the author never agreed to lose. Recommended lengths only drive the
+  over-length hint (`.char-hint[data-over]`).
+- Generate/batch/test requests carry `_noRetry: true`. `ECONNABORTED` (axios timeout) is in
+  `RETRYABLE_CODES`, which is right for plain reads but wrong here: retrying multiplies model
+  quota and wall-clock time by three. Failure is surfaced immediately so the author decides.
+- All `api/seo.ts` methods resolve the `Result<T>` envelope, so callers read `res.data.data`.
 
 ### Configurable public pages
 

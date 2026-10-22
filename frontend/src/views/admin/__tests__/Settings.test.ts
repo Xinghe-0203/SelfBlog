@@ -6,13 +6,18 @@ import Settings from '../Settings.vue'
 import SiteAssetField from '@/components/admin/SiteAssetField.vue'
 import { useSiteStore } from '@/stores/site'
 
-const { getSettings, updateSettings } = vi.hoisted(() => ({
+const { getSettings, updateSettings, testConnection } = vi.hoisted(() => ({
   getSettings: vi.fn(),
-  updateSettings: vi.fn()
+  updateSettings: vi.fn(),
+  testConnection: vi.fn()
 }))
 
 vi.mock('@/api/site', () => ({
   siteApi: { getSettings, updateSettings, uploadSiteAsset: vi.fn() }
+}))
+
+vi.mock('@/api/seo', () => ({
+  seoApi: { testConnection }
 }))
 
 const STATIC_FAVICON = '<link rel="icon" type="image/svg+xml" href="/favicon.svg">'
@@ -141,7 +146,14 @@ describe('Settings brand asset fields', () => {
   it('groups real setting fields by meaning and keeps a single save path', async () => {
     const wrapper = await mountSettings()
     const groupTitles = wrapper.findAll('.panel-heading h2').map((heading) => heading.text())
-    expect(groupTitles).toEqual(['站点资料', '后台与访客', '评论与音乐', '视觉主题', '页面背景'])
+    expect(groupTitles).toEqual([
+      '站点资料',
+      '后台与访客',
+      '评论与音乐',
+      'AI 辅助与 SEO',
+      '视觉主题',
+      '页面背景'
+    ])
     expect(wrapper.findAll('form')).toHaveLength(1)
   })
 
@@ -339,6 +351,114 @@ describe('Settings brand asset fields', () => {
       const root = document.getElementById('selfblog')
       expect(root?.getAttribute('style') ?? '').not.toContain('--bg')
       expect(wrapper.find('.bg-preview').attributes('style')).not.toContain('--')
+    })
+  })
+
+  describe('AI / LLM panel', () => {
+    const MASK = '••••••••'
+
+    function control(wrapper: Awaited<ReturnType<typeof mountSettings>>, name: string) {
+      const found = wrapper.find(`[data-setting="${name}"]`)
+      if (!found.exists()) throw new Error(`missing control: ${name}`)
+      return found
+    }
+
+    it('renders every llm setting and derives the key badge from the mask sentinel', async () => {
+      getSettings.mockResolvedValue({
+        code: 200,
+        message: 'OK',
+        data: {
+          ...useSiteStore().settings,
+          llmEnabled: 'true',
+          llmBaseUrl: 'https://api.example.com/v1',
+          llmApiKey: MASK,
+          llmModel: 'gpt-4o-mini',
+          llmTimeoutSeconds: '45',
+          llmAutoOnPublish: 'true'
+        }
+      })
+      const wrapper = await mountSettings()
+
+      for (const name of [
+        'llmEnabled',
+        'llmBaseUrl',
+        'llmApiKey',
+        'llmModel',
+        'llmTimeoutSeconds',
+        'llmAutoOnPublish'
+      ]) {
+        expect(control(wrapper, name).exists()).toBe(true)
+      }
+      expect((control(wrapper, 'llmBaseUrl').element as HTMLInputElement).value).toBe(
+        'https://api.example.com/v1'
+      )
+      // v-model 写的是 DOM property，不是 attribute，必须读 element.value。
+      expect((control(wrapper, 'llmApiKey').element as HTMLInputElement).value).toBe(MASK)
+      // 已配置 = 服务端回的就是哨兵串；此时徽标必须是"已配置"，且不能把掩码当真实密钥展示
+      const badge = wrapper.get('[data-llm-key]')
+      expect(badge.attributes('data-llm-key')).toBe('configured')
+      expect(badge.text()).toBe('已配置')
+    })
+
+    it('shows an unconfigured key as empty rather than the mask', async () => {
+      const wrapper = await mountSettings()
+      expect((control(wrapper, 'llmApiKey').element as HTMLInputElement).value).toBe('')
+      expect(wrapper.get('[data-llm-key]').attributes('data-llm-key')).toBe('empty')
+      expect(wrapper.get('[data-llm-key]').text()).toBe('未配置')
+    })
+
+    it('round-trips the mask unchanged so saving never wipes a stored key', async () => {
+      getSettings.mockResolvedValue({
+        code: 200,
+        message: 'OK',
+        data: { ...useSiteStore().settings, llmApiKey: MASK, llmBaseUrl: 'https://api.example.com' }
+      })
+      const wrapper = await mountSettings()
+      updateSettings.mockResolvedValue({
+        code: 200,
+        message: 'OK',
+        data: { ...useSiteStore().settings, llmApiKey: MASK }
+      })
+
+      await wrapper.find('form').trigger('submit')
+      await flushPromises()
+
+      // 关键不变量：不动密钥输入框时，提交的必须仍是哨兵串本身。
+      // 若前端把它换成空串或占位符，后端会理解为"清除密钥"。
+      const payload = updateSettings.mock.calls[0]?.[0] as Record<string, string>
+      expect(payload.llmApiKey).toBe(MASK)
+      expect(payload.llmBaseUrl).toBe('https://api.example.com')
+    })
+
+    it('tests the saved configuration and reports latency on success', async () => {
+      testConnection.mockResolvedValue({
+        code: 200,
+        message: 'OK',
+        data: { ok: true, message: '连接成功', latencyMs: 412, model: 'gpt-4o-mini' }
+      })
+      const wrapper = await mountSettings()
+
+      await wrapper.get('[data-action="test-llm"]').trigger('click')
+      await flushPromises()
+
+      expect(testConnection).toHaveBeenCalledTimes(1)
+      const result = wrapper.get('.llm-test')
+      expect(result.attributes('data-ok')).toBe('true')
+      expect(result.text()).toContain('连接成功')
+      expect(result.text()).toContain('412ms')
+      expect(result.text()).toContain('gpt-4o-mini')
+    })
+
+    it('surfaces a failed connection attempt without throwing', async () => {
+      testConnection.mockRejectedValue({ userMessage: '请求超时' })
+      const wrapper = await mountSettings()
+
+      await wrapper.get('[data-action="test-llm"]').trigger('click')
+      await flushPromises()
+
+      const result = wrapper.get('.llm-test')
+      expect(result.attributes('data-ok')).toBe('false')
+      expect(result.text()).toContain('请求超时')
     })
   })
 })

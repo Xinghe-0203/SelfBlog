@@ -32,7 +32,8 @@ public class ReadingHtmlRenderer {
         Document doc = Jsoup.parse(template.load());
         Element head = doc.head();
 
-        head.select("title, meta[name=description], meta[name=robots], meta[property^=og:], meta[name^=twitter:], "
+        head.select("title, meta[name=description], meta[name=robots], meta[name=keywords], "
+                + "meta[property^=og:], meta[name^=twitter:], "
                 + "link[rel=canonical], meta[name=selfblog-site-origin], script[type=application/ld+json]").remove();
 
         SeoModels.Meta meta = page.meta();
@@ -41,6 +42,11 @@ public class ReadingHtmlRenderer {
         if (meta.description() != null && !meta.description().isBlank()) {
             head.appendElement("meta").attr("name", "description").attr("content", meta.description());
         }
+        // keywords：优先后台 SEO 关键词，缺省回落到文章标签；两者都空则不输出该标签。
+        String keywords = joinKeywords(meta);
+        if (!keywords.isEmpty()) {
+            head.appendElement("meta").attr("name", "keywords").attr("content", keywords);
+        }
         head.appendElement("meta").attr("name", "robots").attr("content", meta.indexable() ? "index,follow" : "noindex,follow");
 
         String canonical = absolute(origin, meta.path());
@@ -48,7 +54,8 @@ public class ReadingHtmlRenderer {
         meta(head, "property", "og:type", meta.type() == null ? "website" : meta.type());
         meta(head, "property", "og:title", meta.title());
         if (meta.description() != null && !meta.description().isBlank()) meta(head, "property", "og:description", meta.description());
-        String image = absolute(origin, meta.image());
+        // 分享图与阅读区头图分开：后台可以只换社交分享图而不动正文版式。
+        String image = absolute(origin, shareImage(meta));
         if (image != null) meta(head, "property", "og:image", image);
         if (canonical != null) meta(head, "property", "og:url", canonical);
         meta(head, "name", "twitter:card", "summary_large_image");
@@ -74,6 +81,28 @@ public class ReadingHtmlRenderer {
                 + "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">"
                 + "<meta name=\"robots\" content=\"noindex,follow\"><title>页面暂时无法显示</title></head>"
                 + "<body><main><h1>页面暂时无法显示</h1><p>请稍后重试。</p></main></body></html>";
+    }
+
+    /**
+     * {@code meta[name=keywords]} 的内容：后台关键词优先，否则回落到文章标签。
+     * 去空、去重并保持顺序；都为空时返回空串（调用方据此决定不输出该标签）。
+     */
+    private static String joinKeywords(SeoModels.Meta meta) {
+        List<String> source = meta.keywords() != null && !meta.keywords().isEmpty() ? meta.keywords() : meta.tags();
+        if (source == null || source.isEmpty()) return "";
+        StringBuilder builder = new StringBuilder();
+        for (String keyword : source) {
+            if (keyword == null || keyword.isBlank()) continue;
+            if (builder.length() > 0) builder.append(", ");
+            builder.append(keyword.trim());
+        }
+        return builder.toString();
+    }
+
+    /** 社交分享封面：{@code shareImage} 优先，缺省沿用阅读区头图。 */
+    private static String shareImage(SeoModels.Meta meta) {
+        String share = meta.shareImage();
+        return share != null && !share.isBlank() ? share : meta.image();
     }
 
     private void appendJsonLd(Element head, SeoModels.ReadingPage page, String canonical, String image) {

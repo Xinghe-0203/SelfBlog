@@ -142,6 +142,109 @@
         />
       </section>
 
+      <section class="settings-panel llm-panel">
+        <div class="panel-heading panel-heading-row">
+          <div>
+            <h2>AI 辅助与 SEO</h2>
+            <p>
+              接入任意 OpenAI
+              兼容接口，用于自动生成文章标题、描述与关键词。密钥只保存在服务端，既不下发到前台，也不会写进日志。
+            </p>
+          </div>
+          <button
+            class="btn btn-ghost btn-sm"
+            type="button"
+            :disabled="testing"
+            data-action="test-llm"
+            @click="testConnection"
+          >
+            {{ testing ? '测试中…' : '测试连接' }}
+          </button>
+        </div>
+        <label class="toggle-row"
+          ><span
+            ><strong>启用 AI 辅助</strong
+            ><small>关闭后所有生成接口直接拒绝，已生成的 SEO 数据仍然生效。</small></span
+          ><input
+            v-model="form.llmEnabled"
+            type="checkbox"
+            true-value="true"
+            false-value="false"
+            data-setting="llmEnabled"
+        /></label>
+        <div class="llm-fields">
+          <label
+            >API 地址<input
+              v-model.trim="form.llmBaseUrl"
+              inputmode="url"
+              maxlength="500"
+              placeholder="https://api.openai.com/v1"
+              data-setting="llmBaseUrl"
+            /><small
+              >OpenAI 兼容的根地址，客户端会自动补 `/chat/completions`；末尾斜杠会被去掉。</small
+            ></label
+          >
+          <label
+            >API Key<input
+              v-model.trim="form.llmApiKey"
+              type="password"
+              maxlength="500"
+              autocomplete="new-password"
+              :placeholder="llmKeyConfigured ? '已配置' : '尚未配置'"
+              data-setting="llmApiKey"
+            /><small
+              >已保存的密钥显示为 <code>{{ SECRET_MASK }}</code
+              >：保持原样保存不会改动它，清空后保存即删除。<span
+                class="llm-badge"
+                :data-llm-key="llmKeyConfigured ? 'configured' : 'empty'"
+                >{{ llmKeyConfigured ? '已配置' : '未配置' }}</span
+              ></small
+            ></label
+          >
+          <label
+            >模型名<input
+              v-model.trim="form.llmModel"
+              maxlength="100"
+              placeholder="gpt-4o-mini"
+              data-setting="llmModel"
+            /><small>由服务商决定，例如 gpt-4o-mini、deepseek-chat、qwen-plus。</small></label
+          >
+          <label
+            >单次调用超时（秒）<input
+              v-model.trim="form.llmTimeoutSeconds"
+              type="number"
+              min="5"
+              max="120"
+              step="1"
+              data-setting="llmTimeoutSeconds"
+            /><small>5–120 秒。超时视为一次失败，不影响文章本身的保存。</small></label
+          >
+        </div>
+        <label class="toggle-row"
+          ><span
+            ><strong>发布后自动生成 SEO</strong
+            ><small
+              >文章发布后异步生成，失败只记日志、绝不阻塞保存。关闭时可到「SEO
+              管理」手动批量生成。</small
+            ></span
+          ><input
+            v-model="form.llmAutoOnPublish"
+            type="checkbox"
+            true-value="true"
+            false-value="false"
+            data-setting="llmAutoOnPublish"
+        /></label>
+        <p v-if="testResult" class="llm-test" :data-ok="testResult.ok ? 'true' : 'false'">
+          {{ testResult.message
+          }}<template v-if="testResult.ok">
+            （{{ testResult.model }}，{{ testResult.latencyMs }}ms）</template
+          >
+        </p>
+        <p v-else class="llm-hint">
+          测试连接使用<strong>已保存</strong>的配置；改了地址或密钥请先保存再测试。
+        </p>
+      </section>
+
       <section class="settings-panel">
         <div class="panel-heading">
           <div>
@@ -314,6 +417,8 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useSiteStore, type SiteSettings } from '@/stores/site'
 import { siteApi } from '@/api/site'
+import { seoApi } from '@/api/seo'
+import type { SeoLlmTest } from '@/types/seo'
 import SiteAssetField from '@/components/admin/SiteAssetField.vue'
 
 const siteStore = useSiteStore()
@@ -321,6 +426,21 @@ const form = reactive<SiteSettings>({ ...siteStore.settings })
 const saving = ref(false)
 const saved = ref(false)
 const error = ref('')
+
+/**
+ * 服务端用来表示「密钥已保存」的哨兵串（8 个 U+2022）。
+ *
+ * 它是契约的一部分，不是装饰：`PUT /api/admin/site-settings` 收到这个字面值
+ * 就保留已存密钥，收到空串则删除。前端不能自己造别的占位符，否则一次保存
+ * 就会把作者的密钥悄悄清掉。
+ */
+const SECRET_MASK = '••••••••'
+
+const testing = ref(false)
+const testResult = ref<SeoLlmTest | null>(null)
+
+/** 密钥是否已配置：由哨兵串派生，避免把掩码当真实值展示或比较。 */
+const llmKeyConfigured = computed(() => (form.llmApiKey ?? '') === SECRET_MASK)
 
 type AssetSettingKey =
   | 'authorAvatar'
@@ -412,6 +532,32 @@ async function load() {
     if (response.data) Object.assign(form, response.data)
   } catch {
     error.value = '设置暂时无法加载，请刷新后重试。'
+  }
+}
+
+/**
+ * 用**已保存**的配置测一次连通性。
+ *
+ * 刻意不把表单里的未保存值发过去：否则会出现「测试通过但保存失败」的错位，
+ * 而且把未保存的密钥塞进额外请求会让它多经一次网络。后端对上游失败一律
+ * 返回 200 + `ok:false`，所以这里只需要一个 try/catch 兜住本地网络错误。
+ */
+async function testConnection() {
+  testing.value = true
+  testResult.value = null
+  try {
+    const response = await seoApi.testConnection()
+    testResult.value = response.data
+  } catch (err) {
+    testResult.value = {
+      ok: false,
+      message:
+        (err as Error & { userMessage?: string }).userMessage || '测试请求失败，请稍后重试。',
+      latencyMs: 0,
+      model: ''
+    }
+  } finally {
+    testing.value = false
   }
 }
 
@@ -731,6 +877,75 @@ label small {
   font-size: var(--text-2xs);
   line-height: 1.6;
 }
+/* AI 面板：两个开关行之间夹一组两列字段，面板本身跨两列避免密钥输入被挤成半宽。 */
+.llm-panel {
+  grid-column: 1 / -1;
+}
+.panel-heading-row {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 16px;
+}
+.llm-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+.llm-fields label {
+  display: grid;
+  gap: 7px;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+}
+.llm-fields label small {
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  line-height: 1.6;
+}
+.llm-fields code {
+  padding: 1px 4px;
+  border-radius: var(--radius-xs);
+  background: var(--bg-tertiary);
+  font-size: var(--text-2xs);
+  letter-spacing: 0.08em;
+}
+.llm-badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 7px;
+  border-radius: var(--radius-full);
+  font-size: var(--text-2xs);
+  font-weight: 600;
+}
+.llm-badge[data-llm-key='configured'] {
+  background: var(--success-light);
+  color: var(--success);
+}
+.llm-badge[data-llm-key='empty'] {
+  background: var(--bg-tertiary);
+  color: var(--text-muted);
+}
+.llm-test,
+.llm-hint {
+  margin: 0;
+  padding: 11px 13px;
+  border-radius: var(--radius);
+  font-size: var(--text-sm);
+  line-height: 1.6;
+}
+.llm-test[data-ok='true'] {
+  background: var(--success-light);
+  color: var(--success);
+}
+.llm-test[data-ok='false'] {
+  background: var(--error-light);
+  color: var(--error);
+}
+.llm-hint {
+  background: var(--bg-secondary);
+  color: var(--text-muted);
+}
 .form-footer {
   grid-column: 1 / -1;
   display: flex;
@@ -781,6 +996,12 @@ label small {
   }
   .bg-body {
     grid-template-columns: 1fr;
+  }
+  .llm-fields {
+    grid-template-columns: 1fr;
+  }
+  .panel-heading-row {
+    flex-direction: column;
   }
   .form-footer {
     grid-column: 1;

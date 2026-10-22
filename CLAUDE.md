@@ -2,7 +2,7 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-**版本**: v2.0.25 | **仓库**: https://github.com/Xinghe-0203/SelfBlog
+**版本**: v2.0.27 | **仓库**: https://github.com/Xinghe-0203/SelfBlog
 
 ---
 
@@ -58,7 +58,7 @@ export JAVA_HOME='C:\Program Files\Java\jdk-21'
 ```
 
 - **跑后端测试必须带 `-Dskip.npm=true -Dskip.installnodenpm=true`**。`pom.xml` 里的 `frontend-maven-plugin` 在 `initialize`/`generate-resources` 阶段会在 `../frontend` 执行 `npm ci` + `npm run build`：不带这两个开关，一次测试会先把整个前端重建一遍，并且**会改写前端构建产物**。带上后全套测试约 1 分钟。
-- 基线：**881 tests, 0 failures**（2026-10-21 实测；CI 还会用真实 MySQL 8 再跑一遍）。日志里大量 `[PERF] ... error:` 是 `PerformanceMonitoringAspect` 记录的正常负例断言，不是失败。
+- 基线：**1004 tests, 0 failures**（2026-10-22 实测；CI 还会用真实 MySQL 8 再跑一遍）。日志里大量 `[PERF] ... error:` 是 `PerformanceMonitoringAspect` 记录的正常负例断言，不是失败。
 - 单测：`"$MVN" test -Dtest=AuthControllerTest -Dskip.npm=true -Dskip.installnodenpm=true`，加 `#方法名` 可只跑一条。
 - 打包：`"$MVN" clean package -DskipTests` → `target/selfblog.jar`（`finalName=selfblog`）。
 - 本地起服务：先把 `backend/.env.example` 复制为 `backend/.env`，填 `JWT_SECRET`（≥32 位）与 `ADMIN_PASSWORD`（≥12 位）。
@@ -76,7 +76,7 @@ cd frontend
 ```
 
 - **本机 `npm run <script>` 全部失败**（`'"node"' 不是内部或外部命令`），`dev` / `build` / `test:run` 都不例外；`npm ci`、`npm install` 正常。原因不在仓库：系统 PATH 中 `C:\Program Files\Java\jdk-25\bin"` 这一项带了一个**不配对的引号**，`cmd.exe` 解析 PATH 时把它当成未闭合引号的开头，其后所有条目失效——`node` 无法被 `cmd` 解析（`where node` 仍能找到，走的是 App Paths），而 `node_modules/.bin/*.cmd` 垫片结尾正是调用裸 `node`。bash 不受影响。**因此一律直接调用 `./node_modules/.bin/<tool>`**（POSIX 垫片，可用；上面五条均已实测通过）。根治办法是删掉那条 PATH 里多余的引号；临时办法是在 PowerShell 里把 `backend/target/frontend/node` 前置到 `PATH`（该目录由 Maven 插件生成，`target/` 被清理后需重新构建才有）。
-- 测试基线：**45 个文件 / 444 tests 全通过**（2026-10-21 实测）。
+- 测试基线：**47 个文件 / 477 tests 全通过**（2026-10-22 实测）。
 - 闸门：`lint:check`、`format:check`、`type-check`、`test:run`、`build` 全绿；部署适配另跑 `npm run test:deployment`（Vercel 代理生成器 + Docker/Compose 契约，27 项）。`format:check` 自 2026-10-17 起是真实可用的仓库级闸门（`.prettierrc` 改为 `endOfLine: "auto"` 并重写了一次历史漂移）。
 - `tsconfig.json` 开启 `strict` + **`noUncheckedIndexedAccess`**：索引访问返回 `T | undefined`，`arr[0].foo` 过不了 `type-check`。用 `arr[0]?.foo`，或改用 `replace` 而非 `split()[0]` 这类写法。
 - 开发端口 3000，`/api` 与 `/uploads` 代理到 `VITE_API_TARGET`（默认 `http://localhost:8825`）。SPA 在没有后端时也能靠 `stores/site.ts` 的默认值正常渲染（`loadPublicSettings` 的 `fetch` 失败被静默吞掉），所以**只跑 `./node_modules/.bin/vite` 就能验收布局与样式**。

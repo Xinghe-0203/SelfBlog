@@ -52,7 +52,7 @@ public class GlobalExceptionHandler {
         LogUtils.logSecurityEvent("BUSINESS_EXCEPTION", e.getMessage(), clientIp);
         int httpStatus;
         switch (e.getCode()) {
-            case 400: case 401: case 403: case 404: case 409: case 429: case 500:
+            case 400: case 401: case 403: case 404: case 409: case 429: case 500: case 502:
                 httpStatus = e.getCode();
                 break;
             default:

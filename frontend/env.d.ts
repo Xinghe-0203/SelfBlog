@@ -20,3 +20,10 @@ interface ImportMetaEnv {
 interface ImportMeta {
   readonly env: ImportMetaEnv
 }
+
+/**
+ * 构建期注入的应用版本号，唯一真源是 `frontend/package.json` 的 `version`
+ * （见 `vite.config.ts` 的 `define`）。不要手写版本字面量：`main.ts` 里曾经
+ * 硬编码 `'2.0.25'` 并落后了两个发布版本而无人察觉。
+ */
+declare const __APP_VERSION__: string

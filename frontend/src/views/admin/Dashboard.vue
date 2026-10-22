@@ -23,6 +23,13 @@ const workspaceLinks: Array<{
     icon: 'file-text'
   },
   {
+    segment: 'seo',
+    label: 'SEO 管理',
+    description: '检查标题、描述与封面问题，或用模型为文章起草搜索元数据。',
+    action: '优化收录',
+    icon: 'sparkle'
+  },
+  {
     segment: 'visitors',
     label: '访客记录',
     description: '了解访问量、访客趋势和大家正在阅读的页面。',

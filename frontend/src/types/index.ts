@@ -78,3 +78,17 @@ export type { MediaType, UploadType, Media, UploadProgress, UploadResponse } fro
 
 // 热搜类型
 export type { TrendingContentType, TrendingContent, TrendingParams } from './trending'
+
+// SEO 自动化类型
+export type {
+  SeoIssue,
+  SeoSource,
+  SeoOverview,
+  SeoPostRow,
+  SeoDetail,
+  SeoUpdateRequest,
+  SeoBatchResult,
+  SeoLlmTest,
+  SeoPostListParams,
+  SeoBatchRequest
+} from './seo'

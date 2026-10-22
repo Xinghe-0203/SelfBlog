@@ -4,6 +4,7 @@ import {
   APPEARANCE_STORAGE_KEY,
   applyFavicon,
   buildBackgroundVars,
+  effectiveSurfaceOpacities,
   isDarkCanvas,
   mimeForIcon,
   persistAppearance,
@@ -316,5 +317,118 @@ describe('persistAppearance', () => {
     // 预置只是消闪烁的优化，存储失败绝不能把渲染打断。
     expect(() => persistAppearance({ '--ap-bg-size': 'cover' })).not.toThrow()
     setItem.mockRestore()
+  })
+})
+
+describe('effectiveSurfaceOpacities', () => {
+  it('leaves the author value untouched when the canvas is a calm solid', () => {
+    // 回归红线：没有壁纸时三档必须同值，且等于作者设置 —— 这就是改造前那档半透明。
+    expect(effectiveSurfaceOpacities('60', false, false)).toEqual({
+      paper: 60,
+      raised: 60,
+      control: 60
+    })
+    expect(effectiveSurfaceOpacities('100', false, false)).toEqual({
+      paper: 100,
+      raised: 100,
+      control: 100
+    })
+    // 缺省 / 非法值走 clampInt 的兜底，仍然是完全实心。
+    expect(effectiveSurfaceOpacities(undefined, false, false).paper).toBe(100)
+    expect(effectiveSurfaceOpacities('abc', false, false).raised).toBe(100)
+  })
+
+  it('keeps the 60-100 storage contract instead of rewriting the author setting', () => {
+    // 后端只允许 60–100；越界值在这里夹紧，但库里那条设置保持原样。
+    expect(effectiveSurfaceOpacities('10', false, false).paper).toBe(60)
+    expect(effectiveSurfaceOpacities('250', false, false).paper).toBe(100)
+  })
+
+  it('forces an opaque paper tier over a wallpaper so body text never sits on the photo', () => {
+    // 弱化文字在纯白上也只有 4.35:1 ⇒ 任何半透明纸面都兜不住，纸面必须 100%。
+    for (const dark of [false, true]) {
+      expect(effectiveSurfaceOpacities('60', dark, true).paper).toBe(100)
+    }
+  })
+
+  it('raises the translucent tiers to a per-canvas contrast floor', () => {
+    // 浅色画布 88 / 深色画布 94：浅字压在半透明深色面上更容易掉到 2:1，所以深色要更厚。
+    expect(effectiveSurfaceOpacities('60', false, true).raised).toBe(88)
+    expect(effectiveSurfaceOpacities('60', true, true).raised).toBe(94)
+  })
+
+  it('never lowers an author setting that already sits above the floor', () => {
+    expect(effectiveSurfaceOpacities('95', false, true).raised).toBe(95)
+    expect(effectiveSurfaceOpacities('100', true, true).raised).toBe(100)
+  })
+
+  it('keeps three visibly distinct tiers over a wallpaper', () => {
+    // I3：纸面 → 卡片 → 控件必须读得出来，不能三档同值（那就是改造前的单档半透明）。
+    for (const dark of [false, true]) {
+      const tiers = effectiveSurfaceOpacities('60', dark, true)
+      expect(tiers.paper).toBeGreaterThan(tiers.raised)
+      expect(tiers.raised).toBeGreaterThan(tiers.control)
+      expect(tiers.control).toBeGreaterThanOrEqual(60)
+    }
+  })
+})
+
+describe('wallpaper flag', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    localStorage.clear()
+    delete document.documentElement.dataset.wallpaper
+    document.documentElement.removeAttribute('style')
+  })
+
+  afterEach(() => {
+    delete document.documentElement.dataset.wallpaper
+    document.documentElement.removeAttribute('style')
+    document.documentElement.classList.remove('dark-mode')
+    localStorage.clear()
+  })
+
+  it('marks the root element when the canvas is an image or author gradient', () => {
+    // data-wallpaper 是整套纸面分层的开关，写在 <html> 上 —— 与 index.html 首屏
+    // 预置脚本同一个元素、同一个属性，否则两边会各写各的、CSS 选择器只认一边。
+    const store = useSiteStore()
+    store.applySettings({
+      backgroundType: 'image',
+      backgroundImageUrl: '/uploads/site-assets/background/hero.webp'
+    })
+    expect(document.documentElement.dataset.wallpaper).toBe('')
+
+    store.applySettings({ backgroundType: 'gradient' })
+    expect(document.documentElement.dataset.wallpaper).toBe('')
+  })
+
+  it('clears the flag when the canvas is a solid color', () => {
+    const store = useSiteStore()
+    store.applySettings({
+      backgroundType: 'image',
+      backgroundImageUrl: '/uploads/site-assets/background/hero.webp'
+    })
+    store.applySettings({ backgroundType: 'solid' })
+    expect(document.documentElement.dataset.wallpaper).toBeUndefined()
+  })
+
+  it('ignores an unsafe background url instead of flagging the canvas', () => {
+    const store = useSiteStore()
+    store.applySettings({
+      backgroundType: 'image',
+      backgroundImageUrl: 'javascript:alert(1)'
+    })
+    expect(document.documentElement.dataset.wallpaper).toBeUndefined()
+  })
+
+  it('writes the flag even before #selfblog exists, so prepaint and runtime agree', () => {
+    // 挂载前 loadPublicSettings 就要落地这个属性；applyAppearance 在 #selfblog 早退
+    // 之前必须先写它，否则首屏到挂载之间会有一段「纸面分层不生效」的窗口。
+    expect(document.getElementById('selfblog')).toBeNull()
+    useSiteStore().applySettings({
+      backgroundType: 'image',
+      backgroundImageUrl: '/uploads/site-assets/background/hero.webp'
+    })
+    expect(document.documentElement.dataset.wallpaper).toBe('')
   })
 })

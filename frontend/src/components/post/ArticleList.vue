@@ -54,7 +54,8 @@ const cover = (post: Post) => getSafeImageUrl(post.coverImage || post.coverUrl, 
   padding-inline: 25px;
   border: 1px solid var(--border-solid);
   border-radius: var(--radius-xl);
-  background: var(--surface-primary);
+  /* 浮起档：纯色画布别名回 --surface-primary（逐像素不变），壁纸画布上是纸面之上的一档。 */
+  background: var(--surface-raised);
 }
 .article-row {
   display: flex;

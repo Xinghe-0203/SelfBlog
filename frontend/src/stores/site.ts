@@ -41,6 +41,18 @@ export interface SiteSettings {
   surfaceOpacity: string
   /** 卡片的背景模糊半径 0–40（px），只在组件半透明时才有意义。 */
   surfaceBlur: string
+  /** 是否启用后台 LLM 辅助（SEO 生成等）；关闭时相关接口返回 400。 */
+  llmEnabled: string
+  /** OpenAI 兼容的 API 根地址（如 https://api.openai.com/v1）；服务端保存时去尾斜杠。 */
+  llmBaseUrl: string
+  /** API Key。服务端下发时恒为掩码哨兵 SECRET_MASK（8 个 U+2022），提交掩码=保留已存密钥，提交空串=清除。 */
+  llmApiKey: string
+  /** 模型名，如 gpt-4o-mini。 */
+  llmModel: string
+  /** 单次上游调用超时秒数 5–120。 */
+  llmTimeoutSeconds: string
+  /** 发布文章后是否自动生成 SEO 元数据。 */
+  llmAutoOnPublish: string
 }
 
 const defaults: SiteSettings = {
@@ -69,7 +81,13 @@ const defaults: SiteSettings = {
   backgroundOverlay: '0',
   backgroundFixed: 'true',
   surfaceOpacity: '100',
-  surfaceBlur: '0'
+  surfaceBlur: '0',
+  llmEnabled: 'false',
+  llmBaseUrl: '',
+  llmApiKey: '',
+  llmModel: '',
+  llmTimeoutSeconds: '30',
+  llmAutoOnPublish: 'false'
 }
 
 /** 运行时注入的 favicon 节点标记，用来和 index.html 里的静态兜底区分。 */
@@ -152,6 +170,55 @@ export function isDarkCanvas(skin: string): boolean {
  * 深色画布下都至少压这么厚，保证正文可读性优先于背景可见度。
  */
 const DARK_CANVAS_MIN_OVERLAY = 45
+
+/**
+ * 有壁纸（照片 / 作者渐变）时「浮起表面」的不透明度下限。
+ *
+ * 背景色相不可控 ⇒ 表面合成色也不可控，于是用 alpha 下限把正文对比度兜住。
+ * 以浅色画布 + `--surface-primary: #ffffff` 为例，合成色就是白纸压在最坏画布上：
+ *
+ *   WCAG 相对亮度：L(#262a31) ≈ 0.023，L(#67707e) ≈ 0.160，L(#707a88) ≈ 0.191
+ *   正文（text-primary）要 4.5:1 ⇒ 纸面亮度 L ≥ 4.5 × (0.023 + 0.05) − 0.05 ≈ 0.278
+ *   次要文字（text-secondary）    ⇒ L ≥ 4.5 × (0.160 + 0.05) − 0.05 ≈ 0.895
+ *   弱化文字（text-muted）        ⇒ L ≥ 4.5 × (0.191 + 0.05) − 0.05 ≈ 1.036  ← 超过纯白（1.0）
+ *
+ * 最后一行是结论性的：**任何**半透明层都兜不住弱化文字，纯白底本身也只有 4.35:1。
+ * 所以修复不能只靠调 alpha，必须结构性解决 —— 纸面档（page paper）在壁纸模式下
+ * 直接取 100%（完全不透明，见下方 effectiveSurfaceOpacities），半透明只花在
+ * 「叠在纸面上」的 raised / control 两档；它们的背景是纸面而不是照片，
+ * 对比度天然安全。88 / 94 这两个下限是给 raised / control 用的经验值：
+ * 浅色画布 88% 时合成色仍接近纸面（色调台阶可见、可读），深色画布取 94%，
+ * 因为浅字压在半透明深色面上更容易掉到 2:1（见 m00001 的深色实测）。
+ */
+const WALLPAPER_RAISED_FLOOR_LIGHT = 88
+const WALLPAPER_RAISED_FLOOR_DARK = 94
+/** control 档比 raised 再透明一档，形成「纸面 → 卡片 → 控件」的可见台阶。 */
+const SURFACE_TIER_STEP = 6
+
+/**
+ * 计算三级表面的**实际生效**不透明度。
+ *
+ * 存储契约（后端允许 60–100）保持不变：这里只夹紧「应用值」，作者的设置原样留在库里，
+ * 换掉壁纸后立刻恢复他的选择。三档关系：
+ *   - 无壁纸：三档同值 = 作者设置（不透明度 < 100 时仍是原来的单档半透明观感，零回归）；
+ *   - 有壁纸：paper = 100（正文必须压在实心纸面上），raised = max(设置值, 88/94)，
+ *     control = raised − 6（不低于 60，且不高于 raised）。
+ *
+ * @param rawOpacity 作者设置的 surfaceOpacity（字符串）
+ * @param dark 是否深色画布
+ * @param wallpaper 是否配置了壁纸/渐变（见 applyAppearance 的 data-wallpaper 判定）
+ */
+export function effectiveSurfaceOpacities(
+  rawOpacity: string | undefined,
+  dark: boolean,
+  wallpaper: boolean
+): { paper: number; raised: number; control: number } {
+  const base = clampInt(rawOpacity, 60, 100, 100)
+  if (!wallpaper) return { paper: base, raised: base, control: base }
+  const raised = Math.max(base, dark ? WALLPAPER_RAISED_FLOOR_DARK : WALLPAPER_RAISED_FLOOR_LIGHT)
+  const control = Math.min(raised, Math.max(60, raised - SURFACE_TIER_STEP))
+  return { paper: 100, raised, control }
+}
 
 /**
  * 计算页面背景的 CSS 变量。
@@ -275,12 +342,20 @@ export const useSiteStore = defineStore('site', () => {
 
   function applyAppearance(): void {
     const skin = settings.value.themeSkin || 'ocean'
+    const dark = isDarkCanvas(skin)
     // 深色画布要重算：切到深色时必须把作者的浅色背景撤掉，否则浅底浅字不可读。
-    const vars = buildBackgroundVars(settings.value, isDarkCanvas(skin))
+    const vars = buildBackgroundVars(settings.value, dark)
     // 背景变量写 :root：早于 #selfblog 挂载也要生效（loadPublicSettings 在 mount 之前跑），
     // 且 #selfblog 会自然继承，无需二次写入。
     applyBackgroundVars(vars)
     persistAppearance(vars)
+
+    // 画布是不是「图」——判定与 index.html 首屏预置脚本完全一致：
+    // 只要最终会写入 --ap-bg-image（照片或作者渐变）就算。必须写在 #selfblog 的
+    // 早退之前：预置脚本写的是 <html>，这里晚一拍补齐，两边同一个属性、同一个元素。
+    const wallpaper = !!vars['--ap-bg-image']
+    if (wallpaper) document.documentElement.dataset.wallpaper = ''
+    else delete document.documentElement.dataset.wallpaper
 
     const root = document.getElementById('selfblog')
     if (!root) return
@@ -303,16 +378,23 @@ export const useSiteStore = defineStore('site', () => {
 
     // 组件不透明度 / 模糊：默认值下不写变量也不加属性，
     // 保证「作者没配过」时走的是原来那套完全不透明的实心表面。
-    const opacity = clampInt(settings.value.surfaceOpacity, 60, 100, 100)
+    // 三级表面的实际生效值在 effectiveSurfaceOpacities 里夹紧（含壁纸对比度下限），
+    // 作者的原始设置不动 —— 撤掉壁纸立刻回到他自己的选择。
     const blur = clampInt(settings.value.surfaceBlur, 0, 40, 0)
-    if (opacity < 100) root.style.setProperty('--ap-surface-opacity', `${opacity}%`)
+    const tiers = effectiveSurfaceOpacities(settings.value.surfaceOpacity, dark, wallpaper)
+    if (tiers.paper < 100) root.style.setProperty('--ap-surface-opacity', `${tiers.paper}%`)
     else root.style.removeProperty('--ap-surface-opacity')
+    root.style.setProperty('--ap-surface-paper-opacity', `${tiers.paper}%`)
+    root.style.setProperty('--ap-surface-raised-opacity', `${tiers.raised}%`)
+    root.style.setProperty('--ap-surface-control-opacity', `${tiers.control}%`)
     if (blur > 0) root.style.setProperty('--ap-surface-blur', `${blur}px`)
     else root.style.removeProperty('--ap-surface-blur')
 
     // 用属性做开关，而不是让 backdrop-filter 常驻 blur(0px)：
     // 后者会给每张卡片都建合成层，白白付出层叠上下文的代价。
-    if (opacity < 100) root.dataset.surfaceTranslucent = ''
+    // 壁纸模式下即使作者设了 100% 也要开：paper 是实心的，但 raised/control 两档
+    // 仍是半透明（tiers.raised < 100 时才真的半透明）。
+    if (tiers.raised < 100) root.dataset.surfaceTranslucent = ''
     else delete root.dataset.surfaceTranslucent
     if (blur > 0) root.dataset.surfaceBlur = ''
     else delete root.dataset.surfaceBlur

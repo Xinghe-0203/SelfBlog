@@ -74,6 +74,12 @@ export function createAdminRoutes(adminPath: string): RouteRecordRaw[] {
           meta: { ...adminMeta, title: '编辑页面' }
         },
         {
+          path: 'seo',
+          name: 'AdminSeo',
+          component: lazyLoad(() => import('@/views/admin/Seo.vue')),
+          meta: { ...adminMeta, title: 'SEO 管理' }
+        },
+        {
           path: 'settings',
           name: 'AdminSettings',
           component: lazyLoad(() => import('@/views/admin/Settings.vue')),

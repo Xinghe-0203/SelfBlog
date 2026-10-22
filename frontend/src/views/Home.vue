@@ -217,7 +217,6 @@ onMounted(() => {
   position: absolute;
   inset: 0 0 0 auto;
   width: 43%;
-  background: var(--bg-tertiary);
 }
 .intro-visual img {
   width: 100%;
@@ -233,6 +232,18 @@ onMounted(() => {
     var(--surface-secondary) 35%,
     color-mix(in srgb, var(--surface-secondary) 94%, transparent) 57%,
     color-mix(in srgb, var(--surface-secondary) 16%, transparent)
+  );
+}
+/* 遮罩渐变由**纸面**那一档构成，不是 --surface-secondary：壁纸模式下纸面是实心白，
+   用 --surface-secondary 会在「文案底下的渐变」与「它身后的纸面」之间留一道可见色带。
+   appearance.css 里已有同名规则做同一件事；这里保留一份是为了让 scoped 样式自洽，
+   且只在壁纸模式生效（纯色画布逐像素不变）。 */
+html[data-wallpaper] #selfblog .intro-shell::after {
+  background-image: linear-gradient(
+    90deg,
+    var(--surface-paper) 35%,
+    color-mix(in srgb, var(--surface-paper) 94%, transparent) 57%,
+    color-mix(in srgb, var(--surface-paper) 16%, transparent)
   );
 }
 .home-content {
@@ -267,7 +278,9 @@ onMounted(() => {
   margin-bottom: 16px;
   border: 1px solid var(--border-light);
   border-radius: var(--radius-xl);
-  background: var(--surface-primary);
+  /* 浮起档：纯色画布下别名回 --surface-primary（逐像素不变），
+     壁纸画布下换成比纸面深一档的实底，卡片才从纸面上「浮」出来。 */
+  background: var(--surface-raised);
 }
 .sidebar-block h2 {
   font-size: var(--text-sm);
@@ -326,6 +339,9 @@ onMounted(() => {
   align-items: center;
   gap: 9px;
   padding: 16px;
+  /* 纯色画布保持原样（虚线、无底色）以守住「不透明度 100 时逐像素不变」；
+     壁纸模式下由 appearance.css 的控件档接管成实线 + 控件底色 —— 那条规则
+     （`html[data-wallpaper] #selfblog .archive-callout`）优先级更高。 */
   border: 1px dashed var(--border-light);
   border-radius: var(--radius-xl);
   color: var(--text-secondary);
@@ -345,7 +361,8 @@ onMounted(() => {
   padding: 32px 24px;
   border: 1px solid var(--border-light);
   border-radius: var(--radius-xl);
-  background: var(--surface-primary);
+  /* 页面级纸面档：与 .page-frame 同一档，空态不会浮在壁纸上。 */
+  background: var(--surface-paper);
   color: var(--text-secondary);
   font-size: var(--text-sm);
 }
