@@ -80,6 +80,12 @@ export function createAdminRoutes(adminPath: string): RouteRecordRaw[] {
           meta: { ...adminMeta, title: 'SEO 管理' }
         },
         {
+          path: 'health',
+          name: 'AdminHealth',
+          component: lazyLoad(() => import('@/views/admin/Health.vue')),
+          meta: { ...adminMeta, title: '内容体检' }
+        },
+        {
           path: 'settings',
           name: 'AdminSettings',
           component: lazyLoad(() => import('@/views/admin/Settings.vue')),

@@ -172,6 +172,25 @@
             false-value="false"
             data-setting="llmEnabled"
         /></label>
+        <div class="llm-provider">
+          <label
+            >服务商<select v-model="form.llmProvider" data-setting="llmProvider">
+              <option value="deepseek">DeepSeek 官方接口</option>
+              <option value="custom">自定义 OpenAI 兼容接口</option>
+            </select>
+            <small
+              >DeepSeek 才会发送思考模式与思考强度；自定义服务商按标准 OpenAI 兼容协议调用。</small
+            ></label
+          >
+          <button
+            class="btn btn-ghost btn-sm"
+            type="button"
+            data-action="llm-preset"
+            @click="applyDeepSeekPreset"
+          >
+            填入 DeepSeek 默认
+          </button>
+        </div>
         <div class="llm-fields">
           <label
             >API 地址<input
@@ -201,13 +220,37 @@
               ></small
             ></label
           >
+          <label v-if="modelOptions.length" class="llm-model-picker"
+            >模型候选
+            <div class="llm-model-row">
+              <select v-model="form.llmModel" data-setting="llmModelSelect">
+                <option v-for="model in modelOptions" :key="model.id" :value="model.id">
+                  {{ model.name }}（{{ model.id }}）{{ model.supportsImage ? ' · 支持图像' : '' }}
+                </option>
+              </select>
+              <button
+                class="btn btn-ghost btn-sm"
+                type="button"
+                :disabled="loadingModels"
+                data-action="refresh-models"
+                @click="loadModels"
+              >
+                {{ loadingModels ? '探测中…' : '刷新' }}
+              </button>
+            </div>
+            <small
+              >来源：{{
+                modelsSource === 'upstream' ? '上游实时列表' : '内置候选（上游暂不可用）'
+              }}；也可在下方直接手填模型名。</small
+            ></label
+          >
           <label
             >模型名<input
               v-model.trim="form.llmModel"
               maxlength="100"
               placeholder="gpt-4o-mini"
               data-setting="llmModel"
-            /><small>由服务商决定，例如 gpt-4o-mini、deepseek-chat、qwen-plus。</small></label
+            /><small>由服务商决定，例如 deepseek-flash、gpt-4o-mini、qwen-plus。</small></label
           >
           <label
             >单次调用超时（秒）<input
@@ -219,7 +262,48 @@
               data-setting="llmTimeoutSeconds"
             /><small>5–120 秒。超时视为一次失败，不影响文章本身的保存。</small></label
           >
+          <label
+            >最大输出 token<input
+              v-model.trim="form.llmMaxTokens"
+              type="number"
+              min="0"
+              max="131072"
+              step="1"
+              data-setting="llmMaxTokens"
+            /><small
+              >0–131072。填 0 表示不限制（不向上游发送该参数），由服务商默认值决定。</small
+            ></label
+          >
+          <label
+            >思考强度<select
+              v-model="form.llmReasoningEffort"
+              :disabled="reasoningEffortDisabled"
+              data-setting="llmReasoningEffort"
+            >
+              <option value="low">低 · 更快更省</option>
+              <option value="high">高 · 更细致</option>
+              <option value="max">最高 · 最慢最贵</option>
+            </select>
+            <small
+              >仅在「DeepSeek + 思考模式开启」时生效；此时不再发送
+              temperature，由模型自行推理。</small
+            ></label
+          >
         </div>
+        <label class="toggle-row"
+          ><span
+            ><strong>思考模式</strong
+            ><small
+              >开启后模型先推理再作答，质量更高但更慢、更贵；仅 DeepSeek
+              服务商支持。关闭时思考强度下拉不可用。</small
+            ></span
+          ><input
+            v-model="form.llmThinking"
+            type="checkbox"
+            true-value="enabled"
+            false-value="disabled"
+            data-setting="llmThinking"
+        /></label>
         <label class="toggle-row"
           ><span
             ><strong>发布后自动生成 SEO</strong
@@ -233,6 +317,19 @@
             true-value="true"
             false-value="false"
             data-setting="llmAutoOnPublish"
+        /></label>
+        <label class="toggle-row"
+          ><span
+            ><strong>访客评论自动审核</strong
+            ><small
+              >访客提交留言后异步调用模型审核，结论不是「通过」就落为待审状态；失败静默忽略，绝不影响留言提交。关闭时行为与现在一致。</small
+            ></span
+          ><input
+            v-model="form.llmCommentModeration"
+            type="checkbox"
+            true-value="true"
+            false-value="false"
+            data-setting="llmCommentModeration"
         /></label>
         <p v-if="testResult" class="llm-test" :data-ok="testResult.ok ? 'true' : 'false'">
           {{ testResult.message
@@ -419,6 +516,7 @@ import { useSiteStore, type SiteSettings } from '@/stores/site'
 import { siteApi } from '@/api/site'
 import { seoApi } from '@/api/seo'
 import type { SeoLlmTest } from '@/types/seo'
+import type { LlmModel } from '@/types/llm'
 import SiteAssetField from '@/components/admin/SiteAssetField.vue'
 
 const siteStore = useSiteStore()
@@ -441,6 +539,53 @@ const testResult = ref<SeoLlmTest | null>(null)
 
 /** 密钥是否已配置：由哨兵串派生，避免把掩码当真实值展示或比较。 */
 const llmKeyConfigured = computed(() => (form.llmApiKey ?? '') === SECRET_MASK)
+
+/** DeepSeek 官方接口的默认值：一键预设写这两项，其余（密钥/超时）保持作者原样。 */
+const DEEPSEEK_BASE_URL = 'https://api.deepseek.com'
+const DEEPSEEK_MODEL = 'deepseek-flash'
+
+/** 模型候选列表（`GET /admin/seo/models`）。后端恒 200，上游不可用时回落内置候选。 */
+const modelOptions = ref<LlmModel[]>([])
+const modelsSource = ref<'upstream' | 'fallback' | ''>('')
+const loadingModels = ref(false)
+
+/**
+ * 思考强度只在「DeepSeek + 思考模式开启」时才会真正发给上游。
+ *
+ * <p>下拉在其余情况下 disabled 而不是隐藏：作者要能看见这个能力存在、并且知道
+ * 为什么现在不生效（提示文案就在字段下方）。</p>
+ */
+const reasoningEffortDisabled = computed(
+  () => form.llmThinking !== 'enabled' || form.llmProvider !== 'deepseek'
+)
+
+/** 填入 DeepSeek 默认值：只改地址与模型，不动已保存的密钥与其它设置。 */
+function applyDeepSeekPreset(): void {
+  form.llmProvider = 'deepseek'
+  form.llmBaseUrl = DEEPSEEK_BASE_URL
+  form.llmModel = DEEPSEEK_MODEL
+}
+
+/**
+ * 探测上游模型候选。
+ *
+ * <p>失败一律**静默**回落为「没有候选下拉」，作者仍可手填模型名 —— 探测只是便利，
+ * 不能因为它连不上就把整个设置页标成错误。</p>
+ */
+async function loadModels(): Promise<void> {
+  loadingModels.value = true
+  try {
+    const response = await seoApi.listModels()
+    const payload = response.data
+    modelOptions.value = payload?.models ?? []
+    modelsSource.value = payload?.source ?? 'fallback'
+  } catch {
+    modelOptions.value = []
+    modelsSource.value = ''
+  } finally {
+    loadingModels.value = false
+  }
+}
 
 type AssetSettingKey =
   | 'authorAvatar'
@@ -584,7 +729,11 @@ async function save() {
   }
 }
 
-onMounted(() => void load())
+onMounted(() => {
+  void load()
+  // 模型候选是纯便利信息：与设置加载并行探测，失败静默。
+  void loadModels()
+})
 </script>
 
 <style scoped>
@@ -887,6 +1036,36 @@ label small {
   justify-content: space-between;
   gap: 16px;
 }
+.llm-provider {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 14px;
+}
+.llm-provider label {
+  display: grid;
+  flex: 1 1 auto;
+  gap: 7px;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+}
+.llm-provider label small {
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  line-height: 1.6;
+}
+.llm-model-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.llm-model-row select {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.llm-model-row .btn {
+  flex: 0 0 auto;
+}
 .llm-fields {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -999,6 +1178,10 @@ label small {
   }
   .llm-fields {
     grid-template-columns: 1fr;
+  }
+  .llm-provider {
+    align-items: start;
+    flex-direction: column;
   }
   .panel-heading-row {
     flex-direction: column;

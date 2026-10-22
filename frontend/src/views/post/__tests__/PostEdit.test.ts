@@ -7,6 +7,7 @@ import { postApi } from '@/api/post'
 import { tagApi } from '@/api/tag'
 import { mediaApi } from '@/api/media'
 import { seoApi } from '@/api/seo'
+import { llmApi } from '@/api/llm'
 
 /**
  * 编辑器冒烟测试只覆盖已有动作（草稿 / 发布 / 封面 / 标签），
@@ -26,6 +27,9 @@ vi.mock('@/api/tag', () => ({ tagApi: { getTagList: vi.fn() } }))
 vi.mock('@/api/media', () => ({ mediaApi: { uploadFile: vi.fn() } }))
 vi.mock('@/api/seo', () => ({
   seoApi: { getDetail: vi.fn(), update: vi.fn(), generate: vi.fn() }
+}))
+vi.mock('@/api/llm', () => ({
+  llmApi: { generateSummary: vi.fn(), generateTags: vi.fn(), generateTitles: vi.fn() }
 }))
 vi.mock('@/utils/toast', () => ({ toast: { success: vi.fn(), warning: vi.fn(), error: vi.fn() } }))
 enableAutoUnmount(afterEach)
@@ -491,5 +495,105 @@ describe('author editor smoke coverage', () => {
       seoKeywords: null,
       ogImageUrl: null
     })
+  })
+
+  /**
+   * AI 写作卡片只产出候选，**绝不自动改文章**：
+   * 摘要要点「采用」、标题要点某一条、标签要勾选后点「应用」，
+   * 而且三者都不落库（仍需作者自己保存）。这里逐个验证回填路径。
+   */
+  it('offers AI writing candidates only for a saved post and applies them on explicit choice', async () => {
+    vi.mocked(seoApi.getDetail).mockRejectedValue({ response: { status: 404 } })
+    vi.mocked(tagApi.getTagList).mockResolvedValue(
+      response([
+        { id: 5, name: 'Spring Boot' },
+        { id: 6, name: '事务' }
+      ])
+    )
+    vi.mocked(llmApi.generateSummary).mockResolvedValue(
+      response({ summary: '模型生成的摘要正文', model: 'deepseek-flash', latencyMs: 900 })
+    )
+    vi.mocked(llmApi.generateTags).mockResolvedValue(
+      response({
+        tags: ['Spring Boot', '事务', '池外标签'],
+        model: 'deepseek-flash',
+        latencyMs: 800
+      })
+    )
+    vi.mocked(llmApi.generateTitles).mockResolvedValue(
+      response({
+        titles: ['候选标题一', '候选标题二', '候选标题三'],
+        model: 'deepseek-flash',
+        latencyMs: 700
+      })
+    )
+
+    // 新建草稿还没有 postId，卡片不出现：后端要求文章必须存在。
+    const draft = (await setup()).wrapper
+    expect(draft.find('[data-action="ai-summary"]').exists()).toBe(false)
+
+    const { wrapper } = await setup('/admin/edit/9')
+    await flushPromises()
+
+    await wrapper.get('[data-action="ai-summary"]').trigger('click')
+    await flushPromises()
+    expect(llmApi.generateSummary).toHaveBeenCalledWith({ postId: 9 })
+    // 生成完只是候选，摘要框还没被动过。
+    expect(wrapper.get<HTMLTextAreaElement>('.summary-input').element.value).toBe('')
+    expect(wrapper.get('.ai-candidate-text').text()).toBe('模型生成的摘要正文')
+
+    await wrapper.get('[data-action="ai-summary-apply"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.get<HTMLTextAreaElement>('.summary-input').element.value).toBe(
+      '模型生成的摘要正文'
+    )
+
+    await wrapper.get('[data-action="ai-tags"]').trigger('click')
+    await flushPromises()
+    const chips = wrapper.findAll('.ai-tag-chip')
+    expect(chips.map((chip) => chip.text())).toEqual(['Spring Boot', '事务', '池外标签'])
+    expect(chips.every((chip) => chip.attributes('data-selected') === 'false')).toBe(true)
+
+    // 只勾选前两个（都来自标签池），池外值即使后端漏放也不会被默认选中。
+    await chips[0]?.trigger('click')
+    await chips[1]?.trigger('click')
+    await flushPromises()
+    expect(wrapper.get('[data-action="ai-tags-apply"]').text()).toContain('2')
+    await wrapper.get('[data-action="ai-tags-apply"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.findAll('.tag-badge').map((badge) => badge.text().trim())).toEqual([
+      'Spring Boot',
+      '事务'
+    ])
+
+    await wrapper.get('[data-action="ai-titles"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.findAll('.ai-title-option').map((option) => option.text())).toEqual([
+      '候选标题一',
+      '候选标题二',
+      '候选标题三'
+    ])
+
+    await wrapper.get('[data-action="ai-title-apply-1"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.get<HTMLInputElement>('.title-input').element.value).toBe('候选标题二')
+    // 点击后候选清空，避免重复点选造成来回覆盖。
+    expect(wrapper.find('.ai-titles').exists()).toBe(false)
+  })
+
+  it('surfaces the backend message when an AI writing call fails', async () => {
+    vi.mocked(seoApi.getDetail).mockRejectedValue({ response: { status: 404 } })
+    vi.mocked(llmApi.generateSummary).mockRejectedValue({
+      response: { data: { message: 'AI 辅助功能已关闭，请先在设置中启用' } }
+    })
+    const { wrapper } = await setup('/admin/edit/9')
+    await flushPromises()
+
+    await wrapper.get('[data-action="ai-summary"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.get('.ai-writing .seo-status').text()).toBe(
+      'AI 辅助功能已关闭，请先在设置中启用'
+    )
+    expect(wrapper.find('.ai-candidate').exists()).toBe(false)
   })
 })

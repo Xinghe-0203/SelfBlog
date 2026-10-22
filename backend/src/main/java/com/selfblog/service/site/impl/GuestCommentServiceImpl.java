@@ -9,6 +9,7 @@ import com.selfblog.entity.BlogPost;
 import com.selfblog.entity.GuestComment;
 import com.selfblog.mapper.BlogPostMapper;
 import com.selfblog.mapper.GuestCommentMapper;
+import com.selfblog.service.ai.AiCommentModerationTrigger;
 import com.selfblog.service.site.GuestCommentService;
 import com.selfblog.service.site.SiteSettingsService;
 import com.selfblog.utils.HtmlSanitizer;
@@ -27,6 +28,7 @@ public class GuestCommentServiceImpl implements GuestCommentService {
     private final BlogPostMapper postMapper;
     private final SiteSettingsService settingsService;
     private final HtmlSanitizer htmlSanitizer;
+    private final AiCommentModerationTrigger moderationTrigger;
 
     /**
      * 访客伪名化密钥（S7）。此前是 {@code ${JWT_SECRET:local-visitor-hash}}：既复用 JWT
@@ -37,11 +39,13 @@ public class GuestCommentServiceImpl implements GuestCommentService {
     private String hashSecret;
 
     public GuestCommentServiceImpl(GuestCommentMapper commentMapper, BlogPostMapper postMapper,
-                                  SiteSettingsService settingsService, HtmlSanitizer htmlSanitizer) {
+                                  SiteSettingsService settingsService, HtmlSanitizer htmlSanitizer,
+                                  AiCommentModerationTrigger moderationTrigger) {
         this.commentMapper = commentMapper;
         this.postMapper = postMapper;
         this.settingsService = settingsService;
         this.htmlSanitizer = htmlSanitizer;
+        this.moderationTrigger = moderationTrigger;
     }
 
     @Override
@@ -92,6 +96,8 @@ public class GuestCommentServiceImpl implements GuestCommentService {
         comment.setContent(content);
         comment.setStatus(1);
         commentMapper.insert(comment);
+        // C：总开关打开且模型可用时，等事务提交后异步审核一次；任何异常都不影响本次留言
+        moderationTrigger.fireAfterCommit(comment.getId());
         return comment.getId();
     }
 

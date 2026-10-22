@@ -4,6 +4,197 @@
 
 ---
 
+## v2.0.28 — DeepSeek 原生支持 + AI 写作/审核/校对/图片描述/站点体检 (2026-10-22)
+
+### 说明
+
+用户诉求（原话）：「LLM还能支持更多功能吗？要用deepseek的」。上一版（v2.0.27）只把 LLM 用于
+per-post SEO 元数据，且客户端是「通用 OpenAI 兼容」的，没有服务商概念、没有模型候选、
+没有思考模式，也不支持任何图像输入。本版把它扩成 **A–F 六组能力**：
+
+- **A 服务商原生支持**：`llmProvider`（`deepseek` / `custom`）、一键预设、模型候选下拉
+  （`GET /admin/seo/models` 探测上游 `/models`）、思考模式开关 + 思考强度、
+  `max_tokens`；DeepSeek 的 402（余额不足）与 422（参数被拒）给出中文可执行文案。
+- **B AI 写作辅助**：摘要 / 推荐标签 / 标题备选（三个 POST，**都不写库**，作者显式采用）。
+- **C AI 评论审核**：单条复核 + 批量扫描；开启后访客留言落库即 `afterCommit + @Async` 审核，
+  命中则转待审（`status=0`）。
+- **D AI 内容校对**：只输出问题清单（`typo|grammar|wording|fact` + 建议），**绝不改正文**。
+- **E AI 图片描述**：封面或相册照片 → `alt` + `caption`；图像以 base64 内联。
+- **F AI 站点内容体检**：单次通读站点结构（标题/摘要/分类/标签/时间/字数），出评分与 findings。
+
+同时修掉两个真实缺陷：**`album_photo.caption` 从来没有写入路径**（E 组生成结果只能停在浏览器草稿里），
+以及**每次 JSON 模式调用都会白吃一次 400**（见下）。
+
+### 新增（A — DeepSeek 原生支持）
+
+- **五个新设置键**（`site_setting` KV，零 schema 迁移）：`llmProvider`（默认 `deepseek`）、
+  `llmThinking`（默认 `disabled`）、`llmReasoningEffort`（`low|high|max`，默认 `low`）、
+  `llmMaxTokens`（`0`..`131072`，`0` = 不发该字段）、`llmCommentModeration`（默认 `false`）。
+  五个键全部进 `LLM_SETTING_KEYS`，因此 `GET /api/site/public` 里 `llm*` 键数仍为 **0**。
+- **`SeoLlmConfig` 从 6 字段扩到 10 字段**（`provider` / `thinking` / `reasoningEffort` / `maxTokens`），
+  并**保留 6 参兼容构造**，避免破坏既有调用点与测试。
+- **`OpenAiCompatibleLlmClient` 的采样参数按服务商分流**（`applySampling`）：DeepSeek + 思考模式
+  → 发 `thinking:{type:enabled}` 与 `reasoning_effort`，**不发 `temperature`**
+  （思考模式下 temperature/presence_penalty/frequency_penalty 会被上游静默忽略，发了只会误导）；
+  其余情况发 `temperature 0.4`。`max_tokens` 仅在 `llmMaxTokens > 0` 时发送。
+- **`GET /api/admin/seo/models`**：探测上游 `/models`；成功 → 真实列表（按 `input_modalities`
+  判定 `supportsImage`）；上游不可用 → 内置候选 + `source="fallback"`，**恒 200 不抛错**。
+- **错误码映射**：`402` → 「账户余额不足，请前往模型平台充值后重试」，
+  `422` → 「模型拒绝了这些参数，请检查模型名与设置」；401/403/429/404/5xx 沿用既有安全中文文案。
+- 设置面板：服务商下拉 + 一键预设（只改 provider/baseUrl/model，**不动密钥**）、
+  模型候选下拉 + 刷新、思考模式与强度、`max tokens`、评论审核开关。
+
+### 新增（B — AI 写作辅助）
+
+- `POST /api/admin/ai/writing/summary` → 80–200 字中文摘要（纯文本）。
+- `POST /api/admin/ai/writing/tags` → 3–6 个标签，**只能从已有标签池挑选**：池 =
+  `blog_tag` 全部未删除标签按 `blog_post_tag` 使用频次降序取前 60；模型返回池外值一律丢弃，
+  全被丢弃 → 502；池为空 → 400「还没有任何标签，请先创建标签」。
+- `POST /api/admin/ai/writing/titles` → 恰好 3 个 ≤60 字、互不相同的标题候选。
+- 前端在 `views/post/PostEdit.vue` 侧栏：摘要「采用」回填 `summary`、标签 chip 多选后应用、
+  3 个标题候选点击填入 `title`。三个动作都只改本地表单，**保存仍由作者显式提交**。
+
+### 新增（C — AI 评论审核）
+
+- `POST /api/admin/ai/moderation/check`（body `{commentId, kind: guest|site}`）→
+  `verdict ∈ pass|flag|block` + `reason` + `categories`（`ad|abuse|spam|offtopic|meaningless`）。
+- `POST /api/admin/ai/moderation/scan`（`limit` 默认 20 上限 50）→ 只扫 `status=1` 的已公开访客留言，
+  返回 `scanned` / `flagged` / `items`（只含 flagged 项）。
+- **自动审核**：`llmCommentModeration=true` 且 LLM 可用时，`GuestCommentServiceImpl.createComment`
+  落库后由**独立 Bean** `AiCommentModerationTrigger` 在 `afterCommit` 派发 `@Async` 审核；
+  verdict != pass → 转 `status=0`（待审）。关闭 / 未配置 → 完全不触发，行为与改造前一致。
+- 承重理由（写在类 javadoc 里）：必须等事务提交后再审核（未提交行另起线程读不到，MySQL 还会在
+  行锁上互等）；必须独立 Bean，`@Async` 靠代理，本类自调用会变同步 → 访客提交要去等模型。
+- 前端 `views/admin/Comments.vue`：单条「AI 审核」+ 批量「扫描」+ verdict 徽章，**不改评论状态**。
+
+### 新增（D — AI 内容校对）
+
+- `POST /api/admin/ai/proofread/{postId}` → 最多 20 条 `{type, excerpt≤120, suggestion≤200, severity}`；
+  正文超 6000 字截断并置 `truncated=true`。
+- `POST /api/admin/ai/proofread/batch`（`postIds?` / `limit` 默认 5 上限 10）→ 串行、逐篇隔离失败。
+- 前端在 `views/admin/Seo.vue` 工具栏加「AI 校对」只读弹窗。
+
+### 新增（E — AI 图片描述）
+
+- `POST /api/admin/ai/images/alt`（`source: cover|album`）→ `alt`（≤120 字）+ `caption`（≤80 字）。
+- 服务端读文件 → base64 → `data:{mime};base64,...` 内联；**上限 4 MiB**，超过 → 400
+  「图片过大，请先压缩后再试」。路径必须是站内相对（`/uploads/…`）或 http(s) 绝对地址。
+- **模型能力预判**：先看 `listModels` 的 `supportsImage`。真实 DeepSeek 实测发现
+  `deepseek-v4-pro`（纯文本）收到图片时**不报 HTTP 错**，而是 HTTP 200 + content 里写
+  `{"error": "无法读取图片…"}`，所以只能预判，不能等上游报错：
+  - `listModels` **失败** → fail-open（继续 `completeVision` 让上游裁决，自建网关可能没有 `/models`）；
+  - `listModels` **成功且选中模型 `supportsImage=false`** → fail-closed 502
+    「当前模型不支持图像输入，请在设置中换用 deepseek-flash」且**不花上游调用**。
+- **修复真实缺口：`album_photo.caption` 此前没有任何写入路径。** 列从建表起就存在、
+  `AlbumPhotoVO` 一直回显，但上传只写 file_path/mime_type/sort_order → E 组生成的文案只能停在
+  浏览器草稿里。新增 `PUT /api/admin/albums/{albumId}/photos/{photoId}`（body `{caption}`，
+  null / 空串 = 清除）与 `PhotoCaptionForm`（上限 500，与 `caption VARCHAR(500)` 一致）。
+- 前端 `views/admin/Albums.vue`：生成候选 → 本地草稿 → **作者显式**「保存为照片图注」或
+  「应用到相册简介」。
+
+### 新增（F — AI 站点内容体检）
+
+- `POST /api/admin/ai/health/report`（`limit` 默认 40 上限 80）→ `score` 0–100、
+  100–300 字 `summary`、3–8 条 `findings{title,detail,severity,action,count}`。
+- **单次调用，不逐篇**：送进模型的素材是每篇的标题/摘要/分类/标签/发布时间/字数（**不含正文**）。
+  无已发布文章 → 400「还没有已发布的文章」。
+- 前端新建 `views/admin/Health.vue`（概览评分 + findings 卡片 + 生成按钮）+ 后台路由
+  `health` + 侧栏「内容体检」+ 工作台入口。
+
+### 修复
+
+- **JSON 模式每次白吃一次 400（真实缺陷）。** DeepSeek 对 `response_format:{"type":"json_object"}`
+  有**文档外硬校验**：提示词必须含 `json` 字样，否则 400
+  `Prompt must contain the word 'json' in some form to use 'response_format' of type 'json_object'`。
+  与思考模式无关。原实现靠「400 去 `response_format` 重试一次」兜底，代价是每次多一个往返、
+  且第二次静默丢掉 JSON 模式。现在 `complete()` 先过 `withJsonHint(...)`：任一条 message 含
+  `json`（大小写不敏感）则原样返回，否则给**最后一条**追加「请以 JSON 对象的形式输出结果。」；
+  400 重试分支仍用原始 messages（不重复追加）。
+  真机反证：修复前 `LOG_HAS_400=true`，修复后 `RESPONSE_FORMAT_RETRY_LOG_LINES=0`、单次成功。
+- **`post_seo` 清空字段静默失效**（v2.0.27 引入，本版补回归）：`save` 原用 `updateById` +
+  默认 `NOT_NULL` 策略 → null 字段整列从 SET 剔除，用户清空描述后回读仍是旧值。
+  改为 insert / update 两支，update 走 `LambdaUpdateWrapper` 逐列 `set`（null 真写 NULL）。
+  反证：退回 `updateById` 单跑 `save_ClearsPreviouslyStoredFields` → 立即
+  `expected: <null> but was: <自定义描述>`。
+
+### 承重规则（改动前必读）
+
+1. **`@Async` 必须由独立 Bean 触发。** `SeoAutoGenerationTrigger` 与 `AiCommentModerationTrigger`
+   都是独立 `@Component` + `@Lazy self` 注入自己；在同一个类里自调用 `@Async` 方法会绕过代理、变同步。
+2. **异步副作用一律 `afterCommit` 派发。** 未提交的行，另一个线程可能读不到；MySQL 还会在
+   唯一索引/行锁上互相等待（v2.0.27 的 `REQUIRES_NEW` 自死锁就是这个机理）。
+3. **自动审核/自动 SEO 全链路吞异常。** 访客留言与文章保存**绝不能**因为模型不可用而失败或变慢。
+4. **模型调用类一律不加 `@Transactional`。** 跨网络 IO 不能占着数据库连接
+   （`AiModelCaller`、`SeoGenerationService`、`ReadingPageService` 都是刻意无事务）。
+5. **清空列必须 `update(null, LambdaUpdateWrapper.set(...))`**，且手动 set `updateTime`
+   （`update(null, wrapper)` 没有实体，`MetaObjectHandler` 不会填）。`updateById` 做不到且不报错。
+6. **图像能力只能靠 `/models` 预判。** 纯文本模型收到图片时 DeepSeek 返回 HTTP 200 + 错误对象，
+   不抛 HTTP 错误；`listModels` 失败要 fail-open，成功且 `supportsImage=false` 才 fail-closed。
+7. **提示词进 JSON 模式必须含 `json` 字样**，否则 DeepSeek 直接 400。这不在官方文档里。
+8. **思考模式下不要发 `temperature`。** 上游会静默忽略，发了只是制造「以为调了参数」的错觉。
+9. **`llm*` 整组不进公开设置。** `getPublicSettings()` 必须**复制**缓存 map 再 remove，
+   直接改缓存会污染后续读取。
+10. **`album_photo.caption` 的写入口是 `PUT /admin/albums/{albumId}/photos/{photoId}`。**
+    上传接口不写图注，E 组生成结果必须显式保存。
+
+### 验证
+
+1. **后端全量**（`$env:JAVA_HOME='C:\Program Files\Java\jdk-21'` +
+   `backend\mvnw.cmd -o test "-Dskip.npm=true" "-Dskip.installnodenpm=true"`）：
+   **1140 tests, 0 failures, 0 errors, 0 skipped, BUILD SUCCESS**（基线 1004，+136）。
+2. **前端六闸门**（`frontend/`，TEMP/TMP/TMPDIR 指向工作区内目录）：
+   `lint:check` **0 errors / 42 warnings**、`format:check` 通过、`type-check` **0**、
+   `test:run` **51 files / 496 tests**、`test:deployment` **27/27**、`build` ✓ 2.60s。
+3. **真实 DeepSeek 端到端**（用户提供的真实 Key，jar 起在 :18830，DB 用开发库副本）：
+   - `GET /api/admin/seo/models` → `source=upstream`、2 个模型
+     （`deepseek-flash` image=true、`deepseek-v4-pro` image=false，`input_modalities` 判据在真实上游成立）。
+   - `POST /api/admin/seo/test-connection` → `ok=true latency=732ms`。
+   - B：`/writing/summary` 200 / 161 字 / 2546ms；`/writing/tags` 200 / 5 个池内标签；
+     `/writing/titles` 200 / 3 个互不相同标题。
+   - D：`/proofread/1` 200 / 5 条 issues / 2534ms（首条 `typo medium`）。
+   - E：`/images/alt{source:cover,postId:10}` 200 / alt 描述准确 / 1142ms；
+     打 `deepseek-v4-pro` 复现「HTTP 200 + content 报错对象」，证明必须预判。
+   - F：`/health/report{limit:20}` 200 / `score=44` / 7 findings / 10858ms，
+     findings 逐条是真实可执行判断（7/15 是测试占位内容、摘要全模板、发布时间集中同一天、
+     标签碎片化 13/17 只用一次、字数两极）。
+   - C：`/moderation/scan{limit:10}` 200；随后以真实访客留言验证**自动审核**：
+     广告留言落库后异步转 `status=0`，正常留言保持 `status=1`，提交本身零延迟。
+   - SEO 生成：`POST /api/admin/seo/posts/2/generate` 200 / `source=llm` / 真实 title+description+keywords。
+   - 服务端渲染 `GET /post/2` 含自定义 `<title>`、`meta[name=description]`、`meta[name=keywords]`。
+   - 公开设置 `GET /api/site/public` 的 `llm*` 键数为 **0**；管理端回读 `llmApiKey` 是 8 字符掩码哨兵。
+4. **JSON 模式反证**：`.tmp-llm/json-hint-real-result.txt` 记录 `RESPONSE_FORMAT_RETRY_LOG_LINES=0`、
+   `LOG_HAS_400=false`，同一提示词修复前必吃一次 400。
+5. **`post_seo` 清空反证**：退回 `updateById` 单跑 `save_ClearsPreviouslyStoredFields` → 立即失败。
+6. **图注写入反证**：退回 `photo.setCaption(x); updateById(photo)` 单跑
+   `PhotoAlbumServiceImplCaptionTest` → `blankCaptionIsClearedViaUpdateWrapper` 与
+   `nullCaptionIsAccepted` 立即失败（wrapper 断言捕获）。
+
+### 影响文件
+
+| 文件 | 改动类型 |
+|------|----------|
+| `backend/src/main/java/com/selfblog/service/seo/SeoLlmConfig.java` | 重写（6 → 10 字段 + 6 参兼容构造 + 能力判定方法） |
+| `backend/src/main/java/com/selfblog/service/seo/OpenAiCompatibleLlmClient.java` | 修改（`completeVision`/`listModels`/`parseModels`/`applySampling`/`withJsonHint`/402·422 文案） |
+| `backend/src/main/java/com/selfblog/service/seo/SeoLlmConfigProvider.java` | 修改（读 10 键 + `commentModerationEnabled`） |
+| `backend/src/main/java/com/selfblog/service/seo/SeoGenerationService.java` | 修改（`listModels` 恒 200 + fallback） |
+| `backend/src/main/java/com/selfblog/controller/admin/AdminSeoController.java` | 修改（第 9 端点 `GET /models`） |
+| `backend/src/main/java/com/selfblog/vo/seo/SeoLlmModel{,s}VO.java` | 新增 |
+| `backend/src/main/java/com/selfblog/service/ai/*`（12 类） | 新增（`AiAvailability`/`AiModelCaller`/`AiJson`/`AiPromptBuilder`/`AiWritingService`/`AiModerationService`/`AiCommentModerationTrigger`/`AiProofreadService`/`AiImageAltService`/`AiImageLoader`/`AiHealthReportService`/`AiOutputException`） |
+| `backend/src/main/java/com/selfblog/controller/admin/AdminAiController.java`、`dto/ai/*`（6）、`vo/ai/*`（9） | 新增（9 端点 + DTO/VO） |
+| `backend/src/main/java/com/selfblog/service/site/impl/GuestCommentServiceImpl.java` | 修改（提交后派发异步审核） |
+| `backend/src/main/java/com/selfblog/service/site/impl/SiteSettingsServiceImpl.java` | 修改（5 个新键 + 校验 + 默认值） |
+| `backend/src/main/java/com/selfblog/service/site/{PhotoAlbumService,impl/PhotoAlbumServiceImpl}.java`、`controller/admin/AdminPhotoAlbumController.java`、`dto/site/PhotoCaptionForm.java` | 修改 / 新增（图注写入口） |
+| `backend/src/test/java/com/selfblog/service/ai/*`（7 类）、`controller/AdminAiControllerTest.java`、`service/site/impl/PhotoAlbumServiceImplCaptionTest.java` | 新增 |
+| `backend/src/test/java/com/selfblog/service/seo/{OpenAiCompatibleLlmClientTest,StubLlmServer}.java`、`controller/AdminSeoControllerTest.java`、`service/site/impl/SiteSettingsLlmTest.java` | 修改（+测试） |
+| `frontend/src/types/llm.ts`、`api/llm.ts`、`views/admin/Health.vue` | 新增 |
+| `frontend/src/api/{seo.ts,gallery.ts}`、`types/index.ts`、`stores/site.ts` | 修改（`listModels`、`updatePhotoCaption`、类型 re-export、5 个新键） |
+| `frontend/src/views/admin/{Settings,Comments,Seo,Albums,AdminLayout,Dashboard}.vue`、`views/post/PostEdit.vue`、`router/modules/admin.ts` | 修改（A–F 的 UI 落点） |
+| `frontend/src/**/__tests__/*`（`Settings`/`Seo`/`PostEdit`/`AdminLayout` 改 + `Albums`/`Comments`/`Dashboard`/`Health` 新） | 修改 / 新增 |
+| `README.md`、`backend/README.md`、`frontend/README.md`、`CLAUDE.md`、`frontend/CLAUDE.md`、`AGENTS.md`、`docs/agents/{backend,frontend}.md` | 修改（新功能文档 + 测试基线） |
+| `CHANGELOG.md` | 新增条目 |
+
+---
+
 ## v2.0.27 — 外观三级表面分层重构 + LLM 辅助 SEO (2026-10-22)
 
 ### 说明

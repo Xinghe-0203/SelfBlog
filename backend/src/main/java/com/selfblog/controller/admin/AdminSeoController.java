@@ -11,6 +11,7 @@ import com.selfblog.service.seo.SeoMetadataService;
 import com.selfblog.vo.seo.SeoBatchResultVO;
 import com.selfblog.vo.seo.SeoDetailVO;
 import com.selfblog.vo.seo.SeoLlmTestVO;
+import com.selfblog.vo.seo.SeoLlmModelsVO;
 import com.selfblog.vo.seo.SeoOverviewVO;
 import com.selfblog.vo.seo.SeoPostRowVO;
 import io.swagger.v3.oas.annotations.Operation;
@@ -136,5 +137,18 @@ public class AdminSeoController {
     @PreAuthorize("hasRole('admin')")
     public Result<SeoLlmTestVO> testConnection() {
         return Result.success(generationService.testConnection());
+    }
+
+    /**
+     * 模型候选清单（供设置页的下拉框）。
+     *
+     * <p>恒返回 200：上游没有 {@code GET /models} 或暂时不可达时回落到内置候选，
+     * {@code source=fallback} 加 {@code reason} 说明原因。前端仍需允许手填模型名。</p>
+     */
+    @Operation(summary = "模型候选清单")
+    @GetMapping("/models")
+    @PreAuthorize("hasRole('admin')")
+    public Result<SeoLlmModelsVO> models() {
+        return Result.success(generationService.listModels());
     }
 }

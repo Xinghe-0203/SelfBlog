@@ -1,6 +1,7 @@
 import api from './index'
 import type { ApiResponse } from '@/types'
 import type { PageResult } from './site'
+import type { LlmModelList } from '@/types/llm'
 import type {
   SeoBatchRequest,
   SeoBatchResult,
@@ -67,6 +68,17 @@ export const seoApi = {
 
   testConnection(): Promise<ApiResponse<SeoLlmTest>> {
     return api.post('/admin/seo/test-connection', null, { timeout: 60000, ...NO_RETRY })
+  },
+
+  /**
+   * 探测上游模型候选列表。
+   *
+   * 后端**恒 200**：上游不可用时回落内置候选并把 `source` 置为 `fallback`，所以调用方
+   * 不需要为「探测失败」写错误分支（网络本身失败仍会 reject，交给调用方兜底）。
+   * 这里不设长超时：探测只是读 `/models`，慢过默认 15 秒就该放弃。
+   */
+  listModels(): Promise<ApiResponse<LlmModelList>> {
+    return api.get('/admin/seo/models', NO_RETRY)
   },
 
   /** 删除该篇的 SEO 记录，前台回落为「由标题/摘要派生」 */

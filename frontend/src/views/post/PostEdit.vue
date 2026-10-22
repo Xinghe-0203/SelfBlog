@@ -824,6 +824,115 @@
             </button>
           </div>
         </div>
+
+        <!--
+          AI 写作辅助：模型只返回候选内容，**一律不落库**。
+          摘要/标题由作者点选后才写进文章表单，最终仍走文章保存接口；
+          标签只从既有标签池里挑，池外值后端已丢弃，这里再按名字匹配一次本地标签。
+        -->
+        <div v-if="editingPostId" class="sidebar-section glass ai-writing">
+          <h3 class="sidebar-title">
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path d="m12 3 1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z" />
+            </svg>
+            AI 写作
+          </h3>
+          <p class="seo-hint">
+            模型只给候选，不会自动改你的文章：点选后才回填到上方表单，仍需自己保存。
+          </p>
+
+          <div class="ai-writing-actions">
+            <button
+              class="btn btn-ghost btn-sm"
+              :disabled="writing.busy !== ''"
+              data-action="ai-summary"
+              @click="generateSummary"
+            >
+              {{ writing.busy === 'summary' ? '生成中…' : '生成摘要' }}
+            </button>
+            <button
+              class="btn btn-ghost btn-sm"
+              :disabled="writing.busy !== ''"
+              data-action="ai-tags"
+              @click="generateTags"
+            >
+              {{ writing.busy === 'tags' ? '生成中…' : '推荐标签' }}
+            </button>
+            <button
+              class="btn btn-ghost btn-sm"
+              :disabled="writing.busy !== ''"
+              data-action="ai-titles"
+              @click="generateTitles"
+            >
+              {{ writing.busy === 'titles' ? '生成中…' : '标题备选' }}
+            </button>
+          </div>
+
+          <p v-if="writing.error" class="seo-status" data-state="error">{{ writing.error }}</p>
+          <p v-else-if="writing.notice" class="seo-status" data-state="ok">{{ writing.notice }}</p>
+
+          <!-- 摘要候选：点「采用」才回填，避免模型结果覆盖作者已经写好的摘要 -->
+          <div v-if="writing.summary" class="ai-candidate" data-candidate="summary">
+            <p class="ai-candidate-text">{{ writing.summary }}</p>
+            <div class="ai-candidate-actions">
+              <button
+                class="btn btn-ghost btn-xs"
+                data-action="ai-summary-apply"
+                @click="applySummary"
+              >
+                采用这段摘要
+              </button>
+              <button class="btn btn-text btn-xs" @click="writing.summary = ''">忽略</button>
+            </div>
+          </div>
+
+          <!-- 标签候选：chip 多选，应用时只把选中的并进已选标签 -->
+          <div v-if="writing.tags.length" class="ai-tags" data-candidate="tags">
+            <button
+              v-for="name in writing.tags"
+              :key="name"
+              class="ai-tag-chip"
+              :data-selected="isTagCandidateSelected(name) ? 'true' : 'false'"
+              @click="toggleTagCandidate(name)"
+            >
+              {{ name }}
+            </button>
+            <div class="ai-candidate-actions">
+              <button
+                class="btn btn-ghost btn-xs"
+                :disabled="!selectedTagCandidates.length"
+                data-action="ai-tags-apply"
+                @click="applyTags"
+              >
+                应用选中标签（{{ selectedTagCandidates.length }}）
+              </button>
+              <button class="btn btn-text btn-xs" @click="writing.tags = []">忽略</button>
+            </div>
+          </div>
+
+          <!-- 标题候选：点一条直接填入标题输入框 -->
+          <div v-if="writing.titles.length" class="ai-titles" data-candidate="titles">
+            <button
+              v-for="(candidate, index) in writing.titles"
+              :key="index"
+              class="ai-title-option"
+              :data-action="`ai-title-apply-${index}`"
+              @click="applyTitle(candidate)"
+            >
+              {{ candidate }}
+            </button>
+            <div class="ai-candidate-actions">
+              <button class="btn btn-text btn-xs" @click="writing.titles = []">忽略</button>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -839,6 +948,7 @@ import { postApi } from '../../api/post'
 import { tagApi } from '../../api/tag'
 import { mediaApi } from '../../api/media'
 import { seoApi } from '../../api/seo'
+import { llmApi } from '../../api/llm'
 import { useLogger } from '../../utils/logger'
 import { toast } from '../../utils/toast'
 import { useConfirm } from '../../composables/useConfirm'
@@ -1249,6 +1359,121 @@ async function generateSeo() {
   } finally {
     seoInfo.busy = false
   }
+}
+
+// ========== AI 写作辅助 ==========
+
+/**
+ * 模型只产出候选：摘要/标题点选后才写进 `form`，标签点选后并进 `selectedTags`。
+ * 三者都不落库 —— 真正保存仍由作者触发文章保存，避免「AI 悄悄改了我的文章」。
+ */
+const writing = reactive({
+  busy: '' as '' | 'summary' | 'tags' | 'titles',
+  error: '',
+  notice: '',
+  summary: '',
+  tags: [] as string[],
+  titles: [] as string[]
+})
+const selectedTagCandidates = ref<string[]>([])
+
+/** 当前文章 id；新建草稿时还没有 postId，AI 卡片不出现（后端要求文章必须存在）。 */
+function currentPostId(): number | null {
+  const postId = editingPostId.value
+  return postId ? Number(postId) : null
+}
+
+/** 三个生成动作共用的收尾：忙标记、错误文案、提示文案。 */
+async function runWriting(kind: 'summary' | 'tags' | 'titles') {
+  const postId = currentPostId()
+  if (!postId || writing.busy) return
+  writing.busy = kind
+  writing.error = ''
+  writing.notice = ''
+  try {
+    if (kind === 'summary') {
+      const res = await llmApi.generateSummary({ postId })
+      writing.summary = res.data?.summary || ''
+      writing.notice = writing.summary ? '已生成摘要候选，点「采用」才会回填' : '模型没有给出摘要'
+    } else if (kind === 'tags') {
+      const res = await llmApi.generateTags({ postId })
+      writing.tags = res.data?.tags || []
+      // 新一批候选重置勾选状态，避免上一批的选中项残留
+      selectedTagCandidates.value = []
+      writing.notice = writing.tags.length ? '已推荐标签，点选后应用' : '模型没有给出可用的已有标签'
+    } else {
+      const res = await llmApi.generateTitles({ postId })
+      writing.titles = res.data?.titles || []
+      writing.notice = writing.titles.length ? '已生成标题备选，点击即填入' : '模型没有给出标题'
+    }
+  } catch (err) {
+    const detail = err as {
+      userMessage?: string
+      response?: { data?: { message?: string } }
+    }
+    writing.error =
+      detail.userMessage || detail.response?.data?.message || '模型生成失败，请稍后重试'
+  } finally {
+    writing.busy = ''
+  }
+}
+
+function generateSummary() {
+  void runWriting('summary')
+}
+
+function generateTags() {
+  void runWriting('tags')
+}
+
+function generateTitles() {
+  void runWriting('titles')
+}
+
+/** 采用摘要候选：写进摘要输入框并清空候选（摘要同时计入未保存状态）。 */
+function applySummary() {
+  if (!writing.summary) return
+  form.summary = writing.summary
+  writing.summary = ''
+  writing.notice = '摘要已填入，记得保存文章'
+}
+
+function isTagCandidateSelected(name: string): boolean {
+  return selectedTagCandidates.value.includes(name)
+}
+
+function toggleTagCandidate(name: string): void {
+  selectedTagCandidates.value = isTagCandidateSelected(name)
+    ? selectedTagCandidates.value.filter((item) => item !== name)
+    : [...selectedTagCandidates.value, name]
+}
+
+/**
+ * 应用选中的标签候选。
+ *
+ * <p>候选名来自后端「已有标签池」，但仍按名字在本地 `allTags` 里再匹配一次：
+ * 匹配到就用带 id 的完整对象（保存时能带上 tagIds），匹配不到才退回只带 name，
+ * 与手动输入标签的既有行为一致。</p>
+ */
+function applyTags() {
+  if (!selectedTagCandidates.value.length) return
+  let added = 0
+  for (const name of selectedTagCandidates.value) {
+    if (selectedTags.value.some((tag) => tag.name === name)) continue
+    const existing = allTags.value.find((tag) => tag.name === name)
+    selectedTags.value.push(existing ? { ...existing } : { name })
+    added += 1
+  }
+  selectedTagCandidates.value = []
+  writing.tags = []
+  writing.notice = added ? `已应用 ${added} 个标签，记得保存文章` : '这些标签已经在文章里了'
+}
+
+function applyTitle(candidate: string) {
+  if (!candidate) return
+  form.title = candidate
+  writing.titles = []
+  writing.notice = '标题已填入，记得保存文章'
 }
 
 // ========== 文章数据 ==========
@@ -1892,6 +2117,105 @@ onBeforeRouteLeave((_to, _from) => {
 
 .seo-actions .btn {
   flex: 1;
+}
+
+/* AI 写作：三个入口并排，候选区各自一块，点选前不改动任何表单字段 */
+.ai-writing-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm);
+  margin-bottom: 12px;
+}
+
+.ai-writing-actions .btn {
+  flex: 1 1 auto;
+}
+
+.ai-candidate {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 12px;
+  padding: 11px 12px;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius);
+  background: var(--bg-secondary);
+}
+
+.ai-candidate-text {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  line-height: 1.7;
+  white-space: pre-wrap;
+}
+
+.ai-candidate-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.ai-tags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  padding: 11px 12px;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius);
+  background: var(--bg-secondary);
+}
+
+.ai-tag-chip {
+  padding: 4px 10px;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-full);
+  background: var(--surface-primary);
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: var(--text-xs);
+  cursor: pointer;
+}
+
+.ai-tags .ai-candidate-actions {
+  flex: 1 1 100%;
+}
+
+.ai-tag-chip[data-selected='true'] {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--contrast-fg);
+}
+
+.ai-titles {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 12px;
+  padding: 11px 12px;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius);
+  background: var(--bg-secondary);
+}
+
+.ai-title-option {
+  width: 100%;
+  padding: 9px 11px;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius);
+  background: var(--surface-primary);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: var(--text-sm);
+  line-height: 1.6;
+  text-align: start;
+  cursor: pointer;
+}
+
+.ai-title-option:hover {
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
 /* 封面图上传 */

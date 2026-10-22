@@ -4,21 +4,23 @@ import { createPinia, setActivePinia } from 'pinia'
 import Seo from '../Seo.vue'
 import type { SeoOverview, SeoPostRow } from '@/types/seo'
 
-const { getOverview, getPosts, getDetail, update, generate, batchGenerate, remove } = vi.hoisted(
-  () => ({
+const { getOverview, getPosts, getDetail, update, generate, batchGenerate, remove, proofread } =
+  vi.hoisted(() => ({
     getOverview: vi.fn(),
     getPosts: vi.fn(),
     getDetail: vi.fn(),
     update: vi.fn(),
     generate: vi.fn(),
     batchGenerate: vi.fn(),
-    remove: vi.fn()
-  })
-)
+    remove: vi.fn(),
+    proofread: vi.fn()
+  }))
 
 vi.mock('@/api/seo', () => ({
   seoApi: { getOverview, getPosts, getDetail, update, generate, batchGenerate, remove }
 }))
+
+vi.mock('@/api/llm', () => ({ llmApi: { proofread } }))
 
 vi.mock('vue-router', () => ({
   useRouter: () => ({ currentRoute: { value: { query: {} } } })
@@ -84,6 +86,7 @@ describe('SEO admin page', () => {
     generate.mockReset()
     batchGenerate.mockReset()
     remove.mockReset()
+    proofread.mockReset()
     getOverview.mockResolvedValue({ code: 200, message: 'OK', data: OVERVIEW })
     getPosts.mockResolvedValue(pageOf([ROW]))
   })
@@ -192,5 +195,77 @@ describe('SEO admin page', () => {
     await flushPromises()
 
     expect(wrapper.get('.alert').text()).toBe('上游模型返回 401')
+  })
+
+  /**
+   * AI 校对是**只读**功能：弹窗展示问题清单，绝不自动改正文、也不写库。
+   * 这里验证 issues 的渲染（类型/严重度/摘录/建议）与截断提示。
+   */
+  it('renders proofread issues with type and severity without touching the article', async () => {
+    proofread.mockResolvedValue({
+      code: 200,
+      message: 'OK',
+      data: {
+        postId: 7,
+        issues: [
+          {
+            type: 'typo',
+            excerpt: '事务边界与自调用陷井',
+            suggestion: '改为「陷阱」',
+            severity: 'high'
+          },
+          {
+            type: 'wording',
+            excerpt: '这个写法非常非常地不好',
+            suggestion: '精简为「这种写法不好」',
+            severity: 'low'
+          }
+        ],
+        truncated: true,
+        model: 'deepseek-flash',
+        latencyMs: 2100
+      }
+    })
+    const wrapper = await setup()
+
+    await wrapper.get('[data-action="ai-proofread"]').trigger('click')
+    await flushPromises()
+
+    // 工具栏入口默认校对列表第一篇。
+    expect(proofread).toHaveBeenCalledWith(7)
+    const items = wrapper.findAll('.issue-item')
+    expect(items).toHaveLength(2)
+    expect(items[0]?.attributes('data-severity')).toBe('high')
+    expect(items[0]?.get('.issue-type').text()).toBe('错别字')
+    expect(items[0]?.get('.issue-severity').text()).toBe('重要')
+    expect(items[0]?.get('.issue-excerpt').text()).toBe('事务边界与自调用陷井')
+    expect(items[0]?.get('.issue-suggestion').text()).toBe('建议：改为「陷阱」')
+    expect(items[1]?.get('.issue-severity').text()).toBe('轻微')
+    expect(wrapper.get('[data-truncated]').text()).toContain('6000')
+
+    // 只读：不触发任何 SEO 写入，详情编辑面板也不会被打开。
+    expect(update).not.toHaveBeenCalled()
+    expect(generate).not.toHaveBeenCalled()
+    expect(wrapper.find('[data-editor="seoTitle"]').exists()).toBe(false)
+  })
+
+  it('shows the empty and failure states of the proofread dialog', async () => {
+    proofread.mockResolvedValue({
+      code: 200,
+      message: 'OK',
+      data: { postId: 7, issues: [], truncated: false, model: 'm', latencyMs: 10 }
+    })
+    const wrapper = await setup()
+    await wrapper.get('[data-action="ai-proofread"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.get('[data-proofread-empty]').text()).toBe('没有发现问题。')
+    expect(wrapper.find('[data-truncated]').exists()).toBe(false)
+
+    proofread.mockRejectedValue({ userMessage: '模型返回的内容不符合要求，请重试或手动填写' })
+    await wrapper.get('.modal-footer .primary-button').trigger('click')
+    await flushPromises()
+    expect(wrapper.get('.modal-body .alert, .proofread .alert').text()).toBe(
+      '模型返回的内容不符合要求，请重试或手动填写'
+    )
   })
 })

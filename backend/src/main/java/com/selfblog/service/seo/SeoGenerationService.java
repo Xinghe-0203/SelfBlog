@@ -10,6 +10,8 @@ import com.selfblog.service.seo.SeoGenerationParser.SeoDraft;
 import com.selfblog.vo.post.PostDetailResponse;
 import com.selfblog.vo.seo.SeoBatchResultVO;
 import com.selfblog.vo.seo.SeoDetailVO;
+import com.selfblog.vo.seo.SeoLlmModelVO;
+import com.selfblog.vo.seo.SeoLlmModelsVO;
 import com.selfblog.vo.seo.SeoLlmTestVO;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -172,6 +174,58 @@ public class SeoGenerationService {
             vo.setMessage(truncate(redact(safeReason(e), config.apiKey()), 200));
         }
         return vo;
+    }
+
+    /**
+     * 拉取模型候选清单。
+     *
+     * <p><b>永远返回 200</b>：上游不支持 {@code GET /models}（很多 OpenAI 兼容网关没有这个端点）
+     * 或暂时不可达时，回落到内置候选并把原因放进 {@code reason}。前端据此在拉框里提示
+     * 「列表来自内置候选」，但仍允许手填模型名 —— 把探测失败变成错误会让「填对了模型却
+     * 因为 /models 404 而无法保存」变成常态。</p>
+     */
+    public SeoLlmModelsVO listModels() {
+        SeoLlmConfig config = configProvider.current();
+        if (!config.configured()) {
+            return new SeoLlmModelsVO(fallbackModels(config), "fallback",
+                    "尚未配置接口地址或 API Key，以下为内置候选。");
+        }
+        try {
+            List<SeoLlmModelVO> models = client.listModels(config).stream()
+                    .map(info -> new SeoLlmModelVO(info.id(), info.name(), info.supportsImage()))
+                    .toList();
+            if (models.isEmpty()) {
+                return new SeoLlmModelsVO(fallbackModels(config), "fallback",
+                        "模型服务没有返回可用的模型列表，以下为内置候选。");
+            }
+            return new SeoLlmModelsVO(models, "upstream", null);
+        } catch (Exception e) {
+            log.info("[SEO] 拉取模型列表失败，回落到内置候选：error={}", safeReason(e));
+            return new SeoLlmModelsVO(fallbackModels(config), "fallback",
+                    truncate(redact(safeReason(e), config.apiKey()), 200));
+        }
+    }
+
+    /**
+     * 内置候选。
+     *
+     * <p>DeepSeek 用当前真实模型名（{@code deepseek-chat}/{@code deepseek-reasoner} 是只保留到
+     * 2026-07-24 的 legacy 别名，不能作默认值）；自定义端点无从猜测，就把已填的模型名放进去，
+     * 没填时给一条占位。</p>
+     */
+    private static List<SeoLlmModelVO> fallbackModels(SeoLlmConfig config) {
+        if (config.isDeepSeek()) {
+            return List.of(
+                    new SeoLlmModelVO("deepseek-flash", "DeepSeek Flash（支持图像）", true),
+                    new SeoLlmModelVO("deepseek-v4-pro", "DeepSeek V4 Pro", false));
+        }
+        String current = config.model() == null || config.model().isBlank() ? "" : config.model();
+        List<SeoLlmModelVO> models = new ArrayList<>();
+        if (!current.isEmpty()) {
+            models.add(new SeoLlmModelVO(current, current, false));
+        }
+        models.add(new SeoLlmModelVO("gpt-4o-mini", "gpt-4o-mini", true));
+        return models;
     }
 
     // ------------------------------------------------------------------

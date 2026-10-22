@@ -13,6 +13,7 @@ import org.springframework.cache.CacheManager;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -206,6 +207,59 @@ class SiteSettingsLlmTest {
     }
 
     @Test
+    @DisplayName("服务商/思考模式/输出上限的取值校验")
+    void updateSettings_RejectsInvalidProviderThinkingAndBudget() {
+        assertEquals(400, assertThrows(BusinessException.class,
+                () -> siteSettingsService.updateSettings(Map.of("llmProvider", "openai"))).getCode());
+        assertEquals(400, assertThrows(BusinessException.class,
+                () -> siteSettingsService.updateSettings(Map.of("llmThinking", "on"))).getCode());
+        assertEquals(400, assertThrows(BusinessException.class,
+                () -> siteSettingsService.updateSettings(Map.of("llmReasoningEffort", "medium"))).getCode());
+        assertEquals(400, assertThrows(BusinessException.class,
+                () -> siteSettingsService.updateSettings(Map.of("llmMaxTokens", "-1"))).getCode());
+        assertEquals(400, assertThrows(BusinessException.class,
+                () -> siteSettingsService.updateSettings(Map.of("llmMaxTokens", "131073"))).getCode());
+        assertEquals(400, assertThrows(BusinessException.class,
+                () -> siteSettingsService.updateSettings(Map.of("llmCommentModeration", "yes"))).getCode());
+    }
+
+    @Test
+    @DisplayName("新键的合法取值能存下来")
+    void updateSettings_AcceptsNewLlmKeys() {
+        Map<String, String> response = siteSettingsService.updateSettings(Map.of(
+                "llmProvider", "custom",
+                "llmThinking", "enabled",
+                "llmReasoningEffort", "max",
+                "llmMaxTokens", "131072",
+                "llmCommentModeration", "true"));
+
+        assertEquals("custom", response.get("llmProvider"));
+        assertEquals("enabled", response.get("llmThinking"));
+        assertEquals("max", response.get("llmReasoningEffort"));
+        assertEquals("131072", response.get("llmMaxTokens"));
+        assertEquals("true", response.get("llmCommentModeration"));
+        assertEquals("131072", siteSettingsService.getSettings().get("llmMaxTokens"));
+    }
+
+    @Test
+    @DisplayName("新增的五个键也不进公开设置")
+    void publicSettings_NeverExposeNewLlmKeys() {
+        siteSettingsService.updateSettings(Map.of(
+                "llmProvider", "deepseek",
+                "llmThinking", "enabled",
+                "llmReasoningEffort", "high",
+                "llmMaxTokens", "1024",
+                "llmCommentModeration", "true"));
+
+        Map<String, String> publicSettings = siteSettingsService.getPublicSettings();
+
+        for (String key : List.of("llmProvider", "llmThinking", "llmReasoningEffort",
+                "llmMaxTokens", "llmCommentModeration")) {
+            assertFalse(publicSettings.containsKey(key), "公开设置泄露了 " + key);
+        }
+    }
+
+    @Test
     @DisplayName("默认值齐全，未配置时不会出现 null")
     void defaults_ContainAllLlmKeys() {
         Map<String, String> adminSettings = siteSettingsService.getAdminSettings();
@@ -216,5 +270,12 @@ class SiteSettingsLlmTest {
         assertEquals("", adminSettings.get("llmModel"));
         assertEquals("30", adminSettings.get("llmTimeoutSeconds"));
         assertEquals("false", adminSettings.get("llmAutoOnPublish"));
+        // DeepSeek 是默认服务商；思考模式默认关闭 —— SEO/摘要/标签这类结构化任务
+        // 开思考只会白烧输出 token 与延迟。
+        assertEquals("deepseek", adminSettings.get("llmProvider"));
+        assertEquals("disabled", adminSettings.get("llmThinking"));
+        assertEquals("low", adminSettings.get("llmReasoningEffort"));
+        assertEquals("0", adminSettings.get("llmMaxTokens"));
+        assertEquals("false", adminSettings.get("llmCommentModeration"));
     }
 }

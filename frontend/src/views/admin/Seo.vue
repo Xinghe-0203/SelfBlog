@@ -10,6 +10,16 @@
           <Icon name="refresh" :size="16" />{{ loading ? '加载中…' : '刷新' }}
         </button>
         <button
+          class="ghost-button"
+          type="button"
+          :disabled="proofreadBusy || !llmConfigured || !rows.length"
+          :title="llmConfigured ? '' : '请先在网站设置中配置模型接口'"
+          data-action="ai-proofread"
+          @click="openProofread()"
+        >
+          <Icon name="sparkle" :size="16" />{{ proofreadBusy ? '校对中…' : 'AI 校对' }}
+        </button>
+        <button
           class="primary-button"
           type="button"
           :disabled="batchRunning || !llmConfigured"
@@ -163,6 +173,15 @@
                   {{ generatingId === row.postId ? '生成中…' : '生成' }}
                 </button>
                 <button
+                  type="button"
+                  class="link-button"
+                  :disabled="proofreadBusy || !llmConfigured"
+                  data-action="ai-proofread-row"
+                  @click="openProofread(row.postId)"
+                >
+                  校对
+                </button>
+                <button
                   v-if="row.hasSeo"
                   type="button"
                   class="link-button danger"
@@ -276,6 +295,61 @@
       </template>
     </Modal>
 
+    <!--
+      AI 校对：只读展示问题清单，不自动改正文。
+      作者看到 excerpt 与 suggestion 后自己回编辑器修改，避免模型误改。
+    -->
+    <Modal :show="proofreadOpen" title="AI 校对" width="720px" closable @close="closeProofread">
+      <div class="proofread">
+        <div v-if="proofreadTarget" class="proofread-context">
+          <p class="context-label">文章</p>
+          <p class="context-value">{{ proofreadTarget.title }}</p>
+        </div>
+
+        <p v-if="proofreadBusy" class="muted">正在让模型通读正文…</p>
+        <p v-else-if="proofreadError" class="alert" role="alert">{{ proofreadError }}</p>
+
+        <template v-else-if="proofreadResult">
+          <p v-if="proofreadResult.truncated" class="proofread-hint" data-truncated>
+            正文超过 6000 字，本次只检查了前半部分。
+          </p>
+          <p v-if="!proofreadResult.issues.length" class="muted" data-proofread-empty>
+            没有发现问题。
+          </p>
+          <ul v-else class="issue-list">
+            <li
+              v-for="(issue, index) in proofreadResult.issues"
+              :key="index"
+              class="issue-item"
+              :data-severity="issue.severity"
+            >
+              <div class="issue-head">
+                <span class="issue-type">{{ issueTypeLabel(issue.type) }}</span>
+                <span class="issue-severity" :data-severity="issue.severity">
+                  {{ severityLabel(issue.severity) }}
+                </span>
+              </div>
+              <p class="issue-excerpt">{{ issue.excerpt }}</p>
+              <p class="issue-suggestion">建议：{{ issue.suggestion }}</p>
+            </li>
+          </ul>
+        </template>
+      </div>
+
+      <template #footer>
+        <button class="ghost-button" type="button" @click="closeProofread">关闭</button>
+        <button
+          v-if="proofreadTarget"
+          class="primary-button"
+          type="button"
+          :disabled="proofreadBusy"
+          @click="runProofread(proofreadTarget.postId)"
+        >
+          <Icon name="sparkle" :size="16" />{{ proofreadBusy ? '校对中…' : '重新校对' }}
+        </button>
+      </template>
+    </Modal>
+
     <ConfirmDialog />
   </div>
 </template>
@@ -298,6 +372,8 @@ import type {
 } from '@/types/seo'
 import Icon from '@/components/common/Icon.vue'
 import Modal from '@/components/common/Modal.vue'
+import { llmApi } from '@/api/llm'
+import type { ProofreadIssueType, ProofreadSeverity, ProofreadVO } from '@/types/llm'
 
 const ISSUE_LABELS: Record<SeoIssue, string> = {
   missingDescription: '缺少描述',
@@ -305,6 +381,19 @@ const ISSUE_LABELS: Record<SeoIssue, string> = {
   duplicateTitle: '标题重复',
   missingCover: '缺少封面',
   noSeo: '未生成'
+}
+
+const PROOFREAD_TYPE_LABELS: Record<ProofreadIssueType, string> = {
+  typo: '错别字',
+  grammar: '语法',
+  wording: '措辞',
+  fact: '事实性'
+}
+
+const SEVERITY_LABELS: Record<ProofreadSeverity, string> = {
+  low: '轻微',
+  medium: '中等',
+  high: '重要'
 }
 
 const issueOptions: Array<{ value: SeoIssue; label: string }> = (
@@ -346,6 +435,24 @@ const form = reactive<SeoUpdateRequest>({
 })
 
 const llmConfigured = computed(() => overview.value?.llmConfigured === true)
+
+/**
+ * AI 校对状态：结果只读展示，**不改正文也不写库**。
+ * 作者看到 excerpt/suggestion 后自己回编辑器改，避免模型误改已发布文章。
+ */
+const proofreadOpen = ref(false)
+const proofreadBusy = ref(false)
+const proofreadError = ref('')
+const proofreadResult = ref<ProofreadVO | null>(null)
+const proofreadTarget = ref<{ postId: number; title: string } | null>(null)
+
+function issueTypeLabel(type: ProofreadIssueType): string {
+  return PROOFREAD_TYPE_LABELS[type] || type
+}
+
+function severityLabel(severity: ProofreadSeverity): string {
+  return SEVERITY_LABELS[severity] || severity
+}
 
 function issueLabel(code: SeoIssue): string {
   return ISSUE_LABELS[code] || code
@@ -519,6 +626,39 @@ function applyDetail(next: SeoDetail | undefined | null) {
   form.seoDescription = next.seoDescription ?? null
   form.seoKeywords = next.seoKeywords ?? null
   form.ogImageUrl = next.ogImageUrl ?? null
+}
+
+/**
+ * 打开校对面板。不传 postId 时校对本页第一篇 —— 工具栏按钮的「快速入口」语义；
+ * 表格行里的「校对」则指定单篇。
+ */
+function openProofread(postId?: number) {
+  const target = postId ? rows.value.find((row) => row.postId === postId) : rows.value[0]
+  if (!target) return
+  proofreadTarget.value = { postId: target.postId, title: target.title }
+  proofreadOpen.value = true
+  void runProofread(target.postId)
+}
+
+function closeProofread() {
+  proofreadOpen.value = false
+  proofreadError.value = ''
+  proofreadResult.value = null
+  proofreadTarget.value = null
+}
+
+async function runProofread(postId: number) {
+  proofreadBusy.value = true
+  proofreadError.value = ''
+  proofreadResult.value = null
+  try {
+    const response = await llmApi.proofread(postId)
+    proofreadResult.value = response.data || null
+  } catch (err) {
+    proofreadError.value = userMessage(err, '校对失败，请稍后重试。')
+  } finally {
+    proofreadBusy.value = false
+  }
 }
 
 onMounted(() => {
@@ -905,6 +1045,91 @@ tbody tr:last-child td {
   color: var(--text-muted);
   font-size: var(--text-xs);
   line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.proofread {
+  display: grid;
+  gap: 14px;
+}
+.proofread-context {
+  padding: 12px 13px;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius);
+  background: var(--surface-secondary);
+}
+.proofread-hint {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  background: var(--warning-light);
+  color: var(--warning);
+  font-size: var(--text-xs);
+  line-height: 1.6;
+}
+.issue-list {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.issue-item {
+  display: grid;
+  gap: 7px;
+  padding: 12px 13px;
+  border: 1px solid var(--border-light);
+  border-left-width: 3px;
+  border-radius: var(--radius);
+  background: var(--surface-primary);
+}
+.issue-item[data-severity='low'] {
+  border-left-color: var(--text-muted);
+}
+.issue-item[data-severity='medium'] {
+  border-left-color: var(--warning);
+}
+.issue-item[data-severity='high'] {
+  border-left-color: var(--error);
+}
+.issue-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.issue-type {
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
+.issue-severity {
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  font-size: var(--text-2xs);
+}
+.issue-severity[data-severity='low'] {
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+}
+.issue-severity[data-severity='medium'] {
+  background: var(--warning-light);
+  color: var(--warning);
+}
+.issue-severity[data-severity='high'] {
+  background: var(--error-light);
+  color: var(--error);
+}
+.issue-excerpt {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: var(--text-sm);
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+.issue-suggestion {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  line-height: 1.7;
   overflow-wrap: anywhere;
 }
 @media (max-width: 1100px) {

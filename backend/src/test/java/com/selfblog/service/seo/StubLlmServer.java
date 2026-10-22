@@ -53,8 +53,29 @@ final class StubLlmServer implements AutoCloseable {
     private final List<String> authorizations = new CopyOnWriteArrayList<>();
     private final AtomicInteger calls = new AtomicInteger();
 
+    /**
+     * {@code GET /v1/models} 的应答。默认 404 —— 这恰好是「很多 OpenAI 兼容网关没有这个端点」
+     * 的真实情况，让不关心模型列表的测试天然走回落分支。
+     */
+    private volatile Reply modelsReply = Reply.status(404, "{\"error\":\"not found\"}");
+    private final AtomicInteger modelCalls = new AtomicInteger();
+    private final List<String> modelAuthorizations = new CopyOnWriteArrayList<>();
+
     StubLlmServer(Responder responder) throws IOException {
         server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/v1/models", exchange -> {
+            modelAuthorizations.add(exchange.getRequestHeaders().getFirst("Authorization"));
+            modelCalls.incrementAndGet();
+            Reply reply = modelsReply;
+            byte[] bytes = reply.body() == null ? new byte[0] : reply.body().getBytes(StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().add("Content-Type", "application/json");
+            exchange.sendResponseHeaders(reply.status(), bytes.length);
+            try (var out = exchange.getResponseBody()) {
+                out.write(bytes);
+            } catch (IOException ignored) {
+                // 同上：客户端断开无需断言。
+            }
+        });
         server.createContext("/v1/chat/completions", exchange -> {
             String body;
             try (InputStream in = exchange.getRequestBody()) {
@@ -102,6 +123,24 @@ final class StubLlmServer implements AutoCloseable {
 
     List<String> authorizations() {
         return authorizations;
+    }
+
+    /** 让 {@code GET /v1/models} 返回指定的 JSON。 */
+    void serveModels(String body) {
+        this.modelsReply = Reply.status(200, body);
+    }
+
+    /** 让 {@code GET /v1/models} 返回指定状态码（测鉴权/不可用分支）。 */
+    void rejectModels(int status, String body) {
+        this.modelsReply = Reply.status(status, body);
+    }
+
+    int modelCallCount() {
+        return modelCalls.get();
+    }
+
+    List<String> modelAuthorizations() {
+        return modelAuthorizations;
     }
 
     /** 包一层 OpenAI 兼容的 chat completion 响应。 */

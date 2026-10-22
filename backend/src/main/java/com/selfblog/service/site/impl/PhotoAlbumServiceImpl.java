@@ -1,6 +1,7 @@
 package com.selfblog.service.site.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.selfblog.common.exception.BusinessException;
 import com.selfblog.dto.site.AlbumForm;
 import com.selfblog.entity.AlbumPhoto;
@@ -168,6 +169,22 @@ public class PhotoAlbumServiceImpl implements PhotoAlbumService {
             album.setCoverPhotoId(remaining.isEmpty() ? null : remaining.get(0).getId());
             albumMapper.updateById(album);
         }
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void updatePhotoCaption(Long albumId, Long photoId, String caption) {
+        requireAlbum(albumId);
+        AlbumPhoto photo = photoMapper.selectById(photoId);
+        if (photo == null || !albumId.equals(photo.getAlbumId())) throw new BusinessException(404, "照片不存在");
+        String normalized = caption == null ? null : caption.trim();
+        if (normalized != null && normalized.isEmpty()) normalized = null;
+        // 必须用 LambdaUpdateWrapper 而不是 photo.setCaption(x); updateById(photo)：
+        // 全局更新策略是 NOT_NULL，setCaption(null) 会让 caption 整列从 SET 子句剔除，
+        // 于是「清除图注」静默失效（与本仓库 post_seo 的同一类陷阱）。
+        photoMapper.update(null, new LambdaUpdateWrapper<AlbumPhoto>()
+                .eq(AlbumPhoto::getId, photoId)
+                .set(AlbumPhoto::getCaption, normalized));
     }
 
     @Override

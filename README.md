@@ -1,7 +1,7 @@
 # SelfBlog — 个人博客
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Version](https://img.shields.io/badge/version-v2.0.27-blue)](https://github.com/Xinghe-0203)
+[![Version](https://img.shields.io/badge/version-v2.0.28-blue)](https://github.com/Xinghe-0203)
 [![Java](https://img.shields.io/badge/Java-21-orange)](https://www.oracle.com/java/)
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.3.13-green)](https://spring.io/projects/spring-boot)
 [![Vue](https://img.shields.io/badge/Vue-3.5.44-brightgreen)](https://vuejs.org/)
@@ -228,10 +228,10 @@ SelfBlog/
 
 ```bash
 # 从仓库取 JAR
-cp release/selfblog-2.0.27.jar /path/to/deployment/
+cp release/selfblog-2.0.28.jar /path/to/deployment/
 cd /path/to/deployment
 cp /path/to/repo/backend/.env.example .env   # 然后填写 JWT_SECRET 与 ADMIN_PASSWORD
-java -jar selfblog-2.0.27.jar
+java -jar selfblog-2.0.28.jar
 ```
 
 校验与重建方式见 [`release/README.md`](release/README.md)。该 JAR 与提交时的源码一一对应，
@@ -395,6 +395,15 @@ Controller（控制器）→ Service（服务）→ Mapper（数据访问）→ 
 ---
 
 ## 更新日志
+
+### v2.0.28 (2026-10-22)
+
+- LLM 升级为 **DeepSeek 原生支持**：`llmProvider`（`deepseek`/`custom`）+ 一键预设、模型候选下拉（`GET /api/admin/seo/models` 探测上游 `/models`，失败回落到内置候选且恒 200）、思考模式与思考强度、`max_tokens`；402（余额不足）与 422（参数被拒）给出中文可执行文案。思考模式下**不再发 `temperature`**（上游会静默忽略）
+- 新增五组 AI 能力，共 9 个 `POST /api/admin/ai/**` 端点：**写作辅助**（摘要 / 只从已有标签池挑标签 / 3 个标题候选，都不写库）、**评论审核**（单条复核 + 批量扫描 + 开启后访客留言 `afterCommit` 异步审核，命中转待审）、**内容校对**（只出问题清单，不改正文）、**图片描述**（`deepseek-flash` 图像理解，base64 内联）、**站点内容体检**（单次通读元数据，出评分与 findings）
+- 修复 **`album_photo.caption` 从来没有写入路径**（列与 VO 都在，上传只写 file_path/mime_type/sort_order）→ 新增 `PUT /api/admin/albums/{albumId}/photos/{photoId}`，AI 生成的图注终于能落库
+- 修复 **JSON 模式每次白吃一次 400**：DeepSeek 对 `response_format:json_object` 有文档外硬校验（提示词必须含 `json` 字样），原实现靠「400 去 `response_format` 重试」兜底，代价是每次多一个往返且第二次静默丢掉 JSON 模式；现在发请求前自动补提示词
+- 修复 **图像能力只能靠 `/models` 预判**：真实 `deepseek-v4-pro`（纯文本）收到图片返回 **HTTP 200 + content 里写错误对象**，不抛 HTTP 错误；`listModels` 失败 fail-open、成功且 `supportsImage=false` 才 fail-closed 502
+- 门禁：后端 **1140 测试**（本地 H2 + CI 真实 MySQL 8），前端 **51 文件 / 496 测试** + lint/format/type/build/部署契约 27/27；已用真实 DeepSeek Key 端到端验证 A–F 全部六组
 
 ### v2.0.27 (2026-10-22)
 

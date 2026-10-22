@@ -92,3 +92,36 @@ export type {
   SeoPostListParams,
   SeoBatchRequest
 } from './seo'
+
+// AI 能力扩展类型（A 设置 / B 写作 / C 评论审核 / D 校对 / E 图片描述 / F 体检）
+export type {
+  LlmProvider,
+  LlmThinking,
+  LlmReasoningEffort,
+  LlmModel,
+  LlmModelList,
+  WritingRequest,
+  WritingSummaryVO,
+  WritingTagsVO,
+  WritingTitlesVO,
+  ModerationKind,
+  ModerationVerdict,
+  ModerationCategory,
+  ModerationCheckRequest,
+  ModerationCheckVO,
+  ModerationScanRequest,
+  ModerationScanItem,
+  ModerationScanVO,
+  ProofreadIssueType,
+  ProofreadSeverity,
+  ProofreadIssue,
+  ProofreadVO,
+  ProofreadBatchRequest,
+  ProofreadBatchVO,
+  ImageAltSource,
+  ImageAltRequest,
+  ImageAltVO,
+  HealthReportRequest,
+  HealthFinding,
+  HealthReportVO
+} from './llm'

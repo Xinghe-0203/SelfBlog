@@ -6,10 +6,11 @@ import Settings from '../Settings.vue'
 import SiteAssetField from '@/components/admin/SiteAssetField.vue'
 import { useSiteStore } from '@/stores/site'
 
-const { getSettings, updateSettings, testConnection } = vi.hoisted(() => ({
+const { getSettings, updateSettings, testConnection, listModels } = vi.hoisted(() => ({
   getSettings: vi.fn(),
   updateSettings: vi.fn(),
-  testConnection: vi.fn()
+  testConnection: vi.fn(),
+  listModels: vi.fn()
 }))
 
 vi.mock('@/api/site', () => ({
@@ -17,7 +18,7 @@ vi.mock('@/api/site', () => ({
 }))
 
 vi.mock('@/api/seo', () => ({
-  seoApi: { testConnection }
+  seoApi: { testConnection, listModels }
 }))
 
 const STATIC_FAVICON = '<link rel="icon" type="image/svg+xml" href="/favicon.svg">'
@@ -52,6 +53,19 @@ describe('Settings brand asset fields', () => {
     setActivePinia(pinia)
     getSettings.mockReset()
     updateSettings.mockReset()
+    listModels.mockReset()
+    // 默认：探测成功但上游只给内置候选；个别用例会覆盖成 reject 验证静默回落。
+    listModels.mockResolvedValue({
+      code: 200,
+      message: 'OK',
+      data: {
+        models: [
+          { id: 'deepseek-flash', name: 'DeepSeek-V4.1-Flash', supportsImage: true },
+          { id: 'deepseek-v4-pro', name: 'DeepSeek-V4-Pro', supportsImage: false }
+        ],
+        source: 'fallback'
+      }
+    })
     getSettings.mockResolvedValue({
       code: 200,
       message: 'OK',
@@ -459,6 +473,108 @@ describe('Settings brand asset fields', () => {
       const result = wrapper.get('.llm-test')
       expect(result.attributes('data-ok')).toBe('false')
       expect(result.text()).toContain('请求超时')
+    })
+
+    it('fills the DeepSeek defaults without touching the stored key', async () => {
+      getSettings.mockResolvedValue({
+        code: 200,
+        message: 'OK',
+        data: { ...useSiteStore().settings, llmApiKey: MASK }
+      })
+      const wrapper = await mountSettings()
+
+      await wrapper.get('[data-action="llm-preset"]').trigger('click')
+      await flushPromises()
+
+      expect((control(wrapper, 'llmBaseUrl').element as HTMLInputElement).value).toBe(
+        'https://api.deepseek.com'
+      )
+      expect((control(wrapper, 'llmModel').element as HTMLInputElement).value).toBe(
+        'deepseek-flash'
+      )
+      expect((control(wrapper, 'llmProvider').element as HTMLSelectElement).value).toBe('deepseek')
+
+      updateSettings.mockResolvedValue({
+        code: 200,
+        message: 'OK',
+        data: { ...useSiteStore().settings, llmApiKey: MASK }
+      })
+      await wrapper.find('form').trigger('submit')
+      await flushPromises()
+      const payload = updateSettings.mock.calls[0]?.[0] as Record<string, string>
+      expect(payload.llmBaseUrl).toBe('https://api.deepseek.com')
+      expect(payload.llmModel).toBe('deepseek-flash')
+      // 预设绝不能顺手改写密钥：哨兵串必须原样往返
+      expect(payload.llmApiKey).toBe(MASK)
+    })
+
+    it('keeps the reasoning effort select disabled until thinking is enabled', async () => {
+      const wrapper = await mountSettings()
+      const effort = () => control(wrapper, 'llmReasoningEffort')
+
+      expect(effort().attributes('disabled')).toBeDefined()
+
+      await control(wrapper, 'llmThinking').setValue(true)
+      expect(effort().attributes('disabled')).toBeUndefined()
+
+      // 自定义服务商不发思考字段，下拉重新禁用
+      await control(wrapper, 'llmProvider').setValue('custom')
+      expect(effort().attributes('disabled')).toBeDefined()
+    })
+
+    it('submits the five new provider keys with their server-side bounds', async () => {
+      const wrapper = await mountSettings()
+
+      expect(control(wrapper, 'llmMaxTokens').attributes('min')).toBe('0')
+      expect(control(wrapper, 'llmMaxTokens').attributes('max')).toBe('131072')
+      expect(control(wrapper, 'llmCommentModeration').exists()).toBe(true)
+
+      await control(wrapper, 'llmMaxTokens').setValue('4096')
+      await control(wrapper, 'llmCommentModeration').setValue(true)
+      await control(wrapper, 'llmThinking').setValue(true)
+      await control(wrapper, 'llmReasoningEffort').setValue('high')
+
+      updateSettings.mockResolvedValue({
+        code: 200,
+        message: 'OK',
+        data: { ...useSiteStore().settings }
+      })
+      await wrapper.find('form').trigger('submit')
+      await flushPromises()
+
+      expect(updateSettings.mock.calls[0]?.[0]).toMatchObject({
+        llmCommentModeration: 'true',
+        llmThinking: 'enabled',
+        llmReasoningEffort: 'high'
+      })
+      // number 输入框的 v-model 会把值转成数字（与既有 llmTimeoutSeconds 一致），
+      // 这里只断言它确实带上了作者填的数值。
+      const payload = updateSettings.mock.calls[0]?.[0] as Record<string, unknown>
+      expect(String(payload.llmMaxTokens)).toBe('4096')
+    })
+
+    it('renders the model candidates from the probe and falls back to a manual input', async () => {
+      const wrapper = await mountSettings()
+
+      expect(listModels).toHaveBeenCalledTimes(1)
+      const options = control(wrapper, 'llmModelSelect').findAll('option')
+      expect(options.map((option) => option.attributes('value'))).toEqual([
+        'deepseek-flash',
+        'deepseek-v4-pro'
+      ])
+      expect(wrapper.text()).toContain('内置候选')
+      // 手填 input 始终存在，候选只是便利
+      expect(control(wrapper, 'llmModel').exists()).toBe(true)
+    })
+
+    it('silently drops the candidate select when the probe request fails', async () => {
+      listModels.mockRejectedValue(new Error('network down'))
+      const wrapper = await mountSettings()
+
+      expect(wrapper.find('[data-setting="llmModelSelect"]').exists()).toBe(false)
+      expect(control(wrapper, 'llmModel').exists()).toBe(true)
+      // 探测失败不该把设置页标成错误
+      expect(wrapper.find('[role="alert"]').exists()).toBe(false)
     })
   })
 })

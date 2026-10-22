@@ -30,6 +30,13 @@ const workspaceLinks: Array<{
     icon: 'sparkle'
   },
   {
+    segment: 'health',
+    label: '内容体检',
+    description: '让模型通读最近的已发布文章，给出内容质量评分与可执行的改进建议。',
+    action: '开始体检',
+    icon: 'gauge'
+  },
+  {
     segment: 'visitors',
     label: '访客记录',
     description: '了解访问量、访客趋势和大家正在阅读的页面。',

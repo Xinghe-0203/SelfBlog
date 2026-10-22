@@ -28,7 +28,8 @@ public class SiteSettingsServiceImpl implements SiteSettingsService {
             "backgroundType", "backgroundColor", "backgroundGradientFrom", "backgroundGradientTo",
             "backgroundImageUrl", "backgroundOverlay", "backgroundFixed",
             "surfaceOpacity", "surfaceBlur",
-            "llmEnabled", "llmBaseUrl", "llmApiKey", "llmModel", "llmTimeoutSeconds", "llmAutoOnPublish"
+            "llmEnabled", "llmBaseUrl", "llmApiKey", "llmModel", "llmTimeoutSeconds", "llmAutoOnPublish",
+            "llmProvider", "llmThinking", "llmReasoningEffort", "llmMaxTokens", "llmCommentModeration"
     );
 
     /**
@@ -48,7 +49,8 @@ public class SiteSettingsServiceImpl implements SiteSettingsService {
      * 也不该让匿名访客读到（那等于泄露后端的出网目标）。
      */
     private static final Set<String> LLM_SETTING_KEYS = Set.of(
-            "llmEnabled", "llmBaseUrl", "llmApiKey", "llmModel", "llmTimeoutSeconds", "llmAutoOnPublish"
+            "llmEnabled", "llmBaseUrl", "llmApiKey", "llmModel", "llmTimeoutSeconds", "llmAutoOnPublish",
+            "llmProvider", "llmThinking", "llmReasoningEffort", "llmMaxTokens", "llmCommentModeration"
     );
     /** 背景图可选的取色模式。 */
     private static final Set<String> BACKGROUND_TYPES = Set.of("solid", "gradient", "image");
@@ -208,6 +210,14 @@ public class SiteSettingsServiceImpl implements SiteSettingsService {
         values.put("llmModel", "");
         values.put("llmTimeoutSeconds", "30");
         values.put("llmAutoOnPublish", "false");
+        // 服务商维度（A）：DeepSeek 是推荐路径，思考模式默认关闭 —— SEO/摘要/标签这类
+        // 结构化任务开思考只会白烧输出 token 与延迟。
+        values.put("llmProvider", "deepseek");
+        values.put("llmThinking", "disabled");
+        values.put("llmReasoningEffort", "low");
+        values.put("llmMaxTokens", "0");
+        // 访客评论自动审核（C）：默认关闭，作者显式打开后新留言才会过模型。
+        values.put("llmCommentModeration", "false");
         return values;
     }
 
@@ -322,6 +332,19 @@ public class SiteSettingsServiceImpl implements SiteSettingsService {
                 if (value.length() > 100) throw new BusinessException(400, "模型名不能超过100个字符");
             }
             case "llmTimeoutSeconds" -> requireIntegerInRange(value, 5, 120, "模型超时时间需为 5-120 之间的整数秒");
+            case "llmProvider" -> {
+                if (!Set.of("deepseek", "custom").contains(value)) throw new BusinessException(400, "服务商必须为 deepseek 或 custom");
+            }
+            case "llmThinking" -> {
+                if (!Set.of("enabled", "disabled").contains(value)) throw new BusinessException(400, "思考模式必须为 enabled 或 disabled");
+            }
+            case "llmReasoningEffort" -> {
+                if (!Set.of("low", "high", "max").contains(value)) throw new BusinessException(400, "思考强度必须为 low、high 或 max");
+            }
+            case "llmMaxTokens" -> requireIntegerInRange(value, 0, 131072, "输出上限需为 0-131072 之间的整数（0 表示不限制）");
+            case "llmCommentModeration" -> {
+                if (!"true".equalsIgnoreCase(value) && !"false".equalsIgnoreCase(value)) throw new BusinessException(400, "开关值必须为 true 或 false");
+            }
             default -> { }
         }
     }

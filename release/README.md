@@ -4,12 +4,12 @@
 
 | 文件 | 版本 | 大小 | SHA-256 |
 |---|---|---|---|
-| `selfblog-2.0.27.jar` | 2.0.27 | 67,600,675 B | `FF82FC5DECFA8A6114D2C28A3726E5B56E3892F88C7DA5CFBB3E96A042A7BE32` |
+| `selfblog-2.0.28.jar` | 2.0.28 | 67,723,618 B | `FFA68A3C2E2DF1B651FAC6EAC4D360B813F219E9F7203CF6EE8011BE73356C05` |
 
 ## 这个 JAR 是什么
 
 Spring Boot 单 JAR（fat jar）：内嵌 Tomcat、全部后端依赖、以及已构建的 Vue 前端产物
-（`BOOT-INF/classes/static/` 下 81 个条目）。运行它不需要 Node、npm、Nginx 或外挂 Tomcat。
+（`BOOT-INF/classes/static/` 下 82 个条目）。运行它不需要 Node、npm、Nginx 或外挂 Tomcat。
 
 ## 运行
 
@@ -17,7 +17,7 @@ JAR 与配置好的 `.env` 放在**同一运行目录**，并从该目录启动�
 都依赖工作目录）：
 
 ```bash
-java -jar selfblog-2.0.27.jar
+java -jar selfblog-2.0.28.jar
 ```
 
 默认端口 8825：博客 `http://localhost:8825/`，后台 `http://localhost:8825/admin`，
@@ -43,8 +43,8 @@ rm -rf target/classes/static
 所以发布用的副本放在本目录并显式提交。校验：
 
 ```bash
-sha256sum selfblog-2.0.27.jar
-# ff82fc5decfa8a6114d2c28a3726e5b56e3892f88c7da5cfbb3e96a042a7be32
+sha256sum selfblog-2.0.28.jar
+# ffa68a3c2e2df1b651fac6eac4d360b813f219e9f7203cf6ee8011be73356c05
 ```
 
 ## 注意

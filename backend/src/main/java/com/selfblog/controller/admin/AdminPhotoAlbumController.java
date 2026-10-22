@@ -2,6 +2,7 @@ package com.selfblog.controller.admin;
 
 import com.selfblog.common.result.Result;
 import com.selfblog.dto.site.AlbumForm;
+import com.selfblog.dto.site.PhotoCaptionForm;
 import com.selfblog.service.site.PhotoAlbumService;
 import com.selfblog.vo.site.PhotoAlbumVO;
 import jakarta.validation.Valid;
@@ -12,6 +13,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -56,6 +58,18 @@ public class AdminPhotoAlbumController {
     @DeleteMapping("/{albumId}/photos/{photoId}")
     public Result<Void> deletePhoto(@PathVariable Long albumId, @PathVariable Long photoId) {
         albumService.deletePhoto(albumId, photoId);
+        return Result.success(null);
+    }
+
+    /**
+     * 更新单张照片的图注。AI 图片描述（E 块）生成的 alt/caption 经此落库。
+     *
+     * <p>body 允许为空对象：{@code {"caption": null}} 与 {@code {}} 都表示清除图注。</p>
+     */
+    @PutMapping("/{albumId}/photos/{photoId}")
+    public Result<Void> updatePhotoCaption(@PathVariable Long albumId, @PathVariable Long photoId,
+                                           @Valid @RequestBody(required = false) PhotoCaptionForm form) {
+        albumService.updatePhotoCaption(albumId, photoId, form == null ? null : form.getCaption());
         return Result.success(null);
     }
 }

@@ -1,8 +1,8 @@
-# CLAUDE.md - 个人博客 Vue 3 前端 (v2.0.27)
+# CLAUDE.md - 个人博客 Vue 3 前端 (v2.0.28)
 
 ## 项目概述
 
-这是单人作者个人博客的前端项目，基于 Vue 3 + Vite 构建。访客只读、搜索，作者通过管理员后台写作管理。当前版本 v2.0.27。
+这是单人作者个人博客的前端项目，基于 Vue 3 + Vite 构建。访客只读、搜索，作者通过管理员后台写作管理。当前版本 v2.0.28。
 
 ## 常用命令
 
@@ -13,7 +13,7 @@ npm run build          # 构建生产版本（先 vue-tsc --noEmit，再 Vite）
 npm run preview        # 预览生产版本
 npm run lint:check     # 只读 ESLint 检查（npm run lint 会改写文件）
 npm run type-check     # vue-tsc --noEmit（必过闸门）
-npm run test:run       # Vitest 单次运行（当前 47 文件 / 477 tests；原始基线 210）
+npm run test:run       # Vitest 单次运行（当前 51 文件 / 496 tests；原始基线 210）
 npm run test:deployment # node:test：Vercel 代理生成器 + Docker/Compose 源契约（27 项）
 ```
 
@@ -120,6 +120,16 @@ src/
 - `api/seo.ts` 的 8 个方法都返回 `ApiResponse<T>`，调用方读 `res.data`（信封）再取 `res.data.data`
 - SEO 类型只从 `types/seo.ts` 直 import（`types/index.ts` 也做了 re-export，但避免循环依赖时优先直 import）
 
+## AI 辅助功能（2026-10-22，v2.0.28）
+
+- 类型在 `types/llm.ts`（`types/index.ts` 已 re-export），API 在 `api/llm.ts`。**全部方法都带 `_noRetry: true` 与 130000 超时**：超时被自动重试会让一次失败烧掉三倍模型额度与三倍等待时间（`ECONNABORTED` 就在 `RETRYABLE_CODES` 里，这是全站读请求的正确行为、在这里是错的）
+- `views/admin/Settings.vue`：服务商下拉 + 一键预设（只改 `llmProvider`/`llmBaseUrl`/`llmModel`，**绝不动密钥输入框**）、模型候选下拉（`seoApi.listModels()`，探测失败静默清空候选并把文本输入留作兜底）、思考模式与强度、`llmMaxTokens`（0 = 不发送该字段）、评论审核开关。**密钥哨兵往返必须保持**：只有作者真的编辑过密钥输入框，提交时才允许替换 `llmApiKey`
+- `views/post/PostEdit.vue` 侧栏：AI 摘要（采用 → 回填 `summary`）、标签候选 chip 多选（应用 → **并入**作者已有标签，绝不覆盖）、3 个标题候选（点击 → 填入 `title`）。**三个动作都只改本地表单**，未保存前不落库
+- `views/admin/Comments.vue`：单条「AI 审核」+ 批量扫描 + verdict 徽章。**只展示判定与理由，不改评论状态**——改状态必须由作者显式操作
+- `views/admin/Albums.vue`：AI alt/图注候选先落本地草稿，再由作者显式保存为照片图注（`PUT /admin/albums/{albumId}/photos/{photoId}`）或应用到相册简介
+- `views/admin/Seo.vue` 有只读 AI 校对弹窗；`views/admin/Health.vue`（新建，路由 `health`，侧栏「内容体检」）渲染站点级评分与 findings
+- `stores/site.ts` 带五个新 `llm*` 键（`llmProvider`/`llmThinking`/`llmReasoningEffort`/`llmMaxTokens`/`llmCommentModeration`），否则 `reactive<SiteSettings>` 缺键会直接过不了 `type-check`；**它们都不进 `PREPAINT_APPEARANCE_VARS`**（首屏内联脚本只预置外观变量）
+
 ## 路由约定
 
 - 本站为单人作者博客，访客只读：`authRoutes` 只有一条 `/login` 重定向，指向服务端下发的作者后台入口 `siteStore.adminRoot`（默认 `/admin`）。组件中访客需登录时统一 `router.push('/login')`，不要再指向硬编码路径
@@ -146,7 +156,7 @@ src/
 VITE_APP_TITLE=个人博客                     # 应用标题（代码实际消费）
 VITE_API_TARGET=http://localhost:8825       # 开发环境代理目标（vite.config.ts 消费）
 VITE_API_BASE_URL=/api                      # 保留位：axios 在 src/api/index.ts 硬编码 /api，未被消费
-VITE_APP_VERSION=2.0.27                     # 保留位：当前未被代码消费；真实版本号由 vite.config.ts 从 package.json 注入 __APP_VERSION__
+VITE_APP_VERSION=2.0.28                     # 保留位：当前未被代码消费；真实版本号由 vite.config.ts 从 package.json 注入 __APP_VERSION__
 ```
 
 如需本地覆盖，创建 `.env.local`（不提交 git）。

@@ -18,5 +18,12 @@ public interface PhotoAlbumService {
     void deleteAlbum(Long albumId);
     List<PhotoAlbumVO> uploadPhotos(Long albumId, MultipartFile[] files);
     void deletePhoto(Long albumId, Long photoId);
+
+    /**
+     * 更新单张照片的图注（alt 文本）。{@code null} 或空白表示清除。
+     *
+     * <p>只改 caption，不动文件与排序；照片必须属于该相册，否则 404。</p>
+     */
+    void updatePhotoCaption(Long albumId, Long photoId, String caption);
     AlbumImage getImage(Long photoId, String accessToken);
 }

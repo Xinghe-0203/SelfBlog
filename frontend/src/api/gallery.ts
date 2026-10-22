@@ -62,6 +62,19 @@ export const galleryApi = {
   deletePhoto(albumId: number, photoId: number): Promise<ApiResponse> {
     return api.delete(`/admin/albums/${albumId}/photos/${photoId}`)
   },
+  /**
+   * 更新单张照片的图注（alt 文本）。传 `null` 或空串表示清除。
+   *
+   * <p>E 块（AI 图片描述）生成的 caption 经此落库——在此之前 `album_photo.caption`
+   * 列虽存在却没有任何写入路径，生成结果只能停在浏览器草稿里。</p>
+   */
+  updatePhotoCaption(
+    albumId: number,
+    photoId: number,
+    caption: string | null
+  ): Promise<ApiResponse> {
+    return api.put(`/admin/albums/${albumId}/photos/${photoId}`, { caption })
+  },
   getCommentPage<T>(params: {
     pageNum?: number
     pageSize?: number

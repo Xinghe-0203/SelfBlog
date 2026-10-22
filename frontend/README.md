@@ -2,7 +2,7 @@
 
 Vue 3 frontend for a single-author personal blog. Public pages focus on reading, search, archives, about, and tags; writing and content management are protected by administrator-only routes.
 
-**Version**: v2.0.27 | **Vue**: 3.5.44 | **Vite**: 6.4.4
+**Version**: v2.0.28 | **Vue**: 3.5.44 | **Vite**: 6.4.4
 
 ## Tech Stack
 
@@ -38,7 +38,7 @@ For production, Maven builds the Vue assets and embeds them into `backend/target
 
 ```
 src/
-├── api/                # Axios modules + interceptors (index, site, admin, post, media, pages, gallery, …)
+├── api/                # Axios modules + interceptors (index, site, admin, post, media, pages, gallery, seo, llm, …)
 ├── components/
 │   ├── common/         # Reusable UI: Button, Input, Icon, Modal, Toast, ImagePreview, BackToTop, …
 │   ├── layout/         # Navbar, Footer, headless MusicPlayer, NavbarMusicControl
@@ -220,6 +220,33 @@ KV table, so this needs **no schema migration**.
   `RETRYABLE_CODES`, which is right for plain reads but wrong here: retrying multiplies model
   quota and wall-clock time by three. Failure is surfaced immediately so the author decides.
 - All `api/seo.ts` methods resolve the `Result<T>` envelope, so callers read `res.data.data`.
+
+### AI features admin UI (v2.0.28)
+
+- Types live in `types/llm.ts` (re-exported from `types/index.ts`), API in `api/llm.ts`. Every
+  method carries `_noRetry: true` and a 130 s timeout — an auto-retry would triple model quota
+  and wall-clock time on a timeout.
+- `Settings.vue` gained the provider preset (`llmProvider` + one-click preset that only rewrites
+  provider/baseUrl/model, **never the key**), a model-candidate dropdown fed by
+  `seoApi.listModels()` (a failed probe clears the list silently and leaves the text input as
+  the fallback), thinking-mode toggle + reasoning effort, `llmMaxTokens` (0 = omit), and the
+  comment-moderation toggle. The key sentinel round-trip must keep working: the panel never
+  rewrites `llmApiKey` unless the author actually edits it.
+- `views/post/PostEdit.vue` sidebar: AI summary (apply → fills `summary`), tag candidates as
+  multi-select chips (apply → **merges into** the author's existing tags, never replaces them),
+  and three title candidates (click → fills `title`). **All three only touch the local form**;
+  nothing is persisted until the author saves.
+- `views/admin/Comments.vue`: per-comment "AI 审核" + batch scan with a verdict badge. It shows
+  the verdict and reasons but **does not change the comment status** — that stays an explicit
+  author action.
+- `views/admin/Albums.vue`: AI alt/caption candidates land in a local draft, then the author
+  explicitly saves them as the photo caption (`PUT /admin/albums/{albumId}/photos/{photoId}`)
+  or applies them to the album description.
+- `views/admin/Seo.vue`: read-only proofreading modal. `views/admin/Health.vue` (new, route
+  `health`, nav 「内容体检」) renders the site-wide score and findings.
+- `stores/site.ts` carries the five new `llm*` keys (`llmProvider`/`llmThinking`/
+  `llmReasoningEffort`/`llmMaxTokens`/`llmCommentModeration`) so the reactive `SiteSettings`
+  type matches what the server sends; none of them go into `PREPAINT_APPEARANCE_VARS`.
 
 ### Configurable public pages
 

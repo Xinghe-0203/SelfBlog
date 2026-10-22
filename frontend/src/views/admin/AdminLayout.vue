@@ -44,6 +44,7 @@ const navLinks: Array<{ segment: string; label: string; icon: IconName }> = [
   { segment: 'albums', label: '相册管理', icon: 'image' },
   { segment: 'pages', label: '页面管理', icon: 'file-text' },
   { segment: 'seo', label: 'SEO 管理', icon: 'sparkle' },
+  { segment: 'health', label: '内容体检', icon: 'gauge' },
   { segment: 'settings', label: '网站设置', icon: 'settings' }
 ]
 const closeOnMobile = (): void => {

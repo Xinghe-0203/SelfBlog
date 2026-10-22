@@ -20,6 +20,8 @@ const routes = [
   '/admin/comments',
   '/admin/albums',
   '/admin/pages',
+  '/admin/seo',
+  '/admin/health',
   '/admin/settings'
 ].map((path) => ({ path, component: Blank }))
 
@@ -151,6 +153,7 @@ describe('AdminLayout', () => {
       '/admin/albums',
       '/admin/pages',
       '/admin/seo',
+      '/admin/health',
       '/admin/settings'
     ])
     const theme = useThemeStore()

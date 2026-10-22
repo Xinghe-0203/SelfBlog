@@ -11,6 +11,8 @@ import com.selfblog.service.seo.SeoMetadataService;
 import com.selfblog.utils.JwtUtils;
 import com.selfblog.vo.seo.SeoBatchResultVO;
 import com.selfblog.vo.seo.SeoDetailVO;
+import com.selfblog.vo.seo.SeoLlmModelVO;
+import com.selfblog.vo.seo.SeoLlmModelsVO;
 import com.selfblog.vo.seo.SeoLlmTestVO;
 import com.selfblog.vo.seo.SeoOverviewVO;
 import com.selfblog.vo.seo.SeoPostRowVO;
@@ -357,11 +359,47 @@ class AdminSeoControllerTest {
     }
 
     @Test
+    @WithMockUser(roles = "admin")
+    @DisplayName("models_ReturnsUpstreamListWithSourceFlag")
+    void models_ReturnsUpstreamListWithSourceFlag() throws Exception {
+        SeoLlmModelsVO vo = new SeoLlmModelsVO(List.of(
+                new SeoLlmModelVO("deepseek-flash", "DeepSeek-V4.1-Flash", true),
+                new SeoLlmModelVO("deepseek-v4-pro", "DeepSeek-V4-Pro", false)), "upstream", null);
+        when(generationService.listModels()).thenReturn(vo);
+
+        mockMvc.perform(get("/admin/seo/models"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.data.source").value("upstream"))
+                .andExpect(jsonPath("$.data.models[0].id").value("deepseek-flash"))
+                .andExpect(jsonPath("$.data.models[0].supportsImage").value(true))
+                .andExpect(jsonPath("$.data.models[1].supportsImage").value(false));
+    }
+
+    @Test
+    @WithMockUser(roles = "admin")
+    @DisplayName("models_FallbackStillReturnsEnvelope200")
+    void models_FallbackStillReturnsEnvelope200() throws Exception {
+        // 探测失败不是错误：拉框必须照样能用，所以恒 200 + source=fallback + 原因文案。
+        SeoLlmModelsVO vo = new SeoLlmModelsVO(
+                List.of(new SeoLlmModelVO("deepseek-flash", "DeepSeek Flash（支持图像）", true)),
+                "fallback", "模型鉴权失败，请检查 API Key 是否有效");
+        when(generationService.listModels()).thenReturn(vo);
+
+        mockMvc.perform(get("/admin/seo/models"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.source").value("fallback"))
+                .andExpect(jsonPath("$.data.reason").value("模型鉴权失败，请检查 API Key 是否有效"))
+                .andExpect(jsonPath("$.data.models[0].id").value("deepseek-flash"));
+    }
+
+    @Test
     @WithMockUser(roles = "user")
     @DisplayName("nonAdmin_IsForbiddenOnEveryEndpoint")
     void nonAdmin_IsForbiddenOnEveryEndpoint() throws Exception {
         mockMvc.perform(get("/admin/seo/overview")).andExpect(status().isForbidden());
         mockMvc.perform(get("/admin/seo/posts")).andExpect(status().isForbidden());
+        mockMvc.perform(get("/admin/seo/models")).andExpect(status().isForbidden());
         mockMvc.perform(post("/admin/seo/test-connection")).andExpect(status().isForbidden());
         mockMvc.perform(delete("/admin/seo/posts/100")).andExpect(status().isForbidden());
     }

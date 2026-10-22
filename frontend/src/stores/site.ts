@@ -53,6 +53,16 @@ export interface SiteSettings {
   llmTimeoutSeconds: string
   /** 发布文章后是否自动生成 SEO 元数据。 */
   llmAutoOnPublish: string
+  /** 服务商：`deepseek` | `custom`。只有 `deepseek` 才会发送思考模式相关字段。 */
+  llmProvider: string
+  /** 思考模式开关：`disabled` | `enabled`。 */
+  llmThinking: string
+  /** 思考强度：`low` | `high` | `max`，仅在思考模式开启时发送。 */
+  llmReasoningEffort: string
+  /** 单次调用输出上限 token 数 0–131072；0 表示不发送该字段（由上游决定）。 */
+  llmMaxTokens: string
+  /** 访客评论提交后是否自动用模型审核（不通过则落为待审）。 */
+  llmCommentModeration: string
 }
 
 const defaults: SiteSettings = {
@@ -87,7 +97,12 @@ const defaults: SiteSettings = {
   llmApiKey: '',
   llmModel: '',
   llmTimeoutSeconds: '30',
-  llmAutoOnPublish: 'false'
+  llmAutoOnPublish: 'false',
+  llmProvider: 'deepseek',
+  llmThinking: 'disabled',
+  llmReasoningEffort: 'low',
+  llmMaxTokens: '0',
+  llmCommentModeration: 'false'
 }
 
 /** 运行时注入的 favicon 节点标记，用来和 index.html 里的静态兜底区分。 */
