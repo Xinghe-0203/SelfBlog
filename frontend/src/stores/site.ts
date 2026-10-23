@@ -37,10 +37,12 @@ export interface SiteSettings {
   backgroundOverlay: string
   /** 背景图是否固定（不随滚动移动）。 */
   backgroundFixed: string
-  /** 卡片等组件的不透明度百分比 60–100；100 = 完全不透明，保持既有观感。 */
+  /** 卡片等组件的不透明度百分比 60–100；玻璃感开启时按 92 封顶（100 与实心无差别）。 */
   surfaceOpacity: string
   /** 卡片的背景模糊半径 0–40（px），只在组件半透明时才有意义。 */
   surfaceBlur: string
+  /** 玻璃感总开关：`on` = 卡片半透明并带背景模糊；`off` = 全部实心（不透明度 100、无模糊）。 */
+  glassMode: string
   /** 是否启用后台 LLM 辅助（SEO 生成等）；关闭时相关接口返回 400。 */
   llmEnabled: string
   /** OpenAI 兼容的 API 根地址（如 https://api.openai.com/v1）；服务端保存时去尾斜杠。 */
@@ -105,15 +107,16 @@ const defaults: SiteSettings = {
   faviconUrl: '',
   siteLogoUrl: '',
   siteBaseUrl: '',
-  backgroundType: 'solid',
+  backgroundType: 'gradient',
   backgroundColor: '#f5f6f8',
-  backgroundGradientFrom: '#f5f6f8',
-  backgroundGradientTo: '#e7eaf0',
+  backgroundGradientFrom: '#f4f7fc',
+  backgroundGradientTo: '#e9eef7',
   backgroundImageUrl: '',
   backgroundOverlay: '0',
   backgroundFixed: 'true',
-  surfaceOpacity: '100',
-  surfaceBlur: '0',
+  surfaceOpacity: '88',
+  surfaceBlur: '12',
+  glassMode: 'on',
   llmEnabled: 'false',
   llmBaseUrl: '',
   llmApiKey: '',
@@ -168,7 +171,9 @@ export const APPEARANCE_STORAGE_KEY = `${STORAGE_KEY_PREFIX}site_appearance`
  * 默认色覆盖掉。
  */
 const DEFAULT_BACKGROUND_COLOR = '#f5f6f8'
-const DEFAULT_GRADIENT_TO = '#e7eaf0'
+/** 渐变画布的两个缺省端点；与 settings 的默认值保持一致，避免两边画出两张画布。 */
+const DEFAULT_GRADIENT_FROM = '#f4f7fc'
+const DEFAULT_GRADIENT_TO = '#e9eef7'
 
 const HEX_COLOR = /^#[0-9a-f]{6}$/i
 
@@ -202,14 +207,14 @@ function safeBackgroundUrl(raw: string | undefined): string {
 /**
  * 是否处于「深色画布」。
  *
- * 除了显式的 .dark-mode（系统深色 / 站内深色），**midnight 皮肤本身就是深色画布**：
- * 它把 --text-primary 换成了浅色，此时若再套用作者的浅色背景，就会变成浅底浅字。
- * 所以判断依据必须是「这块画布有多深」，而不只是那个 class。
+ * 除了显式的 .dark-mode（系统深色 / 站内深色），**自带深色的皮肤本身就是深色画布**：
+ * midnight 与 dusk 把 --text-primary 换成了浅色，此时若再套用作者的浅色背景，
+ * 就会变成浅底浅字。所以判断依据必须是「这块画布有多深」，而不只是那个 class。
  */
 export function isDarkCanvas(skin: string): boolean {
   if (typeof document === 'undefined') return false
   if (document.documentElement.classList.contains('dark-mode')) return true
-  return skin === 'midnight'
+  return skin === 'midnight' || skin === 'dusk'
 }
 
 /* ==========================================================================
@@ -322,28 +327,63 @@ const WALLPAPER_RAISED_FLOOR_DARK = 94
 const SURFACE_TIER_STEP = 6
 
 /**
+ * 玻璃感开启时卡片不透明度的上限。
+ *
+ * 100% 与实心没有任何区别，却会让作者以为「玻璃感开了却没效果」。
+ * 所以玻璃感开启时把应用值夹到 92%：既有可见的通透感，合成后的纸面也仍然够白，
+ * 文字对比度不掉（见 effectiveSurfaceOpacities 的推导）。
+ */
+const GLASS_MAX_OPACITY = 92
+/** 玻璃感开启时卡片不透明度的默认值。 */
+const GLASS_DEFAULT_OPACITY = 88
+/** 玻璃感开启时卡片背景模糊的默认值（px）。 */
+const GLASS_DEFAULT_BLUR = 12
+/**
+ * 玻璃感开启时，背景照片必须压的最小遮罩百分比。
+ *
+ * 纸面从 100% 变成 88% 之后，正文底下多了一层照片。照片亮度不可控 ⇒
+ * 合成色不可控。与其赌照片暗，不如在玻璃感开启时强制压一层薄遮罩：
+ * 30% 的黑足以把最亮的照片压到 ~178，白纸压上去仍然接近纯白，
+ * 而照片本身的颜色与形状还能透出来（这正是玻璃感要的效果）。
+ * 作者手动把遮罩调大依然生效，调小时会被这个下限兜住。
+ */
+const GLASS_MIN_OVERLAY = 30
+
+/**
  * 计算三级表面的**实际生效**不透明度。
  *
  * 存储契约（后端允许 60–100）保持不变：这里只夹紧「应用值」，作者的设置原样留在库里，
- * 换掉壁纸后立刻恢复他的选择。三档关系：
- *   - 无壁纸：三档同值 = 作者设置（不透明度 < 100 时仍是原来的单档半透明观感，零回归）；
- *   - 有壁纸：paper = 100（正文必须压在实心纸面上），raised = max(设置值, 88/94)，
- *     control = raised − 6（不低于 60，且不高于 raised）。
+ * 换掉壁纸后立刻恢复他的选择。四档关系：
+ *   - 玻璃感关闭：三档全 100（实心，回到最原始的观感）；
+ *   - 玻璃感开启、无壁纸：paper = min(100, 设置值 + 6)、raised = 设置值、control = 设置值 − 6，
+ *     三档拉开台阶，纯色画布下也能看出通透感；
+ *   - 玻璃感开启、有壁纸：paper = 设置值（半透明纸面，照片从底下透上来），
+ *     raised = max(设置值, 88/94)，control = raised − 6（不低于 60，且不高于 raised）。
  *
  * @param rawOpacity 作者设置的 surfaceOpacity（字符串）
  * @param dark 是否深色画布
  * @param wallpaper 是否配置了壁纸/渐变（见 applyAppearance 的 data-wallpaper 判定）
+ * @param glass 玻璃感总开关（glassMode !== 'off'）
  */
 export function effectiveSurfaceOpacities(
   rawOpacity: string | undefined,
   dark: boolean,
-  wallpaper: boolean
+  wallpaper: boolean,
+  glass = true
 ): { paper: number; raised: number; control: number } {
-  const base = clampInt(rawOpacity, 60, 100, 100)
-  if (!wallpaper) return { paper: base, raised: base, control: base }
+  if (!glass) return { paper: 100, raised: 100, control: 100 }
+  const base = clampInt(rawOpacity, 60, GLASS_MAX_OPACITY, GLASS_DEFAULT_OPACITY)
+  if (!wallpaper) {
+    const raised = base
+    return {
+      paper: Math.min(100, base + SURFACE_TIER_STEP),
+      raised,
+      control: Math.max(60, raised - SURFACE_TIER_STEP)
+    }
+  }
   const raised = Math.max(base, dark ? WALLPAPER_RAISED_FLOOR_DARK : WALLPAPER_RAISED_FLOOR_LIGHT)
   const control = Math.min(raised, Math.max(60, raised - SURFACE_TIER_STEP))
-  return { paper: 100, raised, control }
+  return { paper: base, raised, control }
 }
 
 /**
@@ -354,12 +394,14 @@ export function effectiveSurfaceOpacities(
  *
  * @param dark 是否深色画布（见 isDarkCanvas）。深色下忽略作者的纯色与渐变：
  *   两者都是按浅色画布挑选的，浅底配浅字会直接不可读。背景图保留，但强制加厚遮罩。
+ * @param glass 玻璃感总开关。开启时背景照片强制最小遮罩（见 GLASS_MIN_OVERLAY）。
  */
 export function buildBackgroundVars(
   settings: Partial<SiteSettings>,
-  dark = false
+  dark = false,
+  glass = true
 ): Record<string, string> {
-  const type = String(settings.backgroundType ?? '').trim() || 'solid'
+  const type = String(settings.backgroundType ?? '').trim() || 'gradient'
   const color = normalizeHex(settings.backgroundColor)
   const vars: Record<string, string> = {}
 
@@ -367,7 +409,10 @@ export function buildBackgroundVars(
     const image = safeBackgroundUrl(settings.backgroundImageUrl)
     const overlay = clampInt(settings.backgroundOverlay, 0, 90, 0)
     if (image) {
-      const alpha = (dark ? Math.max(overlay, DARK_CANVAS_MIN_OVERLAY) : overlay) / 100
+      // 玻璃感开启时纸面是半透明的，照片会直接透到正文底下 ⇒ 必须留一层薄遮罩兜底可读性。
+      const floor = glass && !dark ? GLASS_MIN_OVERLAY : 0
+      const alpha =
+        (dark ? Math.max(overlay, DARK_CANVAS_MIN_OVERLAY) : Math.max(overlay, floor)) / 100
       // 多图层写法：第一层在上，遮罩压住背景图，底色仍由 background-color 兜底。
       const scrim =
         alpha > 0 ? `linear-gradient(rgba(0, 0, 0, ${alpha}), rgba(0, 0, 0, ${alpha})), ` : ''
@@ -377,7 +422,7 @@ export function buildBackgroundVars(
     vars['--ap-bg-size'] = 'cover'
     vars['--ap-bg-repeat'] = 'no-repeat'
   } else if (type === 'gradient' && !dark) {
-    const from = normalizeHex(settings.backgroundGradientFrom) || DEFAULT_BACKGROUND_COLOR
+    const from = normalizeHex(settings.backgroundGradientFrom) || DEFAULT_GRADIENT_FROM
     const to = normalizeHex(settings.backgroundGradientTo) || DEFAULT_GRADIENT_TO
     vars['--ap-bg-image'] = `linear-gradient(180deg, ${from}, ${to})`
   }
@@ -469,8 +514,10 @@ export const useSiteStore = defineStore('site', () => {
   function applyAppearance(): void {
     const skin = settings.value.themeSkin || 'ocean'
     const dark = isDarkCanvas(skin)
+    // 玻璃感总开关：关掉时三档表面全实心、不做背景模糊，回到最朴素的观感。
+    const glass = settings.value.glassMode !== 'off'
     // 深色画布要重算：切到深色时必须把作者的浅色背景撤掉，否则浅底浅字不可读。
-    const vars = buildBackgroundVars(settings.value, dark)
+    const vars = buildBackgroundVars(settings.value, dark, glass)
     // 背景变量写 :root：早于 #selfblog 挂载也要生效（loadPublicSettings 在 mount 之前跑），
     // 且 #selfblog 会自然继承，无需二次写入。
     applyBackgroundVars(vars)
@@ -505,12 +552,12 @@ export const useSiteStore = defineStore('site', () => {
       'color-mix(in srgb, var(--accent) 82%, var(--accent-shade, black))'
     )
 
-    // 组件不透明度 / 模糊：默认值下不写变量也不加属性，
-    // 保证「作者没配过」时走的是原来那套完全不透明的实心表面。
-    // 三级表面的实际生效值在 effectiveSurfaceOpacities 里夹紧（含壁纸对比度下限），
-    // 作者的原始设置不动 —— 撤掉壁纸立刻回到他自己的选择。
-    const blur = clampInt(settings.value.surfaceBlur, 0, 40, 0)
-    const tiers = effectiveSurfaceOpacities(settings.value.surfaceOpacity, dark, wallpaper)
+    // 组件不透明度 / 模糊：玻璃感关闭时三档全实心、不写变量也不加属性，
+    // 保证「作者显式关掉玻璃感」时走的是原来那套完全不透明的实心表面。
+    // 玻璃感开启时三档按 effectiveSurfaceOpacities 分级（作者的原始设置不动，
+    // 关掉玻璃感立刻回到他自己的选择）。
+    const blur = glass ? clampInt(settings.value.surfaceBlur, 0, 40, GLASS_DEFAULT_BLUR) : 0
+    const tiers = effectiveSurfaceOpacities(settings.value.surfaceOpacity, dark, wallpaper, glass)
     if (tiers.paper < 100) root.style.setProperty('--ap-surface-opacity', `${tiers.paper}%`)
     else root.style.removeProperty('--ap-surface-opacity')
     root.style.setProperty('--ap-surface-paper-opacity', `${tiers.paper}%`)

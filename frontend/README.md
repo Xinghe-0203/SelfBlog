@@ -168,30 +168,42 @@ focus regressions from independent review. See the
 [full report](../docs/reviews/2026-10-16-navigation-fidelity-and-fullstack-audit.md)
 for tested workflows and untested deployment environments.
 
-### Author-configurable appearance (2026-10-19)
+### Author-configurable appearance (2026-10-19, defaults revised v2.0.30)
 
 The author can now change the page background and content-surface opacity from
-`后台 → 网站设置 → 页面背景`, without touching code. Nine keys live in the `site_setting`
+`后台 → 网站设置 → 外观`, without touching code. Ten keys live in the `site_setting`
 KV table, so this needs **no schema migration**.
 
-- **Defaults emit no CSS variable at all.** `buildBackgroundVars()` in `stores/site.ts`
-  writes nothing when the background is the default grey or unconfigured, and every
-  consumer reads `var(--ap-bg-color, var(--bg-primary))`. A site that never opened this
-  panel therefore renders pixel-identically and keeps following its skin and dark mode.
-  A literal default value would instead override the skin the author never changed.
+- **Defaults changed in v2.0.30: glass is on by default.** `backgroundType` `gradient`
+  (`#f4f7fc → #e9eef7`), `surfaceOpacity` `88`, `surfaceBlur` `12`, plus the new
+  `glassMode` (`on | off`) kill switch. `buildBackgroundVars()` therefore always writes
+  `--ap-bg-image` for the gradient, and `#selfblog` always carries
+  `data-surface-translucent` / `data-surface-blur` while glass is on.
 - **Never "clear" these variables with an empty string** — an empty string counts as
   *set*, which defeats the `var()` fallback chain.
 - `styles/appearance.css` must stay **last** in `main.css`, or author settings lose to
   same-specificity declarations in `skins.css`/`dark-mode.css`.
+- **The three surface tiers must stay distinct on every canvas.** `appearance.css` used to
+  have an `html:not([data-wallpaper])` block collapsing `--surface-paper` / `--surface-raised`
+  / `--surface-control` onto the same tint — that is exactly why cards looked 100% opaque
+  before v2.0.30. Removing it is what makes the paper/card/control steps readable on a plain
+  or gradient canvas; do not reintroduce a collapse rule.
+- **Effective opacity is clamped to 60–92, not 60–100.** `effectiveSurfaceOpacities()` caps
+  the author's value at `GLASS_MAX_OPACITY` (92): 100% is visually identical to a solid
+  surface, so allowing it makes the glass toggle look broken. Full solid is expressed by
+  `glassMode: 'off'` instead, which forces every tier to 100 and drops the blur.
 - Opacity/blur apply to a **deliberately narrow surface list** (cards, modals, settings
   panels, page frames — enumerated in the header comment of `appearance.css`), not to
   `--surface-primary` globally. Inputs, table rows and badges stay solid: small, thin-bordered
   surfaces turn muddy when translucent. Renaming a class in that list silently disables it.
 - **Dark canvases drop the author's solid/gradient** (light text on a colour picked for a
   light canvas is unreadable). `isDarkCanvas()` keys on `.dark-mode` **and** the `midnight`
-  skin, whose `--text-primary` is already light. Background *images* survive but get a
-  forced overlay of at least 45% (`DARK_CANVAS_MIN_OVERLAY`); an author-set overlay is
+  and `dusk` skins, whose `--text-primary` is already light. Background *images* survive but
+  get a forced overlay of at least 45% (`DARK_CANVAS_MIN_OVERLAY`); an author-set overlay is
   never thinned. `App.vue` watches `isDarkMode` so switching theme recomputes.
+- **Glass-on image scrim floor is 30%** (`GLASS_MIN_OVERLAY`): a translucent paper surface over
+  a photo loses text contrast, so the floor is applied only when glass is on and the canvas is
+  light. An author-set overlay above the floor is used as-is.
 - First paint uses a **cached-value relay, not a second calculation**: `applyAppearance()`
   persists the composed CSS values to `localStorage` and the second inline script in
   `index.html` forwards them by whitelist before paint. `buildBackgroundVars()` stays the
@@ -201,6 +213,42 @@ KV table, so this needs **no schema migration**.
   again client-side.
 - `SiteAssetField.vue`'s client-side size pre-check must **not** be stricter than the
   server: `KIND_RULES.background.maxBytes` is 8MB, matching `SiteAssetKind.BACKGROUND`.
+
+### Theme presets and new skins (v2.0.30)
+
+`constants/themePresets.ts` ships **four** ready-made combinations — 纸间 (`paper`, ocean),
+墨青 (`ink`, ink skin + serif), 暖砂 (`sand`, sand skin + serif), 暮紫 (`dusk`, dusk dark
+canvas). `applyThemePreset()` writes exactly ten **already-registered** settings keys
+(`themeSkin`, `themePrimaryColor`, `fontFamily`, `radiusScale`, `shadowDepth`,
+`backgroundType`, `backgroundGradientFrom`, `backgroundGradientTo`, `surfaceOpacity`,
+`surfaceBlur`) — the backend needs no new key, no migration and no validation change.
+`isThemePresetActive()` drives the "使用中" badge. A preset is a starting point, not a lock:
+the individual controls stay editable afterwards.
+
+`skins.css` gained `ink` and `sand` (light) and `dusk` (dark canvas). `dusk` needs the same
+`color-scheme: dark` triple selector as `midnight`, and `isDarkCanvas()` must list it, or the
+light gradient would be painted under light-on-dark text. `styles/typography.css` also zeroes
+`letter-spacing` for `:lang(zh)` headings — the Latin-tuned negative tracking squeezed
+full-width CJK glyphs.
+
+### Page banners (v2.0.30)
+
+`PageStyle.banner` turns the home hero and the about author card into author-configurable
+banners. All the rendering lives in `composables/usePageConfig.ts`
+(`normalizePageBanner`, `pageBannerVars`, `safeBannerUrl`, `BANNER_HEIGHTS`); `Home.vue`
+(`.intro-banner`, `intro-shell--banner-{split,centered,stacked}`) and `About.vue`
+(`.author-profile--banner*`, `.profile-banner`) only consume it.
+
+- **A page with no banner must render byte-identically to the pre-v2.0.30 markup.** No extra
+  class, no inline style, and `.intro-visual` still falls back to the first article's cover.
+- Only `home` and `about` declare `banner.layouts` in `pageCatalog.ts`; the backend rejects a
+  banner on any other page, so the editor only shows the block where it can be saved.
+- The image is spliced into a CSS `url()`, so `safeBannerUrl()` mirrors
+  `safeBackgroundUrl()` (http(s) or `/uploads/`, no whitespace/quotes/parens/backslash). An
+  invalid draft value surfaces as an editor hint and never reaches the saved config.
+- Heights are 190/250/330 px (`BANNER_HEIGHTS`); mobile `split` degrades to `stacked`.
+- The editor preview needs no banner-specific code: `PagePreviewContent.vue` mounts the real
+  `Home.vue` / `About.vue`, so what the author sees is the actual component.
 
 ### Deep appearance customization (2026-10-22, v2.0.29)
 

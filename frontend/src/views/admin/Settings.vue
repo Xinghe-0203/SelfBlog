@@ -11,633 +11,602 @@
     </header>
     <p v-if="error" class="alert" role="alert">{{ error }}</p>
     <p v-if="saved" class="success" role="status">设置已保存。</p>
-    <form class="settings-grid" @submit.prevent="save">
-      <section class="settings-panel">
-        <div class="panel-heading">
-          <div>
-            <h2>站点资料</h2>
-            <p>读者会在页面标题、首页和页脚看到这些信息。</p>
-          </div>
-        </div>
-        <label>网站名称<input v-model.trim="form.siteTitle" maxlength="80" required /></label>
-        <label
-          >网站简介<textarea
-            v-model.trim="form.siteDescription"
-            rows="3"
-            maxlength="1000"
-          ></textarea>
-        </label>
-        <label>作者名称<input v-model.trim="form.authorName" maxlength="80" required /></label>
-        <label
-          >作者介绍<textarea v-model.trim="form.authorBio" rows="3" maxlength="1000"></textarea>
-        </label>
-        <SiteAssetField
-          :model-value="form.authorAvatar"
-          kind="avatar"
-          label="作者头像"
-          hint="支持上传或手填外链地址。"
-          @update:model-value="setAsset('authorAvatar', $event)"
-          @uploaded="applyUploadedAsset('authorAvatar', $event)"
-        />
-        <SiteAssetField
-          :model-value="form.siteLogoUrl"
-          kind="logo"
-          label="站点 Logo"
-          hint="公开页顶栏与后台侧边栏的品牌图标；留空使用内置图标。"
-          @update:model-value="setAsset('siteLogoUrl', $event)"
-          @uploaded="applyUploadedAsset('siteLogoUrl', $event)"
-        />
-        <SiteAssetField
-          :model-value="form.faviconUrl"
-          kind="favicon"
-          label="网站图标"
-          hint="浏览器标签页图标；留空使用默认图标。"
-          @update:model-value="setAsset('faviconUrl', $event)"
-          @uploaded="applyUploadedAsset('faviconUrl', $event)"
-        />
-        <label>页脚文字<input v-model.trim="form.footerText" maxlength="1000" /></label>
-        <label
-          >网站域名<input
-            v-model.trim="form.siteBaseUrl"
-            inputmode="url"
-            maxlength="255"
-            placeholder="https://blog.example.com"
-          /><small
-            >用于页面 canonical、分享卡片、订阅源与 sitemap 的正式地址。留空时回落到服务器 .env 的
-            SITE_BASE_URL 或当前访问地址；只填站点地址，不要包含路径或参数。</small
-          ></label
-        >
-      </section>
 
-      <section class="settings-panel">
-        <div class="panel-heading">
-          <div>
-            <h2>后台与访客</h2>
-            <p>后台入口可自定义；管理操作仍由管理员登录保护。</p>
+    <nav class="settings-tabs" role="tablist" aria-label="设置分组">
+      <button
+        v-for="tab in TABS"
+        :key="tab.id"
+        class="settings-tab"
+        :class="{ 'is-active': activeTab === tab.id }"
+        type="button"
+        role="tab"
+        :aria-selected="activeTab === tab.id"
+        :data-tab="tab.id"
+        @click="activeTab = tab.id"
+      >
+        <span class="settings-tab-label">{{ tab.label }}</span>
+        <small class="settings-tab-hint">{{ tab.hint }}</small>
+      </button>
+    </nav>
+
+    <form class="settings-grid" @submit.prevent="save">
+      <!-- 站点资料 -->
+      <div v-show="activeTab === 'profile'" class="tab-panels" data-tab-panel="profile">
+        <section class="settings-panel settings-panel--wide" data-panel="profile">
+          <div class="panel-heading">
+            <div>
+              <h2>站点资料</h2>
+              <p>读者会在页面标题、首页和页脚看到这些信息。</p>
+            </div>
           </div>
-        </div>
-        <label
-          >后台路径
-          <div class="path-input">
-            <span>/</span
-            ><input
-              v-model.trim="form.adminPath"
-              maxlength="40"
-              pattern="[A-Za-z0-9][A-Za-z0-9_-]{1,39}"
-              required
+          <div class="field-grid">
+            <label>网站名称<input v-model.trim="form.siteTitle" maxlength="80" required /></label>
+            <label>作者名称<input v-model.trim="form.authorName" maxlength="80" required /></label>
+            <label
+              >网站简介<textarea
+                v-model.trim="form.siteDescription"
+                rows="3"
+                maxlength="1000"
+              ></textarea>
+            </label>
+            <label
+              >作者介绍<textarea v-model.trim="form.authorBio" rows="3" maxlength="1000"></textarea>
+            </label>
+            <label>页脚文字<input v-model.trim="form.footerText" maxlength="1000" /></label>
+            <label
+              >网站域名<input
+                v-model.trim="form.siteBaseUrl"
+                inputmode="url"
+                maxlength="255"
+                placeholder="https://blog.example.com"
+              /><small
+                >用于页面 canonical、分享卡片、订阅源与 sitemap 的正式地址。留空时回落到服务器 .env
+                的 SITE_BASE_URL 或当前访问地址；只填站点地址，不要包含路径或参数。</small
+              ></label
+            >
+          </div>
+          <div class="asset-grid">
+            <SiteAssetField
+              :model-value="form.authorAvatar"
+              kind="avatar"
+              label="作者头像"
+              hint="支持上传或手填外链地址。"
+              @update:model-value="setAsset('authorAvatar', $event)"
+              @uploaded="applyUploadedAsset('authorAvatar', $event)"
+            />
+            <SiteAssetField
+              :model-value="form.siteLogoUrl"
+              kind="logo"
+              label="站点 Logo"
+              hint="公开页顶栏与后台侧边栏的品牌图标；留空使用内置图标。"
+              @update:model-value="setAsset('siteLogoUrl', $event)"
+              @uploaded="applyUploadedAsset('siteLogoUrl', $event)"
+            />
+            <SiteAssetField
+              :model-value="form.faviconUrl"
+              kind="favicon"
+              label="网站图标"
+              hint="浏览器标签页图标；留空使用默认图标。"
+              @update:model-value="setAsset('faviconUrl', $event)"
+              @uploaded="applyUploadedAsset('faviconUrl', $event)"
             />
           </div>
-          <small>当前地址：{{ siteStore.adminRoot }}</small></label
-        >
-        <label class="toggle-row"
-          ><span
-            ><strong>匿名访客统计</strong
-            ><small>记录页面、时间和不可逆访客摘要，不保存原始 IP。</small></span
-          ><input
-            v-model="form.visitorTrackingEnabled"
-            type="checkbox"
-            true-value="true"
-            false-value="false"
-        /></label>
-        <div class="security-row">
-          <span
-            ><strong>登录密码</strong
-            ><small>修改成功后会退出登录，请用新密码重新进入后台。</small></span
-          >
-          <RouterLink to="/password-change" class="btn btn-ghost btn-sm">修改密码</RouterLink>
-        </div>
-      </section>
+        </section>
+      </div>
 
-      <section class="settings-panel">
-        <div class="panel-heading">
-          <div>
-            <h2>评论与音乐</h2>
-            <p>为读者互动和背景声音设置开关。</p>
-          </div>
-        </div>
-        <label class="toggle-row"
-          ><span
-            ><strong>开放文章评论</strong
-            ><small>关闭后访客无法查看或提交评论，已有评论仍保留。</small></span
-          ><input
-            v-model="form.commentsEnabled"
-            type="checkbox"
-            true-value="true"
-            false-value="false"
-        /></label>
-        <label class="toggle-row"
-          ><span
-            ><strong>启用背景音乐</strong
-            ><small>浏览器通常会阻止有声音的自动播放；访客可手动点击播放。</small></span
-          ><input v-model="form.musicEnabled" type="checkbox" true-value="true" false-value="false"
-        /></label>
-        <label>音乐名称<input v-model.trim="form.musicTitle" maxlength="80" /></label>
-        <SiteAssetField
-          :model-value="form.musicUrl"
-          kind="music"
-          label="背景音乐文件"
-          hint="支持 MP3/OGG/WAV/M4A/AAC，最大 20MB；留空则播放器不出现。"
-          @update:model-value="setAsset('musicUrl', $event)"
-          @uploaded="applyUploadedAsset('musicUrl', $event)"
-        />
-      </section>
-
-      <section class="settings-panel llm-panel">
-        <div class="panel-heading panel-heading-row">
-          <div>
-            <h2>AI 辅助与 SEO</h2>
-            <p>
-              接入任意 OpenAI
-              兼容接口，用于自动生成文章标题、描述与关键词。密钥只保存在服务端，既不下发到前台，也不会写进日志。
-            </p>
-          </div>
-          <button
-            class="btn btn-ghost btn-sm"
-            type="button"
-            :disabled="testing"
-            data-action="test-llm"
-            @click="testConnection"
-          >
-            {{ testing ? '测试中…' : '测试连接' }}
-          </button>
-        </div>
-        <label class="toggle-row"
-          ><span
-            ><strong>启用 AI 辅助</strong
-            ><small>关闭后所有生成接口直接拒绝，已生成的 SEO 数据仍然生效。</small></span
-          ><input
-            v-model="form.llmEnabled"
-            type="checkbox"
-            true-value="true"
-            false-value="false"
-            data-setting="llmEnabled"
-        /></label>
-        <div class="llm-provider">
-          <label
-            >服务商<select v-model="form.llmProvider" data-setting="llmProvider">
-              <option value="deepseek">DeepSeek 官方接口</option>
-              <option value="custom">自定义 OpenAI 兼容接口</option>
-            </select>
-            <small
-              >DeepSeek 才会发送思考模式与思考强度；自定义服务商按标准 OpenAI 兼容协议调用。</small
-            ></label
-          >
-          <button
-            class="btn btn-ghost btn-sm"
-            type="button"
-            data-action="llm-preset"
-            @click="applyDeepSeekPreset"
-          >
-            填入 DeepSeek 默认
-          </button>
-        </div>
-        <div class="llm-fields">
-          <label
-            >API 地址<input
-              v-model.trim="form.llmBaseUrl"
-              inputmode="url"
-              maxlength="500"
-              placeholder="https://api.openai.com/v1"
-              data-setting="llmBaseUrl"
-            /><small
-              >OpenAI 兼容的根地址，客户端会自动补 `/chat/completions`；末尾斜杠会被去掉。</small
-            ></label
-          >
-          <label
-            >API Key<input
-              v-model.trim="form.llmApiKey"
-              type="password"
-              maxlength="500"
-              autocomplete="new-password"
-              :placeholder="llmKeyConfigured ? '已配置' : '尚未配置'"
-              data-setting="llmApiKey"
-            /><small
-              >已保存的密钥显示为 <code>{{ SECRET_MASK }}</code
-              >：保持原样保存不会改动它，清空后保存即删除。<span
-                class="llm-badge"
-                :data-llm-key="llmKeyConfigured ? 'configured' : 'empty'"
-                >{{ llmKeyConfigured ? '已配置' : '未配置' }}</span
-              ></small
-            ></label
-          >
-          <label v-if="modelOptions.length" class="llm-model-picker"
-            >模型候选
-            <div class="llm-model-row">
-              <select v-model="form.llmModel" data-setting="llmModelSelect">
-                <option v-for="model in modelOptions" :key="model.id" :value="model.id">
-                  {{ model.name }}（{{ model.id }}）{{ model.supportsImage ? ' · 支持图像' : '' }}
-                </option>
-              </select>
-              <button
-                class="btn btn-ghost btn-sm"
-                type="button"
-                :disabled="loadingModels"
-                data-action="refresh-models"
-                @click="loadModels"
-              >
-                {{ loadingModels ? '探测中…' : '刷新' }}
-              </button>
+      <!-- 外观 -->
+      <div v-show="activeTab === 'appearance'" class="tab-panels" data-tab-panel="appearance">
+        <section class="settings-panel settings-panel--wide" data-panel="presets">
+          <div class="panel-heading">
+            <div>
+              <h2>成品主题</h2>
+              <p>
+                一整套搭配好的视觉配方：配色、字体、圆角、阴影、画布渐变与卡片玻璃感一次换掉；之后仍可逐项微调。
+              </p>
             </div>
-            <small
-              >来源：{{
-                modelsSource === 'upstream' ? '上游实时列表' : '内置候选（上游暂不可用）'
-              }}；也可在下方直接手填模型名。</small
-            ></label
-          >
-          <label
-            >模型名<input
-              v-model.trim="form.llmModel"
-              maxlength="100"
-              placeholder="gpt-4o-mini"
-              data-setting="llmModel"
-            /><small>由服务商决定，例如 deepseek-flash、gpt-4o-mini、qwen-plus。</small></label
-          >
-          <label
-            >单次调用超时（秒）<input
-              v-model.trim="form.llmTimeoutSeconds"
-              type="number"
-              min="5"
-              max="120"
-              step="1"
-              data-setting="llmTimeoutSeconds"
-            /><small>5–120 秒。超时视为一次失败，不影响文章本身的保存。</small></label
-          >
-          <label
-            >最大输出 token<input
-              v-model.trim="form.llmMaxTokens"
-              type="number"
-              min="0"
-              max="131072"
-              step="1"
-              data-setting="llmMaxTokens"
-            /><small
-              >0–131072。填 0 表示不限制（不向上游发送该参数），由服务商默认值决定。</small
-            ></label
-          >
-          <label
-            >思考强度<select
-              v-model="form.llmReasoningEffort"
-              :disabled="reasoningEffortDisabled"
-              data-setting="llmReasoningEffort"
+          </div>
+          <div class="preset-grid">
+            <button
+              v-for="preset in THEME_PRESETS"
+              :key="preset.id"
+              class="preset-card"
+              :class="{ 'is-active': isPresetActive(preset) }"
+              type="button"
+              :data-preset="preset.id"
+              @click="applyPreset(preset)"
             >
-              <option value="low">低 · 更快更省</option>
-              <option value="high">高 · 更细致</option>
-              <option value="max">最高 · 最慢最贵</option>
-            </select>
-            <small
-              >仅在「DeepSeek + 思考模式开启」时生效；此时不再发送
-              temperature，由模型自行推理。</small
-            ></label
-          >
-        </div>
-        <label class="toggle-row"
-          ><span
-            ><strong>思考模式</strong
-            ><small
-              >开启后模型先推理再作答，质量更高但更慢、更贵；仅 DeepSeek
-              服务商支持。关闭时思考强度下拉不可用。</small
-            ></span
-          ><input
-            v-model="form.llmThinking"
-            type="checkbox"
-            true-value="enabled"
-            false-value="disabled"
-            data-setting="llmThinking"
-        /></label>
-        <label class="toggle-row"
-          ><span
-            ><strong>发布后自动生成 SEO</strong
-            ><small
-              >文章发布后异步生成，失败只记日志、绝不阻塞保存。关闭时可到「SEO
-              管理」手动批量生成。</small
-            ></span
-          ><input
-            v-model="form.llmAutoOnPublish"
-            type="checkbox"
-            true-value="true"
-            false-value="false"
-            data-setting="llmAutoOnPublish"
-        /></label>
-        <label class="toggle-row"
-          ><span
-            ><strong>访客评论自动审核</strong
-            ><small
-              >访客提交留言后异步调用模型审核，结论不是「通过」就落为待审状态；失败静默忽略，绝不影响留言提交。关闭时行为与现在一致。</small
-            ></span
-          ><input
-            v-model="form.llmCommentModeration"
-            type="checkbox"
-            true-value="true"
-            false-value="false"
-            data-setting="llmCommentModeration"
-        /></label>
-        <p v-if="testResult" class="llm-test" :data-ok="testResult.ok ? 'true' : 'false'">
-          {{ testResult.message
-          }}<template v-if="testResult.ok">
-            （{{ testResult.model }}，{{ testResult.latencyMs }}ms）</template
-          >
-        </p>
-        <p v-else class="llm-hint">
-          测试连接使用<strong>已保存</strong>的配置；改了地址或密钥请先保存再测试。
-        </p>
-      </section>
+              <span class="preset-swatches" aria-hidden="true">
+                <i :style="{ backgroundColor: preset.primaryColor }"></i>
+                <i :style="{ backgroundColor: preset.background.from }"></i>
+                <i :style="{ backgroundColor: preset.background.to }"></i>
+              </span>
+              <strong class="preset-name">{{ preset.name }}</strong>
+              <small class="preset-desc">{{ preset.description }}</small>
+              <span v-if="isPresetActive(preset)" class="preset-flag">使用中</span>
+            </button>
+          </div>
+        </section>
 
-      <section class="settings-panel">
-        <div class="panel-heading">
-          <div>
-            <h2>视觉主题</h2>
-            <p>即时切换网站的整体色调。</p>
-          </div>
-        </div>
-        <label
-          >页面皮肤<select v-model="form.themeSkin">
-            <option value="ocean">海蓝 · 清爽</option>
-            <option value="forest">森林 · 自然</option>
-            <option value="lavender">薰衣草 · 柔和</option>
-            <option value="sunset">日落 · 暖色</option>
-            <option value="midnight">午夜 · 深色</option>
-          </select></label
-        >
-        <label
-          >主题强调色
-          <div class="color-input">
-            <input v-model="form.themePrimaryColor" type="color" /><code>{{
-              form.themePrimaryColor
-            }}</code>
-          </div></label
-        >
-        <div class="skin-preview" :data-skin="form.themeSkin">
-          <span></span><span></span><span></span><b>{{ form.siteTitle || '博客预览' }}</b
-          ><small>文章 · 归档 · 关于</small>
-        </div>
-      </section>
-
-      <section class="settings-panel bg-panel">
-        <div class="panel-heading">
-          <div>
-            <h2>页面背景</h2>
-            <p class="panel-desc">
-              决定全站页面的底色：纯色、渐变或一张背景图；卡片的不透明度与模糊也在同一处调整。
-            </p>
-          </div>
-        </div>
-        <div class="bg-body">
-          <div class="bg-controls">
-            <label
-              >背景类型<select v-model="form.backgroundType" data-setting="backgroundType">
-                <option value="solid">纯色</option>
-                <option value="gradient">渐变</option>
-                <option value="image">背景图</option>
-              </select></label
-            >
-            <label v-if="backgroundType === 'solid'"
-              >背景颜色
-              <div class="color-input">
-                <input
-                  v-model="form.backgroundColor"
-                  type="color"
-                  data-setting="backgroundColor"
-                /><code>{{ form.backgroundColor }}</code>
-              </div></label
-            >
-            <template v-else-if="backgroundType === 'gradient'">
-              <label
-                >渐变起点
-                <div class="color-input">
-                  <input
-                    v-model="form.backgroundGradientFrom"
-                    type="color"
-                    data-setting="backgroundGradientFrom"
-                  /><code>{{ form.backgroundGradientFrom }}</code>
-                </div></label
-              >
-              <label
-                >渐变终点
-                <div class="color-input">
-                  <input
-                    v-model="form.backgroundGradientTo"
-                    type="color"
-                    data-setting="backgroundGradientTo"
-                  /><code>{{ form.backgroundGradientTo }}</code>
-                </div></label
-              >
-            </template>
-            <template v-else>
-              <SiteAssetField
-                :model-value="form.backgroundImageUrl"
-                kind="background"
-                label="背景图"
-                hint="支持 PNG/JPG/WEBP，最大 8MB；留空则沿用纯色背景。"
-                data-setting="backgroundImageUrl"
-                @update:model-value="setAsset('backgroundImageUrl', $event)"
-                @uploaded="applyUploadedAsset('backgroundImageUrl', $event)"
-              />
-              <label
-                >遮罩浓度
-                <div class="range-row">
-                  <input
-                    v-model="form.backgroundOverlay"
-                    type="range"
-                    min="0"
-                    max="90"
-                    step="1"
-                    data-setting="backgroundOverlay"
-                  /><code>{{ backgroundOverlay }}%</code>
-                </div>
-                <small>在背景图上叠一层黑色遮罩，数值越高文字越清晰。</small></label
-              >
-              <label class="toggle-row"
-                ><span
-                  ><strong>固定背景</strong><small>开启后页面滚动时背景图保持不动。</small></span
-                ><input
-                  v-model="form.backgroundFixed"
-                  type="checkbox"
-                  true-value="true"
-                  false-value="false"
-                  data-setting="backgroundFixed"
-              /></label>
-            </template>
-            <label
-              >卡片不透明度
-              <div class="range-row">
-                <input
-                  v-model="form.surfaceOpacity"
-                  type="range"
-                  min="60"
-                  max="100"
-                  step="1"
-                  data-setting="surfaceOpacity"
-                /><code>{{ surfaceOpacity }}%</code>
-              </div>
-              <small>低于 100% 时卡片呈半透明，需配合模糊避免内容发虚。</small></label
-            >
-            <label
-              >卡片模糊
-              <div class="range-row">
-                <input
-                  v-model="form.surfaceBlur"
-                  type="range"
-                  min="0"
-                  max="40"
-                  step="1"
-                  data-setting="surfaceBlur"
-                /><code>{{ surfaceBlur }}px</code>
-              </div>
-              <small>为半透明卡片加上背景模糊，0 表示不模糊。</small></label
-            >
-          </div>
-          <div class="bg-preview-column">
-            <div
-              class="bg-preview"
-              :style="previewStyle"
-              :data-bg-type="backgroundType"
-              data-preview="page-background"
-            >
-              <span class="bg-preview-card" :style="previewCardStyle">内容卡片</span>
+        <section class="settings-panel" data-panel="skin">
+          <div class="panel-heading">
+            <div>
+              <h2>视觉主题</h2>
+              <p>即时切换网站的整体色调。</p>
             </div>
-            <small class="bg-preview-hint">预览仅为示意，保存后应用到全站。</small>
           </div>
-        </div>
-      </section>
-
-      <section class="settings-panel appearance-panel">
-        <div class="panel-heading panel-heading-row">
-          <div>
-            <h2>外观深度自定义</h2>
-            <p>
-              这些设置只影响前台内容区（正文、卡片、列表与首页头图），导航栏与后台界面保持不变。「恢复默认外观」只改本页表单，仍需点底部保存才会生效。
-            </p>
-          </div>
-          <button
-            class="btn btn-ghost btn-sm"
-            type="button"
-            data-action="reset-appearance"
-            @click="resetAppearance"
-          >
-            恢复默认外观
-          </button>
-        </div>
-        <div class="appearance-grid">
           <label
-            >正文字体<select v-model="form.fontFamily" data-setting="fontFamily">
-              <option value="system">系统默认</option>
-              <option value="sans">无衬线</option>
-              <option value="serif">衬线（宋体）</option>
-              <option value="mono">等宽</option>
+            >页面皮肤<select v-model="form.themeSkin" data-setting="themeSkin">
+              <option value="ocean">海蓝 · 清爽</option>
+              <option value="forest">森林 · 自然</option>
+              <option value="lavender">薰衣草 · 柔和</option>
+              <option value="sunset">日落 · 暖色</option>
+              <option value="midnight">午夜 · 深色</option>
+              <option value="ink">墨青 · 素雅</option>
+              <option value="dusk">暮紫 · 柔和</option>
+              <option value="sand">暖砂 · 温润</option>
             </select></label
           >
           <label
-            >正文字号
+            >主题强调色
+            <div class="color-input">
+              <input v-model="form.themePrimaryColor" type="color" /><code>{{
+                form.themePrimaryColor
+              }}</code>
+            </div></label
+          >
+          <div class="skin-preview" :data-skin="form.themeSkin">
+            <span></span><span></span><span></span><b>{{ form.siteTitle || '博客预览' }}</b
+            ><small>文章 · 归档 · 关于</small>
+          </div>
+        </section>
+
+        <section class="settings-panel" data-panel="glass">
+          <div class="panel-heading">
+            <div>
+              <h2>玻璃感</h2>
+              <p>卡片要不要半透明并带背景模糊。</p>
+            </div>
+          </div>
+          <label class="toggle-row"
+            ><span
+              ><strong>玻璃感卡片</strong
+              ><small
+                >开启后卡片半透明并透出背景，层次更轻；关闭后卡片为完全不透明的实色。</small
+              ></span
+            ><input
+              v-model="form.glassMode"
+              type="checkbox"
+              true-value="on"
+              false-value="off"
+              data-setting="glassMode"
+          /></label>
+          <label
+            >卡片不透明度
             <div class="range-row">
               <input
+                v-model="form.surfaceOpacity"
                 type="range"
-                min="14"
-                max="19"
+                min="60"
+                max="92"
                 step="1"
-                data-setting="baseFontSize"
-                :value="appearanceNumber('baseFontSize')"
-                @input="setAppearanceNumber('baseFontSize', $event)"
-              /><code>{{ appearanceReadout('baseFontSize') }}</code>
+                :disabled="!glassEnabled"
+                data-setting="surfaceOpacity"
+              /><code>{{ surfaceOpacity }}%</code>
             </div>
-            <small>14–19 px，只作用于文章与页面正文。</small></label
+            <small>玻璃感开启时最高 92%，完全实色请关闭玻璃感。</small></label
           >
           <label
-            >正文行高
+            >卡片模糊
             <div class="range-row">
               <input
-                type="range"
-                min="1.5"
-                max="2.2"
-                step="0.05"
-                data-setting="bodyLineHeight"
-                :value="appearanceNumber('bodyLineHeight')"
-                @input="setAppearanceNumber('bodyLineHeight', $event)"
-              /><code>{{ appearanceReadout('bodyLineHeight') }}</code>
-            </div>
-            <small>1.5–2.2 倍行距，越大越松散。</small></label
-          >
-          <label
-            >阅读栏宽
-            <div class="range-row">
-              <input
-                type="range"
-                min="640"
-                max="960"
-                step="10"
-                data-setting="readerWidth"
-                :value="appearanceNumber('readerWidth')"
-                @input="setAppearanceNumber('readerWidth', $event)"
-              /><code>{{ appearanceReadout('readerWidth') }}</code>
-            </div>
-            <small>640–960 px，正文可读性与宽屏留白的取舍。</small></label
-          >
-          <label
-            >段落间距
-            <div class="range-row">
-              <input
+                v-model="form.surfaceBlur"
                 type="range"
                 min="0"
-                max="2"
-                step="0.1"
-                data-setting="paragraphSpacing"
-                :value="appearanceNumber('paragraphSpacing')"
-                @input="setAppearanceNumber('paragraphSpacing', $event)"
-              /><code>{{ appearanceReadout('paragraphSpacing') }}</code>
+                max="40"
+                step="1"
+                :disabled="!glassEnabled"
+                data-setting="surfaceBlur"
+              /><code>{{ surfaceBlur }}px</code>
             </div>
-            <small>0–2 em，正文段落之间的额外留白。</small></label
+            <small>为半透明卡片加上背景模糊，0 表示不模糊。</small></label
           >
+          <p v-if="!glassEnabled" class="panel-hint">关闭后卡片为完全不透明的实色。</p>
+        </section>
+
+        <section class="settings-panel settings-panel--wide bg-panel" data-panel="background">
+          <div class="panel-heading">
+            <div>
+              <h2>页面背景</h2>
+              <p class="panel-desc">
+                决定全站页面的底色：纯色、渐变或一张背景图；卡片的不透明度与模糊在「玻璃感」里调整。
+              </p>
+            </div>
+          </div>
+          <div class="bg-body">
+            <div class="bg-controls">
+              <label
+                >背景类型<select v-model="form.backgroundType" data-setting="backgroundType">
+                  <option value="solid">纯色</option>
+                  <option value="gradient">渐变</option>
+                  <option value="image">背景图</option>
+                </select></label
+              >
+              <label v-if="backgroundType === 'solid'"
+                >背景颜色
+                <div class="color-input">
+                  <input
+                    v-model="form.backgroundColor"
+                    type="color"
+                    data-setting="backgroundColor"
+                  /><code>{{ form.backgroundColor }}</code>
+                </div></label
+              >
+              <template v-else-if="backgroundType === 'gradient'">
+                <label
+                  >渐变起点
+                  <div class="color-input">
+                    <input
+                      v-model="form.backgroundGradientFrom"
+                      type="color"
+                      data-setting="backgroundGradientFrom"
+                    /><code>{{ form.backgroundGradientFrom }}</code>
+                  </div></label
+                >
+                <label
+                  >渐变终点
+                  <div class="color-input">
+                    <input
+                      v-model="form.backgroundGradientTo"
+                      type="color"
+                      data-setting="backgroundGradientTo"
+                    /><code>{{ form.backgroundGradientTo }}</code>
+                  </div></label
+                >
+              </template>
+              <template v-else>
+                <SiteAssetField
+                  :model-value="form.backgroundImageUrl"
+                  kind="background"
+                  label="背景图"
+                  hint="支持 PNG/JPG/WEBP，最大 8MB；留空则沿用纯色背景。"
+                  data-setting="backgroundImageUrl"
+                  @update:model-value="setAsset('backgroundImageUrl', $event)"
+                  @uploaded="applyUploadedAsset('backgroundImageUrl', $event)"
+                />
+                <label
+                  >遮罩浓度
+                  <div class="range-row">
+                    <input
+                      v-model="form.backgroundOverlay"
+                      type="range"
+                      min="0"
+                      max="90"
+                      step="1"
+                      data-setting="backgroundOverlay"
+                    /><code>{{ backgroundOverlay }}%</code>
+                  </div>
+                  <small>在背景图上叠一层黑色遮罩，数值越高文字越清晰。</small></label
+                >
+                <label class="toggle-row"
+                  ><span
+                    ><strong>固定背景</strong><small>开启后页面滚动时背景图保持不动。</small></span
+                  ><input
+                    v-model="form.backgroundFixed"
+                    type="checkbox"
+                    true-value="true"
+                    false-value="false"
+                    data-setting="backgroundFixed"
+                /></label>
+              </template>
+            </div>
+            <div class="bg-preview-column">
+              <div
+                class="bg-preview"
+                :style="previewStyle"
+                :data-bg-type="backgroundType"
+                data-preview="page-background"
+              >
+                <span class="bg-preview-card" :style="previewCardStyle">内容卡片</span>
+              </div>
+              <small class="bg-preview-hint">预览仅为示意，保存后应用到全站。</small>
+            </div>
+          </div>
+        </section>
+
+        <section
+          class="settings-panel settings-panel--wide appearance-panel"
+          data-panel="appearance"
+        >
+          <div class="panel-heading panel-heading-row">
+            <div>
+              <h2>外观深度自定义</h2>
+              <p>
+                这些设置只影响前台内容区（正文、卡片、列表与首页头图），导航栏与后台界面保持不变。「恢复默认外观」只改本页表单，仍需点底部保存才会生效。
+              </p>
+            </div>
+            <button
+              class="btn btn-ghost btn-sm"
+              type="button"
+              data-action="reset-appearance"
+              @click="resetAppearance"
+            >
+              恢复默认外观
+            </button>
+          </div>
+          <div class="appearance-grid">
+            <label
+              >正文字体<select v-model="form.fontFamily" data-setting="fontFamily">
+                <option value="system">系统默认</option>
+                <option value="sans">无衬线</option>
+                <option value="serif">衬线（宋体）</option>
+                <option value="mono">等宽</option>
+              </select></label
+            >
+            <label
+              >正文字号
+              <div class="range-row">
+                <input
+                  type="range"
+                  min="14"
+                  max="19"
+                  step="1"
+                  data-setting="baseFontSize"
+                  :value="appearanceNumber('baseFontSize')"
+                  @input="setAppearanceNumber('baseFontSize', $event)"
+                /><code>{{ appearanceReadout('baseFontSize') }}</code>
+              </div>
+              <small>14–19 px，只作用于文章与页面正文。</small></label
+            >
+            <label
+              >正文行高
+              <div class="range-row">
+                <input
+                  type="range"
+                  min="1.5"
+                  max="2.2"
+                  step="0.05"
+                  data-setting="bodyLineHeight"
+                  :value="appearanceNumber('bodyLineHeight')"
+                  @input="setAppearanceNumber('bodyLineHeight', $event)"
+                /><code>{{ appearanceReadout('bodyLineHeight') }}</code>
+              </div>
+              <small>1.5–2.2 倍行距，越大越松散。</small></label
+            >
+            <label
+              >阅读栏宽
+              <div class="range-row">
+                <input
+                  type="range"
+                  min="640"
+                  max="960"
+                  step="10"
+                  data-setting="readerWidth"
+                  :value="appearanceNumber('readerWidth')"
+                  @input="setAppearanceNumber('readerWidth', $event)"
+                /><code>{{ appearanceReadout('readerWidth') }}</code>
+              </div>
+              <small>640–960 px，正文可读性与宽屏留白的取舍。</small></label
+            >
+            <label
+              >段落间距
+              <div class="range-row">
+                <input
+                  type="range"
+                  min="0"
+                  max="2"
+                  step="0.1"
+                  data-setting="paragraphSpacing"
+                  :value="appearanceNumber('paragraphSpacing')"
+                  @input="setAppearanceNumber('paragraphSpacing', $event)"
+                /><code>{{ appearanceReadout('paragraphSpacing') }}</code>
+              </div>
+              <small>0–2 em，正文段落之间的额外留白。</small></label
+            >
+            <label
+              >圆角风格<select v-model="form.radiusScale" data-setting="radiusScale">
+                <option value="none">无圆角</option>
+                <option value="sharp">锐利</option>
+                <option value="default">默认</option>
+                <option value="soft">柔和</option>
+                <option value="round">圆润</option>
+              </select></label
+            >
+            <label
+              >阴影层次<select v-model="form.shadowDepth" data-setting="shadowDepth">
+                <option value="flat">扁平 · 无阴影</option>
+                <option value="default">默认</option>
+                <option value="deep">加深 · 更强悬浮感</option>
+              </select></label
+            >
+            <label
+              >布局密度<select v-model="form.layoutDensity" data-setting="layoutDensity">
+                <option value="compact">紧凑</option>
+                <option value="default">默认</option>
+                <option value="comfortable">宽松</option>
+              </select></label
+            >
+            <label
+              >首页头图<select v-model="form.homeHeroStyle" data-setting="homeHeroStyle">
+                <option value="default">默认</option>
+                <option value="compact">紧凑</option>
+                <option value="minimal">极简</option>
+                <option value="off">关闭</option>
+              </select></label
+            >
+            <label
+              >文章封面<select v-model="form.postCoverStyle" data-setting="postCoverStyle">
+                <option value="default">默认</option>
+                <option value="wide">通栏</option>
+                <option value="hidden">隐藏</option>
+              </select></label
+            >
+            <label
+              >动效强度<select v-model="form.motionIntensity" data-setting="motionIntensity">
+                <option value="off">关闭</option>
+                <option value="subtle">轻微</option>
+                <option value="default">默认</option>
+                <option value="lively">活泼</option>
+              </select>
+              <small>关闭后前台不再播放入场与滚动动效。</small></label
+            >
+          </div>
+        </section>
+      </div>
+
+      <!-- 内容与互动 -->
+      <div v-show="activeTab === 'interaction'" class="tab-panels" data-tab-panel="interaction">
+        <section class="settings-panel" data-panel="interaction">
+          <div class="panel-heading">
+            <div>
+              <h2>互动开关</h2>
+              <p>决定读者能不能留言，以及后台要不要记录匿名访客。</p>
+            </div>
+          </div>
+          <label class="toggle-row"
+            ><span
+              ><strong>开放文章评论</strong
+              ><small>关闭后访客无法查看或提交评论，已有评论仍保留。</small></span
+            ><input
+              v-model="form.commentsEnabled"
+              type="checkbox"
+              true-value="true"
+              false-value="false"
+              data-setting="commentsEnabled"
+          /></label>
+          <label class="toggle-row"
+            ><span
+              ><strong>匿名访客统计</strong
+              ><small>记录页面、时间和不可逆访客摘要，不保存原始 IP。</small></span
+            ><input
+              v-model="form.visitorTrackingEnabled"
+              type="checkbox"
+              true-value="true"
+              false-value="false"
+              data-setting="visitorTrackingEnabled"
+          /></label>
+        </section>
+
+        <section class="settings-panel" data-panel="music">
+          <div class="panel-heading">
+            <div>
+              <h2>背景音乐</h2>
+              <p>为阅读页加一段背景声音。</p>
+            </div>
+          </div>
+          <label class="toggle-row"
+            ><span
+              ><strong>启用背景音乐</strong
+              ><small>浏览器通常会阻止有声音的自动播放；访客可手动点击播放。</small></span
+            ><input
+              v-model="form.musicEnabled"
+              type="checkbox"
+              true-value="true"
+              false-value="false"
+              data-setting="musicEnabled"
+          /></label>
+          <label>音乐名称<input v-model.trim="form.musicTitle" maxlength="80" /></label>
+          <SiteAssetField
+            :model-value="form.musicUrl"
+            kind="music"
+            label="背景音乐文件"
+            hint="支持 MP3/OGG/WAV/M4A/AAC，最大 20MB；留空则播放器不出现。"
+            @update:model-value="setAsset('musicUrl', $event)"
+            @uploaded="applyUploadedAsset('musicUrl', $event)"
+          />
+        </section>
+
+        <section class="settings-panel settings-panel--wide" data-panel="moderation">
+          <div class="panel-heading">
+            <div>
+              <h2>留言审核</h2>
+              <p>用模型帮访客留言做一次初筛。</p>
+            </div>
+          </div>
+          <label class="toggle-row"
+            ><span
+              ><strong>访客评论自动审核</strong
+              ><small
+                >访客提交留言后异步调用模型审核，结论不是「通过」就落为待审状态；失败静默忽略，绝不影响留言提交。关闭时行为与现在一致。</small
+              ></span
+            ><input
+              v-model="form.llmCommentModeration"
+              type="checkbox"
+              true-value="true"
+              false-value="false"
+              data-setting="llmCommentModeration"
+          /></label>
+          <p class="panel-hint">
+            模型接口地址与密钥已移到
+            <RouterLink :to="`${siteStore.adminRoot}/seo`">SEO 管理</RouterLink>
+            页顶部，生成能力与连接配置现在在同一屏。
+          </p>
+        </section>
+      </div>
+
+      <!-- 系统与安全 -->
+      <div v-show="activeTab === 'system'" class="tab-panels" data-tab-panel="system">
+        <section class="settings-panel" data-panel="admin">
+          <div class="panel-heading">
+            <div>
+              <h2>后台入口</h2>
+              <p>后台路径可自定义；管理操作仍由管理员登录保护。</p>
+            </div>
+          </div>
           <label
-            >圆角风格<select v-model="form.radiusScale" data-setting="radiusScale">
-              <option value="none">无圆角</option>
-              <option value="sharp">锐利</option>
-              <option value="default">默认</option>
-              <option value="soft">柔和</option>
-              <option value="round">圆润</option>
-            </select></label
+            >后台路径
+            <div class="path-input">
+              <span>/</span
+              ><input
+                v-model.trim="form.adminPath"
+                maxlength="40"
+                pattern="[A-Za-z0-9][A-Za-z0-9_-]{1,39}"
+                required
+              />
+            </div>
+            <small>当前地址：{{ siteStore.adminRoot }}</small></label
           >
-          <label
-            >阴影层次<select v-model="form.shadowDepth" data-setting="shadowDepth">
-              <option value="flat">扁平 · 无阴影</option>
-              <option value="default">默认</option>
-              <option value="deep">加深 · 更强悬浮感</option>
-            </select></label
-          >
-          <label
-            >布局密度<select v-model="form.layoutDensity" data-setting="layoutDensity">
-              <option value="compact">紧凑</option>
-              <option value="default">默认</option>
-              <option value="comfortable">宽松</option>
-            </select></label
-          >
-          <label
-            >首页头图<select v-model="form.homeHeroStyle" data-setting="homeHeroStyle">
-              <option value="default">默认</option>
-              <option value="compact">紧凑</option>
-              <option value="minimal">极简</option>
-              <option value="off">关闭</option>
-            </select></label
-          >
-          <label
-            >文章封面<select v-model="form.postCoverStyle" data-setting="postCoverStyle">
-              <option value="default">默认</option>
-              <option value="wide">通栏</option>
-              <option value="hidden">隐藏</option>
-            </select></label
-          >
-          <label
-            >动效强度<select v-model="form.motionIntensity" data-setting="motionIntensity">
-              <option value="off">关闭</option>
-              <option value="subtle">轻微</option>
-              <option value="default">默认</option>
-              <option value="lively">活泼</option>
-            </select>
-            <small>关闭后前台不再播放入场与滚动动效。</small></label
-          >
-        </div>
-      </section>
+          <div class="security-row">
+            <span
+              ><strong>登录密码</strong
+              ><small>修改成功后会退出登录，请用新密码重新进入后台。</small></span
+            >
+            <RouterLink to="/password-change" class="btn btn-ghost btn-sm">修改密码</RouterLink>
+          </div>
+        </section>
+
+        <section class="settings-panel" data-panel="visitors">
+          <div class="panel-heading">
+            <div>
+              <h2>访客统计</h2>
+              <p>匿名、不可逆，只用来了解文章有没有人看。</p>
+            </div>
+          </div>
+          <p class="panel-hint">
+            访客统计记录访问的页面、时间与一个不可逆的访客摘要，**不保存原始 IP**、不保存
+            身份信息，也没有任何第三方追踪。开关在「内容与互动」分组里，原始记录可在
+            <RouterLink :to="`${siteStore.adminRoot}/visitors`">访客记录</RouterLink>
+            里查看。
+          </p>
+        </section>
+
+        <section class="settings-panel settings-panel--wide" data-panel="llm-entry">
+          <div class="panel-heading">
+            <div>
+              <h2>模型接口</h2>
+              <p>AI 辅助用的 OpenAI 兼容接口，已经独立成一页。</p>
+            </div>
+          </div>
+          <p class="panel-hint">
+            API 地址、密钥、模型与思考参数都在
+            <RouterLink :to="`${siteStore.adminRoot}/seo`">SEO 管理</RouterLink>
+            页顶部的「AI 辅助与
+            SEO」面板里配置，测连通性和批量生成也在同一页完成；这里不再重复维护一份。
+          </p>
+        </section>
+      </div>
 
       <div class="form-footer">
-        <p>更改后台路径后将自动跳转到新地址。</p>
+        <p>四个分组的改动会一起保存；更改后台路径后将自动跳转到新地址。</p>
         <button class="save-button btn btn-primary" type="submit" :disabled="saving">
           {{ saving ? '正在保存…' : '保存所有设置' }}
         </button>
@@ -650,78 +619,45 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useSiteStore, type SiteSettings } from '@/stores/site'
 import { siteApi } from '@/api/site'
-import { seoApi } from '@/api/seo'
-import type { SeoLlmTest } from '@/types/seo'
-import type { LlmModel } from '@/types/llm'
+import {
+  THEME_PRESETS,
+  applyThemePreset,
+  isThemePresetActive,
+  type ThemePreset
+} from '@/constants/themePresets'
 import SiteAssetField from '@/components/admin/SiteAssetField.vue'
 
 const siteStore = useSiteStore()
-const form = reactive<SiteSettings>({ ...siteStore.settings })
+
+/**
+ * 站点设置表单：在站点设置键之外带上「玻璃感」开关。
+ *
+ * <p>`glassMode` 由后端与 store 登记；这里用本地加宽的类型承接，
+ * 免得表单要等 store 改动才能写。</p>
+ */
+type SettingsForm = SiteSettings & { glassMode?: string }
+
+const form = reactive<SettingsForm>({ ...siteStore.settings, glassMode: 'on' })
 const saving = ref(false)
 const saved = ref(false)
 const error = ref('')
 
 /**
- * 服务端用来表示「密钥已保存」的哨兵串（8 个 U+2022）。
+ * 设置页的四个分组。
  *
- * 它是契约的一部分，不是装饰：`PUT /api/admin/site-settings` 收到这个字面值
- * 就保留已存密钥，收到空串则删除。前端不能自己造别的占位符，否则一次保存
- * 就会把作者的密钥悄悄清掉。
+ * <p>分组只影响**怎么呈现**：所有输入绑的都是同一个响应式表单对象，
+ * 切组不会丢任何已填的内容，保存也只有一条路径。</p>
  */
-const SECRET_MASK = '••••••••'
+const TABS = [
+  { id: 'profile', label: '站点资料', hint: '名称、简介与品牌素材' },
+  { id: 'appearance', label: '外观', hint: '主题、背景与玻璃感' },
+  { id: 'interaction', label: '内容与互动', hint: '评论、音乐与留言审核' },
+  { id: 'system', label: '系统与安全', hint: '后台入口与模型接口' }
+] as const
 
-const testing = ref(false)
-const testResult = ref<SeoLlmTest | null>(null)
+type TabId = (typeof TABS)[number]['id']
 
-/** 密钥是否已配置：由哨兵串派生，避免把掩码当真实值展示或比较。 */
-const llmKeyConfigured = computed(() => (form.llmApiKey ?? '') === SECRET_MASK)
-
-/** DeepSeek 官方接口的默认值：一键预设写这两项，其余（密钥/超时）保持作者原样。 */
-const DEEPSEEK_BASE_URL = 'https://api.deepseek.com'
-const DEEPSEEK_MODEL = 'deepseek-flash'
-
-/** 模型候选列表（`GET /admin/seo/models`）。后端恒 200，上游不可用时回落内置候选。 */
-const modelOptions = ref<LlmModel[]>([])
-const modelsSource = ref<'upstream' | 'fallback' | ''>('')
-const loadingModels = ref(false)
-
-/**
- * 思考强度只在「DeepSeek + 思考模式开启」时才会真正发给上游。
- *
- * <p>下拉在其余情况下 disabled 而不是隐藏：作者要能看见这个能力存在、并且知道
- * 为什么现在不生效（提示文案就在字段下方）。</p>
- */
-const reasoningEffortDisabled = computed(
-  () => form.llmThinking !== 'enabled' || form.llmProvider !== 'deepseek'
-)
-
-/** 填入 DeepSeek 默认值：只改地址与模型，不动已保存的密钥与其它设置。 */
-function applyDeepSeekPreset(): void {
-  form.llmProvider = 'deepseek'
-  form.llmBaseUrl = DEEPSEEK_BASE_URL
-  form.llmModel = DEEPSEEK_MODEL
-}
-
-/**
- * 探测上游模型候选。
- *
- * <p>失败一律**静默**回落为「没有候选下拉」，作者仍可手填模型名 —— 探测只是便利，
- * 不能因为它连不上就把整个设置页标成错误。</p>
- */
-async function loadModels(): Promise<void> {
-  loadingModels.value = true
-  try {
-    const response = await seoApi.listModels()
-    const payload = response.data
-    modelOptions.value = payload?.models ?? []
-    modelsSource.value = payload?.source ?? 'fallback'
-  } catch {
-    modelOptions.value = []
-    modelsSource.value = ''
-  } finally {
-    loadingModels.value = false
-  }
-}
+const activeTab = ref<TabId>('profile')
 
 type AssetSettingKey =
   | 'authorAvatar'
@@ -748,8 +684,38 @@ const backgroundType = computed<'solid' | 'gradient' | 'image'>(() => {
 })
 
 const backgroundOverlay = computed(() => clampInt(form.backgroundOverlay, 0, 90, 0))
-const surfaceOpacity = computed(() => clampInt(form.surfaceOpacity, 60, 100, 100))
+
+/**
+ * 玻璃感开关：`off` 时卡片是完全不透明的实色，不透明度与模糊两个控件随之失效。
+ *
+ * <p>未识别的值一律按开启处理：玻璃感是新版默认形态，宁可多一层透明，
+ * 也不要因为一个脏值把卡片变成刺眼的实色块。</p>
+ */
+const glassEnabled = computed(() => form.glassMode !== 'off')
+
+/** 玻璃感开启时不透明度封顶 92（后端会把 100 夹到 92）；关闭时允许 100 的实色。 */
+const surfaceOpacity = computed(() =>
+  glassEnabled.value
+    ? clampInt(form.surfaceOpacity, 60, 92, 88)
+    : clampInt(form.surfaceOpacity, 60, 100, 100)
+)
+
 const surfaceBlur = computed(() => clampInt(form.surfaceBlur, 0, 40, 0))
+
+/**
+ * 点一下预设 = 一次写入 10 个键（皮肤、强调色、字体、圆角、阴影、画布渐变与玻璃感强度）。
+ *
+ * <p>预设是「换一套底子」而不是「重置全部」：作者在单项控件上做过的其它调整不动。</p>
+ */
+function applyPreset(preset: ThemePreset): void {
+  // 站点设置是接口声明、没有索引签名，预设写入器按键值表工作，这里做一次显式断言。
+  applyThemePreset(form as unknown as Record<string, string>, preset)
+}
+
+/** 当前设置是否与某套预设一致（用于在预设卡上标出「使用中」）。 */
+function isPresetActive(preset: ThemePreset): boolean {
+  return isThemePresetActive(form as unknown as Record<string, string | undefined>, preset)
+}
 
 /** 外观深度自定义里四个数值型设置键；其余七个是枚举字符串。 */
 type AppearanceNumberKey = 'baseFontSize' | 'bodyLineHeight' | 'readerWidth' | 'paragraphSpacing'
@@ -865,38 +831,20 @@ function applyUploadedAsset(key: AssetSettingKey, url: string): void {
   siteStore.applySettings({ [key]: url.trim() })
 }
 
+/** 玻璃感开关的取值归一：只认 'off'，其余一律按开启处理。 */
+function normalizeGlassMode(value: string | undefined): 'on' | 'off' {
+  return value === 'off' ? 'off' : 'on'
+}
+
 async function load() {
   try {
     const response = await siteApi.getSettings()
-    if (response.data) Object.assign(form, response.data)
+    if (response.data) {
+      Object.assign(form, response.data)
+      form.glassMode = normalizeGlassMode(form.glassMode)
+    }
   } catch {
     error.value = '设置暂时无法加载，请刷新后重试。'
-  }
-}
-
-/**
- * 用**已保存**的配置测一次连通性。
- *
- * 刻意不把表单里的未保存值发过去：否则会出现「测试通过但保存失败」的错位，
- * 而且把未保存的密钥塞进额外请求会让它多经一次网络。后端对上游失败一律
- * 返回 200 + `ok:false`，所以这里只需要一个 try/catch 兜住本地网络错误。
- */
-async function testConnection() {
-  testing.value = true
-  testResult.value = null
-  try {
-    const response = await seoApi.testConnection()
-    testResult.value = response.data
-  } catch (err) {
-    testResult.value = {
-      ok: false,
-      message:
-        (err as Error & { userMessage?: string }).userMessage || '测试请求失败，请稍后重试。',
-      latencyMs: 0,
-      model: ''
-    }
-  } finally {
-    testing.value = false
   }
 }
 
@@ -909,6 +857,7 @@ async function save() {
     const response = await siteApi.updateSettings({ ...form })
     if (response.data) {
       Object.assign(form, response.data)
+      form.glassMode = normalizeGlassMode(form.glassMode)
       siteStore.applySettings(response.data)
     }
     saved.value = true
@@ -925,8 +874,6 @@ async function save() {
 
 onMounted(() => {
   void load()
-  // 模型候选是纯便利信息：与设置加载并行探测，失败静默。
-  void loadModels()
 })
 </script>
 
@@ -951,10 +898,52 @@ onMounted(() => {
   color: var(--text-muted);
   font-size: var(--text-sm);
 }
+/* 分组导航：一排等宽卡片，选中项用强调色描边，和后台其它页面的分段控件一致。 */
+.settings-tabs {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+.settings-tab {
+  display: grid;
+  gap: 3px;
+  padding: 11px 14px;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-lg);
+  background: var(--surface-primary);
+  color: var(--text-secondary);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 0.18s ease,
+    box-shadow 0.18s ease;
+}
+.settings-tab:hover {
+  border-color: var(--border-strong);
+}
+.settings-tab.is-active {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+  color: var(--text-primary);
+}
+.settings-tab-label {
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+.settings-tab-hint {
+  color: var(--text-muted);
+  font-size: var(--text-2xs);
+  line-height: 1.5;
+}
 .settings-grid {
+  display: grid;
+  gap: 14px;
+}
+.tab-panels {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 14px;
+  align-items: start;
 }
 .settings-panel {
   display: grid;
@@ -964,6 +953,9 @@ onMounted(() => {
   border: 1px solid var(--border-light);
   border-radius: var(--radius-xl);
   background: var(--surface-primary);
+}
+.settings-panel--wide {
+  grid-column: 1 / -1;
 }
 .panel-heading {
   padding-bottom: 12px;
@@ -979,7 +971,26 @@ onMounted(() => {
   font-size: var(--text-xs);
   line-height: 1.6;
 }
-.settings-panel > label:not(.toggle-row) {
+.panel-heading-row {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 16px;
+}
+.field-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 15px 18px;
+  align-items: start;
+}
+.asset-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 15px 18px;
+  align-items: start;
+}
+.settings-panel > label:not(.toggle-row),
+.field-grid > label:not(.toggle-row) {
   display: grid;
   gap: 7px;
   color: var(--text-secondary);
@@ -997,6 +1008,11 @@ select {
   font: inherit;
   font-size: var(--text-base);
 }
+input:disabled,
+select:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
 textarea {
   resize: vertical;
 }
@@ -1004,6 +1020,15 @@ label small {
   color: var(--text-muted);
   font-size: var(--text-xs);
   line-height: 1.6;
+}
+.panel-hint {
+  margin: 0;
+  padding: 11px 13px;
+  border-radius: var(--radius);
+  background: var(--bg-secondary);
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  line-height: 1.7;
 }
 .toggle-row {
   display: flex;
@@ -1116,8 +1141,63 @@ label small {
   color: var(--text-muted);
   font-size: var(--text-2xs);
 }
-.bg-panel {
-  grid-column: 1 / -1;
+/* 成品主题预设卡：一排小卡，每张卡三个色块 + 名称 + 一句话说明。 */
+.preset-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 12px;
+}
+.preset-card {
+  position: relative;
+  display: grid;
+  gap: 6px;
+  padding: 14px;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-lg);
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 0.18s ease,
+    box-shadow 0.18s ease,
+    transform 0.18s ease;
+}
+.preset-card:hover {
+  border-color: var(--border-strong);
+  transform: translateY(-1px);
+}
+.preset-card.is-active {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+  color: var(--text-primary);
+}
+.preset-swatches {
+  display: flex;
+  gap: 6px;
+}
+.preset-swatches i {
+  width: 22px;
+  height: 22px;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-full);
+}
+.preset-name {
+  font-size: var(--text-sm);
+}
+.preset-desc {
+  color: var(--text-muted);
+  font-size: var(--text-2xs);
+  line-height: 1.6;
+}
+.preset-flag {
+  justify-self: start;
+  padding: 1px 8px;
+  border-radius: var(--radius-full);
+  background: var(--accent);
+  color: var(--accent-contrast, #fff);
+  font-size: var(--text-2xs);
+  font-weight: 600;
 }
 .bg-body {
   display: grid;
@@ -1152,6 +1232,10 @@ label small {
   border: 0;
   background: transparent;
   cursor: pointer;
+}
+.range-row input[type='range']:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
 }
 .range-row input[type='range']::-webkit-slider-runnable-track {
   height: 4px;
@@ -1220,109 +1304,7 @@ label small {
   font-size: var(--text-2xs);
   line-height: 1.6;
 }
-/* AI 面板：两个开关行之间夹一组两列字段，面板本身跨两列避免密钥输入被挤成半宽。 */
-.llm-panel {
-  grid-column: 1 / -1;
-}
-.panel-heading-row {
-  display: flex;
-  align-items: start;
-  justify-content: space-between;
-  gap: 16px;
-}
-.llm-provider {
-  display: flex;
-  align-items: end;
-  justify-content: space-between;
-  gap: 14px;
-}
-.llm-provider label {
-  display: grid;
-  flex: 1 1 auto;
-  gap: 7px;
-  color: var(--text-secondary);
-  font-size: var(--text-sm);
-}
-.llm-provider label small {
-  color: var(--text-muted);
-  font-size: var(--text-xs);
-  line-height: 1.6;
-}
-.llm-model-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.llm-model-row select {
-  flex: 1 1 auto;
-  min-width: 0;
-}
-.llm-model-row .btn {
-  flex: 0 0 auto;
-}
-.llm-fields {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
-}
-.llm-fields label {
-  display: grid;
-  gap: 7px;
-  color: var(--text-secondary);
-  font-size: var(--text-sm);
-}
-.llm-fields label small {
-  color: var(--text-muted);
-  font-size: var(--text-xs);
-  line-height: 1.6;
-}
-.llm-fields code {
-  padding: 1px 4px;
-  border-radius: var(--radius-xs);
-  background: var(--bg-tertiary);
-  font-size: var(--text-2xs);
-  letter-spacing: 0.08em;
-}
-.llm-badge {
-  display: inline-block;
-  margin-left: 6px;
-  padding: 1px 7px;
-  border-radius: var(--radius-full);
-  font-size: var(--text-2xs);
-  font-weight: 600;
-}
-.llm-badge[data-llm-key='configured'] {
-  background: var(--success-light);
-  color: var(--success);
-}
-.llm-badge[data-llm-key='empty'] {
-  background: var(--bg-tertiary);
-  color: var(--text-muted);
-}
-.llm-test,
-.llm-hint {
-  margin: 0;
-  padding: 11px 13px;
-  border-radius: var(--radius);
-  font-size: var(--text-sm);
-  line-height: 1.6;
-}
-.llm-test[data-ok='true'] {
-  background: var(--success-light);
-  color: var(--success);
-}
-.llm-test[data-ok='false'] {
-  background: var(--error-light);
-  color: var(--error);
-}
-.llm-hint {
-  background: var(--bg-secondary);
-  color: var(--text-muted);
-}
-/* 外观深度自定义：面板跨两列，11 个控件走两列网格；range 读数复用 .range-row。 */
-.appearance-panel {
-  grid-column: 1 / -1;
-}
+/* 外观深度自定义：11 个控件走两列网格；range 读数复用 .range-row。 */
 .appearance-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1384,22 +1366,35 @@ label small {
   background: #172332;
   color: #ecf2f8;
 }
+.skin-preview[data-skin='ink'] {
+  --primary: #1f7a72;
+  background: #e4ece8;
+}
+.skin-preview[data-skin='dusk'] {
+  --primary: #9d8bf5;
+  background: #ece9fb;
+}
+.skin-preview[data-skin='sand'] {
+  --primary: #c2703f;
+  background: #efe3d6;
+}
+@media (max-width: 900px) {
+  .settings-tabs {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .tab-panels {
+    grid-template-columns: 1fr;
+  }
+}
 @media (max-width: 760px) {
-  .settings-grid {
+  .field-grid {
     grid-template-columns: 1fr;
   }
   .bg-body {
     grid-template-columns: 1fr;
   }
-  .llm-fields {
-    grid-template-columns: 1fr;
-  }
   .appearance-grid {
     grid-template-columns: 1fr;
-  }
-  .llm-provider {
-    align-items: start;
-    flex-direction: column;
   }
   .panel-heading-row {
     flex-direction: column;
@@ -1412,6 +1407,9 @@ label small {
   .page-heading {
     align-items: start;
     flex-direction: column;
+  }
+  .settings-tabs {
+    grid-template-columns: 1fr;
   }
   .form-footer {
     align-items: start;

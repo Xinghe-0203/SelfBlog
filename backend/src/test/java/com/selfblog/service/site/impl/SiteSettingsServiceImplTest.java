@@ -143,18 +143,19 @@ class SiteSettingsServiceImplTest {
     // ---------- 外观定制（9 个新键） ----------
 
     @Test
-    @DisplayName("appearanceKeys_ArePresentInDefaultsWithFrozenDefaults")
-    void appearanceKeys_ArePresentInDefaultsWithFrozenDefaults() {
+    @DisplayName("appearanceKeys_ArePresentInDefaultsWithGlassBaseline")
+    void appearanceKeys_ArePresentInDefaultsWithGlassBaseline() {
         Map<String, String> settings = siteSettingsService.getSettings();
-        assertEquals("solid", settings.get("backgroundType"));
+        assertEquals("gradient", settings.get("backgroundType"));
         assertEquals("#f5f6f8", settings.get("backgroundColor"));
-        assertEquals("#f5f6f8", settings.get("backgroundGradientFrom"));
-        assertEquals("#e7eaf0", settings.get("backgroundGradientTo"));
+        assertEquals("#f4f7fc", settings.get("backgroundGradientFrom"));
+        assertEquals("#e9eef7", settings.get("backgroundGradientTo"));
         assertEquals("", settings.get("backgroundImageUrl"));
         assertEquals("0", settings.get("backgroundOverlay"));
         assertEquals("true", settings.get("backgroundFixed"));
-        assertEquals("100", settings.get("surfaceOpacity"));
-        assertEquals("0", settings.get("surfaceBlur"));
+        assertEquals("88", settings.get("surfaceOpacity"));
+        assertEquals("12", settings.get("surfaceBlur"));
+        assertEquals("on", settings.get("glassMode"));
     }
 
     @Test
@@ -162,7 +163,42 @@ class SiteSettingsServiceImplTest {
     void appearanceKeys_AreAllExposedByPublicSettings() {
         assertTrue(siteSettingsService.getPublicSettings().keySet().containsAll(java.util.List.of(
                 "backgroundType", "backgroundColor", "backgroundGradientFrom", "backgroundGradientTo",
-                "backgroundImageUrl", "backgroundOverlay", "backgroundFixed", "surfaceOpacity", "surfaceBlur")));
+                "backgroundImageUrl", "backgroundOverlay", "backgroundFixed", "surfaceOpacity", "surfaceBlur",
+                "glassMode")));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"on", "off"})
+    @DisplayName("glassMode_AcceptsOnAndOff")
+    void glassMode_AcceptsOnAndOff(String mode) {
+        assertEquals(mode, siteSettingsService.updateSettings(Map.of("glassMode", mode)).get("glassMode"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"", "ON", "Off", "true", "1", "yes", "glass"})
+    @DisplayName("glassMode_RejectsAnythingElse")
+    void glassMode_RejectsAnythingElse(String mode) {
+        var error = assertThrows(BusinessException.class,
+                () -> siteSettingsService.updateSettings(Map.of("glassMode", mode)), mode);
+        assertEquals(400, error.getCode());
+        assertEquals("请选择有效的玻璃感模式", error.getMessage());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"ocean", "forest", "lavender", "sunset", "midnight", "ink", "dusk", "sand"})
+    @DisplayName("themeSkin_AcceptsEveryPublishedSkin")
+    void themeSkin_AcceptsEveryPublishedSkin(String skin) {
+        assertEquals(skin, siteSettingsService.updateSettings(Map.of("themeSkin", skin)).get("themeSkin"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"", "OCEAN", "ink-gradient", "noir"})
+    @DisplayName("themeSkin_RejectsUnknownSkins")
+    void themeSkin_RejectsUnknownSkins(String skin) {
+        var error = assertThrows(BusinessException.class,
+                () -> siteSettingsService.updateSettings(Map.of("themeSkin", skin)), skin);
+        assertEquals(400, error.getCode());
+        assertEquals("请选择有效的页面皮肤", error.getMessage());
     }
 
     @ParameterizedTest

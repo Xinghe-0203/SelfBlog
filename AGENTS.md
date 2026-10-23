@@ -22,7 +22,7 @@ npm run lint:check; npm run format:check; npm run type-check; npm run test:run; 
 ```
 
 - **Always pass `-Dskip.npm=true -Dskip.installnodenpm=true` on backend runs.** Otherwise `frontend-maven-plugin` runs `npm ci` + `npm run build` in `../frontend` first, and a plain `mvn test` mutates frontend build output. Never run it while frontend files are mid-edit.
-- Never leave the suites below baseline: backend **1254 tests / 0 failures**, frontend **51 files / 504 tests** plus `lint:check`, `format:check`, `type-check`, `test:deployment` (27/27) and `build` green (2026-10-22).
+- Never leave the suites below baseline: backend **1288 tests / 0 failures**, frontend **55 files / 534 tests** plus `lint:check`, `format:check`, `type-check`, `test:deployment` (27/27) and `build` green (2026-10-23).
 
 ## CI (`.github/workflows/ci.yml`)
 

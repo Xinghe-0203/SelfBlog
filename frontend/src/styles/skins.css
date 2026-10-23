@@ -44,6 +44,42 @@
   --accent-dark: #a8442d;
 }
 
+/* ── 新增皮肤（v2.0.30，配合后台的成品主题预设）─────────────────────────
+   命名与 constants/themePresets.ts 里的 ThemePresetSkin 一一对应，
+   后端 settings 的 themeSkin 白名单也必须包含它们，否则保存会被拒。 */
+
+/* 墨青：宋体标题 + 青墨强调色，圆角硬、投影浅，像一张方格笺纸。 */
+#selfblog[data-skin='ink']:not(.dark-mode) {
+  --bg-primary: #f2f5f4;
+  --bg-secondary: #e9efed;
+  --bg-tertiary: #dfe7e4;
+  --surface-primary: #ffffff;
+  --surface-secondary: #f7faf9;
+  --border-light: #d7e0dd;
+  --text-primary: #1f2a28;
+  --text-secondary: #56635f;
+  --text-muted: #64716d;
+  --accent: #1f7a72;
+  --accent-light: #e0f0ee;
+  --accent-dark: #186059;
+}
+
+/* 暖砂：陶土橙强调色 + 暖白纸面，圆角更软、投影更深。 */
+#selfblog[data-skin='sand']:not(.dark-mode) {
+  --bg-primary: #f8f4ee;
+  --bg-secondary: #f1ebe1;
+  --bg-tertiary: #e8dfd1;
+  --surface-primary: #fffdfa;
+  --surface-secondary: #faf6ef;
+  --border-light: #e5dbcb;
+  --text-primary: #33291f;
+  --text-secondary: #6b5b4a;
+  --text-muted: #7a6a58;
+  --accent: #c2703f;
+  --accent-light: #f7e8dc;
+  --accent-dark: #a05a31;
+}
+
 #selfblog[data-skin='midnight'] {
   --accent-strength: 62%;
   --accent-shade: white;
@@ -74,6 +110,37 @@
   --border-solid: #2d4053;
 }
 
+/* 暮紫：深色画布 + 雾紫强调色，晚上读长文不刺眼。 */
+#selfblog[data-skin='dusk'] {
+  --accent-strength: 66%;
+  --accent-shade: white;
+  --contrast-bg: #ebebeb;
+  --contrast-bg-hover: #fff;
+  --contrast-bg-active: #d6d6d6;
+  --contrast-fg: #111;
+  --text-inverse: #111;
+  --functional-glass-edge: rgb(255 255 255 / 12%);
+  --functional-glass-shadow: 0 9px 30px rgb(0 0 0 / 26%);
+  --bg-primary: #131220;
+  --bg-secondary: #1b1930;
+  --bg-tertiary: #232040;
+  --surface-primary: #1c1a2e;
+  --surface-secondary: #232140;
+  --border-light: #2f2c4a;
+  --text-primary: #eceaf7;
+  --text-secondary: #b3aecb;
+  --text-muted: #908aa8;
+  --accent: #9d8bf5;
+  --accent-light: #2a2545;
+  --accent-dark: #b3a4ff;
+  --surface-solid: #1c1a2e;
+  --background-solid: #131220;
+  --glass-bg: #1c1a2e;
+  --glass-bg-light: #232140;
+  --glass-bg-heavy: #1c1a2e;
+  --border-solid: #2f2c4a;
+}
+
 /* midnight 皮肤本身就是深色，原生控件/滚动条应始终按深色渲染。
    App.vue 把 .dark-mode 加在 #selfblog 自身（而非其后代），
    原来的 `#selfblog[data-skin='midnight'] .dark-mode` 是后代选择器，
@@ -81,5 +148,12 @@
 #selfblog[data-skin='midnight'],
 #selfblog[data-skin='midnight'].dark-mode,
 #selfblog[data-skin='midnight'] .dark-mode {
+  color-scheme: dark;
+}
+
+/* 暮紫同样是自带深色的皮肤，原生控件同样按深色渲染。 */
+#selfblog[data-skin='dusk'],
+#selfblog[data-skin='dusk'].dark-mode,
+#selfblog[data-skin='dusk'] .dark-mode {
   color-scheme: dark;
 }

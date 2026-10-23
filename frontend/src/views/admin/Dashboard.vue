@@ -23,11 +23,11 @@ const workspaceLinks: Array<{
     icon: 'file-text'
   },
   {
-    segment: 'seo',
-    label: 'SEO 管理',
-    description: '检查标题、描述与封面问题，或用模型为文章起草搜索元数据。',
-    action: '优化收录',
-    icon: 'sparkle'
+    segment: 'pages',
+    label: '页面管理',
+    description: '自定义首页、关于页与导航，以及站点其它独立页面。',
+    action: '管理页面',
+    icon: 'home'
   },
   {
     segment: 'health',

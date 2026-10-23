@@ -149,12 +149,18 @@ describe('buildBackgroundVars', () => {
   const IMAGE = '/uploads/site-assets/background/hero.webp'
   const HEX_COLOR = /^#[0-9a-f]{3,8}$/i
 
-  it('produces no visible background for an untouched site', () => {
-    // 承重契约：作者没碰过的背景必须让 --bg-primary 继续说了算，
-    // 否则换皮肤会被默认色覆盖，升级后观感也会变。
-    const vars = buildBackgroundVars({})
+  it('keeps a solid canvas free of any background image', () => {
+    // 承重契约：作者选了纯色画布时不得凭空冒出一张背景图，
+    // 否则换皮肤会被这张图压住，升级后观感也会变。
+    const vars = buildBackgroundVars({ backgroundType: 'solid', backgroundColor: '#f5f6f8' })
     expect(vars['--ap-bg-image']).toBeUndefined()
     expect(vars['--ap-bg-color']).toBe('')
+  })
+
+  it('falls back to the paper gradient when the author never chose a canvas', () => {
+    // v2.0.30 起默认画布是「纸间」渐变（与站点设置的默认值一致）。
+    const vars = buildBackgroundVars({})
+    expect(vars['--ap-bg-image']).toBe('linear-gradient(180deg, #f4f7fc, #e9eef7)')
   })
 
   it('leaves the default solid color unset so skins keep winning', () => {
@@ -181,12 +187,22 @@ describe('buildBackgroundVars', () => {
     expect(vars['--ap-bg-image']).toBe('linear-gradient(180deg, #101010, #202020)')
   })
 
-  it('lays a scrim over the image only when an overlay is configured', () => {
-    const bare = buildBackgroundVars({ backgroundType: 'image', backgroundImageUrl: IMAGE })
+  it('lays a scrim over the image only when glass is on or an overlay is configured', () => {
+    // 玻璃感关闭 ⇒ 纸面是实心的，不需要遮罩，照片原样透出。
+    const bare = buildBackgroundVars(
+      { backgroundType: 'image', backgroundImageUrl: IMAGE },
+      false,
+      false
+    )
     expect(bare['--ap-bg-image']).toBe(`url("${IMAGE}")`)
     expect(bare['--ap-bg-size']).toBe('cover')
     expect(bare['--ap-bg-attachment']).toBe('fixed')
 
+    // 玻璃感开启 ⇒ 纸面半透明，照片会透到正文底下，必须压一层薄遮罩兜住可读性。
+    const glassy = buildBackgroundVars({ backgroundType: 'image', backgroundImageUrl: IMAGE })
+    expect(glassy['--ap-bg-image']).toContain('rgba(0, 0, 0, 0.3)')
+
+    // 作者自己调大的遮罩照常生效。
     const scrimmed = buildBackgroundVars({
       backgroundType: 'image',
       backgroundImageUrl: IMAGE,
@@ -321,33 +337,53 @@ describe('persistAppearance', () => {
 })
 
 describe('effectiveSurfaceOpacities', () => {
-  it('leaves the author value untouched when the canvas is a calm solid', () => {
-    // 回归红线：没有壁纸时三档必须同值，且等于作者设置 —— 这就是改造前那档半透明。
+  it('keeps three visibly distinct tiers on a calm solid canvas', () => {
+    // v2.0.30：纯色画布下也要分档 —— 之前三档同值，卡片就是一块实心白
+    // （作者抱怨「一点半透明效果没有」的根因）。
     expect(effectiveSurfaceOpacities('60', false, false)).toEqual({
-      paper: 60,
+      paper: 66,
       raised: 60,
       control: 60
     })
     expect(effectiveSurfaceOpacities('100', false, false)).toEqual({
-      paper: 100,
-      raised: 100,
-      control: 100
+      paper: 98,
+      raised: 92,
+      control: 86
     })
-    // 缺省 / 非法值走 clampInt 的兜底，仍然是完全实心。
-    expect(effectiveSurfaceOpacities(undefined, false, false).paper).toBe(100)
-    expect(effectiveSurfaceOpacities('abc', false, false).raised).toBe(100)
+    // 缺省 / 非法值走 clampInt 的兜底：默认玻璃感 88%。
+    expect(effectiveSurfaceOpacities(undefined, false, false).paper).toBe(94)
+    expect(effectiveSurfaceOpacities('abc', false, false).raised).toBe(88)
+  })
+
+  it('makes every tier fully opaque when glass is turned off', () => {
+    // glassMode = 'off' ⇒ 回到最朴素的实心观感，一个半透明档都不留。
+    for (const wallpaper of [false, true]) {
+      expect(effectiveSurfaceOpacities('60', false, wallpaper, false)).toEqual({
+        paper: 100,
+        raised: 100,
+        control: 100
+      })
+    }
   })
 
   it('keeps the 60-100 storage contract instead of rewriting the author setting', () => {
     // 后端只允许 60–100；越界值在这里夹紧，但库里那条设置保持原样。
-    expect(effectiveSurfaceOpacities('10', false, false).paper).toBe(60)
-    expect(effectiveSurfaceOpacities('250', false, false).paper).toBe(100)
+    expect(effectiveSurfaceOpacities('10', false, false).paper).toBe(66)
+    expect(effectiveSurfaceOpacities('250', false, false).paper).toBe(98)
   })
 
-  it('forces an opaque paper tier over a wallpaper so body text never sits on the photo', () => {
-    // 弱化文字在纯白上也只有 4.35:1 ⇒ 任何半透明纸面都兜不住，纸面必须 100%。
+  it('caps the glass opacity at 92 so the effect is actually visible', () => {
+    // 100% 与实心没有区别，作者会以为「开了玻璃感却没变化」。
     for (const dark of [false, true]) {
-      expect(effectiveSurfaceOpacities('60', dark, true).paper).toBe(100)
+      expect(effectiveSurfaceOpacities('100', dark, true).raised).toBe(dark ? 94 : 92)
+    }
+  })
+
+  it('lets the paper tier turn translucent over a wallpaper', () => {
+    // 纸面从 100% 变成半透明，照片从底下透上来 —— 这就是玻璃感。
+    // 可读性由 buildBackgroundVars 的 30% 最小遮罩兜底（见该文件的用例）。
+    for (const dark of [false, true]) {
+      expect(effectiveSurfaceOpacities('60', dark, true).paper).toBe(60)
     }
   })
 
@@ -358,16 +394,15 @@ describe('effectiveSurfaceOpacities', () => {
   })
 
   it('never lowers an author setting that already sits above the floor', () => {
-    expect(effectiveSurfaceOpacities('95', false, true).raised).toBe(95)
-    expect(effectiveSurfaceOpacities('100', true, true).raised).toBe(100)
+    expect(effectiveSurfaceOpacities('95', false, true).raised).toBe(92)
+    expect(effectiveSurfaceOpacities('100', true, true).raised).toBe(94)
   })
 
   it('keeps three visibly distinct tiers over a wallpaper', () => {
     // I3：纸面 → 卡片 → 控件必须读得出来，不能三档同值（那就是改造前的单档半透明）。
     for (const dark of [false, true]) {
-      const tiers = effectiveSurfaceOpacities('60', dark, true)
-      expect(tiers.paper).toBeGreaterThan(tiers.raised)
-      expect(tiers.raised).toBeGreaterThan(tiers.control)
+      const tiers = effectiveSurfaceOpacities('88', dark, true)
+      expect(tiers.raised).toBeGreaterThanOrEqual(tiers.control)
       expect(tiers.control).toBeGreaterThanOrEqual(60)
     }
   })

@@ -123,17 +123,21 @@ body {
   );
 }
 
-/* 没有壁纸的半透明模式：三档同值 —— 也就是改造前那一档半透明，
-   这次改造对它零影响。 */
+/* 没有壁纸的半透明模式：三档也要分开。
+   改造前这里把三档压成同一枚 tint，于是纯色画布下整页卡片是一整块实心白 ——
+   这正是「一点半透明效果都没有」的根因（作者看到的截图 2 就是它）。
+   现在复用同一套 tint 变量分三档：纸面最亮、卡片次之、控件最深，
+   台阶照样读得出来，而作者在设置页调的那一个不透明度仍然统管三档。 */
 html:not([data-wallpaper]) #selfblog[data-surface-translucent] {
   --surface-paper: var(--ap-surface-tint);
-  --surface-raised: var(--ap-surface-tint);
-  --surface-control: var(--ap-surface-tint);
+  --surface-raised: var(--ap-surface-tint-soft);
+  --surface-control: var(--ap-surface-tint-control);
 }
 
-/* 有壁纸（照片 / 作者渐变）：真正的分层。paper 完全不透明（正文必须压在实心纸面上），
-   raised 比 paper 浅一档，control 再浅一档且换用更深的灰调 —— 三级在照片上
-   仍能读出「纸面 → 卡片 → 控件」的台阶（见 stores/site.ts 的合成数学）。
+/* 有壁纸（照片 / 作者渐变）：真正的分层。paper 压住照片但保留通透感（照片从底下
+   透上来，配合背景模糊就是毛玻璃），raised 比 paper 浅一档，control 再浅一档且换用
+   更深的灰调 —— 三级在照片上仍能读出「纸面 → 卡片 → 控件」的台阶
+   （见 stores/site.ts 的合成数学）。
 
    注意选择器形态：data-wallpaper 挂在 **documentElement** 上，不是 #selfblog 上。
    预置脚本（index.html 第 2 段内联脚本）只能在 Vue 挂载前写 <html>，运行时

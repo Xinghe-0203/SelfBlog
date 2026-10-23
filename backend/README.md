@@ -228,8 +228,14 @@ and stored in the `site_setting` KV table. **No schema migration is required.**
 `solid | gradient | image`, the three colour keys to `#RRGGBB`, `backgroundFixed` to a
 boolean, and the numeric keys go through `requireIntegerInRange` (pure decimal integers only,
 no decimals or signs). The declared ranges are `backgroundOverlay` 0-90, `surfaceOpacity`
-60-100, `surfaceBlur` 0-40. Defaults are chosen so an untouched site renders exactly as
-before, which is why the frontend emits **no** CSS variable in that case.
+60-100, `surfaceBlur` 0-40.
+
+**Since v2.0.30 the defaults are glass-on, not transparent-by-omission**: `surfaceOpacity`
+`88`, `surfaceBlur` `12`, `backgroundType` `gradient`, `backgroundGradientFrom` `#f4f7fc`,
+`backgroundGradientTo` `#e9eef7`, plus the new `glassMode` (`on | off`, default `on`). The
+frontend clamps the effective opacity to 60-92 because 100% is indistinguishable from a solid
+surface, and it floors the background-image scrim at 30% whenever glass is on so a translucent
+paper surface keeps its text contrast.
 
 `backgroundImageUrl` is a CSS-injection surface: the value is spliced into `url("…")`
 client-side, so whitespace and `\u00A0`, `"`, `'`, `(`, `)`, and `\` are all rejected,
@@ -290,6 +296,26 @@ request decoding reject unknown fields. Body limit10000 characters; one serializ
 document limit48KiB UTF-8. Back up the entire database, not only the site-settings API.
 See [the page-management guide](../docs/page-management.md) and
 [the storage decision](../docs/decisions/001-versioned-pages-in-existing-kv.md).
+
+### Page banners (v2.0.30)
+
+`PageStyle` gained a nested `banner` component (`PageBanner` in `dto/site/PageModels.java`):
+`image`, `fit` (`cover | contain`), `position` (`center | top | bottom`),
+`height` (`compact | standard | tall` = 190/250/330 px), `overlay` (0–80, nullable),
+`tone` (`auto | light | dark`) and `layout` (`split | centered | stacked`). **Only `home`
+and `about` accept a banner**; `PageCatalog.validate` rejects it everywhere else with
+`400 请选择有效的横幅样式`, and every enum goes through the existing `bannerChoice` helper.
+
+The banner image reuses the same `imageUrl(...)` whitelist as the SEO share image
+(`http(s)` with a host and no userinfo, or an `/uploads/` path without `\ % .. CR LF`),
+because the value is spliced into a CSS `url()` exactly like `backgroundImageUrl`.
+`PageStyle` is deserialized by Jackson and has **no Java constructor call sites anywhere in
+the repository**, so adding the component breaks no caller.
+
+`ReadingContent` mirrors the banner into the crawlable HTML as `seo-banner-*` classes plus
+`--seo-banner-*` custom properties; `static/seo-reading.css` carries the matching rules.
+Page-level SEO data (`PageSeo`) is still validated, still rendered into the crawlable HTML
+and still drives `sitemap` inclusion — only its **editor UI** was removed in v2.0.30.
 
 The final full suite with this feature passes **491 tests / 0 failures / 0 errors / 0 skipped**,
 including two real independent-transaction H2 concurrency tests. A disposable SQLite/browser

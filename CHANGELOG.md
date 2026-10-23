@@ -4,6 +4,167 @@
 
 ---
 
+## 未发布 — 页面横幅自定义 + 玻璃感默认开启 + 后台信息架构重排 (2026-10-23)
+
+### 说明
+
+用户诉求（原话）：「当前项目前端很难看，1位置请在后台可以设置背景图片和大小和内容。2位置你看看，一点半透明效果没有。3位置也要有可以设置背景图片和大小内容。工作台这里的SEO就没必要了，刚刚我和你说的那些自定义可以放在这种页面里。网站设置里面的内容太多了太杂乱了，请仔细整理。如果你觉得这种做前端不合适你也可以采用别的前端框架之类的，我只要你能够做好前端。」
+
+作者对四处观感不满，逐条核实根因后本版按「清透纸面」方向做增量重做（不换框架、不推翻设计系统）：
+
+- **位置 1（首页介绍区）**：`.intro-shell` 的背景图写死为「第一篇文章的封面」、宽度写死 43%、文案写死取站点资料，页面编辑器里根本没有「横幅」这一档。
+- **位置 2（卡片没有半透明）**：`stores/site.ts` 的 `effectiveSurfaceOpacities()` 在**无壁纸**时把三档表面压成同一个值，`appearance.css` 还有一条 `html:not([data-wallpaper])` 规则把三档强制拉平 —— 于是纯色/渐变画布下卡片必然是实心白块。**这就是「一点半透明效果没有」的直接原因。**
+- **位置 3（关于页作者卡）**：`.author-profile` 只有 `background: var(--surface-raised)`，作者卡是「作者资料」而不是「视觉横幅」。
+- **位置 4（页面编辑器的 SEO 档）**：页面级 SEO 与「SEO 管理」页（文章级）职责重叠，而页面编辑器是作者配置页面的地方，不该塞搜索元数据。
+- **位置 5（网站设置太杂）**：7 段平铺表单混了「站点资料 / 外观 / 内容互动 / 系统安全 / AI 集成」五类关注点。
+
+设计稿与验收清单见 [`docs/frontend-redesign-plan.md`](docs/frontend-redesign-plan.md)。
+
+### 新增（页面横幅：位置 1 与位置 3）
+
+- **`PageStyle.banner`**（`backend/.../dto/site/PageModels.java` + `frontend/src/types/page.ts`）：
+  `image`（http(s):// 或 `/uploads/`，服务端复用既有 `imageUrl()` 白名单）/ `fit`（`cover|contain`）/
+  `position`（`center|top|bottom`）/ `height`（`compact|standard|tall` = 190/250/330px）/
+  `overlay`（0–80）/ `tone`（`auto|light|dark`）/ `layout`（`split|centered|stacked`）。
+  只有 `home` 与 `about` 允许横幅，其余页面传入即 400（`PageCatalog.validate` 的 `bannerChoice`）。
+  **`new PageStyle(...)` 在全仓没有任何构造调用点**（全部走 Jackson 反序列化），加字段不破坏 Java 侧。
+- **后台入口在「页面管理 → 编辑页面 → 样式」**，不是网站设置：新增「横幅」区块，背景图走
+  `SiteAssetField kind="background"`（复用 `SiteAssetKind.BACKGROUND`，≤8MB，png/jpg/jpeg/webp），
+  同时允许粘贴外链；适配/焦点/高度/遮罩/文字明暗/排布六个控件。地址先过 `safeBannerUrl()`，
+  非法值只提示不落草稿（背景图会被拼进 CSS `url()`，与全站背景图同一个注入面）。
+- **首页渲染**：`.intro-shell` 成为真正的横幅容器 —— `.intro-banner`（media + scrim）铺底，
+  按 `layout` 排成左右分栏（split）/ 居中（centered）/ 上下堆叠（stacked）；`split` 在窄屏降级为堆叠。
+  无横幅时 class / style / DOM 与改造前逐字一致（`.intro-visual` 仍回落第一篇文章封面）。
+- **关于页渲染**：`.author-profile` 支持同一套横幅，头像与文字层级保留（`isolation: isolate` 保证遮罩不压文字）。
+- **服务端可抓取 HTML 同步**：`ReadingContent` 输出 `seo-banner-*` 类与 `--seo-banner-*` 变量，
+  `backend/src/main/resources/static/seo-reading.css` 补齐样式 —— 爬虫拿到的 HTML 也带横幅。
+- **预览零成本**：`PagePreviewContent` 直接挂真实 `Home.vue` / `About.vue`，编辑器预览自动所见即所得。
+
+### 新增（玻璃感：位置 2）
+
+- **新设置键 `glassMode`**（`on|off`，默认 `on`）：一键关闭即回到完全实心（三档全 100、无模糊）。
+- **默认值改为玻璃感开启**：`surfaceOpacity` 100 → **88**、`surfaceBlur` 0 → **12**、
+  `backgroundType` `solid` → **`gradient`**、画布 `#f5f6f8` → **`#f4f7fc → #e9eef7`**。
+- **三档表面在纯色/渐变画布下也分档**（`appearance.css`）：删掉
+  `html:not([data-wallpaper])` 那条「三档压成同值」的规则，改成各用自己的 tint 变量 ——
+  这是本次最关键的一处修复，纸面 / 卡片 / 控件从此在任何画布下都能读出台阶。
+- **`effectiveSurfaceOpacities(rawOpacity, dark, wallpaper, glass)`** 新契约：
+  `glass=off` → 全 100；`glass=on` 且无壁纸 → paper `min(100, base+6)` / raised `base` / control `base−6`；
+  有壁纸 → paper `base` / raised `max(base, 88 浅 / 94 深)` / control `raised−6`；`base = clamp(raw, 60, 92)`。
+  **上限 92 而不是 100**：100% 与实心无差别，作者会以为「开了却没效果」。
+- **纸面半透明的可读性兜底**：玻璃感开启时背景照片强制至少 30% 遮罩（`GLASS_MIN_OVERLAY`），
+  作者调大照常生效、调小被这个下限兜住；深色画布仍走原有 45% 下限。
+- 设置页「玻璃感」面板：总开关 + 不透明度滑杆（60–92）+ 模糊滑杆（0–40），关闭时两个滑杆禁用。
+
+### 新增（成品主题预设）
+
+- `frontend/src/constants/themePresets.ts`：**4 套**搭配好的主题，一点即换、换完仍可微调单项
+  （`applyThemePreset()` 只写 10 个**已有**设置键，后端零迁移；`isThemePresetActive()` 用于标「使用中」）。
+
+  | 预设 | 皮肤 | 强调色 | 字体 | 圆角 | 阴影 | 画布渐变 | 卡片 |
+  |------|------|--------|------|------|------|----------|------|
+  | 纸间 | ocean | `#165DFF` | system | default | default | `#f4f7fc → #e9eef7` | 88% / 12px |
+  | 墨青 | ink | `#1F7A72` | serif | sharp | flat | `#f3f6f4 → #e4ece8` | 90% / 10px |
+  | 暖砂 | sand | `#C2703F` | serif | soft | deep | `#faf6f0 → #efe3d6` | 88% / 12px |
+  | 暮紫 | dusk | `#9D8BF5` | sans | soft | deep | 深色画布 | 88% / 12px |
+
+- **三套新皮肤**（`frontend/src/styles/skins.css`）：`ink`（墨青，浅）、`sand`（暖砂，浅）、
+  `dusk`（暮紫，深色画布，自带 `color-scheme: dark`），并同步进后端 `themeSkin` 白名单。
+  `isDarkCanvas()` 增加 `dusk`，深色画布规则（丢浅色渐变、遮罩加厚）随之生效。
+- **中文标题不再收负字距**（`styles/typography.css`）：`:lang(zh) h1/h2/h3 { letter-spacing: 0 }` ——
+  原来的 `-0.035em / -0.025em` 在全角汉字上会挤字，西文保留负字距。
+
+### 变更（后台信息架构：位置 4 与位置 5）
+
+- **页面编辑器去掉 SEO 档**：只剩「内容 / 样式 / 预览」三档（连带删除 `forcedNoindex`、`setSeo()`、
+  `PageSeo` 导入）。**页面级 SEO 仍然生效** —— `usePageSeo.ts`、`ReadingPageService`、`SitemapService`、
+  `PageCatalog` 都继续消费已存 `config.seo`，只是不再提供编辑 UI；文章级 SEO 仍在「SEO 管理」页。
+- **网站设置收敛为四个 tab**（`views/admin/Settings.vue`，单个 `<form>` 保留）：
+  站点资料（名称/简介/品牌素材/页脚/域名）· 外观（成品主题/皮肤/强调色/页面背景/玻璃感/外观深度自定义）·
+  内容与互动（评论与默认审核/留言审核/背景音乐/访客统计）· 系统与安全（后台入口/登录密码/匿名访问统计）。
+- **模型连接迁到「SEO 管理」页顶部**：新组件 `frontend/src/components/admin/LlmConnectionPanel.vue`
+  承载服务商/地址/密钥/模型/超时/思考强度/最大 token/测试连接，只提交 11 个 `llm*` 键；
+  设置页「系统与安全」只留一句指向 `${adminRoot}/seo` 的说明，避免两处重复表单。
+- **工作台去掉「SEO 管理」卡**，换成「页面管理」卡（页面的视觉与文案才是这一版的主战场）。
+
+### 修复（真机验证发现的问题）
+
+- **`.intro-shell` / `.author-profile` 在无壁纸时永远实心**：见上文「三档表面在纯色/渐变画布下也分档」。
+- **`PageServiceImplTest` 的两个测试自身缺陷**（新增用例暴露）：
+  ① `List.of(...).toList()` 在 JDK 21 不合法（只有 `Stream.toList()`），删掉 `.toList()`；
+  ② 连续三次 `saveDraft("home", 0, …)` 第二次即 409（revision 已变 1），改为循环内递进 revision。
+- **`Seo.vue` 的两处 tooltip 文案**仍写「请先在网站设置中配置模型接口」，改为指向本页顶部的模型连接面板。
+
+### 验证
+
+1. **后端全量**：`Tests run: 1288, Failures: 0, Errors: 0, Skipped: 0, BUILD SUCCESS`
+   （基线 1254 → 1288，新增横幅校验、玻璃感默认值、阅读 HTML 横幅、主题皮肤白名单等用例）。
+2. **前端六道闸门全绿**：`lint:check` 0 errors / 42 warnings（与基线一致）、`format:check` 通过、
+   `type-check` 0、`test:run` **55 files / 534 tests**（基线 51/504，新增 4 文件 30 用例）、
+   `test:deployment` 27/27、`build` ✓。
+3. **真机浏览器验收**（Playwright 1.59.1 + Chrome，Vite :3000 + jar :8825 + 作者真实 SQLite 库）：
+   - **半透明默认开启**：`.intro-shell` = `color(srgb 1 1 1 / 0.88)` + `backdrop-filter: blur(12px) saturate(1.05)`；
+     `.article-list` / `.sidebar-block` = `color(srgb 0.933 0.941 0.957 / 0.88)`；
+     `.archive-callout` = `… / 0.82`；关于页 `.author-profile` = `… / 0.88` + blur —— 三级台阶逐档可读。
+   - **深色模式**：`.intro-shell` = `… / 0.94`、卡片 = `… / 0.88`，正文 `rgb(237, 240, 245)`，对比度正常。
+   - **壁纸模式**（作者真实 `backgroundType=image`）：三档 = `1 1 1 / 0.88`、`0.933 0.941 0.957 / 0.88`、
+     `0.905 0.917 0.941 / 0.82`，模糊生效，无「卡片全透明」回归。
+   - **横幅**：首页写入 `split/tall/overlay 35/tone light` 后 DOM 为
+     `.intro-shell.intro-shell--banner.intro-shell--banner-split`，`min-height: 330px`，
+     `--banner-height/--banner-overlay/--banner-image` 全部正确；关于页 `centered/standard/overlay 45`
+     渲染为 `.author-profile--banner-centered`，白字压图可读。验证后已通过 API 还原到作者原配置。
+   - **后台**：工作台 5 卡（`文章管理/页面管理/内容体检/访客记录/网站设置`，**无 SEO 卡**）；
+     设置页 4 tab（`profile/appearance/interaction/system`）+ 4 张成品主题卡（`paper/ink/sand/dusk`）+
+     玻璃感开关 `checked=true` + 不透明度滑杆 `max=92`；页面编辑器 3 档（`内容/样式/预览`）+ 横幅 6 个控件；
+     SEO 页顶部 `[data-llm-panel]` 渲染正常，无 console error。
+4. **未验证项**：真实 Vercel 部署、真实 MySQL 8 运行时（仍由 CI 覆盖）、搜索引擎实际收录。
+
+完整方法与读数见 [`docs/reviews/2026-10-23-glass-and-banner-verification.md`](docs/reviews/2026-10-23-glass-and-banner-verification.md)，
+持久化截图 8 张在 `docs/reviews/assets/2026-10-23-*.png`（默认玻璃感首页 / 深色首页 / 作者壁纸态 /
+首页 split 横幅 / 关于页 centered 横幅 / 页面编辑器横幅控件 / 设置页外观分组 / 工作台）。
+
+### 影响文件
+
+| 文件 | 改动类型 |
+|------|----------|
+| `backend/src/main/java/com/selfblog/dto/site/PageModels.java` | 修改（新增 `PageBanner` record，`PageStyle` 加 `banner` 分量） |
+| `backend/src/main/java/com/selfblog/service/site/page/PageCatalog.java` | 修改（横幅校验 `bannerChoice`，仅 home/about 允许） |
+| `backend/src/main/java/com/selfblog/service/site/impl/SiteSettingsServiceImpl.java` | 修改（`glassMode` 键 + 玻璃感默认值 + `ink`/`sand`/`dusk` 皮肤白名单） |
+| `backend/src/main/java/com/selfblog/service/site/seo/ReadingContent.java` | 修改（服务端阅读 HTML 输出横幅 class/变量） |
+| `backend/src/main/resources/static/seo-reading.css` | 修改（横幅样式） |
+| `backend/src/test/java/com/selfblog/service/site/impl/PageServiceImplTest.java` | 修改（横幅用例 + 两处测试自身缺陷修复） |
+| `backend/src/test/java/com/selfblog/service/site/impl/SiteSettingsServiceImplTest.java` | 修改（玻璃感/新皮肤断言） |
+| `backend/src/test/java/com/selfblog/service/site/seo/ReadingHtmlRendererTest.java` | 修改（横幅 HTML 断言） |
+| `backend/src/test/java/com/selfblog/service/site/seo/ReadingPageServiceTest.java` | 修改（横幅 HTML 断言） |
+| `frontend/src/types/page.ts` | 修改（`PageBanner` 与 `PageStyle.banner`） |
+| `frontend/src/utils/pageCatalog.ts` | 修改（`PageBannerCapability`，home/about 声明横幅能力） |
+| `frontend/src/composables/usePageConfig.ts` | 修改（`normalizePageBanner` / `pageBannerVars` / `safeBannerUrl` / `BANNER_HEIGHTS`） |
+| `frontend/src/views/Home.vue` | 修改（`.intro-banner` 三种排布渲染） |
+| `frontend/src/views/About.vue` | 修改（`.author-profile--banner` 渲染） |
+| `frontend/src/views/admin/pages/PageEditor.vue` | 修改（删除 SEO 档；样式档新增横幅控件） |
+| `frontend/src/stores/site.ts` | 修改（`glassMode` + 玻璃感数学 + 新默认值 + `dusk` 深色画布） |
+| `frontend/src/constants/themePresets.ts` | 新增（4 套成品主题预设） |
+| `frontend/src/styles/appearance.css` | 修改（纯色/渐变画布下三档表面分档） |
+| `frontend/src/styles/skins.css` | 修改（新增 `ink` / `sand` / `dusk` 三套皮肤） |
+| `frontend/src/styles/typography.css` | 修改（中文标题不收负字距） |
+| `frontend/src/views/admin/Settings.vue` | 修改（7 段 → 4 tab；接主题预设与玻璃感面板） |
+| `frontend/src/views/admin/Seo.vue` | 修改（顶部挂 `LlmConnectionPanel`，tooltip 文案修正） |
+| `frontend/src/components/admin/LlmConnectionPanel.vue` | 新增（模型连接面板，只提交 11 个 `llm*` 键） |
+| `frontend/src/views/admin/Dashboard.vue` | 修改（SEO 卡 → 页面管理卡） |
+| `frontend/src/views/admin/__tests__/Dashboard.test.ts` | 修改（工作台卡断言） |
+| `frontend/src/views/admin/__tests__/Settings.test.ts` | 修改（4 tab + 12 面板 + 模型接口已迁走） |
+| `frontend/src/views/admin/pages/__tests__/PageEditor.test.ts` | 修改（横幅用例） |
+| `frontend/src/components/admin/__tests__/LlmConnectionPanel.test.ts` | 新增（11 用例） |
+| `frontend/src/components/pages/__tests__/pageBanner.test.ts` | 新增（横幅变量与安全地址） |
+| `frontend/src/utils/__tests__/pageCatalog.test.ts` | 新增（横幅能力位） |
+| `frontend/src/views/__tests__/PageBanner.test.ts` | 新增（首页/关于页横幅渲染） |
+| `frontend/src/stores/__tests__/site.test.ts` | 修改（玻璃感数学新契约） |
+| `docs/frontend-redesign-plan.md` | 新增（设计稿 + 验收清单） |
+| `docs/reviews/2026-10-23-glass-and-banner-verification.md` | 新增（真机验证记录 + 8 张对照截图） |
+| `docs/page-management.md`、`README.md`、`backend/README.md`、`frontend/README.md`、`CLAUDE.md`、`frontend/CLAUDE.md`、`AGENTS.md`、`docs/agents/{backend,frontend}.md` | 修改（功能说明 + 测试基线） |
+
+---
+
 ## v2.0.29 — 外观深度自定义（11 个视觉维度）+ 只读路径限流修复 (2026-10-22)
 
 ### 说明

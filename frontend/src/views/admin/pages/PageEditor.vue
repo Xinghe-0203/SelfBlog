@@ -1,10 +1,20 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useSiteStore } from '@/stores/site'
 import { pageCapability } from '@/utils/pageCatalog'
+import { safeBannerUrl } from '@/composables/usePageConfig'
 import { usePageEditor } from './usePageEditor'
 import PagePreview from './PagePreview.vue'
-import type { PageStyle, PageSeo } from '@/types/page'
+import SiteAssetField from '@/components/admin/SiteAssetField.vue'
+import type {
+  BannerFit,
+  BannerHeight,
+  BannerLayout,
+  BannerPosition,
+  BannerTone,
+  PageBanner,
+  PageStyle
+} from '@/types/page'
 const site = useSiteStore()
 const {
   editor,
@@ -21,11 +31,8 @@ const {
   reset,
   ConfirmDialog
 } = usePageEditor()
-const tab = ref<'content' | 'style' | 'seo' | 'preview'>('content')
+const tab = ref<'content' | 'style' | 'preview'>('content')
 const capability = computed(() => pageCapability(editor.value?.id || 'about'))
-const forcedNoindex = computed(
-  () => editor.value?.id === 'search' || editor.value?.id === 'notFound'
-)
 function overridden(key: string) {
   return key === 'title' || key === 'description'
     ? config.value[key] != null
@@ -48,8 +55,107 @@ function setField(key: string, value: string | null) {
 function setStyle(key: keyof PageStyle, value: string) {
   config.value = { ...config.value, style: { ...config.value.style, [key]: value } }
 }
-function setSeo(key: keyof PageSeo, value: string | boolean | null) {
-  config.value = { ...config.value, seo: { ...config.value.seo, [key]: value } }
+/* ---------------------------------------------------------------------------
+   横幅背景
+   ---------------------------------------------------------------------------
+   banner 是一个对象，不能走 setStyle(key: keyof PageStyle, value: string) 那条
+   字符串通道 —— 这里单独维护一个 setBanner(patch)，逐字段合并到 style.banner。
+   背景图地址先过白名单（safeBannerUrl）：非法地址只停在输入框里，不写进草稿。 */
+const FIT_OPTIONS: BannerFit[] = ['cover', 'contain']
+const POSITION_OPTIONS: BannerPosition[] = ['center', 'top', 'bottom']
+const HEIGHT_OPTIONS: BannerHeight[] = ['compact', 'standard', 'tall']
+const TONE_OPTIONS: BannerTone[] = ['auto', 'light', 'dark']
+const LAYOUT_LABELS: Record<BannerLayout, string> = {
+  split: '左右（文字在左，背景图在右）',
+  centered: '居中（背景图铺满，文字压在上面）',
+  stacked: '上下（背景图在上，文字在下）'
+}
+/** 输入框里的原始文本：非法地址只停在这里，不进草稿。 */
+const bannerImageDraft = ref('')
+/** 背景图地址不合法时的提示。 */
+const bannerError = ref('')
+const banner = computed(() => config.value.style?.banner ?? null)
+const bannerFit = computed(() => banner.value?.fit ?? 'cover')
+const bannerPosition = computed(() => banner.value?.position ?? 'center')
+const bannerHeight = computed(() => banner.value?.height ?? 'standard')
+const bannerOverlay = computed(() => banner.value?.overlay ?? 0)
+const bannerTone = computed(() => banner.value?.tone ?? 'auto')
+const bannerLayout = computed(() => banner.value?.layout ?? 'split')
+/** 该页面允许的排布；没有 banner 能力位时为空数组（横幅区块整体不显示）。 */
+const bannerLayouts = computed(() => capability.value.banner?.layouts ?? [])
+watch(
+  () => config.value.style?.banner?.image ?? '',
+  (value) => {
+    if (value !== bannerImageDraft.value) bannerImageDraft.value = value
+  },
+  { immediate: true }
+)
+function setBanner(patch: Partial<PageBanner>) {
+  const style = { ...config.value.style }
+  style.banner = { ...(style.banner ?? {}), ...patch }
+  config.value = { ...config.value, style }
+}
+/**
+ * 背景图地址。
+ *
+ * 只接受 http(s):// 或 /uploads/ 开头、且不含空白/引号/圆括号/反斜杠的地址 ——
+ * 与站点背景设置同一套白名单：这个值会被拼进 `url("…")`，校验必须在前端也做一次。
+ */
+function setBannerImage(value: string) {
+  bannerImageDraft.value = value
+  const trimmed = value.trim()
+  if (!trimmed) {
+    bannerError.value = ''
+    setBanner({ image: null })
+    return
+  }
+  if (!safeBannerUrl(trimmed)) {
+    bannerError.value = '背景图地址不合法'
+    return
+  }
+  bannerError.value = ''
+  setBanner({ image: trimmed })
+}
+function clearBanner() {
+  bannerImageDraft.value = ''
+  bannerError.value = ''
+  const style = { ...config.value.style }
+  delete style.banner
+  config.value = { ...config.value, style }
+}
+function setBannerFit(value: string) {
+  const fit = FIT_OPTIONS.find((item) => item === value)
+  if (fit) setBanner({ fit })
+}
+function setBannerPosition(value: string) {
+  const position = POSITION_OPTIONS.find((item) => item === value)
+  if (position) setBanner({ position })
+}
+function setBannerHeight(value: string) {
+  const height = HEIGHT_OPTIONS.find((item) => item === value)
+  if (height) setBanner({ height })
+}
+function setBannerTone(value: string) {
+  const tone = TONE_OPTIONS.find((item) => item === value)
+  if (tone) setBanner({ tone })
+}
+function setBannerLayout(value: string) {
+  const layout = bannerLayouts.value.find((item) => item === value)
+  if (layout) setBanner({ layout })
+}
+function setBannerOverlay(value: string) {
+  const parsed = Number.parseInt(value, 10)
+  if (!Number.isFinite(parsed)) return
+  setBanner({ overlay: Math.min(80, Math.max(0, parsed)) })
+}
+/** 保存前再校验一次背景图地址：非法的地址不落库。 */
+function requestWrite(action: 'save' | 'publish') {
+  const image = bannerImageDraft.value.trim()
+  if (image && !safeBannerUrl(image)) {
+    bannerError.value = '背景图地址不合法，请修正后再保存。'
+    return
+  }
+  void write(action)
 }
 </script>
 <template>
@@ -66,7 +172,7 @@ function setSeo(key: keyof PageSeo, value: string | boolean | null) {
           data-action="save"
           type="button"
           :disabled="busy || !dirty"
-          @click="write('save')"
+          @click="requestWrite('save')"
         >
           {{ busy ? '处理中…' : '保存草稿' }}</button
         ><button
@@ -75,7 +181,7 @@ function setSeo(key: keyof PageSeo, value: string | boolean | null) {
           type="button"
           :disabled="busy || dirty"
           :title="dirty ? '请先保存草稿' : '发布当前已保存版本'"
-          @click="write('publish')"
+          @click="requestWrite('publish')"
         >
           发布页面
         </button>
@@ -83,6 +189,9 @@ function setSeo(key: keyof PageSeo, value: string | boolean | null) {
     </header>
     <p v-if="error" class="editor-alert" role="alert">
       {{ error }} <button type="button" :disabled="busy" @click="reload">重新加载</button>
+    </p>
+    <p v-if="bannerError" class="editor-alert" role="alert" data-banner-error>
+      {{ bannerError }}
     </p>
     <p v-if="success" class="editor-success" role="status">{{ success }}</p>
     <p v-if="loading" role="status">正在加载页面配置…</p>
@@ -107,7 +216,6 @@ function setSeo(key: keyof PageSeo, value: string | boolean | null) {
           v-for="item in [
             { key: 'content', label: '内容' },
             { key: 'style', label: '样式' },
-            { key: 'seo', label: 'SEO' },
             { key: 'preview', label: '预览' }
           ] as const"
           :key="item.key"
@@ -236,54 +344,100 @@ function setSeo(key: keyof PageSeo, value: string | boolean | null) {
             <option value="comfortable">舒展</option>
           </select></label
         >
-      </section>
-      <section v-show="tab === 'seo'" class="editor-panel" aria-label="页面SEO">
-        <p class="field-hint">
-          留空会从真实页面信息生成。此处是页面元数据，不保证搜索引擎收录或排名。
-        </p>
-        <label class="page-field"
-          >{{ capability.dynamic ? 'SEO标题后缀（保留真实标题）' : 'SEO标题'
-          }}<input
-            :value="config.seo?.title || ''"
-            maxlength="160"
-            @input="setSeo('title', ($event.target as HTMLInputElement).value)" /></label
-        ><label class="page-field"
-          >SEO描述<textarea
-            :value="config.seo?.description || ''"
-            rows="3"
-            maxlength="400"
-            @input="setSeo('description', ($event.target as HTMLTextAreaElement).value)"
-          /></label
-        ><label class="page-field"
-          >分享图地址<input
-            :value="config.seo?.image || ''"
-            maxlength="2048"
-            placeholder="https://… 或 /uploads/…"
-            @input="setSeo('image', ($event.target as HTMLInputElement).value)" /></label
-        ><label class="page-field"
-          >搜索收录<select
-            :value="
-              forcedNoindex
-                ? 'false'
-                : config.seo?.indexable == null
-                  ? 'inherit'
-                  : String(config.seo.indexable)
-            "
-            :disabled="forcedNoindex"
-            @change="
-              setSeo(
-                'indexable',
-                ($event.target as HTMLSelectElement).value === 'inherit'
-                  ? null
-                  : ($event.target as HTMLSelectElement).value === 'true'
-              )
-            "
+        <fieldset v-if="capability.banner" class="banner-fields" data-banner-fields>
+          <legend>横幅背景</legend>
+          <p class="field-hint">
+            只影响{{ capability.label }}页的这块区域；横幅上的文字仍在「内容」标签里改。
+          </p>
+          <SiteAssetField
+            :model-value="bannerImageDraft"
+            kind="background"
+            label="背景图"
+            hint="可以上传图片，也可以直接填写地址；只接受 https://… 或 /uploads/… 开头的地址。"
+            @update:model-value="setBannerImage"
+          />
+          <p v-if="bannerError" class="banner-error" role="alert" data-banner-error-inline>
+            {{ bannerError }}
+          </p>
+          <div class="banner-grid">
+            <label class="page-field"
+              >图片填充方式<select
+                data-banner-field="fit"
+                :value="bannerFit"
+                @change="setBannerFit(($event.target as HTMLSelectElement).value)"
+              >
+                <option value="cover">填满裁切</option>
+                <option value="contain">完整显示</option>
+              </select></label
+            >
+            <label class="page-field"
+              >图片焦点<select
+                data-banner-field="position"
+                :value="bannerPosition"
+                @change="setBannerPosition(($event.target as HTMLSelectElement).value)"
+              >
+                <option value="center">居中</option>
+                <option value="top">靠上</option>
+                <option value="bottom">靠下</option>
+              </select></label
+            >
+            <label class="page-field"
+              >横幅高度<select
+                data-banner-field="height"
+                :value="bannerHeight"
+                @change="setBannerHeight(($event.target as HTMLSelectElement).value)"
+              >
+                <option value="compact">紧凑</option>
+                <option value="standard">标准</option>
+                <option value="tall">高</option>
+              </select></label
+            >
+            <label class="page-field"
+              >文字明暗<select
+                data-banner-field="tone"
+                :value="bannerTone"
+                @change="setBannerTone(($event.target as HTMLSelectElement).value)"
+              >
+                <option value="auto">自动</option>
+                <option value="light">浅色</option>
+                <option value="dark">深色</option>
+              </select></label
+            >
+            <label class="page-field"
+              >内容排布<select
+                data-banner-field="layout"
+                :value="bannerLayout"
+                @change="setBannerLayout(($event.target as HTMLSelectElement).value)"
+              >
+                <option v-for="item in bannerLayouts" :key="item" :value="item">
+                  {{ LAYOUT_LABELS[item] }}
+                </option>
+              </select></label
+            >
+            <label class="page-field"
+              >遮罩强度<input
+                type="number"
+                data-banner-field="overlay"
+                min="0"
+                max="80"
+                step="1"
+                :value="bannerOverlay"
+                @input="setBannerOverlay(($event.target as HTMLInputElement).value)"
+            /></label>
+          </div>
+          <p class="field-hint">
+            「居中」排布时文字压在图上，文字明暗才起作用；「左右」「上下」排布的文字落在纸面上。
+          </p>
+          <button
+            type="button"
+            class="btn btn-ghost"
+            data-action="clear-banner"
+            :disabled="busy"
+            @click="clearBanner"
           >
-            <option value="inherit">继承页面默认</option>
-            <option value="true">允许收录</option>
-            <option value="false">不允许收录</option></select
-          ><small v-if="forcedNoindex">搜索和404页面始终不允许收录。</small></label
-        >
+            清除横幅
+          </button>
+        </fieldset>
       </section>
       <PagePreview
         v-if="tab === 'preview'"
@@ -466,6 +620,28 @@ select {
 .module-fields legend {
   margin-bottom: 12px;
   font-size: var(--text-sm);
+}
+.banner-fields {
+  display: grid;
+  gap: 16px;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-lg);
+  padding: 18px;
+}
+.banner-fields legend {
+  padding-inline: 6px;
+  color: var(--text-primary);
+  font-size: var(--text-sm);
+}
+.banner-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 14px 18px;
+}
+.banner-error {
+  margin: 0;
+  color: var(--error);
+  font-size: var(--text-xs);
 }
 .module-fields label {
   display: flex;

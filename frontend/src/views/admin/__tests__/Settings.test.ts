@@ -26,7 +26,19 @@ const STATIC_FAVICON = '<link rel="icon" type="image/svg+xml" href="/favicon.svg
 let pinia: ReturnType<typeof createPinia>
 
 async function mountSettings() {
-  const wrapper = mount(Settings, { global: { plugins: [pinia] } })
+  const wrapper = mount(Settings, {
+    global: {
+      plugins: [pinia],
+      // Settings 只有一条指向「SEO 管理」的 RouterLink，不需要真路由表；
+      // 用保留 slot 的桩替代，避免未注册组件退化成 <routerlink> 拿不到 href。
+      stubs: {
+        RouterLink: {
+          props: ['to'],
+          template: '<a :href="to"><slot /></a>'
+        }
+      }
+    }
+  })
   await flushPromises()
   return wrapper
 }
@@ -159,17 +171,77 @@ describe('Settings brand asset fields', () => {
 
   it('groups real setting fields by meaning and keeps a single save path', async () => {
     const wrapper = await mountSettings()
+    // 四个分组 tab（v2.0.30 起把 7 段长表单拆成 4 个页签）
+    const tabs = wrapper.findAll('[data-tab]').map((tab) => tab.attributes('data-tab'))
+    expect(tabs).toEqual(['profile', 'appearance', 'interaction', 'system'])
+    const activeTab = wrapper
+      .findAll('[role="tab"]')
+      .find((tab) => tab.attributes('aria-selected') === 'true')
+    expect(activeTab?.attributes('data-tab')).toBe('profile')
+
+    // 面板按分组归位，标题顺序与作者阅读顺序一致
     const groupTitles = wrapper.findAll('.panel-heading h2').map((heading) => heading.text())
     expect(groupTitles).toEqual([
       '站点资料',
-      '后台与访客',
-      '评论与音乐',
-      'AI 辅助与 SEO',
+      '成品主题',
       '视觉主题',
+      '玻璃感',
       '页面背景',
-      '外观深度自定义'
+      '外观深度自定义',
+      '互动开关',
+      '背景音乐',
+      '留言审核',
+      '后台入口',
+      '访客统计',
+      '模型接口'
     ])
     expect(wrapper.findAll('form')).toHaveLength(1)
+  })
+
+  it('switches the visible panel group without leaving the page', async () => {
+    const wrapper = await mountSettings()
+    const panelFor = (tab: string) => wrapper.get(`[data-tab-panel="${tab}"]`)
+    // VTU 默认挂载在脱离 document 的容器里，jsdom 对游离节点的 getComputedStyle 拿不到
+    // 内联 display，isVisible() 会恒为 true；这里直接读 v-show 写下的内联样式。
+    const hidden = (tab: string) =>
+      (panelFor(tab).attributes('style') ?? '').includes('display: none')
+
+    expect(hidden('profile')).toBe(false)
+    expect(hidden('appearance')).toBe(true)
+
+    await wrapper.get('[data-tab="appearance"]').trigger('click')
+    expect(hidden('profile')).toBe(true)
+    expect(hidden('appearance')).toBe(false)
+    expect(wrapper.get('[data-tab="appearance"]').attributes('aria-selected')).toBe('true')
+    // 换分组不丢表单内容，也不触发保存
+    expect(updateSettings).not.toHaveBeenCalled()
+  })
+
+  it('keeps the comment moderation toggle in 内容与互动 and ships it with the save payload', async () => {
+    const wrapper = await mountSettings()
+    expect(wrapper.find('[data-setting="llmCommentModeration"]').exists()).toBe(true)
+    const toggle = wrapper.get('[data-setting="llmCommentModeration"]')
+
+    await toggle.setValue(true)
+    updateSettings.mockResolvedValue({
+      code: 200,
+      message: 'OK',
+      data: { ...useSiteStore().settings }
+    })
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+    expect(updateSettings.mock.calls[0]?.[0]).toMatchObject({ llmCommentModeration: 'true' })
+  })
+
+  it('points the model endpoint at the SEO page instead of duplicating its form', async () => {
+    const wrapper = await mountSettings()
+    // 模型连接表单已整体迁到「SEO 管理」页顶部，这里只留一条入口说明
+    for (const name of ['llmBaseUrl', 'llmApiKey', 'llmModel', 'llmEnabled']) {
+      expect(wrapper.find(`[data-setting="${name}"]`).exists()).toBe(false)
+    }
+    const entry = wrapper.get('[data-panel="llm-entry"]')
+    expect(entry.text()).toContain('模型接口')
+    expect(entry.get('a').attributes('href')).toContain('/seo')
   })
 
   it('saves the site domain, documents the env fallback and surfaces backend validation errors', async () => {
@@ -239,10 +311,11 @@ describe('Settings brand asset fields', () => {
       if (!panel) throw new Error('missing 页面背景 panel')
       expect(panel.find('.panel-desc').text()).toContain('卡片的不透明度与模糊')
 
-      // 类型选择 + 两个卡片表面控制（渐变/背景图分支之外始终可见）
+      // 类型选择；卡片表面控制已独立到「玻璃感」面板，但仍在同一张表单里
       expect(control(wrapper, 'backgroundType').exists()).toBe(true)
       expect(control(wrapper, 'surfaceOpacity').attributes('min')).toBe('60')
-      expect(control(wrapper, 'surfaceOpacity').attributes('max')).toBe('100')
+      // 玻璃感开启时不透明度上限是 92%：100% 等于不透明，交给总开关表达
+      expect(control(wrapper, 'surfaceOpacity').attributes('max')).toBe('92')
       expect(control(wrapper, 'surfaceBlur').attributes('min')).toBe('0')
       expect(control(wrapper, 'surfaceBlur').attributes('max')).toBe('40')
 
@@ -313,7 +386,10 @@ describe('Settings brand asset fields', () => {
 
       await control(wrapper, 'backgroundType').setValue('image')
       await control(wrapper, 'backgroundOverlay').setValue('45')
-      expect(wrapper.get('.range-row code').text()).toBe('45%')
+      // 读数要读自己那一行：页面里还有玻璃感的两条滑杆，不能抓第一个 .range-row
+      expect(control(wrapper, 'backgroundOverlay').element.parentElement?.textContent).toContain(
+        '45%'
+      )
 
       await control(wrapper, 'surfaceOpacity').setValue('72')
       expect(control(wrapper, 'surfaceOpacity').element.parentElement?.textContent).toContain('72%')
@@ -367,216 +443,6 @@ describe('Settings brand asset fields', () => {
       const root = document.getElementById('selfblog')
       expect(root?.getAttribute('style') ?? '').not.toContain('--bg')
       expect(wrapper.find('.bg-preview').attributes('style')).not.toContain('--')
-    })
-  })
-
-  describe('AI / LLM panel', () => {
-    const MASK = '••••••••'
-
-    function control(wrapper: Awaited<ReturnType<typeof mountSettings>>, name: string) {
-      const found = wrapper.find(`[data-setting="${name}"]`)
-      if (!found.exists()) throw new Error(`missing control: ${name}`)
-      return found
-    }
-
-    it('renders every llm setting and derives the key badge from the mask sentinel', async () => {
-      getSettings.mockResolvedValue({
-        code: 200,
-        message: 'OK',
-        data: {
-          ...useSiteStore().settings,
-          llmEnabled: 'true',
-          llmBaseUrl: 'https://api.example.com/v1',
-          llmApiKey: MASK,
-          llmModel: 'gpt-4o-mini',
-          llmTimeoutSeconds: '45',
-          llmAutoOnPublish: 'true'
-        }
-      })
-      const wrapper = await mountSettings()
-
-      for (const name of [
-        'llmEnabled',
-        'llmBaseUrl',
-        'llmApiKey',
-        'llmModel',
-        'llmTimeoutSeconds',
-        'llmAutoOnPublish'
-      ]) {
-        expect(control(wrapper, name).exists()).toBe(true)
-      }
-      expect((control(wrapper, 'llmBaseUrl').element as HTMLInputElement).value).toBe(
-        'https://api.example.com/v1'
-      )
-      // v-model 写的是 DOM property，不是 attribute，必须读 element.value。
-      expect((control(wrapper, 'llmApiKey').element as HTMLInputElement).value).toBe(MASK)
-      // 已配置 = 服务端回的就是哨兵串；此时徽标必须是"已配置"，且不能把掩码当真实密钥展示
-      const badge = wrapper.get('[data-llm-key]')
-      expect(badge.attributes('data-llm-key')).toBe('configured')
-      expect(badge.text()).toBe('已配置')
-    })
-
-    it('shows an unconfigured key as empty rather than the mask', async () => {
-      const wrapper = await mountSettings()
-      expect((control(wrapper, 'llmApiKey').element as HTMLInputElement).value).toBe('')
-      expect(wrapper.get('[data-llm-key]').attributes('data-llm-key')).toBe('empty')
-      expect(wrapper.get('[data-llm-key]').text()).toBe('未配置')
-    })
-
-    it('round-trips the mask unchanged so saving never wipes a stored key', async () => {
-      getSettings.mockResolvedValue({
-        code: 200,
-        message: 'OK',
-        data: { ...useSiteStore().settings, llmApiKey: MASK, llmBaseUrl: 'https://api.example.com' }
-      })
-      const wrapper = await mountSettings()
-      updateSettings.mockResolvedValue({
-        code: 200,
-        message: 'OK',
-        data: { ...useSiteStore().settings, llmApiKey: MASK }
-      })
-
-      await wrapper.find('form').trigger('submit')
-      await flushPromises()
-
-      // 关键不变量：不动密钥输入框时，提交的必须仍是哨兵串本身。
-      // 若前端把它换成空串或占位符，后端会理解为"清除密钥"。
-      const payload = updateSettings.mock.calls[0]?.[0] as Record<string, string>
-      expect(payload.llmApiKey).toBe(MASK)
-      expect(payload.llmBaseUrl).toBe('https://api.example.com')
-    })
-
-    it('tests the saved configuration and reports latency on success', async () => {
-      testConnection.mockResolvedValue({
-        code: 200,
-        message: 'OK',
-        data: { ok: true, message: '连接成功', latencyMs: 412, model: 'gpt-4o-mini' }
-      })
-      const wrapper = await mountSettings()
-
-      await wrapper.get('[data-action="test-llm"]').trigger('click')
-      await flushPromises()
-
-      expect(testConnection).toHaveBeenCalledTimes(1)
-      const result = wrapper.get('.llm-test')
-      expect(result.attributes('data-ok')).toBe('true')
-      expect(result.text()).toContain('连接成功')
-      expect(result.text()).toContain('412ms')
-      expect(result.text()).toContain('gpt-4o-mini')
-    })
-
-    it('surfaces a failed connection attempt without throwing', async () => {
-      testConnection.mockRejectedValue({ userMessage: '请求超时' })
-      const wrapper = await mountSettings()
-
-      await wrapper.get('[data-action="test-llm"]').trigger('click')
-      await flushPromises()
-
-      const result = wrapper.get('.llm-test')
-      expect(result.attributes('data-ok')).toBe('false')
-      expect(result.text()).toContain('请求超时')
-    })
-
-    it('fills the DeepSeek defaults without touching the stored key', async () => {
-      getSettings.mockResolvedValue({
-        code: 200,
-        message: 'OK',
-        data: { ...useSiteStore().settings, llmApiKey: MASK }
-      })
-      const wrapper = await mountSettings()
-
-      await wrapper.get('[data-action="llm-preset"]').trigger('click')
-      await flushPromises()
-
-      expect((control(wrapper, 'llmBaseUrl').element as HTMLInputElement).value).toBe(
-        'https://api.deepseek.com'
-      )
-      expect((control(wrapper, 'llmModel').element as HTMLInputElement).value).toBe(
-        'deepseek-flash'
-      )
-      expect((control(wrapper, 'llmProvider').element as HTMLSelectElement).value).toBe('deepseek')
-
-      updateSettings.mockResolvedValue({
-        code: 200,
-        message: 'OK',
-        data: { ...useSiteStore().settings, llmApiKey: MASK }
-      })
-      await wrapper.find('form').trigger('submit')
-      await flushPromises()
-      const payload = updateSettings.mock.calls[0]?.[0] as Record<string, string>
-      expect(payload.llmBaseUrl).toBe('https://api.deepseek.com')
-      expect(payload.llmModel).toBe('deepseek-flash')
-      // 预设绝不能顺手改写密钥：哨兵串必须原样往返
-      expect(payload.llmApiKey).toBe(MASK)
-    })
-
-    it('keeps the reasoning effort select disabled until thinking is enabled', async () => {
-      const wrapper = await mountSettings()
-      const effort = () => control(wrapper, 'llmReasoningEffort')
-
-      expect(effort().attributes('disabled')).toBeDefined()
-
-      await control(wrapper, 'llmThinking').setValue(true)
-      expect(effort().attributes('disabled')).toBeUndefined()
-
-      // 自定义服务商不发思考字段，下拉重新禁用
-      await control(wrapper, 'llmProvider').setValue('custom')
-      expect(effort().attributes('disabled')).toBeDefined()
-    })
-
-    it('submits the five new provider keys with their server-side bounds', async () => {
-      const wrapper = await mountSettings()
-
-      expect(control(wrapper, 'llmMaxTokens').attributes('min')).toBe('0')
-      expect(control(wrapper, 'llmMaxTokens').attributes('max')).toBe('131072')
-      expect(control(wrapper, 'llmCommentModeration').exists()).toBe(true)
-
-      await control(wrapper, 'llmMaxTokens').setValue('4096')
-      await control(wrapper, 'llmCommentModeration').setValue(true)
-      await control(wrapper, 'llmThinking').setValue(true)
-      await control(wrapper, 'llmReasoningEffort').setValue('high')
-
-      updateSettings.mockResolvedValue({
-        code: 200,
-        message: 'OK',
-        data: { ...useSiteStore().settings }
-      })
-      await wrapper.find('form').trigger('submit')
-      await flushPromises()
-
-      expect(updateSettings.mock.calls[0]?.[0]).toMatchObject({
-        llmCommentModeration: 'true',
-        llmThinking: 'enabled',
-        llmReasoningEffort: 'high'
-      })
-      // number 输入框的 v-model 会把值转成数字（与既有 llmTimeoutSeconds 一致），
-      // 这里只断言它确实带上了作者填的数值。
-      const payload = updateSettings.mock.calls[0]?.[0] as Record<string, unknown>
-      expect(String(payload.llmMaxTokens)).toBe('4096')
-    })
-
-    it('renders the model candidates from the probe and falls back to a manual input', async () => {
-      const wrapper = await mountSettings()
-
-      expect(listModels).toHaveBeenCalledTimes(1)
-      const options = control(wrapper, 'llmModelSelect').findAll('option')
-      expect(options.map((option) => option.attributes('value'))).toEqual([
-        'deepseek-flash',
-        'deepseek-v4-pro'
-      ])
-      expect(wrapper.text()).toContain('内置候选')
-      // 手填 input 始终存在，候选只是便利
-      expect(control(wrapper, 'llmModel').exists()).toBe(true)
-    })
-
-    it('silently drops the candidate select when the probe request fails', async () => {
-      listModels.mockRejectedValue(new Error('network down'))
-      const wrapper = await mountSettings()
-
-      expect(wrapper.find('[data-setting="llmModelSelect"]').exists()).toBe(false)
-      expect(control(wrapper, 'llmModel').exists()).toBe(true)
-      // 探测失败不该把设置页标成错误
-      expect(wrapper.find('[role="alert"]').exists()).toBe(false)
     })
   })
 

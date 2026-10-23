@@ -16,10 +16,30 @@ import { useLatestRequest } from '@/composables/useLatestRequest'
 const route = useRoute()
 const router = useRouter()
 const siteStore = useSiteStore()
-const { config, text, module: showModule } = usePageConfig('home')
+const { config, text, module: showModule, banner, bannerVars } = usePageConfig('home')
 const hasSidebar = computed(
   () => showModule('author') || showModule('tags') || showModule('archiveLink')
 )
+/**
+ * 横幅的版式 class。
+ *
+ * 没有横幅时返回空对象 —— `.intro-shell` 的 class 与改造前逐字一致，
+ * 介绍区保持原有外观（右侧继续用第一篇文章封面）。
+ */
+const bannerClass = computed(() => {
+  const current = banner.value
+  if (!current) return {}
+  return {
+    'intro-shell--banner': true,
+    [`intro-shell--banner-${current.layout}`]: true
+  }
+})
+/** 文字明暗：tone=light，或 auto 且遮罩够深（≥40）时用浅色。 */
+const bannerTone = computed(() => {
+  const current = banner.value
+  if (!current) return undefined
+  return current.light ? 'light' : 'dark'
+})
 usePageSeo('home', () => ({
   title: text('title', siteStore.settings.siteTitle),
   description: text('description', siteStore.settings.siteDescription),
@@ -93,8 +113,22 @@ onMounted(() => {
 
 <template>
   <PageFrame :config="config" class="blog-home">
-    <section v-if="showModule('hero')" class="intro-shell">
-      <div v-if="showModule('cover') && heroCover" class="intro-visual" aria-hidden="true">
+    <section
+      v-if="showModule('hero')"
+      class="intro-shell"
+      :class="bannerClass"
+      :style="bannerVars"
+      :data-banner-tone="bannerTone"
+    >
+      <div v-if="banner" class="intro-banner" aria-hidden="true">
+        <div class="intro-banner-media"></div>
+        <div class="intro-banner-scrim"></div>
+      </div>
+      <div
+        v-if="showModule('cover') && heroCover && !banner"
+        class="intro-visual"
+        aria-hidden="true"
+      >
         <img :src="heroCover" alt="" @error="heroCover = ''" />
       </div>
       <div class="intro-copy">
@@ -245,6 +279,81 @@ html[data-wallpaper] #selfblog .intro-shell::after {
     color-mix(in srgb, var(--surface-paper) 94%, transparent) 57%,
     color-mix(in srgb, var(--surface-paper) 16%, transparent)
   );
+}
+/* ---------------------------------------------------------------------------
+   横幅背景（作者在「页面管理 → 首页」里设置）
+   ---------------------------------------------------------------------------
+   没有横幅时下面每一条规则都不生效：`.intro-shell` 的 class、style 属性与 DOM
+   结构都和改造前完全一致 —— 右侧继续用第一篇文章封面做 `.intro-visual`。
+   变量由 usePageConfig 的 pageBannerVars() 拼好，地址已经过白名单校验。 */
+.intro-shell--banner {
+  min-height: var(--banner-height, 250px);
+  isolation: isolate;
+}
+.intro-banner {
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  overflow: hidden;
+  border-radius: inherit;
+  pointer-events: none;
+}
+.intro-banner-media {
+  position: absolute;
+  inset: 0;
+  background-image: var(--banner-image);
+  background-size: var(--banner-size, cover);
+  background-position: var(--banner-position, center);
+  background-repeat: no-repeat;
+}
+.intro-banner-scrim {
+  position: absolute;
+  inset: 0;
+  /* 遮罩用「永远深色」的语义 token（--code-bg），不用会被暗色模式反转的灰度梯度。 */
+  background: color-mix(in srgb, var(--code-bg) calc(var(--banner-overlay, 0) * 1%), transparent);
+}
+/* 左右分栏：文字在左（纸面上），图在右。 */
+.intro-shell--banner-split .intro-banner {
+  inset: 0 0 0 auto;
+  width: 43%;
+}
+.intro-shell--banner-split .intro-copy {
+  max-width: 55%;
+}
+/* 居中：图铺满整个介绍区，文字压在上面。 */
+.intro-shell--banner-centered {
+  justify-content: center;
+  text-align: center;
+}
+.intro-shell--banner-centered .intro-copy {
+  max-width: 720px;
+}
+.intro-shell--banner-centered .intro-description {
+  margin-inline: auto;
+}
+/* 上下堆叠：图在上，文字在下。 */
+.intro-shell--banner-stacked {
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-end;
+}
+.intro-shell--banner-stacked .intro-banner {
+  inset: 0 0 auto 0;
+  height: calc(var(--banner-height, 250px) * 0.58);
+}
+.intro-shell--banner-stacked .intro-copy {
+  margin-top: calc(var(--banner-height, 250px) * 0.58);
+  max-width: 100%;
+}
+/* 文字压在图上（居中排布）时才按明暗切换文字颜色。 */
+.intro-shell--banner-centered[data-banner-tone='light'] .intro-copy,
+.intro-shell--banner-centered[data-banner-tone='light'] .intro-description,
+.intro-shell--banner-centered[data-banner-tone='light'] .intro-author {
+  color: var(--text-inverse);
+}
+/* 横幅自带底图，不再叠那层纸面渐变。 */
+.intro-shell--banner::after {
+  content: none;
 }
 .home-content {
   display: grid;
@@ -422,6 +531,26 @@ html[data-wallpaper] #selfblog .intro-shell::after {
   .intro-visual {
     width: 69%;
     opacity: 0.6;
+  }
+  /* 横幅：窄屏下左右分栏退化成上下堆叠；min-height 仍按作者选的高度档位，
+     上面那条 .intro-shell { min-height: 217px } 会盖掉横幅档位，这里补回来。 */
+  .intro-shell--banner {
+    min-height: var(--banner-height, 250px);
+  }
+  .intro-shell--banner-split .intro-banner {
+    inset: 0 0 auto 0;
+    width: 100%;
+    height: calc(var(--banner-height, 250px) * 0.46);
+  }
+  .intro-shell--banner-split .intro-copy {
+    max-width: 100%;
+    margin-top: calc(var(--banner-height, 250px) * 0.46);
+  }
+  .intro-shell--banner-stacked .intro-banner {
+    height: calc(var(--banner-height, 250px) * 0.46);
+  }
+  .intro-shell--banner-stacked .intro-copy {
+    margin-top: calc(var(--banner-height, 250px) * 0.46);
   }
   .home-content {
     margin-top: 27px;

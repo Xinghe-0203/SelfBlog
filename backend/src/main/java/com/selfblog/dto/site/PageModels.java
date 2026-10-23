@@ -7,7 +7,16 @@ import java.util.Map;
 public final class PageModels {
     private PageModels() { }
 
-    public record PageStyle(String accent, String background, String width, String density) { }
+    /**
+     * 页面级横幅配置（首页介绍区 / 关于页作者卡）。
+     *
+     * <p>字段名与前端 {@code frontend/src/types/page.ts} 的 {@code PageBanner} 逐字一致，
+     * 少一个字段就会出现「前端写好了、后端读不出」的静默丢失。所有取值都走
+     * {@code PageCatalog} 的白名单校验，不接受任意 CSS 片段。</p>
+     */
+    public record PageBanner(String image, String fit, String position, String height,
+                             Integer overlay, String tone, String layout) { }
+    public record PageStyle(String accent, String background, String width, String density, PageBanner banner) { }
     public record PageSeo(String title, String description, String image, Boolean indexable) { }
     public record PageConfig(String title, String description, String body,
                              Map<String, String> text, Map<String, Boolean> modules,

@@ -1,5 +1,6 @@
 package com.selfblog.service.site.seo;
 
+import com.selfblog.dto.site.PageModels.PageBanner;
 import com.selfblog.dto.site.PageModels.PageConfig;
 import org.jsoup.nodes.Element;
 import org.jsoup.parser.Tag;
@@ -23,6 +24,14 @@ public class ReadingContent {
     private static final Set<String> BACKGROUNDS = Set.of("plain", "soft", "paper");
     private static final Set<String> WIDTHS = Set.of("narrow", "standard", "wide");
     private static final Set<String> DENSITIES = Set.of("compact", "comfortable");
+    /** 横幅取值白名单：与前端 PageBanner 类型、PageCatalog 校验保持一致。 */
+    private static final Set<String> BANNER_FITS = Set.of("cover", "contain");
+    private static final Set<String> BANNER_POSITIONS = Set.of("center", "top", "bottom");
+    private static final Set<String> BANNER_HEIGHTS = Set.of("compact", "standard", "tall");
+    private static final Set<String> BANNER_TONES = Set.of("auto", "light", "dark");
+    private static final Set<String> BANNER_LAYOUTS = Set.of("split", "centered", "stacked");
+    /** 横幅遮罩的最大强度（百分比），与 PageCatalog 的校验上限一致。 */
+    private static final int BANNER_OVERLAY_MAX = 80;
     private static final DateTimeFormatter DATE = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
     /** 返回完整的阅读容器；Vue 挂载时会整体替换它。 */
@@ -47,6 +56,8 @@ public class ReadingContent {
     }
 
     private void home(Element main, SeoModels.ReadingPage page) {
+        Element banner = bannerElement(page.config());
+        if (banner != null) main.appendChild(banner);
         heading(main, page.displayTitle(), page.meta().description());
         String eyebrow = text(page.config(), "eyebrow");
         if (module(page.config(), "hero") && eyebrow != null && !eyebrow.isBlank()) {
@@ -69,12 +80,17 @@ public class ReadingContent {
 
     private void about(Element main, SeoModels.ReadingPage page) {
         heading(main, page.displayTitle(), page.meta().description());
+        // 关于页的横幅落在作者卡里；作者模块关闭时退回到标题下方，保证横幅始终可见。
+        Element banner = bannerElement(page.config());
         if (module(page.config(), "author") && page.site() != null) {
             Element author = main.appendElement("section").addClass("seo-author");
+            if (banner != null) author.appendChild(banner);
             author.appendElement("h2").text(page.site().author());
             if (page.site().authorBio() != null && !page.site().authorBio().isBlank()) {
                 author.appendElement("p").text(page.site().authorBio());
             }
+        } else if (banner != null) {
+            main.appendChild(banner);
         }
         appendBody(main, page.bodyHtml());
         if (module(page.config(), "site") && page.site() != null) {
@@ -197,11 +213,67 @@ public class ReadingContent {
 
     private void applyStyle(Element root, PageConfig config) {
         if (config == null || config.style() == null) return;
+        StringBuilder style = new StringBuilder();
         String accent = config.style().accent();
-        if (accent != null && ACCENT.matcher(accent).matches()) root.attr("style", "--seo-accent:" + accent + ";");
+        if (accent != null && ACCENT.matcher(accent).matches()) style.append("--seo-accent:").append(accent).append(";");
+        applyBannerStyle(root, style, config.style().banner());
+        if (style.length() > 0) root.attr("style", style.toString());
         choice(root, "seo-bg-", config.style().background(), BACKGROUNDS);
         choice(root, "seo-width-", config.style().width(), WIDTHS);
         choice(root, "seo-density-", config.style().density(), DENSITIES);
+    }
+
+    /**
+     * 横幅样式：图片进 CSS 变量，裁切/位置/高度/遮罩/色调/布局进受控 class。
+     *
+     * <p>变量值必须是能安全写进 {@code url("…")} 的地址：引号、括号、反斜杠、
+     * 空白都能闭合或截断 CSS 声明，这里逐个拒绝；不合格就只留 class，不发变量。</p>
+     */
+    private void applyBannerStyle(Element root, StringBuilder style, PageBanner banner) {
+        if (banner == null) return;
+        // 受控 class 描述作者的选择，与图片地址能否写进 CSS 无关，先落 class。
+        Integer overlay = banner.overlay();
+        if (overlay != null && overlay >= 0 && overlay <= BANNER_OVERLAY_MAX) {
+            style.append("--seo-banner-overlay:").append(overlay).append(";");
+            root.addClass("seo-banner-overlay-" + overlay);
+        }
+        choice(root, "seo-banner-fit-", banner.fit(), BANNER_FITS);
+        choice(root, "seo-banner-position-", banner.position(), BANNER_POSITIONS);
+        choice(root, "seo-banner-height-", banner.height(), BANNER_HEIGHTS);
+        choice(root, "seo-banner-tone-", banner.tone(), BANNER_TONES);
+        choice(root, "seo-banner-layout-", banner.layout(), BANNER_LAYOUTS);
+        // 图片地址单独把关：不合格就只留 class，不发变量，避免 CSS 注入。
+        String image = cssImage(banner.image());
+        if (image != null) style.append("--seo-banner-image:url(\"").append(image).append("\");");
+    }
+
+    /** 横幅图元素：首页介绍区与关于页作者卡共用，让爬虫能直接看到图片。 */
+    private Element bannerElement(PageConfig config) {
+        if (config == null || config.style() == null) return null;
+        String src = bannerSource(config.style().banner());
+        if (src == null) return null;
+        Element banner = new Element(Tag.valueOf("div"), "").addClass("seo-banner");
+        banner.appendElement("img").addClass("seo-banner-image").attr("src", src).attr("alt", "");
+        return banner;
+    }
+
+    /** 横幅图片地址：站内相对路径或 http(s) 绝对地址，其余一律不渲染。 */
+    private static String bannerSource(PageBanner banner) {
+        return banner == null ? null : safeUrl(banner.image());
+    }
+
+    /** 能安全写进 CSS {@code url("…")} 的地址；不合格返回 null（只保留 class）。 */
+    private static String cssImage(String value) {
+        String url = safeUrl(value);
+        if (url == null) return null;
+        for (int i = 0; i < url.length(); i++) {
+            char c = url.charAt(i);
+            if (Character.isWhitespace(c) || Character.isISOControl(c) || c == '"' || c == '\'' || c == '('
+                    || c == ')' || c == '\\' || c == '<' || c == '>' || c == '{' || c == '}' || c == ';') {
+                return null;
+            }
+        }
+        return url;
     }
 
     private void choice(Element root, String prefix, String value, Set<String> allowed) {

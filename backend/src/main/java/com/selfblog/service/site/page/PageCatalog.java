@@ -13,6 +13,15 @@ public final class PageCatalog {
     public record Definition(String label, String path, Set<String> text, Set<String> modules) { }
     public static final Map<String, Definition> BUILTINS;
     private static final Definition CUSTOM = new Definition("内容页", null, Set.of(), Set.of("header", "updated", "links"));
+    /** 允许配置横幅的页面：首页介绍区与关于页作者卡。 */
+    private static final Set<String> BANNER_PAGES = Set.of("home", "about");
+    private static final Set<String> BANNER_FITS = Set.of("cover", "contain");
+    private static final Set<String> BANNER_POSITIONS = Set.of("center", "top", "bottom");
+    private static final Set<String> BANNER_HEIGHTS = Set.of("compact", "standard", "tall");
+    private static final Set<String> BANNER_TONES = Set.of("auto", "light", "dark");
+    private static final Set<String> BANNER_LAYOUTS = Set.of("split", "centered", "stacked");
+    /** 横幅遮罩的最大强度（百分比）。 */
+    private static final int BANNER_OVERLAY_MAX = 80;
     static {
         var definitions = new LinkedHashMap<String, Definition>();
         definitions.put("home", new Definition("首页", "/", Set.of("eyebrow", "listTitle"), Set.of("hero", "cover", "author", "tags", "archiveLink")));
@@ -57,6 +66,7 @@ public final class PageCatalog {
             choice(style.background(), Set.of("inherit", "plain", "soft", "paper"));
             choice(style.width(), Set.of("inherit", "narrow", "standard", "wide"));
             choice(style.density(), Set.of("inherit", "compact", "comfortable"));
+            validateBanner(id, style.banner());
         }
         var seo = config.seo();
         if (seo != null) {
@@ -66,6 +76,47 @@ public final class PageCatalog {
             imageUrl(seo.image());
         }
     }
+    /**
+     * 横幅校验：只有首页与关于页允许出现横幅，其余页面出现即拒绝。
+     *
+     * <p>字段白名单与前端保持一致（fit / position / height / tone / layout），
+     * 越界一律报「请选择有效的横幅样式」；遮罩单独报「横幅遮罩需为 0-80 之间的整数」，
+     * 便于作者一眼看出是自己拖过头了。图片地址复用 {@link #imageUrl(String)}，
+     * 不另写一套规则。</p>
+     *
+     * <p>整个 banner 为 null 时不做任何校验；空对象（所有字段都没填）也按「未配置」处理，
+     * 免得前端表单默认值把无关页面也拦下来。</p>
+     */
+    private static void validateBanner(String id, PageBanner banner) {
+        if (banner == null || !bannerConfigured(banner)) return;
+        if (!BANNER_PAGES.contains(id)) throw new BusinessException(400, "此页面不支持自定义横幅");
+        if (banner.image() != null && !banner.image().isEmpty()) imageUrl(banner.image());
+        bannerChoice(banner.fit(), BANNER_FITS);
+        bannerChoice(banner.position(), BANNER_POSITIONS);
+        bannerChoice(banner.height(), BANNER_HEIGHTS);
+        bannerChoice(banner.tone(), BANNER_TONES);
+        bannerChoice(banner.layout(), BANNER_LAYOUTS);
+        Integer overlay = banner.overlay();
+        if (overlay != null && (overlay < 0 || overlay > BANNER_OVERLAY_MAX)) {
+            throw new BusinessException(400, "横幅遮罩需为 0-" + BANNER_OVERLAY_MAX + " 之间的整数");
+        }
+    }
+
+    /** banner 对象里是否真的有内容；全空视为未配置。 */
+    private static boolean bannerConfigured(PageBanner banner) {
+        return notBlank(banner.image()) || notBlank(banner.fit()) || notBlank(banner.position())
+                || notBlank(banner.height()) || notBlank(banner.tone()) || notBlank(banner.layout())
+                || banner.overlay() != null;
+    }
+
+    private static boolean notBlank(String value) {
+        return value != null && !value.isBlank();
+    }
+
+    private static void bannerChoice(String value, Set<String> choices) {
+        if (value != null && !choices.contains(value)) throw new BusinessException(400, "请选择有效的横幅样式");
+    }
+
     private static void length(String value, int limit, String field) {
         if (value != null && value.length() > limit) throw new BusinessException(400, field + "不能超过" + limit + "个字符");
     }

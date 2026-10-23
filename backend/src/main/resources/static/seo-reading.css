@@ -133,6 +133,100 @@
   padding-block: 44px 80px;
 }
 
+/*
+  页面横幅（首页介绍区 / 关于页作者卡）：
+  这份样式页是服务端自带的，不消费前端的 variables.css，所以色值与尺寸都在这里写死一份。
+  图片地址由服务端写进根节点的 --seo-banner-image，裁切/位置/高度/遮罩/色调/布局走受控 class。
+*/
+.seo-reading .seo-banner {
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+  height: 200px;
+  margin: 0 0 20px;
+  border-radius: 14px;
+  background: rgba(128, 128, 128, 0.12);
+}
+.seo-reading .seo-banner-image {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+}
+.seo-reading .seo-banner::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 23, 42, calc(var(--seo-banner-overlay, 0) / 100));
+  pointer-events: none;
+}
+.seo-reading .seo-author .seo-banner {
+  margin-bottom: 16px;
+}
+
+/* 高度档位 */
+.seo-reading.seo-banner-height-compact .seo-banner {
+  height: 140px;
+}
+.seo-reading.seo-banner-height-standard .seo-banner {
+  height: 200px;
+}
+.seo-reading.seo-banner-height-tall .seo-banner {
+  height: 280px;
+}
+
+/* 裁切与焦点位置 */
+.seo-reading.seo-banner-fit-cover .seo-banner-image {
+  object-fit: cover;
+}
+.seo-reading.seo-banner-fit-contain .seo-banner-image {
+  object-fit: contain;
+}
+.seo-reading.seo-banner-position-top .seo-banner-image {
+  object-position: top center;
+}
+.seo-reading.seo-banner-position-bottom .seo-banner-image {
+  object-position: bottom center;
+}
+.seo-reading.seo-banner-position-center .seo-banner-image {
+  object-position: center;
+}
+
+/* 色调：auto 走默认的深色遮罩，light 用浅色遮罩，dark 强制深色遮罩 */
+.seo-reading.seo-banner-tone-light .seo-banner::after {
+  background: rgba(248, 250, 252, calc(var(--seo-banner-overlay, 0) / 100));
+}
+.seo-reading.seo-banner-tone-dark .seo-banner::after {
+  background: rgba(15, 23, 42, calc(var(--seo-banner-overlay, 0) / 100));
+}
+.seo-reading.seo-banner-overlay-0 .seo-banner::after {
+  background: transparent;
+}
+
+/* 布局：split 靠左留出文字位，centered 居中满宽，stacked 满宽并压低高度 */
+.seo-reading.seo-banner-layout-split .seo-banner {
+  width: 62%;
+}
+.seo-reading.seo-banner-layout-centered .seo-banner {
+  width: 100%;
+  margin-inline: auto;
+}
+.seo-reading.seo-banner-layout-stacked .seo-banner {
+  width: 100%;
+}
+.seo-reading.seo-banner-layout-stacked.seo-banner-height-compact .seo-banner {
+  height: 120px;
+}
+.seo-reading.seo-banner-layout-stacked.seo-banner-height-standard .seo-banner {
+  height: 170px;
+}
+.seo-reading.seo-banner-layout-stacked.seo-banner-height-tall .seo-banner {
+  height: 240px;
+}
+
 /* GFM 表格：与前端 marked（gfm: true）一致，不能退化成纯文本 */
 .seo-reading .seo-body table {
   width: 100%;
@@ -185,4 +279,7 @@ html.dark-mode .seo-reading .seo-body td {
 }
 html.dark-mode .seo-reading .seo-body thead th {
   background: rgba(154, 165, 177, 0.12);
+}
+html.dark-mode .seo-reading .seo-banner {
+  background: rgba(154, 165, 177, 0.14);
 }

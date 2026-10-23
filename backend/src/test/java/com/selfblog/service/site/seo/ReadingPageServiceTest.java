@@ -213,4 +213,22 @@ class ReadingPageServiceTest {
 
         postSeoMapper.deleteById(770001L);
     }
+
+    /** 发布的横幅配置必须原样进入可抓取的阅读页：存-取往返不能丢字段。 */
+    @Test void publishedBannerReachesTheCrawlableReadingPage() {
+        Map<String, Object> banner = Map.<String, Object>of("image", "/uploads/site-assets/banner-home.jpg",
+                "fit", "cover", "height", "tall", "overlay", 30);
+        pages.saveDraft("home", 0, null, config(Map.of("style", Map.of("banner", banner))));
+        pages.publish("home", 1);
+
+        var home = reading.resolve("/", null);
+
+        assertEquals(200, home.status());
+        var published = home.config().style().banner();
+        assertNotNull(published);
+        assertEquals("/uploads/site-assets/banner-home.jpg", published.image());
+        assertEquals("cover", published.fit());
+        assertEquals("tall", published.height());
+        assertEquals(Integer.valueOf(30), published.overlay());
+    }
 }

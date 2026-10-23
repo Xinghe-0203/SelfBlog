@@ -55,7 +55,9 @@ describe('dashboard workspace entries', () => {
     const cards = wrapper.findAll('.workspace-card')
     const labels = cards.map((card) => card.get('h2').text())
     expect(labels).toContain('内容体检')
-    expect(labels).toContain('SEO 管理')
+    // SEO 卡已从工作台移除：生成能力与模型连接都在「SEO 管理」页，工作台不再重复入口。
+    expect(labels).toContain('页面管理')
+    expect(labels).not.toContain('SEO 管理')
 
     const health = cards.find((card) => card.get('h2').text() === '内容体检')
     expect(health?.attributes('href')).toBe('/admin/health')

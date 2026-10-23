@@ -1,16 +1,42 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useSiteStore } from '@/stores/site'
 import { getSafeImageUrl } from '@/utils'
 import Icon from '@/components/common/Icon.vue'
 import PageFrame from '@/components/pages/PageFrame.vue'
 import MarkdownContent from '@/components/pages/MarkdownContent.vue'
-import { usePageConfig } from '@/composables/usePageConfig'
+import { usePageConfig, BANNER_CARD_HEIGHTS } from '@/composables/usePageConfig'
 import { publicationKey, usePagesStore } from '@/stores/pages'
 import { usePageSeo } from '@/composables/usePageSeo'
 const siteStore = useSiteStore()
 const pages = usePagesStore()
-const { config, text, module: showModule, isPreview } = usePageConfig('about')
+const {
+  config,
+  text,
+  module: showModule,
+  isPreview,
+  banner,
+  bannerVars
+} = usePageConfig('about', { heights: BANNER_CARD_HEIGHTS })
+/**
+ * 横幅的版式 class。
+ *
+ * 没有横幅时返回空对象 —— 作者卡的 class、style 属性与 DOM 结构都和改造前完全一致。
+ */
+const bannerClass = computed(() => {
+  const current = banner.value
+  if (!current) return {}
+  return {
+    'author-profile--banner': true,
+    [`author-profile--banner-${current.layout}`]: true
+  }
+})
+/** 文字明暗：tone=light，或 auto 且遮罩够深（≥40）时用浅色。 */
+const bannerTone = computed(() => {
+  const current = banner.value
+  if (!current) return undefined
+  return current.light ? 'light' : 'dark'
+})
 usePageSeo('about', () => ({
   title: text('title', '关于'),
   description: text('description', siteStore.settings.authorBio),
@@ -43,7 +69,17 @@ onBeforeUnmount(() => {
 
 <template>
   <PageFrame :config="config" class="about-page">
-    <section v-if="showModule('author')" class="author-profile">
+    <section
+      v-if="showModule('author')"
+      class="author-profile"
+      :class="bannerClass"
+      :style="bannerVars"
+      :data-banner-tone="bannerTone"
+    >
+      <div v-if="banner" class="profile-banner" aria-hidden="true">
+        <div class="profile-banner-media"></div>
+        <div class="profile-banner-scrim"></div>
+      </div>
       <img
         v-if="siteStore.settings.authorAvatar"
         class="profile-avatar"
@@ -155,6 +191,75 @@ onBeforeUnmount(() => {
   font-size: var(--text-base);
   line-height: 1.9;
 }
+/* ---------------------------------------------------------------------------
+   横幅背景（作者在「页面管理 → 关于」里设置）
+   ---------------------------------------------------------------------------
+   没有横幅时下面每一条规则都不生效：作者卡的 class、style 属性与 DOM 结构
+   都和改造前完全一致。变量由 usePageConfig 的 pageBannerVars() 拼好，
+   背景图地址已经过白名单校验。 */
+.author-profile--banner {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  min-height: var(--banner-height, 210px);
+}
+.profile-banner {
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.profile-banner-media {
+  position: absolute;
+  inset: 0;
+  background-image: var(--banner-image);
+  background-size: var(--banner-size, cover);
+  background-position: var(--banner-position, center);
+  background-repeat: no-repeat;
+}
+.profile-banner-scrim {
+  position: absolute;
+  inset: 0;
+  /* 遮罩用「永远深色」的语义 token（--code-bg），不用会被暗色模式反转的灰度梯度。 */
+  background: color-mix(in srgb, var(--code-bg) calc(var(--banner-overlay, 0) * 1%), transparent);
+}
+/* 左右分栏：头像与文字在左，背景图在右。 */
+.author-profile--banner-split .profile-banner {
+  position: relative;
+  inset: auto;
+  order: 3;
+  align-self: stretch;
+  width: 40%;
+  min-height: var(--banner-height, 210px);
+  border-radius: var(--radius-lg);
+}
+.author-profile--banner-split .profile-copy {
+  flex: 1 1 auto;
+}
+/* 居中：整卡铺图，文字压在上面。 */
+.author-profile--banner-centered .profile-avatar,
+.author-profile--banner-centered .profile-copy {
+  position: relative;
+  z-index: 1;
+}
+.author-profile--banner-centered[data-banner-tone='light'] .profile-label,
+.author-profile--banner-centered[data-banner-tone='light'] .profile-copy h1,
+.author-profile--banner-centered[data-banner-tone='light'] .author-bio {
+  color: var(--text-inverse);
+}
+/* 上下堆叠：图在上，文字在下。 */
+.author-profile--banner-stacked {
+  flex-direction: column;
+}
+.author-profile--banner-stacked .profile-banner {
+  position: relative;
+  inset: auto;
+  order: -1;
+  width: 100%;
+  height: calc(var(--banner-height, 210px) * 0.58);
+  border-radius: var(--radius-lg);
+}
 .about-site {
   margin: var(--page-section-gap, 32px) 34px 0;
 }
@@ -204,6 +309,13 @@ onBeforeUnmount(() => {
   }
   .profile-copy h1 {
     font-size: var(--text-2xl);
+  }
+  /* 横幅：窄屏下左右分栏退化成上下堆叠（图在上、文字在下）。 */
+  .author-profile--banner-split .profile-banner {
+    order: -1;
+    width: 100%;
+    height: calc(var(--banner-height, 210px) * 0.5);
+    min-height: 0;
   }
   .about-site {
     margin-inline: 6px;

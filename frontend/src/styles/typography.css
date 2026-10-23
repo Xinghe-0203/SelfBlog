@@ -29,6 +29,17 @@ h2 {
   font-weight: var(--font-semibold);
   letter-spacing: -0.025em;
 }
+
+/* 中文标题不收紧字距。
+   汉字是全角方块字，字面之间本来就只剩一条缝；再套一层负字距（-0.035em），
+   相邻字会直接贴到一起，大标题上尤其明显（作者首轮截图里的问题）。
+   西文标题保留负字距（那是拉丁字母的排版惯例），中文站点则归零。
+   :lang() 由 <html lang="zh-CN"> 继承，混排标题按中文处理 —— 这是通行做法。 */
+:lang(zh) h1,
+:lang(zh) h2,
+:lang(zh) h3 {
+  letter-spacing: 0;
+}
 h3 {
   font-size: var(--text-2xl);
   font-weight: var(--font-semibold);

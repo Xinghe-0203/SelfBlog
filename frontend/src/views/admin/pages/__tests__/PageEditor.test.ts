@@ -18,9 +18,9 @@ vi.mock('@/api/pages', () => ({
 }))
 enableAutoUnmount(afterEach)
 const response = <T>(data: T) => ({ code: 200, message: 'ok', data })
-function document(config: PageConfig = {}, revision = 0): PageEditorDocument {
+function document(config: PageConfig = {}, revision = 0, id = 'about'): PageEditorDocument {
   const draft = { schemaVersion: 1, revision, config, everPublished: true }
-  return { id: 'about', builtin: true, label: '关于', draft, published: { ...draft } }
+  return { id, builtin: true, label: '关于', draft, published: { ...draft } }
 }
 beforeEach(() => {
   vi.resetAllMocks()
@@ -33,7 +33,7 @@ beforeEach(() => {
   vi.mocked(pageApi.getManifest).mockResolvedValue(response({ pages: [], navigation: [] }))
 })
 afterEach(() => vi.restoreAllMocks())
-async function setup() {
+async function setup(id = 'about') {
   const router = createRouter({
     history: createMemoryHistory(),
     routes: [
@@ -42,7 +42,7 @@ async function setup() {
       { path: '/', component: { template: '<div />' } }
     ]
   })
-  await router.push('/admin/pages/about')
+  await router.push(`/admin/pages/${id}`)
   const wrapper = mount(
     { template: '<RouterView />' },
     {
@@ -181,5 +181,84 @@ describe('page draft editor', () => {
     expect(pageApi.publish).not.toHaveBeenCalled()
     expect(wrapper.get<HTMLInputElement>('[data-override="title"]').element.checked).toBe(false)
     expect(wrapper.find('[data-action="delete"]').exists()).toBe(false)
+  })
+  it('offers the banner controls on pages that support a banner background', async () => {
+    const { wrapper } = await setup()
+    expect(wrapper.find('[data-banner-fields]').exists()).toBe(true)
+    expect(wrapper.find('[data-banner-field="layout"]').exists()).toBe(true)
+    expect(wrapper.find('[data-banner-field="overlay"]').exists()).toBe(true)
+  })
+  it('hides the banner controls on pages without a banner background', async () => {
+    vi.mocked(pageApi.getEditor).mockResolvedValue(response(document({}, 0, 'archives')))
+    const { wrapper } = await setup('archives')
+    expect(wrapper.find('[data-banner-fields]').exists()).toBe(false)
+    expect(wrapper.find('.asset-input').exists()).toBe(false)
+  })
+  it('writes the banner as an object instead of a string style value', async () => {
+    const { wrapper } = await setup()
+    await wrapper.get('.asset-input').setValue('/uploads/site-assets/hero.png')
+    await wrapper.get('[data-banner-field="fit"]').setValue('contain')
+    await wrapper.get('[data-banner-field="position"]').setValue('top')
+    await wrapper.get('[data-banner-field="height"]').setValue('tall')
+    await wrapper.get('[data-banner-field="tone"]').setValue('light')
+    await wrapper.get('[data-banner-field="layout"]').setValue('centered')
+    await wrapper.get('[data-banner-field="overlay"]').setValue('45')
+    await wrapper.get('[data-action="save"]').trigger('click')
+    await flushPromises()
+    expect(pageApi.saveDraft).toHaveBeenCalledWith(
+      'about',
+      0,
+      expect.objectContaining({
+        style: expect.objectContaining({
+          banner: {
+            image: '/uploads/site-assets/hero.png',
+            fit: 'contain',
+            position: 'top',
+            height: 'tall',
+            tone: 'light',
+            layout: 'centered',
+            overlay: 45
+          }
+        })
+      }),
+      null
+    )
+  })
+  it('rejects an unsafe background address and blocks the draft save', async () => {
+    const { wrapper } = await setup()
+    await wrapper.get('.asset-input').setValue('/uploads/site-assets/hero.png')
+    await wrapper.get('.asset-input').setValue('javascript:alert(1)')
+    expect(wrapper.get('[data-banner-error]').text()).toContain('背景图地址不合法')
+    await wrapper.get('[data-action="save"]').trigger('click')
+    await flushPromises()
+    expect(pageApi.saveDraft).not.toHaveBeenCalled()
+    // 改成合法地址后再保存：非法地址从未写进草稿。
+    await wrapper.get('.asset-input').setValue('/uploads/site-assets/hero.png')
+    await wrapper.get('[data-action="save"]').trigger('click')
+    await flushPromises()
+    expect(pageApi.saveDraft).toHaveBeenCalledWith(
+      'about',
+      0,
+      expect.objectContaining({
+        style: expect.objectContaining({
+          banner: expect.objectContaining({ image: '/uploads/site-assets/hero.png' })
+        })
+      }),
+      null
+    )
+  })
+  it('clears the banner together with the other defaults', async () => {
+    vi.mocked(pageApi.getEditor).mockResolvedValue(
+      response(document({ style: { banner: { image: '/uploads/hero.png' } } }, 2))
+    )
+    const { wrapper } = await setup()
+    expect(wrapper.get<HTMLInputElement>('.asset-input').element.value).toBe('/uploads/hero.png')
+    await wrapper.get('[data-action="reset"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.get<HTMLInputElement>('.asset-input').element.value).toBe('')
+    await wrapper.get('[data-action="save"]').trigger('click')
+    await flushPromises()
+    const payload = vi.mocked(pageApi.saveDraft).mock.calls[0]?.[2] as PageConfig
+    expect(payload.style?.banner).toBeUndefined()
   })
 })

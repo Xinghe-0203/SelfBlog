@@ -28,6 +28,8 @@ public class SiteSettingsServiceImpl implements SiteSettingsService {
             "backgroundType", "backgroundColor", "backgroundGradientFrom", "backgroundGradientTo",
             "backgroundImageUrl", "backgroundOverlay", "backgroundFixed",
             "surfaceOpacity", "surfaceBlur",
+            // 玻璃感总开关：on = 卡片半透明 + 背景模糊，off = 回到纯色不透明卡片。
+            "glassMode",
             "llmEnabled", "llmBaseUrl", "llmApiKey", "llmModel", "llmTimeoutSeconds", "llmAutoOnPublish",
             "llmProvider", "llmThinking", "llmReasoningEffort", "llmMaxTokens", "llmCommentModeration",
             // 外观深度自定义（v2.0.29）：排版 / 布局 / 呈现 / 动效四个维度。
@@ -59,6 +61,10 @@ public class SiteSettingsServiceImpl implements SiteSettingsService {
     );
     /** 背景图可选的取色模式。 */
     private static final Set<String> BACKGROUND_TYPES = Set.of("solid", "gradient", "image");
+    /** 玻璃感总开关取值。 */
+    private static final Set<String> GLASS_MODES = Set.of("on", "off");
+    /** 可选皮肤；前端 skins.css 提供对应的 CSS。 */
+    private static final Set<String> THEME_SKINS = Set.of("ocean", "forest", "lavender", "sunset", "midnight", "ink", "dusk", "sand");
     private static final Set<String> RESERVED_PATHS = Set.of(
             "api", "assets", "uploads", "post", "archives", "about", "search", "gallery",
             "tag", "pages", "login", "password-reset", "favicon.ico", "robots.txt"
@@ -198,16 +204,17 @@ public class SiteSettingsServiceImpl implements SiteSettingsService {
         values.put("themeSkin", "ocean");
         values.put("themePrimaryColor", "#165DFF");
         values.put("footerText", "用文字记录生活，用好奇探索世界。");
-        // 外观定制：默认值是「与改造前完全一致」的观感 —— 纯色浅灰背景 + 不透明卡片。
-        values.put("backgroundType", "solid");
+        // 外观定制：默认是「淡渐变背景 + 半透明玻璃卡片」，玻璃感总开关默认打开。
+        values.put("backgroundType", "gradient");
         values.put("backgroundColor", "#f5f6f8");
-        values.put("backgroundGradientFrom", "#f5f6f8");
-        values.put("backgroundGradientTo", "#e7eaf0");
+        values.put("backgroundGradientFrom", "#f4f7fc");
+        values.put("backgroundGradientTo", "#e9eef7");
         values.put("backgroundImageUrl", "");
         values.put("backgroundOverlay", "0");
         values.put("backgroundFixed", "true");
-        values.put("surfaceOpacity", "100");
-        values.put("surfaceBlur", "0");
+        values.put("surfaceOpacity", "88");
+        values.put("surfaceBlur", "12");
+        values.put("glassMode", "on");
         // 外观深度自定义：默认值刻意等于改造前的硬编码取值（16px / 1.75 / 760px / 1em 段距、
         // 默认圆角与阴影、标准密度、完整 hero 与文章封面、默认动效），保证升级零回归。
         values.put("fontFamily", "system");
@@ -296,7 +303,7 @@ public class SiteSettingsServiceImpl implements SiteSettingsService {
                 if (!"true".equalsIgnoreCase(value) && !"false".equalsIgnoreCase(value)) throw new BusinessException(400, "开关值必须为 true 或 false");
             }
             case "themeSkin" -> {
-                if (!Set.of("ocean", "forest", "lavender", "sunset", "midnight").contains(value)) throw new BusinessException(400, "请选择有效的页面皮肤");
+                if (!THEME_SKINS.contains(value)) throw new BusinessException(400, "请选择有效的页面皮肤");
             }
             case "themePrimaryColor" -> {
                 if (!value.matches("#[0-9a-fA-F]{6}")) throw new BusinessException(400, "主题色需使用 #RRGGBB 格式");
@@ -342,6 +349,9 @@ public class SiteSettingsServiceImpl implements SiteSettingsService {
             }
             case "surfaceOpacity" -> requireIntegerInRange(value, 60, 100, "卡片不透明度需为 60-100 之间的整数");
             case "surfaceBlur" -> requireIntegerInRange(value, 0, 40, "卡片模糊半径需为 0-40 之间的整数");
+            case "glassMode" -> {
+                if (!GLASS_MODES.contains(value)) throw new BusinessException(400, "请选择有效的玻璃感模式");
+            }
             case "fontFamily" -> {
                 if (!Set.of("system", "sans", "serif", "mono").contains(value)) {
                     throw new BusinessException(400, "字体族必须为 system、sans、serif 或 mono");

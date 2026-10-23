@@ -13,7 +13,7 @@ npm run build          # 构建生产版本（先 vue-tsc --noEmit，再 Vite）
 npm run preview        # 预览生产版本
 npm run lint:check     # 只读 ESLint 检查（npm run lint 会改写文件）
 npm run type-check     # vue-tsc --noEmit（必过闸门）
-npm run test:run       # Vitest 单次运行（当前 51 文件 / 504 tests；原始基线 210）
+npm run test:run       # Vitest 单次运行（当前 55 文件 / 534 tests；原始基线 210）
 npm run test:deployment # node:test：Vercel 代理生成器 + Docker/Compose 源契约（27 项）
 ```
 
@@ -64,7 +64,7 @@ src/
 ## 主要特性
 
 - 单人作者博客：访客只读、搜索、匿名点赞与留言；写作与管理需要管理员登录
-- 清透空间设计底座：CSS 变量 token、深色模式、5 套皮肤、内置 SVG 图标；正文实底，导航与临时控件按需使用玻璃
+- 清透空间设计底座：CSS 变量 token、深色模式、8 套皮肤、内置 SVG 图标；正文实底，导航与临时控件按需使用玻璃
 - 文章列表统一由 `components/post/ArticleList.vue` 渲染；首页、搜索、标签共用同一套行样式，无封面不留占位图
 - 阅读页把标题/时间/阅读时长放在封面之前；目录侧栏与移动端抽屉共用 1020px 断点
 - 后台使用同一套「标题 + 说明 + 内容区」层级；抽屉的焦点、Esc 与滚动锁由 `AdminLayout` 的 `useDialog` 统一负责
@@ -77,7 +77,7 @@ src/
 
 - 入口 `src/styles/main.css`，按顺序 `@import` **14** 个模块；设计 token 在 `variables.css`，深色模式覆盖在 `dark-mode.css`，皮肤在 `skins.css`。**`appearance.css` 与 `customize.css` 必须排在最后且 `customize.css` 更后**（作者配置的背景/不透明度/排版要压过皮肤与深色模式里同优先级的声明）
 - 深色模式通过 `.dark-mode` 类生效（`stores/theme.ts` 加在 `<html>`，`App.vue` 同时绑在 `#selfblog` 上）
-- 皮肤通过 `#selfblog[data-skin='...']` 生效：`ocean`(默认)/`forest`/`lavender`/`sunset`/`midnight`
+- 皮肤通过 `#selfblog[data-skin='...']` 生效：`ocean`(默认)/`forest`/`lavender`/`sunset`/`midnight`/`ink`/`sand`/`dusk`（`midnight` 与 `dusk` 是自带深色画布的皮肤，各自声明 `color-scheme: dark`）
 - 动画工具类: `.fade-in`, `.slide-up`, `.pulse`
 
 ### Token 使用约定（重要）
@@ -120,7 +120,7 @@ src/
 - 不覆盖 `--radius-full`（9999px）与 `50%`：胶囊导航、圆形头像/圆形按钮必须真圆
 - 11 个键**不进 `PREPAINT_APPEARANCE_VARS`**：它们依赖 `#selfblog` 作用域，预置到 `<html>` 会绕过作用域把导航栏一起改掉
 - `App.vue` 的外观 `watch` 依赖数组必须包含全部 11 个新键（当前 14 项），否则改设置不重新应用
-- 后台面板在 `views/admin/Settings.vue` 第 7 个 section「外观深度自定义」；「恢复默认外观」**只改表单不保存**（避免误触）
+- 后台面板在 `views/admin/Settings.vue` 的「外观」分组（`data-tab="appearance"`）里、面板标题「外观深度自定义」；「恢复默认外观」**只改表单不保存**（避免误触）
 
 ## LLM 辅助 SEO（2026-10-22）
 

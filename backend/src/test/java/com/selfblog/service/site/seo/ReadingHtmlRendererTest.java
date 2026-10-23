@@ -1,10 +1,13 @@
 package com.selfblog.service.site.seo;
 
 import com.selfblog.common.exception.BusinessException;
+import com.selfblog.dto.site.PageModels.PageBanner;
 import com.selfblog.dto.site.PageModels.PageConfig;
 import com.selfblog.dto.site.PageModels.PageSeo;
+import com.selfblog.dto.site.PageModels.PageStyle;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
+import org.jsoup.nodes.Element;
 import org.junit.jupiter.api.Test;
 import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
@@ -20,6 +23,15 @@ class ReadingHtmlRendererTest {
     private SeoModels.ReadingPage page(SeoModels.Kind kind, String title, String path, String body, boolean indexable) {
         return new SeoModels.ReadingPage(200, kind, kind == SeoModels.Kind.POST ? "post" : "about", PageConfig.empty(),
                 meta(title, path, indexable), title, body, List.of(), List.of(),
+                new SeoModels.SiteInfo("示例博客", "站点说明", "示例作者", "作者简介"));
+    }
+
+    /** 带横幅的阅读页：样式里只多一个 banner，其余走默认。 */
+    private SeoModels.ReadingPage pageWithBanner(SeoModels.Kind kind, String title, String path, PageBanner banner) {
+        var config = new PageConfig(null, null, null, null, null,
+                new PageStyle(null, null, null, null, banner), null);
+        return new SeoModels.ReadingPage(200, kind, kind == SeoModels.Kind.POST ? "post" : "about", config,
+                meta(title, path, true), title, "", List.of(), List.of(),
                 new SeoModels.SiteInfo("示例博客", "站点说明", "示例作者", "作者简介"));
     }
 
@@ -147,5 +159,64 @@ class ReadingHtmlRendererTest {
                 doc.selectFirst("meta[name=twitter:image]").attr("content"));
         assertEquals("/uploads/cover.jpg",
                 doc.selectFirst("#app img").attr("src"));
+    }
+
+    // ---------- 页面横幅 ----------
+
+    /** 去掉空格再比对 style，避免 Jsoup 序列化时在冒号后补空格。 */
+    private String compactStyle(Element root) {
+        return root.attr("style").replace(" ", "");
+    }
+
+    /** 首页介绍区的横幅：图片进 DOM（爬虫可见），裁切/遮罩等进受控 class 与 CSS 变量。 */
+    @Test void homeBannerRendersTheImageAndTheControlledClasses() {
+        var banner = new PageBanner("/uploads/site-assets/banner-home.jpg", "cover", "center", "standard", 30, "light", "split");
+        Document doc = Jsoup.parse(renderer.render(pageWithBanner(SeoModels.Kind.HOME, "首页", "/", banner), base));
+        var root = doc.selectFirst(".seo-reading");
+        assertNotNull(root);
+        assertEquals(1, doc.select(".seo-banner").size());
+        assertEquals("/uploads/site-assets/banner-home.jpg", doc.selectFirst(".seo-banner-image").attr("src"));
+        assertTrue(root.hasClass("seo-banner-fit-cover"));
+        assertTrue(root.hasClass("seo-banner-position-center"));
+        assertTrue(root.hasClass("seo-banner-height-standard"));
+        assertTrue(root.hasClass("seo-banner-overlay-30"));
+        assertTrue(root.hasClass("seo-banner-tone-light"));
+        assertTrue(root.hasClass("seo-banner-layout-split"));
+        String style = compactStyle(root);
+        assertTrue(style.contains("--seo-banner-image:url("), style);
+        assertTrue(style.contains("/uploads/site-assets/banner-home.jpg"), style);
+        assertTrue(style.contains("--seo-banner-overlay:30"), style);
+    }
+
+    /** 关于页的横幅落在作者卡里，让爬虫在作者介绍上方看到图片。 */
+    @Test void aboutBannerRendersInsideTheAuthorCard() {
+        var banner = new PageBanner("https://cdn.example.com/about.jpg", "contain", "bottom", "tall", 0, "dark", "stacked");
+        Document doc = Jsoup.parse(renderer.render(pageWithBanner(SeoModels.Kind.ABOUT, "关于", "/about", banner), base));
+        assertEquals(1, doc.select(".seo-author .seo-banner").size());
+        assertEquals("https://cdn.example.com/about.jpg", doc.selectFirst(".seo-author .seo-banner-image").attr("src"));
+        var root = doc.selectFirst(".seo-reading");
+        assertTrue(root.hasClass("seo-banner-fit-contain"));
+        assertTrue(root.hasClass("seo-banner-layout-stacked"));
+        assertTrue(root.hasClass("seo-banner-overlay-0"));
+    }
+
+    /** 没有横幅时不许凭空多出横幅元素或变量。 */
+    @Test void pagesWithoutABannerRenderNoBannerMarkup() {
+        Document doc = Jsoup.parse(renderer.render(page(SeoModels.Kind.HOME, "首页", "/", "", true), base));
+        assertEquals(0, doc.select(".seo-banner").size());
+        var root = doc.selectFirst(".seo-reading");
+        assertFalse(root.hasClass("seo-banner-fit-cover"));
+        assertFalse(compactStyle(root).contains("--seo-banner-image"));
+    }
+
+    /** 图片地址里带括号/引号时只渲染图片，绝不写进 CSS 变量（防 CSS 注入）。 */
+    @Test void bannerImageThatCouldBreakCssIsNeverWrittenIntoAStyleVariable() {
+        var banner = new PageBanner("/uploads/banner).png", "cover", "center", "standard", 20, "auto", "split");
+        Document doc = Jsoup.parse(renderer.render(pageWithBanner(SeoModels.Kind.HOME, "首页", "/", banner), base));
+        var root = doc.selectFirst(".seo-reading");
+        assertNotNull(root);
+        assertFalse(compactStyle(root).contains("--seo-banner-image"), compactStyle(root));
+        assertTrue(root.hasClass("seo-banner-fit-cover"));
+        assertTrue(root.hasClass("seo-banner-overlay-20"));
     }
 }

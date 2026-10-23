@@ -1,4 +1,4 @@
-import type { BuiltinPageId } from '@/types/page'
+import type { BannerLayout, BuiltinPageId } from '@/types/page'
 
 export interface PageField {
   key: string
@@ -6,12 +6,22 @@ export interface PageField {
   limit: number
   multiline?: boolean
 }
+/**
+ * 页面级横幅能力。
+ *
+ * 只有声明了这一项的页面才允许在后台设置横幅背景（首页介绍区、关于页作者卡）；
+ * `layouts` 是该页面允许的内容排布，编辑器据此渲染下拉选项。
+ */
+export interface PageBannerCapability {
+  layouts: BannerLayout[]
+}
 export interface PageCapability {
   label: string
   fields: PageField[]
   modules: Array<{ key: string; label: string }>
   body?: boolean
   dynamic?: boolean
+  banner?: PageBannerCapability
 }
 const title: PageField = { key: 'title', label: '页面标题', limit: 120 }
 const description: PageField = {
@@ -22,6 +32,8 @@ const description: PageField = {
 }
 const modules = (values: Record<string, string>) =>
   Object.entries(values).map(([key, label]) => ({ key, label }))
+/** 首页与关于页都支持横幅，且允许全部三种内容排布。 */
+const bannerLayouts: BannerLayout[] = ['split', 'centered', 'stacked']
 export const pageCatalog: Record<BuiltinPageId, PageCapability> = {
   home: {
     label: '首页',
@@ -37,13 +49,15 @@ export const pageCatalog: Record<BuiltinPageId, PageCapability> = {
       author: '作者侧栏',
       tags: '标签区',
       archiveLink: '归档入口'
-    })
+    }),
+    banner: { layouts: bannerLayouts }
   },
   about: {
     label: '关于',
     fields: [title, description],
     body: true,
-    modules: modules({ author: '作者资料', site: '网站说明', links: '继续阅读入口' })
+    modules: modules({ author: '作者资料', site: '网站说明', links: '继续阅读入口' }),
+    banner: { layouts: bannerLayouts }
   },
   archives: {
     label: '归档',

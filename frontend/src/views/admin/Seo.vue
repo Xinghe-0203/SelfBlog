@@ -13,7 +13,7 @@
           class="ghost-button"
           type="button"
           :disabled="proofreadBusy || !llmConfigured || !rows.length"
-          :title="llmConfigured ? '' : '请先在网站设置中配置模型接口'"
+          :title="llmConfigured ? '' : '请先在本页顶部的模型连接面板中填写 API 地址与密钥'"
           data-action="ai-proofread"
           @click="openProofread()"
         >
@@ -23,7 +23,7 @@
           class="primary-button"
           type="button"
           :disabled="batchRunning || !llmConfigured"
-          :title="llmConfigured ? '' : '请先在网站设置中配置模型接口'"
+          :title="llmConfigured ? '' : '请先在本页顶部的模型连接面板中填写 API 地址与密钥'"
           @click="runBatch"
         >
           <Icon name="sparkle" :size="16" />{{ batchRunning ? '生成中…' : '批量生成' }}
@@ -31,15 +31,16 @@
       </div>
     </header>
 
+    <LlmConnectionPanel :form="llmForm" />
+
     <p v-if="error" class="alert" role="alert">{{ error }}</p>
     <p v-if="notice" class="success" role="status">{{ notice }}</p>
 
     <section v-if="overview && !overview.llmConfigured" class="notice" role="status">
       <Icon name="info" :size="18" />
       <p>
-        尚未配置可用的模型接口，自动生成与连通性测试暂不可用。请到
-        <RouterLink :to="`${siteStore.adminRoot}/settings`">网站设置</RouterLink>
-        填写 API 地址与密钥。
+        尚未配置可用的模型接口，自动生成与连通性测试暂不可用。请在本页顶部的「AI 辅助与
+        SEO」面板里填写 API 地址与密钥。
       </p>
     </section>
 
@@ -359,6 +360,7 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { formatDate } from '@/utils'
 import { seoApi } from '@/api/seo'
+import { siteApi } from '@/api/site'
 import { useConfirm } from '@/composables/useConfirm'
 import { useLatestRequest } from '@/composables/useLatestRequest'
 import { useSiteStore } from '@/stores/site'
@@ -372,6 +374,10 @@ import type {
 } from '@/types/seo'
 import Icon from '@/components/common/Icon.vue'
 import Modal from '@/components/common/Modal.vue'
+import LlmConnectionPanel, {
+  LLM_SETTING_KEYS,
+  type LlmForm
+} from '@/components/admin/LlmConnectionPanel.vue'
 import { llmApi } from '@/api/llm'
 import type { ProofreadIssueType, ProofreadSeverity, ProofreadVO } from '@/types/llm'
 
@@ -433,6 +439,41 @@ const form = reactive<SeoUpdateRequest>({
   seoKeywords: null,
   ogImageUrl: null
 })
+
+/**
+ * 模型连接配置表单：与「网站设置」共用同一批站点设置键。
+ *
+ * <p>面板直接编辑这个对象，保存由面板自己发起（只提交 11 个 llm* 键，
+ * 后端是局部合并）。这里只负责把已保存的值读进来。</p>
+ */
+const llmForm = reactive<LlmForm>({
+  llmEnabled: siteStore.settings.llmEnabled,
+  llmProvider: siteStore.settings.llmProvider,
+  llmBaseUrl: siteStore.settings.llmBaseUrl,
+  llmApiKey: siteStore.settings.llmApiKey,
+  llmModel: siteStore.settings.llmModel,
+  llmTimeoutSeconds: siteStore.settings.llmTimeoutSeconds,
+  llmMaxTokens: siteStore.settings.llmMaxTokens,
+  llmThinking: siteStore.settings.llmThinking,
+  llmReasoningEffort: siteStore.settings.llmReasoningEffort,
+  llmAutoOnPublish: siteStore.settings.llmAutoOnPublish,
+  llmCommentModeration: siteStore.settings.llmCommentModeration
+})
+
+/** 读回已保存的模型连接配置；读不到就保持默认值，不打断本页其它功能。 */
+async function loadLlmSettings(): Promise<void> {
+  try {
+    const response = await siteApi.getSettings()
+    const settings = response.data
+    if (!settings) return
+    for (const key of LLM_SETTING_KEYS) {
+      const value = settings[key]
+      if (typeof value === 'string') llmForm[key] = value
+    }
+  } catch {
+    // 连接配置读不出来时，面板保持默认值；生成按钮本来就会被 llmConfigured 拦住。
+  }
+}
 
 const llmConfigured = computed(() => overview.value?.llmConfigured === true)
 
@@ -667,6 +708,8 @@ onMounted(() => {
   void reload().then(() => {
     if (Number.isFinite(queryPostId) && queryPostId > 0) void openEditor(queryPostId)
   })
+  // 模型连接配置与 SEO 元数据在同一页，先把已保存的连接配置读进面板。
+  void loadLlmSettings()
 })
 </script>
 
