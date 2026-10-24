@@ -521,7 +521,12 @@
               maxlength="300000"
             ></textarea>
             <div v-else class="editor-preview">
-              <div v-if="form.content" class="markdown-body" v-html="renderedContent"></div>
+              <div
+                v-if="form.content"
+                class="markdown-body"
+                v-html="renderedContent"
+                @click="onPreviewClick"
+              ></div>
               <div v-else class="empty-preview">
                 <svg
                   width="48"
@@ -942,8 +947,6 @@
 <script setup lang="ts">
 import { ref, reactive, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router'
-import { marked } from 'marked'
-import DOMPurify from 'dompurify'
 import { postApi } from '../../api/post'
 import { tagApi } from '../../api/tag'
 import { mediaApi } from '../../api/media'
@@ -954,6 +957,7 @@ import { toast } from '../../utils/toast'
 import { useConfirm } from '../../composables/useConfirm'
 import { formatDate } from '../../utils'
 import { estimateReadMinutes } from '../../utils/reading'
+import { renderMarkdown, isInternalMarkdownHref } from '../../utils/markdown'
 
 const route = useRoute()
 const router = useRouter()
@@ -1006,15 +1010,25 @@ function acceptSavedSnapshot(snapshot: string) {
 
 const renderedContent = computed(() => {
   if (!form.content) return ''
-  try {
-    return DOMPurify.sanitize(marked.parse(form.content) as string, {
-      FORBID_TAGS: ['style', 'script', 'iframe', 'form', 'input', 'button', 'textarea', 'select'],
-      FORBID_ATTR: ['onerror', 'onload', 'onclick', 'onmouseover']
-    })
-  } catch {
-    return DOMPurify.sanitize(form.content)
-  }
+  // 与文章详情、页面正文共用同一条渲染链路，预览里点链接的行为才不会和线上不一致
+  return renderMarkdown(form.content)
 })
+
+/**
+ * 预览区的链接不能在编辑器里真的跳走：站内链接一跳就离开当前编辑页，
+ * 未保存的改动全靠离开前的提示，体验很差。这里只拦站内跳转并给出提示，
+ * 外链仍由渲染链路加好的 target="_blank" 交给浏览器新开标签。
+ */
+function onPreviewClick(event: MouseEvent): void {
+  const target = event.target
+  if (!(target instanceof Element)) return
+  const anchor = target.closest('a[href]')
+  if (!anchor) return
+  const href = anchor.getAttribute('href')
+  if (!href || !isInternalMarkdownHref(href)) return
+  event.preventDefault()
+  toast.info('预览中不跳转站内链接，发布后点击即可正常打开')
+}
 
 const wordCount = computed(() => {
   const text = form.content || ''
@@ -1078,9 +1092,18 @@ function insertLink() {
   const start = ta.selectionStart,
     end = ta.selectionEnd
   const selected = form.content.substring(start, end) || '链接文字'
-  const linkText = `[${selected}](url)`
+  // 占位符用 https:// 而不是裸 "url"：前者即使没改也不会渲染成站内相对路径，
+  // 后者会变成 [文字](url) → 点开跳到本站 404（见 utils/markdown.ts 的协议补全）。
+  const placeholder = 'https://'
+  const linkText = `[${selected}](${placeholder})`
   saveHistory()
   form.content = form.content.substring(0, start) + linkText + form.content.substring(end)
+  nextTick(() => {
+    ta.focus()
+    // 光标直接落在 URL 占位上并全选，粘贴/输入即可替换，不会留下占位符
+    const urlStart = start + selected.length + 3
+    ta.setSelectionRange(urlStart, urlStart + placeholder.length)
+  })
 }
 
 function insertTab(e: KeyboardEvent) {

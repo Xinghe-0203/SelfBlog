@@ -1,8 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
-import { marked } from 'marked'
-import DOMPurify from 'dompurify'
+import { useRoute, useRouter } from 'vue-router'
 import { postApi } from '@/api/post'
 import {
   publicInteractionApi,
@@ -10,6 +8,7 @@ import {
   type GuestComment
 } from '@/api/public-interactions'
 import { formatDate, getSafeImageUrl } from '@/utils'
+import { renderMarkdown, isInternalMarkdownHref } from '@/utils/markdown'
 import { estimateReadMinutes } from '@/utils/reading'
 import { useUserStore } from '@/stores/user'
 import { useSiteStore } from '@/stores/site'
@@ -33,6 +32,7 @@ interface TocItem {
 }
 
 const route = useRoute()
+const router = useRouter()
 const userStore = useUserStore()
 const siteStore = useSiteStore()
 const post = ref<Post | null>(null)
@@ -84,15 +84,9 @@ const beginCommentRequest = useLatestRequest().begin
 
 const renderedContent = computed(() => {
   if (!post.value?.content) return ''
-  const rawHtml = marked.parse(post.value.content) as string
-  return DOMPurify.sanitize(rawHtml, {
-    USE_PROFILES: { html: true },
-    ADD_ATTR: ['target', 'rel', 'referrerpolicy'],
-    FORBID_TAGS: ['style', 'script', 'iframe', 'form'],
-    FORBID_ATTR: ['onerror', 'onload', 'onclick']
-  })
-    .replace(/<a\s/g, '<a target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer" ')
-    .replace(/<img\s/g, '<img referrerpolicy="no-referrer" loading="lazy" ')
+  // 统一渲染链路：补全裸域名协议（否则 `[文字](example.com)` 会被当成站内相对路径 → 404）、
+  // 站内链接不新开标签、站外链接补 noopener。实现见 utils/markdown.ts
+  return renderMarkdown(post.value.content)
 })
 
 /**
@@ -327,9 +321,28 @@ const scrollToHeading = (item: TocItem) => {
 /**
  * v-html 里的图片没有事件绑定，只能在正文容器上做事件委托：
  * 用原始 src（与 enhanceMarkdown 收集时一致）定位点击的是第几张，灯箱从它开始浏览。
+ *
+ * 站内链接同样在这里接管：sanitizeMarkdownHtml 只给外链加 target="_blank"，
+ * 站内链接保持原样，交给 router 走 SPA 跳转（整页刷新会重新拉一遍全站资源）。
+ * 外链已由 target="_blank" + rel="noopener noreferrer" 交给浏览器处理。
  */
 function onContentClick(event: MouseEvent): void {
   const target = event.target
+  if (!(target instanceof Element)) return
+  const anchor = target.closest('a[href]')
+  if (anchor && !(target instanceof HTMLImageElement)) {
+    const href = anchor.getAttribute('href')
+    if (href && isInternalMarkdownHref(href)) {
+      event.preventDefault()
+      if (href.startsWith('#')) {
+        const heading = contentRef.value?.querySelector(href)
+        heading?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        return
+      }
+      void router.push(href)
+      return
+    }
+  }
   if (!(target instanceof HTMLImageElement)) return
   const src = target.getAttribute('src')
   if (!src) return

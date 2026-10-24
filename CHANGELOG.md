@@ -4,6 +4,66 @@
 
 ---
 
+## 未发布 — 文章链接跳转修复 + Markdown 渲染链路统一 (2026-10-24)
+
+### 说明
+
+用户诉求（原话）：「仔细检查文章的markdown渲染引擎，样式按钮等。我现在设置的文章中的URL跳转识别，跳转到了本网站的404页面。」
+
+逐项核实后的根因：
+
+- **链接跳到本站 404（主诉）**：`marked` 只在 **GFM autolink**（裸 `https://…` 或裸 `www.…`）时补协议，**Markdown 链接语法 `[文字](example.com)` 的 href 原样保留成相对地址**。浏览器把它解析成 `https://本站/example.com`，命中 SPA 兜底路由 `/:pathMatch(.*)*` → `NotFound`。实测（marked 12.0.2）：`[文字](example.com)` → `<a href="example.com">`；`[文字](www.example.com)` 同样不补协议。
+- **三处渲染点各写一套**：`PostDetail.vue`、`PostEdit.vue`（预览）、`MarkdownContent.vue` 分别调用 `marked.parse` + `DOMPurify.sanitize`，配置互不相同，修一处另两处照旧。
+- **旧的正则外链处理有两个缺陷**：`PostDetail.vue` 用 `.replace(/<a\s/g, …)` 无条件给所有链接加 `target="_blank"` —— 既会把站内锚点/站内路由开进新标签，也会误命中 `<area `、`<abbr ` 等标签开头。
+- **编辑器「链接」按钮**：`insertLink()` 插入的是占位符 `[文字](url)`，且插入后**不做光标定位**，作者很容易留下 `url` 这个相对路径，正是上面 404 的来源之一。
+- **服务端与前端不一致**：`SafeMarkdown` 的 Jsoup 白名单只允许 `http/https/mailto`，无协议 href 会被**整条剥掉**，服务端阅读 HTML 里的裸域名链接变成点不动的文本。
+- **样式里混进了无效声明**：`typography.css` 的 `.markdown-body a` 与 `.markdown-body img` 里各有一行 `referrerpolicy: no-referrer;` —— 这是 HTML 属性，不是 CSS 属性，属于误写。
+
+### 修复
+
+- **统一渲染入口 `frontend/src/utils/markdown.ts`（新增）**，三处调用点全部改为调用它：
+  - `normalizeMarkdownHref(raw)`：危险协议（`javascript:`/`vbscript:`/`data:`/`file:`）返回空串；已有 `SAFE_SCHEME`（http/https/mailto/tel/ftp/sms/irc/news/nntp/feed/magnet）、`//`、`#`、`/`、`?`、`.` 开头一律原样；邮箱补 `mailto:`；**裸域名补 `https://`**。
+  - 裸域名判定 `looksLikeBareHost()`：authority 至少两段、首段至少 2 字符、末段为 2–24 位纯字母且**不在文件扩展名白名单**（md/png/jpg/pdf/txt/json/js/ts/vue/css/html/zip/mp4/mp3/exe/apk 等 45 项）—— 避免把 `a.md`、`notes.txt`、`photo.png` 误补成网址。
+  - `isInternalMarkdownHref(href)`：`#`/`?`/`/` 开头视为站内，`//` 视为站外，其余按 origin 比对。
+  - `sanitizeMarkdownHtml(rawHtml)`：DOMPurify（`USE_PROFILES: {html:true}`、`ADD_ATTR: ['target','rel','referrerpolicy','loading']`、禁用 `style/script/iframe/form/input/button/textarea/select` 与内联事件）之后，**用 `DOMParser` 遍历 `a[href]` 与 `img` 改写属性**，不再用正则匹配标签开头。
+  - `renderMarkdown(source)`：`marked.parse` + 上面的净化，是唯一对外入口。
+- **外链与站内链接分流**：外链补 `target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer"`；站内链接与锚点**不加 target**，改由组件接管。
+- **`PostDetail.vue` 接管站内点击**：`onContentClick` 先找 `target.closest('a[href]')`，站内链接 `preventDefault()` 后 —— `#` 锚点走 `scrollIntoView({behavior:'smooth'})`，其余走 `router.push(href)`，避免整页刷新；外链仍交给浏览器。图片灯箱逻辑保持原样。
+- **`PostEdit.vue` 预览拦截站内跳转**：`onPreviewClick` 对站内链接只 `toast.info('预览中不跳转站内链接，发布后点击即可正常打开')` —— 否则点一下就会离开编辑页、丢掉未保存内容。
+- **`insertLink()` 修好**：占位符从 `url` 改成 `https://`，插入后用 `setSelectionRange` 把这段占位全选，作者直接键入域名即可。
+- **`SafeMarkdown.java` 同步**：新增与前端同规则的 `normalizeHref`（危险协议清空、邮箱补 `mailto:`、裸域名补 `https://`），在 Jsoup 清洗**之前**改写 `href`，服务端阅读 HTML 与前端行为一致。
+- **样式清理**：删掉 `typography.css` 里两处无效的 `referrerpolicy` 声明。
+
+### 影响文件
+
+| 文件 | 改动类型 |
+|------|----------|
+| `frontend/src/utils/markdown.ts` | 新增（统一渲染入口：协议补全 / 站内外分流 / DOMPurify + DOMParser 净化） |
+| `frontend/src/utils/__tests__/markdown.test.ts` | 新增（15 用例：协议补全、危险协议、文件扩展名不误判、站内外属性、GFM 回归） |
+| `frontend/src/views/post/PostDetail.vue` | 修改（改用 `renderMarkdown`；站内链接走 router/锚点，外链交给浏览器） |
+| `frontend/src/views/post/PostEdit.vue` | 修改（预览改用 `renderMarkdown`；`onPreviewClick` 拦截站内跳转；`insertLink` 占位符与光标） |
+| `frontend/src/components/pages/MarkdownContent.vue` | 修改（改用 `renderMarkdown`） |
+| `frontend/src/styles/typography.css` | 修改（删除两处无效的 `referrerpolicy` 声明） |
+| `frontend/src/views/post/__tests__/PostDetail.test.ts` | 修改（+3 用例：裸域名补协议、站内路由接管、锚点滚动） |
+| `frontend/src/views/post/__tests__/PostEdit.test.ts` | 修改（+2 用例：链接占位符与选中区间、预览拦截站内跳转） |
+| `backend/src/main/java/com/selfblog/service/site/seo/SafeMarkdown.java` | 修改（`normalizeHref` 与服务端渲染同步补协议） |
+| `backend/src/test/java/com/selfblog/service/site/seo/SafeMarkdownTest.java` | 修改（+3 用例：裸域名补协议、危险协议、相对阅读链接保留） |
+| `docs/reviews/2026-10-24-markdown-link-verification.md` | 新增（真机验证记录） |
+
+### 验证
+
+- 后端全量：**1291 tests / 0 failures / 0 errors**，`BUILD SUCCESS`（基线 1288，本批 +3）。
+- 前端全量：**56 files / 554 tests 全通过**（基线 55/534，本批 +1 文件 +20 tests）。
+- `vue-tsc --noEmit` 0 错误；`eslint src` 0 error / 42 warning（与基线一致）；`prettier --check` 通过。
+- **真机验证（Playwright + Chrome + 真实后端 SQLite 库）**：临时发文含 `[外站裸域名](example.com/path)`、`[外站完整](https://example.com/path)`、`[归档页](/archives)`、`[跳到本节](#section-x)`、`<hi@example.com>`，实测——
+  - 裸域名 → `href="https://example.com/path"` + `target="_blank"` + `rel="noopener noreferrer"`；点击后真实导航目标为 `https://example.com/path`（路由拦截记录），**不再是本站 404**。
+  - 站内 `/archives` → 无 `target`，点击后 URL 变为 `http://localhost:3000/archives`，SPA 接管、无整页刷新。
+  - `#section-x` → 无 `target`，点击后原地滚动到本节。
+  - 邮箱 → `mailto:hi@example.com`；标题锚点 `#section-0`/`#section-1` 正常；`pageErrors: []`。临时文章已从库中物理删除（回到原始 15 篇）。
+  - 完整记录见 `docs/reviews/2026-10-24-markdown-link-verification.md`。
+
+---
+
 ## 未发布 — 页面横幅自定义 + 玻璃感默认开启 + 后台信息架构重排 (2026-10-23)
 
 ### 说明

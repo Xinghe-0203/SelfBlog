@@ -410,6 +410,14 @@ Controller（控制器）→ Service（服务）→ Mapper（数据访问）→ 
 - 修复新增用例暴露的两处测试自身缺陷（`List.of(...).toList()` 在 JDK 21 不合法；连续 `saveDraft` 未递进 revision 触发 409）
 - 门禁：后端 **1288 测试**（+34），前端 **55 文件 / 534 测试**（+4 文件/+30）+ lint(0 error)/format/type/build/部署契约 27/27；真机 Playwright 验证默认玻璃感三档台阶、深色模式、壁纸模式、横幅三种排布、后台 4 tab/主题预设/编辑器 3 档，验证后已还原作者原配置
 
+### 未发布（2026-10-24）— 文章链接跳转修复 + Markdown 渲染链路统一
+
+- **修复「文章里的 URL 点击后跳到本站 404」**：根因是 marked 只在 GFM autolink（裸 `https://…` 或裸 `www.…`）时补协议，而 `[文字](example.com)` 这种链接语法的 href 会原样输出成相对路径，浏览器解析成 `https://本站/example.com`，被 SPA 兜底路由 `/:pathMatch(.*)*` 接走变成 404 页
+- 新增唯一渲染入口 `frontend/src/utils/markdown.ts`：`normalizeMarkdownHref`（危险协议 `javascript:`/`data:` 等清空；邮箱补 `mailto:`；裸域名补 `https://`，并用文件扩展名白名单避免把 `a.md`、`photo.png` 误判成域名）、`isInternalMarkdownHref`、`sanitizeMarkdownHtml`（DOMPurify 之后用 `DOMParser` 遍历 `a[href]`/`img` 改属性，取代原先会误命中 `<area>`/`<abbr>` 的正则）、`renderMarkdown`。文章详情、编辑器预览、页面正文三处共用同一条链路
+- 外链补 `target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer"`，站内链接不再被强行新开标签；详情页 `onContentClick` 接管站内链接（`#` 锚点平滑滚动、其余走 `router.push`），编辑器预览里点站内链接只提示不跳转（避免丢未保存内容）
+- 编辑器「链接」按钮插入 `[文字](https://)` 并自动全选 URL 占位，不再留裸 `url`；后端 `SafeMarkdown` 同步补协议（此前 Jsoup 白名单会把无协议 href 直接剥掉）；清理 `typography.css` 两处误写成 CSS 的 `referrerpolicy` 声明
+- 门禁：后端 **1291 测试**，前端 **56 文件 / 554 测试**（+1 文件/+20）+ `vue-tsc` 0 错、`eslint` 0 error、`prettier` 通过
+
 ### v2.0.29 (2026-10-22)
 
 - 外观新增 **11 个深度自定义维度**，此前作者只能调背景与表面透明度：**排版**（字体族 `system|sans|serif|mono`、字号 14–19px、行高 1.5–2.2、阅读栏宽 640–960px、段间距 0–2em）、**布局**（圆角五档、阴影三档、密度三档）、**呈现**（首页头图四档、文章封面三档）、**动效**（四档）。三条硬约束：**导航栏与后台界面完全不动**（规则限定在 `.app-main:not(.app-main--admin)`）、**默认值逐像素等于改造前观感**（老站点升级零回归）、WCAG 对比度不回退

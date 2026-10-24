@@ -8,6 +8,7 @@ import { tagApi } from '@/api/tag'
 import { mediaApi } from '@/api/media'
 import { seoApi } from '@/api/seo'
 import { llmApi } from '@/api/llm'
+import { toast } from '@/utils/toast'
 
 /**
  * 编辑器冒烟测试只覆盖已有动作（草稿 / 发布 / 封面 / 标签），
@@ -31,7 +32,9 @@ vi.mock('@/api/seo', () => ({
 vi.mock('@/api/llm', () => ({
   llmApi: { generateSummary: vi.fn(), generateTags: vi.fn(), generateTitles: vi.fn() }
 }))
-vi.mock('@/utils/toast', () => ({ toast: { success: vi.fn(), warning: vi.fn(), error: vi.fn() } }))
+vi.mock('@/utils/toast', () => ({
+  toast: { success: vi.fn(), warning: vi.fn(), error: vi.fn(), info: vi.fn() }
+}))
 enableAutoUnmount(afterEach)
 const response = <T>(data: T) => ({ code: 200, message: 'ok', data })
 const nextFrame = () => new Promise((resolve) => setTimeout(resolve, 0))
@@ -308,6 +311,41 @@ describe('author editor smoke coverage', () => {
     expect(wrapper.find('.content-input').exists()).toBe(true)
     expect(wrapper.text()).toContain('字数')
     expect(wrapper.text()).toContain('预计阅读')
+  })
+
+  it('links the selection with a protocol placeholder instead of a bare url', async () => {
+    const { wrapper } = await setup()
+    const textarea = wrapper.get('.content-input').element as HTMLTextAreaElement
+    await wrapper.get('.content-input').setValue('看看这个')
+    textarea.setSelectionRange(0, 4)
+
+    await wrapper.get('.toolbar button[title="链接"]').trigger('click')
+
+    // 修复前插入的是 [看看这个](url)：不改就会变成站内相对路径，点开跳到本站 404。
+    expect((wrapper.get('.content-input').element as HTMLTextAreaElement).value).toBe(
+      '[看看这个](https://)'
+    )
+    expect(textarea.selectionStart).toBe(7)
+    expect(textarea.selectionEnd).toBe(15)
+  })
+
+  it('blocks in-site link navigation inside the preview but leaves external links alone', async () => {
+    const { wrapper, router } = await setup()
+    await wrapper.get('.content-input').setValue('[站内文章](/post/2)\n\n[外站](example.com/path)')
+    await wrapper.get('.header-actions button.btn-secondary').trigger('click')
+    await flushPromises()
+
+    const [internal, external] = wrapper.findAll('.editor-preview .markdown-body a')
+    // 预览里点站内链接会离开编辑页、丢掉未保存改动，所以只提示不跳转。
+    await internal!.trigger('click')
+    expect(vi.mocked(toast.info)).toHaveBeenCalledWith(
+      '预览中不跳转站内链接，发布后点击即可正常打开'
+    )
+    expect(router.currentRoute.value.path).toBe('/admin/write')
+
+    // 外链由渲染链路加上 target="_blank"，不受预览拦截影响。
+    expect(external!.attributes('href')).toBe('https://example.com/path')
+    expect(external!.attributes('target')).toBe('_blank')
   })
 
   it('saves a draft with the real payload and reports the saved state', async () => {

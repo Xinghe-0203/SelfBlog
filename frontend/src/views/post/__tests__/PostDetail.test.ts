@@ -63,7 +63,8 @@ afterEach(() => {
   vi.restoreAllMocks()
   vi.unstubAllGlobals()
 })
-async function setup() {
+async function setupWithContent(content: string) {
+  vi.mocked(postApi.getPostById).mockResolvedValue(response({ ...post, content }))
   const router = createRouter({
     history: createMemoryHistory(),
     routes: [
@@ -76,7 +77,10 @@ async function setup() {
     global: { plugins: [createPinia(), router], stubs: { teleport: true, transition: true } }
   })
   await flushPromises()
-  return wrapper
+  return { wrapper, router }
+}
+async function setup() {
+  return (await setupWithContent(post.content)).wrapper
 }
 describe('reader layout and preserved interactions', () => {
   it('introduces the title and metadata before the optional cover', async () => {
@@ -172,5 +176,40 @@ describe('reader layout and preserved interactions', () => {
       pageNum: 2,
       pageSize: 10
     })
+  })
+
+  it('turns a scheme-less markdown link into an external absolute URL', async () => {
+    const { wrapper } = await setupWithContent('[外站](example.com/path)')
+    const anchor = wrapper.get('.markdown-body a')
+
+    // 修复前 href="example.com/path" 会被浏览器当成站内相对路径 → 跳到本站 404。
+    expect(anchor.attributes('href')).toBe('https://example.com/path')
+    expect(anchor.attributes('target')).toBe('_blank')
+    expect(anchor.attributes('rel')).toBe('noopener noreferrer')
+  })
+
+  it('routes in-site links through the router instead of reloading the page', async () => {
+    const { wrapper, router } = await setupWithContent('[站内文章](/post/2)')
+    const anchor = wrapper.get('.markdown-body a')
+
+    // 站内链接不加 target，交给 onContentClick 走 SPA 跳转。
+    expect(anchor.attributes('target')).toBeUndefined()
+    await anchor.trigger('click')
+    await flushPromises()
+
+    expect(router.currentRoute.value.path).toBe('/post/2')
+  })
+
+  it('scrolls to same-page anchors without leaving the article', async () => {
+    const { wrapper, router } = await setupWithContent('## 第二节\n\n[回到本节](#section-0)')
+    const anchor = wrapper.get('.markdown-body a[href="#section-0"]')
+    const scrollIntoView = vi.fn()
+    const section = wrapper.get('#section-0').element
+    section.scrollIntoView = scrollIntoView
+
+    await anchor.trigger('click')
+
+    expect(scrollIntoView).toHaveBeenCalled()
+    expect(router.currentRoute.value.path).toBe('/post/1')
   })
 })

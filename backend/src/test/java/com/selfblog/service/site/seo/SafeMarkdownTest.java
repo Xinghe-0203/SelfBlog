@@ -25,6 +25,39 @@ class SafeMarkdownTest {
     }
 
     /**
+     * 与前端 {@code frontend/src/utils/markdown.ts} 的 normalizeMarkdownHref 保持同一套规则：
+     * CommonMark 不会给 {@code [文字](example.com)} 补协议，若不在这里补，Jsoup 的协议白名单
+     * 会把 href 整条删掉，服务端阅读 HTML 里就出现点不动的链接。
+     */
+    @Test void completesBareHostLinksLikeTheClient() {
+        var doc = Jsoup.parse(markdown.render(
+                "[示例](example.com/page) [带www](www.example.com) [子域](sub.example.co.uk/a?x=1)"));
+        var links = doc.select("a");
+        assertEquals("https://example.com/page", links.get(0).attr("href"));
+        assertEquals("https://www.example.com", links.get(1).attr("href"));
+        assertEquals("https://sub.example.co.uk/a?x=1", links.get(2).attr("href"));
+    }
+
+    @Test void keepsAlreadyQualifiedAndInternalLinksUntouched() {
+        var doc = Jsoup.parse(markdown.render(
+                "[绝对](https://example.com/a) [站内](/post/1) [锚点](#top) [邮件](mailto:a@b.com) [裸邮箱](a@b.com)"));
+        var links = doc.select("a");
+        assertEquals("https://example.com/a", links.get(0).attr("href"));
+        assertEquals("/post/1", links.get(1).attr("href"));
+        assertEquals("#top", links.get(2).attr("href"));
+        assertEquals("mailto:a@b.com", links.get(3).attr("href"));
+        assertEquals("mailto:a@b.com", links.get(4).attr("href"));
+    }
+
+    @Test void doesNotMistakeRelativeFileNamesForHosts() {
+        assertEquals("a.md", SafeMarkdown.normalizeHref("a.md"));
+        assertEquals("notes.txt", SafeMarkdown.normalizeHref("notes.txt"));
+        assertEquals("photo.png", SafeMarkdown.normalizeHref("photo.png"));
+        assertEquals("single", SafeMarkdown.normalizeHref("single"));
+        assertEquals("", SafeMarkdown.normalizeHref("javascript:alert(1)"));
+    }
+
+    /**
      * 与前端共享同一篇 fixture（docs/fixtures/gfm-sample.md）：表格/删除线/任务列表
      * 在服务端 HTML 里必须与浏览器里一致，不能退化成纯文本。
      */

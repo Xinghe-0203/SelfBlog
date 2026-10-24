@@ -1,18 +1,12 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
-import { marked } from 'marked'
-import DOMPurify from 'dompurify'
 import { enhanceMarkdown, disposeMarkdownEnhance } from '@/composables/useMarkdownEnhance'
+import { renderMarkdown } from '@/utils/markdown'
 const props = defineProps<{ source: string }>()
 const root = ref<HTMLElement | null>(null)
 let active = true
-const html = computed(() =>
-  DOMPurify.sanitize(marked.parse(props.source, { async: false }) as string, {
-    USE_PROFILES: { html: true },
-    FORBID_TAGS: ['style', 'script', 'iframe', 'form', 'input', 'button'],
-    FORBID_ATTR: ['style']
-  })
-)
+// 统一走 utils/markdown：协议补全 + 站内/站外链接属性，与文章详情、编辑器预览保持一致
+const html = computed(() => renderMarkdown(props.source))
 watch(
   html,
   async () => {

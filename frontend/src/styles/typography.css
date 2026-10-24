@@ -111,7 +111,6 @@ b {
   text-underline-offset: 3px;
   text-decoration-color: rgba(31, 108, 159, 0.3);
   transition: text-decoration-color var(--transition-fast);
-  referrerpolicy: no-referrer;
 }
 .markdown-body a:hover {
   color: var(--accent-dark);
@@ -174,7 +173,6 @@ b {
   max-width: 100%;
   border-radius: var(--radius-md);
   box-shadow: var(--shadow);
-  referrerpolicy: no-referrer;
 }
 .markdown-body table {
   width: 100%;
