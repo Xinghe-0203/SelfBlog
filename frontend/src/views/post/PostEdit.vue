@@ -957,7 +957,7 @@ import { toast } from '../../utils/toast'
 import { useConfirm } from '../../composables/useConfirm'
 import { formatDate } from '../../utils'
 import { estimateReadMinutes } from '../../utils/reading'
-import { renderMarkdown, isInternalMarkdownHref } from '../../utils/markdown'
+import { renderMarkdown, isInternalMarkdownHref, looksLikeLinkTarget } from '../../utils/markdown'
 
 const route = useRoute()
 const router = useRouter()
@@ -1086,23 +1086,37 @@ function insertCodeBlock() {
   insertMarkdown('```\n', '\n```')
 }
 
+const LINK_TEXT_PLACEHOLDER = '链接文字'
+const LINK_HREF_PLACEHOLDER = 'https://'
+
 function insertLink() {
   const ta = contentTextarea.value
   if (!ta) return
   const start = ta.selectionStart,
     end = ta.selectionEnd
-  const selected = form.content.substring(start, end) || '链接文字'
-  // 占位符用 https:// 而不是裸 "url"：前者即使没改也不会渲染成站内相对路径，
-  // 后者会变成 [文字](url) → 点开跳到本站 404（见 utils/markdown.ts 的协议补全）。
-  const placeholder = 'https://'
-  const linkText = `[${selected}](${placeholder})`
+  const selected = form.content.substring(start, end).trim()
+
+  // 方向由「选中内容是什么」决定，不能一律把选中内容当链接文字：
+  // 选中地址 → [链接文字](选中地址)，等用户补可读文字；
+  // 选中普通文字 → [选中文字](https://)，等用户补地址。
+  // 占位符用 https:// 而不是裸 "url"：后者会渲染成 [文字](url) → 点开跳到本站 404
+  // （见 utils/markdown.ts 的协议补全）。
+  const selectionIsHref = looksLikeLinkTarget(selected)
+  const text = selectionIsHref ? LINK_TEXT_PLACEHOLDER : selected || LINK_TEXT_PLACEHOLDER
+  const href = selectionIsHref ? selected : LINK_HREF_PLACEHOLDER
   saveHistory()
-  form.content = form.content.substring(0, start) + linkText + form.content.substring(end)
+  form.content =
+    form.content.substring(0, start) + `[${text}](${href})` + form.content.substring(end)
   nextTick(() => {
     ta.focus()
-    // 光标直接落在 URL 占位上并全选，粘贴/输入即可替换，不会留下占位符
-    const urlStart = start + selected.length + 3
-    ta.setSelectionRange(urlStart, urlStart + placeholder.length)
+    if (selectionIsHref) {
+      // 全选「链接文字」占位，直接输入即可替换
+      ta.setSelectionRange(start + 1, start + 1 + text.length)
+    } else {
+      // 全选 URL 占位，粘贴即可替换，不会留下占位符
+      const urlStart = start + text.length + 3
+      ta.setSelectionRange(urlStart, urlStart + href.length)
+    }
   })
 }
 

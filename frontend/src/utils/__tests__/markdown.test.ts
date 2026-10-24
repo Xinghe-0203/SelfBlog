@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   isInternalMarkdownHref,
+  looksLikeLinkTarget,
   normalizeMarkdownHref,
   renderMarkdown,
   sanitizeMarkdownHtml
@@ -57,6 +58,29 @@ describe('isInternalMarkdownHref', () => {
     expect(isInternalMarkdownHref('//cdn.example.com/x')).toBe(false)
     expect(isInternalMarkdownHref('mailto:a@b.com')).toBe(false)
     expect(isInternalMarkdownHref('')).toBe(false)
+  })
+})
+
+describe('looksLikeLinkTarget', () => {
+  it('把地址形态识别为可直接当 href 的值', () => {
+    expect(looksLikeLinkTarget('https://nas.starsx.top/s/ed86e4d17a07425198')).toBe(true)
+    expect(looksLikeLinkTarget('http://example.com')).toBe(true)
+    expect(looksLikeLinkTarget('example.com/a')).toBe(true)
+    expect(looksLikeLinkTarget('www.example.com')).toBe(true)
+    expect(looksLikeLinkTarget('mailto:a@b.com')).toBe(true)
+    expect(looksLikeLinkTarget('a@b.com')).toBe(true)
+    expect(looksLikeLinkTarget('//cdn.example.com/x')).toBe(true)
+  })
+
+  it('把普通文字与站内路径排除在"地址"之外', () => {
+    expect(looksLikeLinkTarget('看看这个')).toBe(false)
+    expect(looksLikeLinkTarget('示例 站点')).toBe(false)
+    expect(looksLikeLinkTarget('/post/2')).toBe(false)
+    expect(looksLikeLinkTarget('#section')).toBe(false)
+    expect(looksLikeLinkTarget('readme.md')).toBe(false)
+    expect(looksLikeLinkTarget('javascript:alert(1)')).toBe(false)
+    expect(looksLikeLinkTarget('')).toBe(false)
+    expect(looksLikeLinkTarget(undefined)).toBe(false)
   })
 })
 

@@ -329,6 +329,38 @@ describe('author editor smoke coverage', () => {
     expect(textarea.selectionEnd).toBe(15)
   })
 
+  it('keeps a selected URL in the href and asks for the link text instead', async () => {
+    const { wrapper } = await setup()
+    const textarea = wrapper.get('.content-input').element as HTMLTextAreaElement
+    const url = 'https://nas.starsx.top/s/ed86e4d17a07425198'
+    await wrapper.get('.content-input').setValue(url)
+    textarea.setSelectionRange(0, url.length)
+
+    await wrapper.get('.toolbar button[title="链接"]').trigger('click')
+
+    // 方向不能反：选中的是地址就进 href，[] 里放可编辑的链接文字占位。
+    expect((wrapper.get('.content-input').element as HTMLTextAreaElement).value).toBe(
+      `[链接文字](${url})`
+    )
+    // 选区落在「链接文字」上，直接输入即可替换
+    expect(textarea.selectionStart).toBe(1)
+    expect(textarea.selectionEnd).toBe(5)
+  })
+
+  it('wraps a selected bare domain as an external href instead of a relative path', async () => {
+    const { wrapper } = await setup()
+    const textarea = wrapper.get('.content-input').element as HTMLTextAreaElement
+    const domain = 'nas.starsx.top/s/ed86e4d17a07425198'
+    await wrapper.get('.content-input').setValue(domain)
+    textarea.setSelectionRange(0, domain.length)
+
+    await wrapper.get('.toolbar button[title="链接"]').trigger('click')
+
+    expect((wrapper.get('.content-input').element as HTMLTextAreaElement).value).toBe(
+      `[链接文字](${domain})`
+    )
+  })
+
   it('blocks in-site link navigation inside the preview but leaves external links alone', async () => {
     const { wrapper, router } = await setup()
     await wrapper.get('.content-input').setValue('[站内文章](/post/2)\n\n[外站](example.com/path)')

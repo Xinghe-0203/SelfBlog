@@ -108,6 +108,22 @@ export function normalizeMarkdownHref(raw: string | null | undefined): string {
   return value
 }
 
+/**
+ * 判断一段文本本身是否已经可以直接当 href 用。
+ *
+ * 编辑器的「链接」按钮靠它决定方向：选中的是地址就把它放进 href、让用户补链接文字；
+ * 选中的是普通文字才反过来把文字放进 `[]`、等用户补地址。
+ */
+export function looksLikeLinkTarget(raw: string | null | undefined): boolean {
+  const value = (raw ?? '').trim()
+  if (!value || /\s/.test(value)) return false
+  if (DANGEROUS_SCHEME.test(value)) return false
+  if (SAFE_SCHEME.test(value)) return true
+  if (value.startsWith('//')) return true
+  if (EMAIL.test(value)) return true
+  return looksLikeBareHost(value)
+}
+
 /** 站内链接：`#`、`?`、`/`（但不是 `//`）、或与当前 origin 相同的绝对地址。 */
 export function isInternalMarkdownHref(href: string | null | undefined): boolean {
   const value = (href ?? '').trim()

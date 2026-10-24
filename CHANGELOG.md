@@ -4,6 +4,40 @@
 
 ---
 
+## 未发布 — 编辑器「链接」按钮方向修正 (2026-10-24)
+
+### 说明
+
+用户反馈（原话）：「编辑器那个链接按钮错了，[https://nas.starsx.top/s/ed86e4d17a07425198](url)，这是它给的，方向反了。」
+
+在编辑器里选中一段**已经存在的地址**再点工具栏「链接」按钮，旧实现不管选中内容是什么，一律把选中内容当**链接文字**、href 留占位符，于是产出 `[https://nas.starsx.top/s/ed86e4d17a07425198](url)` —— 括号方向反了：可读文字位置塞了地址，可跳转的 href 位置留着 `url` 占位符。这正是上一批修掉的「点链接跳到本站 404」的同源问题：`url` 是相对路径。
+
+### 修复
+
+- **按选中内容的形态决定插入方向**（`frontend/src/views/post/PostEdit.vue` 的 `insertLink()`）：
+  - 选中内容是**地址形态**（有 `http(s)://`、`mailto:` 等协议，或裸域名、`//` 协议相对地址、邮箱）→ 产出 `[链接文字](选中的地址)`，并把「链接文字」四个字全选，直接键入即可替换。
+  - 选中内容是**普通文字**（含中文、空格，或以 `/`、`#` 开头的站内路径）→ 产出 `[选中的文字](https://)`，并把 `https://` 占位全选，粘贴地址即可替换。
+  - 未选中任何内容 → 产出 `[链接文字](https://)`，选区落在「链接文字」上。
+- **新增判定函数 `looksLikeLinkTarget(raw)`**（`frontend/src/utils/markdown.ts`）：与 `normalizeMarkdownHref` 共用同一套「什么算地址」的判断（协议 / `//` / 邮箱 / 裸域名），但**额外排除** `/`、`#`、`?` 开头的站内路径与危险协议 —— 否则选中 `/post/2` 也会被当成地址塞进 href，反而丢掉可读文字。
+- 占位符常量化为 `LINK_TEXT_PLACEHOLDER`（`链接文字`）与 `LINK_HREF_PLACEHOLDER`（`https://`），避免再出现裸 `url`。
+
+### 影响文件
+
+| 文件 | 改动类型 |
+|------|----------|
+| `frontend/src/views/post/PostEdit.vue` | 修改（`insertLink` 按选中内容分流方向；占位符常量） |
+| `frontend/src/utils/markdown.ts` | 修改（新增导出 `looksLikeLinkTarget`） |
+| `frontend/src/utils/__tests__/markdown.test.ts` | 修改（+2 用例：地址形态识别、普通文字与站内路径排除） |
+| `frontend/src/views/post/__tests__/PostEdit.test.ts` | 修改（+2 用例：选中 URL 方向不反、选中裸域名进 href） |
+
+### 验证
+
+- `frontend/src/utils/__tests__/markdown.test.ts` + `frontend/src/views/post/__tests__/PostEdit.test.ts`：**41 tests 全通过**（17 + 24）。
+- 前端全量：**56 files / 558 tests 全通过**（上一批 554，本批 +4）。
+- `vue-tsc --noEmit` 0 错误；`eslint` 目标文件 0 error / 19 warning（与基线同类告警）；`prettier --write` 已格式化。
+
+---
+
 ## 未发布 — 文章链接跳转修复 + Markdown 渲染链路统一 (2026-10-24)
 
 ### 说明

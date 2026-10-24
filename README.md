@@ -416,7 +416,8 @@ Controller（控制器）→ Service（服务）→ Mapper（数据访问）→ 
 - 新增唯一渲染入口 `frontend/src/utils/markdown.ts`：`normalizeMarkdownHref`（危险协议 `javascript:`/`data:` 等清空；邮箱补 `mailto:`；裸域名补 `https://`，并用文件扩展名白名单避免把 `a.md`、`photo.png` 误判成域名）、`isInternalMarkdownHref`、`sanitizeMarkdownHtml`（DOMPurify 之后用 `DOMParser` 遍历 `a[href]`/`img` 改属性，取代原先会误命中 `<area>`/`<abbr>` 的正则）、`renderMarkdown`。文章详情、编辑器预览、页面正文三处共用同一条链路
 - 外链补 `target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer"`，站内链接不再被强行新开标签；详情页 `onContentClick` 接管站内链接（`#` 锚点平滑滚动、其余走 `router.push`），编辑器预览里点站内链接只提示不跳转（避免丢未保存内容）
 - 编辑器「链接」按钮插入 `[文字](https://)` 并自动全选 URL 占位，不再留裸 `url`；后端 `SafeMarkdown` 同步补协议（此前 Jsoup 白名单会把无协议 href 直接剥掉）；清理 `typography.css` 两处误写成 CSS 的 `referrerpolicy` 声明
-- 门禁：后端 **1291 测试**，前端 **56 文件 / 554 测试**（+1 文件/+20）+ `vue-tsc` 0 错、`eslint` 0 error、`prettier` 通过
+- 编辑器「链接」按钮此前方向是反的：选中一段已有 URL 再点它，会产出 `[URL](url)`（URL 被当成链接文字、href 留裸占位符）。现在按选中内容形态分流——选中的像地址就生成 `[链接文字](选中地址)` 并全选「链接文字」等作者改写，选中的像文字就生成 `[选中文字](https://)` 并全选 URL 占位；判定复用 `looksLikeLinkTarget`（排除 `/`、`#`、`?` 开头的站内路径与危险协议）
+- 门禁：后端 **1291 测试**，前端 **56 文件 / 558 测试**（+1 文件/+24）+ `vue-tsc` 0 错、`eslint` 0 error、`prettier` 通过
 
 ### v2.0.29 (2026-10-22)
 

@@ -76,7 +76,7 @@ cd frontend
 ```
 
 - **本机 `npm run <script>` 全部失败**（`'"node"' 不是内部或外部命令`），`dev` / `build` / `test:run` 都不例外；`npm ci`、`npm install` 正常。原因不在仓库：系统 PATH 中 `C:\Program Files\Java\jdk-25\bin"` 这一项带了一个**不配对的引号**，`cmd.exe` 解析 PATH 时把它当成未闭合引号的开头，其后所有条目失效——`node` 无法被 `cmd` 解析（`where node` 仍能找到，走的是 App Paths），而 `node_modules/.bin/*.cmd` 垫片结尾正是调用裸 `node`。bash 不受影响。**因此一律直接调用 `./node_modules/.bin/<tool>`**（POSIX 垫片，可用；上面五条均已实测通过）。根治办法是删掉那条 PATH 里多余的引号；临时办法是在 PowerShell 里把 `backend/target/frontend/node` 前置到 `PATH`（该目录由 Maven 插件生成，`target/` 被清理后需重新构建才有）。
-- 测试基线：**56 个文件 / 554 tests 全通过**（2026-10-24 实测）。
+- 测试基线：**56 个文件 / 558 tests 全通过**（2026-10-24 实测）。
 - 闸门：`lint:check`、`format:check`、`type-check`、`test:run`、`build` 全绿；部署适配另跑 `npm run test:deployment`（Vercel 代理生成器 + Docker/Compose 契约，27 项）。`format:check` 自 2026-10-17 起是真实可用的仓库级闸门（`.prettierrc` 改为 `endOfLine: "auto"` 并重写了一次历史漂移）。
 - `tsconfig.json` 开启 `strict` + **`noUncheckedIndexedAccess`**：索引访问返回 `T | undefined`，`arr[0].foo` 过不了 `type-check`。用 `arr[0]?.foo`，或改用 `replace` 而非 `split()[0]` 这类写法。
 - 开发端口 3000，`/api` 与 `/uploads` 代理到 `VITE_API_TARGET`（默认 `http://localhost:8825`）。SPA 在没有后端时也能靠 `stores/site.ts` 的默认值正常渲染（`loadPublicSettings` 的 `fetch` 失败被静默吞掉），所以**只跑 `./node_modules/.bin/vite` 就能验收布局与样式**。
