@@ -1,14 +1,23 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { formatDate, getSafeImageUrl, truncateText } from '@/utils'
 import { estimateReadMinutes } from '@/utils/reading'
 import type { Post } from '@/types'
 
-withDefaults(defineProps<{ posts: Post[]; featured?: boolean; heading?: 'h2' | 'h3' }>(), {
-  heading: 'h3'
-})
+const props = withDefaults(
+  defineProps<{ posts: Post[]; featured?: boolean; heading?: 'h2' | 'h3' }>(),
+  { heading: 'h3' }
+)
 const failed = ref(new Set<string>())
 const cover = (post: Post) => getSafeImageUrl(post.coverImage || post.coverUrl, '')
+// 阅读时长按 post.id 记忆成 Map：estimateReadMinutes 要对全文跑多趟正则，
+// 模板里每次渲染逐条重算太贵。Post.id 必填，Map 与同一数组同源，get 不会落空。
+const readMinutes = computed(
+  () =>
+    new Map(
+      props.posts.map((post): [number, number] => [post.id, estimateReadMinutes(post.content)])
+    )
+)
 </script>
 
 <template>
@@ -33,7 +42,7 @@ const cover = (post: Post) => getSafeImageUrl(post.coverImage || post.coverUrl, 
               tag.name
             }}</router-link>
           </div>
-          <span class="reading-time">{{ estimateReadMinutes(post.content) }} 分钟阅读</span>
+          <span class="reading-time">{{ readMinutes.get(post.id) }} 分钟阅读</span>
         </div>
       </div>
       <router-link

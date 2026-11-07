@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.selfblog.common.exception.BusinessException;
 import com.selfblog.dto.site.PageModels.PageConfig;
 import com.selfblog.service.site.PageService;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -34,10 +35,22 @@ class SitemapServiceTest {
     @Autowired JdbcTemplate jdbc;
     @Autowired PageService pages;
     @Autowired ObjectMapper json;
+    @Autowired org.springframework.cache.CacheManager caches;
 
     @BeforeEach void clean() {
+        clearPageCache();
         jdbc.update("DELETE FROM blog_post");
         jdbc.update("DELETE FROM site_setting WHERE setting_key LIKE 'page.%'");
+    }
+
+    @AfterEach void cleanup() {
+        clearPageCache();
+    }
+
+    /** 页面写发生在测试事务里（会回滚），pageCache 不参与回滚——与 PageServiceImplTest 同一约定。 */
+    private void clearPageCache() {
+        var cache = caches.getCache(com.selfblog.config.cache.CaffeineCacheConfig.PAGE_CACHE);
+        if (cache != null) cache.clear();
     }
 
     @Test void allPublishedPostsAppearExactlyOnceAcrossShardsBeyondOneHundred() {

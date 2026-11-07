@@ -3,6 +3,8 @@ package com.selfblog.controller.admin;
 import com.selfblog.common.result.Result;
 import com.selfblog.dto.ai.AiHealthReportRequest;
 import com.selfblog.dto.ai.AiImageAltRequest;
+import com.selfblog.dto.ai.AiInlineWritingRequest;
+import com.selfblog.dto.ai.AiLinkSuggestionRequest;
 import com.selfblog.dto.ai.AiModerationCheckRequest;
 import com.selfblog.dto.ai.AiModerationScanRequest;
 import com.selfblog.dto.ai.AiPostRequest;
@@ -14,6 +16,8 @@ import com.selfblog.service.ai.AiProofreadService;
 import com.selfblog.service.ai.AiWritingService;
 import com.selfblog.vo.ai.AiHealthReportVO;
 import com.selfblog.vo.ai.AiImageAltVO;
+import com.selfblog.vo.ai.AiInlineWritingVO;
+import com.selfblog.vo.ai.AiLinkSuggestionsVO;
 import com.selfblog.vo.ai.AiModerationScanVO;
 import com.selfblog.vo.ai.AiModerationVO;
 import com.selfblog.vo.ai.AiProofreadBatchVO;
@@ -77,6 +81,28 @@ public class AdminAiController {
     @PostMapping("/writing/titles")
     public Result<AiTitlesVO> titles(@RequestBody(required = false) AiPostRequest request) {
         return Result.success(writingService.titles(postIdOf(request)));
+    }
+
+    /** B：行内写作（选区润色/续写/精简）。 */
+    @Operation(summary = "行内写作", description = "对编辑器选区做 polish/continue/shorten，只返回建议文本，不写库")
+    @PreAuthorize("hasRole('admin')")
+    @PostMapping("/writing/inline")
+    public Result<AiInlineWritingVO> inlineWrite(
+            @RequestBody(required = false) AiInlineWritingRequest request) {
+        AiInlineWritingRequest safe =
+                request == null ? new AiInlineWritingRequest(null, null) : request;
+        return Result.success(writingService.inlineWrite(safe.action(), safe.text()));
+    }
+
+    /** B：站内链接建议。 */
+    @Operation(summary = "推荐站内链接", description = "从其他已发布文章里挑 3-5 篇值得链接的目标，不写库")
+    @PreAuthorize("hasRole('admin')")
+    @PostMapping("/writing/links")
+    public Result<AiLinkSuggestionsVO> linkSuggestions(
+            @RequestBody(required = false) AiLinkSuggestionRequest request) {
+        AiLinkSuggestionRequest safe =
+                request == null ? new AiLinkSuggestionRequest(null) : request;
+        return Result.success(writingService.suggestLinks(safe.postId()));
     }
 
     /** C：单条评论审核。 */

@@ -7,9 +7,11 @@ import com.selfblog.dto.post.PostAdvancedSearchRequest;
 import com.selfblog.dto.post.PostQueryRequest;
 import com.selfblog.dto.post.SaveDraftRequest;
 import com.selfblog.entity.BlogPost;
+import com.selfblog.vo.post.ArchivePostVO;
 import com.selfblog.vo.post.AdjacentPostVO;
 import com.selfblog.vo.post.PostDetailResponse;
 import com.selfblog.vo.post.PostListResponse;
+import com.selfblog.vo.post.RelatedPostVO;
 
 import java.util.List;
 import java.util.Map;
@@ -94,4 +96,27 @@ public interface PostQueryService extends IService<BlogPost> {
      * @return 固定包含 "prev"（更早一篇）与 "next"（更新一篇）两个键，不存在时值为 null
      */
     Map<String, AdjacentPostVO> getAdjacentPosts(Long postId);
+
+    /**
+     * 获取当前文章的相关文章推荐（文章详情页「相关阅读」板块）。
+     *
+     * <p>当前文章必须已发布，否则返回空列表（作者预览草稿时不展示推荐）；
+     * 不存在的文章与详情接口同一套 404 语义。推荐优先按共享标签数降序，
+     * 同数按 id 降序（新文章优先），不足 5 篇用最新已发布文章补齐；
+     * 全程只读，不触碰阅读计数。</p>
+     *
+     * @param postId 当前文章ID
+     * @return 最多 5 篇的相关文章（可能少于 5 篇甚至为空）
+     */
+    List<RelatedPostVO> getRelatedPosts(Long postId);
+
+    /**
+     * 获取全站归档（归档页时间轴），只返回已发布文章。
+     *
+     * <p>仅投影 id/title/category/createTime/updateTime/viewCount 六列（绝不拉正文），
+     * 按创建时间倒序、同时间戳 id 降序；无分页（个人博客量级），上限 2000 条兜底。</p>
+     *
+     * @return 归档条目列表
+     */
+    List<ArchivePostVO> getArchives();
 }

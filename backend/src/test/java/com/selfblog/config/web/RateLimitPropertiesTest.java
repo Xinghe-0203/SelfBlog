@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -132,5 +133,23 @@ class RateLimitPropertiesTest {
         assertEquals(60, read.get("/api/guest-comments/post"));
         assertTrue("/api/guest-comments/post".length() > "/api/guest-comments".length(),
                 "读前缀必须比写前缀更长，否则 5/min 的发表配额会让读者看到第 6 个评论区就被拦");
+    }
+
+    @Test
+    @DisplayName("搜索联想读阈值 120/min：比 /api/post 读桶更宽松的长前缀，写阈值不受影响")
+    void postSearchSuggestReadPathHasItsOwnLooserThreshold() {
+        RateLimitProperties properties = new RateLimitProperties();
+        Map<String, Integer> write = properties.getAllLimits();
+        Map<String, Integer> read = properties.getReadLimits();
+
+        assertEquals(120, read.get("/api/post/search"),
+                "typeahead 约每 300ms 一次请求，60/min 的 /api/post 读桶会被快速输入打满，必须单列更宽的读阈值");
+        assertTrue(read.get("/api/post/search") > read.get("/api/post"),
+                "联想读阈值必须比文章详情读阈值（60/min）更宽松");
+        assertTrue(read.containsKey("/api/post/search") && "/api/post/search".startsWith("/api/post"),
+                "读前缀 /api/post/search 比读前缀 /api/post 更长，最长前缀匹配才能在 GET /api/post/search/** 上胜出");
+        assertFalse(write.containsKey("/api/post/search"),
+                "写表不得新增该前缀：/api/post/search 下的写路径仍由 /api/post/ 的 10/min 保护");
+        assertEquals(10, write.get("/api/post/"), "写路径保持 10/min 不变");
     }
 }

@@ -9,16 +9,17 @@ import {
 } from '@/api/public-interactions'
 import { formatDate, getSafeImageUrl } from '@/utils'
 import { renderMarkdown, isInternalMarkdownHref } from '@/utils/markdown'
-import { estimateReadMinutes } from '@/utils/reading'
+import { estimateReadMinutes, countWords } from '@/utils/reading'
 import { useUserStore } from '@/stores/user'
 import { useSiteStore } from '@/stores/site'
 import { usePageSeo } from '@/composables/usePageSeo'
+import { canonicalOrigin } from '@/composables/useSeoMeta'
 import { enhanceMarkdown, disposeMarkdownEnhance } from '@/composables/useMarkdownEnhance'
 import { toast } from '@/utils/toast'
 import ImagePreview from '@/components/common/ImagePreview.vue'
 import MobileTocSheet from '@/components/post/MobileTocSheet.vue'
 import Icon from '@/components/common/Icon.vue'
-import type { Post } from '@/types'
+import type { Post, RelatedPostItem } from '@/types'
 import PageFrame from '@/components/pages/PageFrame.vue'
 import { usePageConfig } from '@/composables/usePageConfig'
 import { useLatestRequest } from '@/composables/useLatestRequest'
@@ -56,6 +57,8 @@ const adjacent = ref<{
   prev: null,
   next: null
 })
+/** 相关阅读（最多 5 条）；取不到时保持为空，整个分区不渲染 */
+const relatedPosts = ref<RelatedPostItem[]>([])
 const loading = ref(true)
 const error = ref('')
 const readingProgress = ref(0)
@@ -95,6 +98,9 @@ const renderedContent = computed(() => {
  */
 const estimatedReadMinutes = computed(() => estimateReadMinutes(post.value?.content || ''))
 
+/** 正文字数：与阅读时长共用同一套统计口径；为 0（空正文）时 meta 里不展示。 */
+const estimatedWordCount = computed(() => countWords(post.value?.content || ''))
+
 /** 最后更新提示的阈值：7 天内的小改动不值得在阅读入口提示。 */
 const UPDATE_NOTICE_THRESHOLD_MS = 7 * 24 * 60 * 60 * 1000
 
@@ -111,6 +117,38 @@ const lastUpdated = computed(() => {
   if (Number.isNaN(updatedAt) || Number.isNaN(createdAt)) return ''
   if (updatedAt - createdAt <= UPDATE_NOTICE_THRESHOLD_MS) return ''
   return formatDate(updated, 'YYYY年MM月DD日')
+})
+
+/**
+ * 目录总开关：tocStyle=hidden 时阅读页不渲染任何目录（桌面侧栏 + 移动端抽屉与浮动胶囊）。
+ * 与 readingProgress 一样由模板 / v-if 响应式消费，不落 CSS 属性；未知取值按显示处理。
+ */
+const tocVisible = computed(() => siteStore.settings.tocStyle !== 'hidden')
+
+/**
+ * 摘要卡（TL;DR）：默认关闭（summaryCallout=off，升级零回归 —— 关闭时不渲染任何新节点）。
+ * 作者显式开启且文章带非空摘要时，在封面与正文之间渲染一张纯文本摘要卡；
+ * 预览上下文没有真实文章页，同样不渲染。空白摘要（纯空格）不算「有摘要」。
+ */
+const summaryCalloutVisible = computed(
+  () => !isPreview && siteStore.settings.summaryCallout === 'on' && !!post.value?.summary?.trim()
+)
+
+/**
+ * 版权声明：后台「内容与互动」的 postLicense，留空（含纯空白）时整块不渲染 ——
+ * 默认设置下阅读页 DOM 与没有这个功能时完全一致。预览上下文没有真实文章页，
+ * permalink 无从谈起，同样不渲染。
+ */
+const licenseText = computed(() => siteStore.settings.postLicense?.trim() || '')
+const licenseVisible = computed(() => !isPreview && !!licenseText.value)
+
+/**
+ * 本文永久链接：站点对外 origin（SEO 同源的 selfblog-site-origin 标记，缺省回落浏览器 origin）
+ * + /post/{id}。渲染在版权声明里供读者复制转发。
+ */
+const postPermalink = computed(() => {
+  const id = post.value?.id ?? route.params.id
+  return id ? `${canonicalOrigin()}/post/${id}` : ''
 })
 
 const fetchPost = async () => {
@@ -133,6 +171,7 @@ const fetchPost = async () => {
     likeInfo.value = { liked: false, likeCount: response.data.likeCount || 0 }
     void loadLikeStatus(isLatest)
     void loadAdjacent(isLatest)
+    void loadRelated(isLatest)
     if (siteStore.isCommentsEnabled) void loadComments()
   } catch (err: unknown) {
     if (!isLatest()) return
@@ -159,6 +198,24 @@ async function loadAdjacent(isLatest: () => boolean) {
   } catch {
     if (!isLatest()) return
     adjacent.value = { prev: null, next: null }
+  }
+}
+
+/**
+ * 相关阅读跟正文共用同一条令牌；预览上下文没有真实文章页，直接跳过。
+ * 失败静默清空 —— 相关阅读只是阅读出口的补充，不值得为它打断正文。
+ */
+async function loadRelated(isLatest: () => boolean) {
+  if (isPreview) return
+  const id = post.value?.id
+  if (!id) return
+  try {
+    const response = await postApi.getRelated(id)
+    if (!isLatest()) return
+    relatedPosts.value = response.data || []
+  } catch {
+    if (!isLatest()) return
+    relatedPosts.value = []
   }
 }
 
@@ -403,7 +460,7 @@ onUnmounted(() => {
 
 <template>
   <div
-    v-if="!isPreview"
+    v-if="!isPreview && siteStore.settings.readingProgress !== 'off'"
     class="reading-progress"
     :style="{ width: `${readingProgress}%` }"
     aria-hidden="true"
@@ -432,7 +489,7 @@ onUnmounted(() => {
     <article
       v-else-if="post"
       class="reader-layout"
-      :class="{ 'reader-layout--no-toc': !toc.length || !showModule('toc') }"
+      :class="{ 'reader-layout--no-toc': !tocVisible || !toc.length || !showModule('toc') }"
     >
       <div class="article-column">
         <header class="article-header">
@@ -455,6 +512,10 @@ onUnmounted(() => {
             <span>约 {{ estimatedReadMinutes }} 分钟阅读</span>
             <span class="meta-dot" aria-hidden="true"></span>
             <span>{{ post.viewCount || 0 }} 次阅读</span>
+            <template v-if="estimatedWordCount > 0">
+              <span class="meta-dot" aria-hidden="true"></span>
+              <span>约 {{ estimatedWordCount }} 字</span>
+            </template>
             <template v-if="lastUpdated">
               <span class="meta-dot" aria-hidden="true"></span>
               <span>最后更新于 {{ lastUpdated }}</span>
@@ -469,12 +530,45 @@ onUnmounted(() => {
           alt=""
         />
 
+        <!-- 摘要卡：纯文本插值（绝不 v-html），默认设置下整块不渲染 -->
+        <aside v-if="summaryCalloutVisible" class="summary-callout" aria-label="文章摘要">
+          <span class="summary-callout-label">摘要</span>
+          <p class="summary-callout-text">{{ post.summary }}</p>
+        </aside>
+
         <div
           ref="contentRef"
           class="markdown-body"
           v-html="renderedContent"
           @click="onContentClick"
         ></div>
+
+        <!-- 版权声明：正文之后、相关阅读之前；留空设置下整块不渲染 -->
+        <footer v-if="licenseVisible" class="post-license">
+          <p class="post-license-text">{{ licenseText }}</p>
+          <p class="post-license-permalink">
+            本文链接：<a :href="postPermalink" referrerpolicy="no-referrer">{{ postPermalink }}</a>
+          </p>
+        </footer>
+
+        <!-- 相关阅读：取不到数据时整块不渲染，不打扰只有一两篇文章的博客 -->
+        <section v-if="relatedPosts.length" class="related-posts">
+          <h2>相关阅读</h2>
+          <ul class="related-list">
+            <li v-for="item in relatedPosts" :key="item.id" class="related-item">
+              <div class="related-row">
+                <!-- 站内跳转走 router-link，不经过 markdown-body 的点击拦截 -->
+                <router-link class="related-title" :to="`/post/${item.id}`">{{
+                  item.title
+                }}</router-link>
+                <time class="related-date">{{
+                  formatDate(item.createTime, 'YYYY年MM月DD日')
+                }}</time>
+              </div>
+              <p v-if="item.summary" class="related-summary">{{ item.summary }}</p>
+            </li>
+          </ul>
+        </section>
 
         <nav
           v-if="showModule('adjacent') && (adjacent.prev || adjacent.next)"
@@ -575,7 +669,7 @@ onUnmounted(() => {
         </footer>
       </div>
 
-      <aside v-if="showModule('toc') && toc.length" class="article-aside">
+      <aside v-if="tocVisible && showModule('toc') && toc.length" class="article-aside">
         <div class="toc-card">
           <h2>文章目录</h2>
           <nav aria-label="文章目录">
@@ -594,7 +688,7 @@ onUnmounted(() => {
     </article>
 
     <MobileTocSheet
-      v-if="showModule('toc') && toc.length && !isPreview"
+      v-if="tocVisible && showModule('toc') && toc.length && !isPreview"
       :items="toc"
       :active-id="activeHeading"
       @select="scrollToHeading"
@@ -670,6 +764,32 @@ onUnmounted(() => {
   margin-block: 24px 0;
   border-radius: var(--radius-lg);
   object-fit: cover;
+}
+/* 摘要卡（TL;DR）：封面/元信息与正文之间的轻量导读卡，左色条与 blockquote 呼应 */
+.summary-callout {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-top: 24px;
+  padding: 13px 16px;
+  border: 1px solid var(--border-light);
+  border-left: 3px solid var(--primary);
+  border-radius: var(--radius-md);
+  background: var(--bg-secondary);
+}
+.summary-callout-label {
+  flex-shrink: 0;
+  color: var(--primary);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+.summary-callout-text {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  line-height: 1.7;
+  overflow-wrap: anywhere;
 }
 .article-header {
   padding: 4px 0 25px;
@@ -769,6 +889,86 @@ onUnmounted(() => {
   .adjacent-link--next {
     text-align: left;
   }
+}
+/* 版权声明：正文后的弱化收尾行；permalink 给读者复制转发，长 URL 必须能断行 */
+.post-license {
+  margin: 26px 0 0;
+  padding-top: 14px;
+  border-top: 1px solid var(--border-solid);
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+}
+.post-license-text {
+  margin: 0;
+  line-height: 1.7;
+  white-space: pre-wrap;
+}
+.post-license-permalink {
+  margin: 6px 0 0;
+  word-break: break-all;
+}
+.post-license-permalink a {
+  color: var(--text-muted);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.post-license-permalink a:hover {
+  color: var(--primary);
+}
+/* 相关阅读：正文读完后的轻量出口，视觉重量低于相邻文章的卡片 */
+.related-posts {
+  margin: 34px 0 0;
+  padding-top: 18px;
+  border-top: 1px solid var(--border-solid);
+}
+.related-posts h2 {
+  margin: 0 0 12px;
+  font-family: var(--font-display);
+  font-size: var(--text-base);
+}
+.related-list {
+  display: grid;
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.related-item {
+  display: grid;
+  gap: 4px;
+}
+.related-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 2px 12px;
+}
+.related-title {
+  color: var(--text-primary);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  line-height: 1.5;
+  text-decoration: none;
+}
+.related-title:hover {
+  color: var(--primary);
+}
+.related-date {
+  color: var(--text-muted);
+  font-size: var(--text-2xs);
+  white-space: nowrap;
+}
+.related-summary {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  line-height: 1.6;
 }
 .comments-section {
   margin: 46px 0 30px;

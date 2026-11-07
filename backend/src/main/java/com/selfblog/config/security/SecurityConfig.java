@@ -170,6 +170,11 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/post/{id}", "/post/{id}").permitAll()
                         // 文章详情页底部的上一篇/下一篇，访客也要能拿
                         .requestMatchers(HttpMethod.GET, "/api/post/{id}/adjacent", "/post/{id}/adjacent").permitAll()
+                        // 详情页「相关阅读」推荐，同为公开只读 GET（不触碰阅读计数）
+                        .requestMatchers(HttpMethod.GET, "/api/post/{id}/related", "/post/{id}/related").permitAll()
+                        // 全站归档（精简字段）。字面量段落比 {id} 更具体，MVC 路由总是先命中
+                        // 字面量映射，这里只需保证安全层放行；声明放 {id} 规则之后语义不变。
+                        .requestMatchers(HttpMethod.GET, "/api/post/archives", "/post/archives").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/post/list", "/post/list").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/post/search/**", "/post/search/**").permitAll()
                         .requestMatchers(HttpMethod.PUT, "/api/post/{id}/view", "/post/{id}/view").permitAll()

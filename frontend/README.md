@@ -286,6 +286,89 @@ Eleven more author settings, in four dimensions — typography (`fontFamily`, `b
 - The admin panel is the 7th section of `views/admin/Settings.vue`; its "restore defaults"
   button only edits the form and does **not** save, so a mis-click cannot change the live site.
 
+### AI editor writing & reading presentation (v2.0.30)
+
+- `PostEdit.vue`'s AI card now has two more tools. **Selection writing** (润色/续写/精简 via
+  `llmApi.inlineWriting`) works on unsaved drafts: the textarea selection is captured
+  synchronously on click (before the `await`), `polish`/`shorten` splice the captured range
+  back and refuse (with an error toast) if the author edited the content during the request,
+  `continue` inserts after the selection end. **Internal-link suggestions** (`llmApi.suggestLinks`,
+  saved posts only) render anchor + target title + reason rows; 插入 writes
+  `[anchor](/post/{id})` at the cursor (appends as its own paragraph when the textarea is not
+  focused) and the button disables after use. Both requests carry `_noRetry` + 130 s like every
+  other LLM call.
+- Five new appearance keys complete the reading surface: `readingProgress` (`on|off` — drives a
+  reactive `v-if` on PostDetail's progress bar, deliberately not in `App.vue`'s watch array),
+  `blockquoteStyle` / `postRowStyle` / `contentImageStyle` / `tableStyle` — all four are pure CSS
+  in `customize.css` sections 9–12 under the same hard scope
+  (`#selfblog[data-ap-*] .app-main:not(.app-main--admin)`), with **no rule for the default tier**
+  and none of the five in `PREPAINT_APPEARANCE_VARS`. `App.vue`'s watch array is now 18 entries;
+  the admin panel exposes 16 keys.
+- `utils/markdown.ts` now owns `marked.setOptions({ gfm: true, breaks: true })` at module
+  top-level; `main.ts` no longer imports `marked`, so the 66 KB markdown chunk is no longer
+  modulepreloaded on first paint (Home/Search/Archives/Tag never fetch it — verified in
+  `dist/index.html`). Navbar's resize listener is rAF-coalesced, and `ArticleList` computes
+  read minutes once per `posts` change instead of once per row per render.
+- Both `recordVisitor()` call sites in `App.vue` skip when
+  `siteStore.settings.visitorTrackingEnabled === 'false'` (the server enforces the same setting;
+  this saves the round trip).
+
+### Related reading, archives light endpoint & batch 2 (v2.0.30)
+
+- **Related reading** (`GET /api/post/{id}/related`): PostDetail renders a quiet 相关阅读 list
+  after the markdown body (before the adjacent-post nav) whenever the backend returns rows —
+  shared-tag ranking with recency fill, published posts only. Silent failure/loading; not
+  fetched in preview; `router-link` rows with date (+ clamped summary), semantic tokens only.
+- **Archives** now issues ONE `getArchives()` call against the compact 6-column backend
+  projection instead of crawling five 100-item list pages; grouping/ordering/visuals unchanged
+  (`viewCount`/`updateTime` arrive in the payload but are not rendered).
+- **Selection writing gained 翻译** (`action: 'translate'`, language auto-detected) — same
+  replace-selection flow and guards as polish/shorten.
+- Two more template-driven appearance keys (18 total now): `homeSidebarOrder` (one of the 6
+  author/tags/archive permutations; Home renders the existing blocks in that order, per-block
+  `showModule` conditions untouched, default DOM byte-identical) and `tocStyle` (`hidden` also
+  removes the mobile sheet/FAB and reuses the existing `reader-layout--no-toc` grid modifier).
+  Neither is a CSS hook: not in `applyCustomizations`, the `App.vue` watch array or
+  `PREPAINT_APPEARANCE_VARS`.
+
+### Summary callout, search typeahead & link style (v2.0.30, batch 3)
+
+- **PostDetail 「摘要」 callout** (`siteStore.settings.summaryCallout === 'on'` + non-blank
+  summary + not preview): plain-text interpolation between cover and body — never `v-html`.
+  Default `off` renders nothing (byte-identical DOM).
+- **Search page typeahead**: 300 ms trailing debounce → `getSearchSuggestions` → a
+  `role="listbox"` dropdown under the input (`--z-dropdown`), combobox ARIA, wrap-around
+  ↓/↑, Enter reusing the existing `submitSearch()`, `mousedown.prevent` options, Esc/blur
+  close. Plain strings, text interpolation only. The backend suggest route has its own
+  120/min read budget (`/api/post/search`) — typeahead no longer shares the 60/min detail
+  bucket that exhausted in ~18 s of continuous typing.
+- **`linkStyle`** (`data-ap-link` on `.markdown-body a`): `dotted` keeps the always-on
+  underline dotted; `flat` hides the rest-state line and restores it on hover (excluding
+  `.heading-anchor`). Default tier has no rule; the baseline is typography.css's
+  always-underline + PostDetail's `:deep` color override.
+- **4 new theme presets** (墨韵/杏暖/青苔/暮色) in `constants/themePresets.ts`, each writing
+  only existing keys; the presets panel now shows 8 cards. Appearance panel: **20 keys**.
+
+### Syntax highlighting, full-text feeds & license footer (v2.0.30, batch 4 — borrowed from Hexo/Ghost)
+
+- **Syntax highlighting** via `highlight.js/lib/common` (the repo's only new frontend
+  dependency, 11.12.0) inside `useMarkdownEnhance`: known-language blocks only (`hljs.getLanguage`
+  gate — NO auto-detect), highlight runs **before** collapse measurement, copy still reads
+  `textContent`, v-html refresh discards hljs classes with the old DOM. The github-dark theme
+  supplies token colors only — `.markdown-body pre code.hljs` forces a transparent background so
+  the surface stays `--code-bg/--code-text/--code-border` (always dark, both modes). This also
+  unified `typography.css`'s `pre`, which had used `--bg-secondary` (a LIGHT surface in light
+  mode) instead of the code tokens. hljs ships in its own async chunk (~56 KB gzip, entry
+  unchanged); it is a client-only enhancement, so `utils/markdown.ts`'s sanitize pipeline and
+  the SafeMarkdown parity contract are untouched.
+- **Post footer** (`siteStore.settings.postLicense`, empty = nothing): a muted license line +
+  self-permalink (SEO `canonicalOrigin()`, `referrerpolicy="no-referrer"`, break-all URL)
+  between the markdown body and the related-reading section; admin field in the 内容与互动 tab.
+- **Word count** `· 约 N 字` in the post meta (existing `countWords()`).
+- **Global search shortcut**: Ctrl/Cmd+K or `/` → `/search` (pure `shouldOpenSearch` guard:
+  editable targets ignored, `event.repeat` ignored); Search.vue focuses its input on mount.
+- Feeds are full-text server-side (see the backend README); no frontend change involved.
+
 ### LLM-assisted SEO admin UI (2026-10-22)
 
 - Three write areas, kept separate on purpose: `views/admin/Settings.vue` (model connection +

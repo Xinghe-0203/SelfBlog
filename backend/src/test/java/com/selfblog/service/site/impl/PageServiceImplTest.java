@@ -35,6 +35,11 @@ class PageServiceImplTest {
     @BeforeEach @AfterEach void clearSiteCache() {
         var cache = caches.getCache(com.selfblog.config.cache.CaffeineCacheConfig.SITE_SETTINGS_CACHE);
         if (cache != null) cache.clear();
+        // 本类的页面写入发生在测试事务里、结束回滚，而 pageCache 不参与回滚
+        // （公开读 getPublished/getBySlug/getManifest/getNavigation 现在走 pageCache），
+        // 不清就会把未提交数据泄漏给同一上下文里的后续用例。
+        var pageCache = caches.getCache(com.selfblog.config.cache.CaffeineCacheConfig.PAGE_CACHE);
+        if (pageCache != null) pageCache.clear();
     }
 
     PageConfig config(Map<String, Object> values) { return json.convertValue(values, PageConfig.class); }
@@ -49,6 +54,14 @@ class PageServiceImplTest {
         assertEquals(List.of("home", "archives", "gallery", "about"),
                 pages.getManifest().navigation().stream().map(PublicNavigationItem::pageId).toList());
         assertEquals(count, mapper.selectCount(null));
+    }
+
+    @Test void manifestListsAreUnmodifiableSoTheCacheCannotBePoisoned() {
+        // pageCache 缓存返回引用：getManifest 的 navigation 必须是不可变拷贝，
+        // 否则任何调用方原地 add/remove 都会污染缓存里的 manifest。
+        var manifest = pages.getManifest();
+        assertThrows(UnsupportedOperationException.class, () -> manifest.pages().add(null));
+        assertThrows(UnsupportedOperationException.class, () -> manifest.navigation().add(null));
     }
 
     @Test void unknownStoredSchemaFailsClosedInsteadOfReturningRawData() {

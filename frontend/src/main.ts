@@ -1,7 +1,6 @@
 /** Application entry point. */
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'
-import { marked } from 'marked'
 import App from './App.vue'
 import router, { installAdminRoutes } from './router'
 import { useLogger } from './utils/logger'
@@ -10,8 +9,6 @@ import { useUserStore } from './stores/user'
 import { usePagesStore } from './stores/pages'
 import { vScrollReveal } from './composables/useScrollReveal'
 import './styles/main.css'
-
-marked.setOptions({ gfm: true, breaks: true })
 
 const app = createApp(App)
 const pinia = createPinia()

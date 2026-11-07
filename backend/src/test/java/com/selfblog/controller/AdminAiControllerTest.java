@@ -17,6 +17,9 @@ import com.selfblog.service.ai.AiWritingService;
 import com.selfblog.utils.JwtUtils;
 import com.selfblog.vo.ai.AiHealthReportVO;
 import com.selfblog.vo.ai.AiImageAltVO;
+import com.selfblog.vo.ai.AiInlineWritingVO;
+import com.selfblog.vo.ai.AiLinkSuggestionVO;
+import com.selfblog.vo.ai.AiLinkSuggestionsVO;
 import com.selfblog.vo.ai.AiModerationScanVO;
 import com.selfblog.vo.ai.AiModerationVO;
 import com.selfblog.vo.ai.AiProofreadBatchVO;
@@ -141,6 +144,57 @@ class AdminAiControllerTest {
         mockMvc.perform(post("/admin/ai/writing/summary").contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk());
         verify(writingService).summary(isNull());
+    }
+
+    @Test
+    @DisplayName("inlineWrite_ReturnsEnvelope")
+    @WithMockUser(roles = "admin")
+    void inlineWrite_ReturnsEnvelope() throws Exception {
+        AiInlineWritingVO vo = new AiInlineWritingVO("polish", "润色后的句子", "deepseek-flash", 800L);
+        when(writingService.inlineWrite("polish", "原文")).thenReturn(vo);
+
+        mockMvc.perform(post("/admin/ai/writing/inline")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"action\":\"polish\",\"text\":\"原文\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.data.action").value("polish"))
+                .andExpect(jsonPath("$.data.text").value("润色后的句子"))
+                .andExpect(jsonPath("$.data.model").value("deepseek-flash"))
+                .andExpect(jsonPath("$.data.latencyMs").value(800));
+    }
+
+    @Test
+    @DisplayName("inlineWrite_InvalidAction_MapsTo400")
+    @WithMockUser(roles = "admin")
+    void inlineWrite_InvalidAction_MapsTo400() throws Exception {
+        when(writingService.inlineWrite("expand", "原文"))
+                .thenThrow(new BusinessException(400, "处理方式仅支持 polish、continue、shorten、translate"));
+
+        mockMvc.perform(post("/admin/ai/writing/inline")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"action\":\"expand\",\"text\":\"原文\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("处理方式仅支持 polish、continue、shorten、translate"));
+    }
+
+    @Test
+    @DisplayName("linkSuggestions_ReturnsEnvelope")
+    @WithMockUser(roles = "admin")
+    void linkSuggestions_ReturnsEnvelope() throws Exception {
+        AiLinkSuggestionsVO vo = new AiLinkSuggestionsVO(
+                List.of(new AiLinkSuggestionVO(5L, "目标文章", "事务传播", "讲的是同一件事")),
+                "deepseek-flash", 1200L);
+        when(writingService.suggestLinks(12L)).thenReturn(vo);
+
+        mockMvc.perform(post("/admin/ai/writing/links")
+                        .contentType(MediaType.APPLICATION_JSON).content(POST_BODY))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.suggestions.length()").value(1))
+                .andExpect(jsonPath("$.data.suggestions[0].targetPostId").value(5))
+                .andExpect(jsonPath("$.data.suggestions[0].targetTitle").value("目标文章"))
+                .andExpect(jsonPath("$.data.suggestions[0].anchor").value("事务传播"))
+                .andExpect(jsonPath("$.data.model").value("deepseek-flash"));
     }
 
     @Test

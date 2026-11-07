@@ -87,6 +87,19 @@ public class RateLimitProperties {
     private int postRead = 60;
 
     /**
+     * 搜索**联想/高级搜索**只读 GET 接口限流（次/分钟）。
+     *
+     * 为什么单列：`GET /api/post/search/suggest`（标题自动补全，typeahead）此前只能落到
+     * `/api/post` 的 60/min 读桶——读前缀 `/api/post` 与写前缀 `/api/post/` 去尾斜杠后等长，
+     * 靠「等长时读优先」胜出。而前端联想是「停顿约 300ms 就发一次」的节奏，快速连续输入
+     * 理论上限约 200/min，60/min 在持续输入十几秒后就会打满，之后同桶的搜索请求全部 429。
+     * 取 120/min：覆盖正常联想节奏且仍是纯读阈值；本条只登记在**读表**里，
+     * 写路径（`/api/post/` 的 PUT/DELETE 10/min）不受任何影响。
+     * `GET /api/post/search/advanced`（高级搜索）同属这条更长的读前缀，一并受益。
+     */
+    private int postSearchRead = 120;
+
+    /**
      * 访客评论**列表**读取限流（次/分钟）。
      *
      * 为什么单列：`/api/guest-comments/` 的 5/min 是给「发表评论」定的，
@@ -266,6 +279,9 @@ public class RateLimitProperties {
         // 文章详情/相邻/搜索等 GET 读路径：与 /api/post/ 的写阈值（10/min）同前缀，
         // 靠「等长时读优先」区分，因此这里的前缀必须与写前缀完全一致（不带尾斜杠）。
         limits.put("/api/post", postRead);
+        // 搜索联想/高级搜索的 GET 读路径：比写前缀 /api/post/ 更长，靠最长前缀直接胜出，
+        // 不再与文章详情共用 60/min 的 /api/post 读桶。
+        limits.put("/api/post/search", postSearchRead);
         // 公开评论列表：比写前缀 /api/guest-comments 更长，靠最长前缀直接胜出。
         limits.put("/api/guest-comments/post", guestCommentRead);
         return Collections.unmodifiableMap(limits);

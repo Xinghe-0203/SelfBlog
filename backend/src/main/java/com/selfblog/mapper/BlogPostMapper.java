@@ -57,4 +57,11 @@ public interface BlogPostMapper extends BaseMapper<BlogPost> {
     void incrementShareCount(@Param("id") Long id);
 
     List<Map<String, Object>> countPostsGroupByDate(@Param("since") LocalDateTime since);
+
+    /**
+     * 访客看板的「文章总浏览量」：直接 SUM 聚合，替代「全量已发布文章行拉到内存求和」。
+     * 过滤条件与旧实现逐项一致（is_deleted=0 + status=1）；COALESCE 保证零行时返回 0
+     * 而不是 NULL。语句在 BlogPostMapper.xml（无 databaseId 的可移植共享语句）。
+     */
+    Long sumPublishedPostViews();
 }

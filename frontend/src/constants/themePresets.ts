@@ -97,6 +97,58 @@ export const THEME_PRESETS: ThemePreset[] = [
     background: { type: 'gradient', from: '#f4f7fc', to: '#e9eef7' },
     surfaceOpacity: 88,
     surfaceBlur: 12
+  },
+  {
+    id: 'inkstone',
+    name: '墨韵',
+    description: '比墨青更沉的墨灰纸面配石墨蓝强调色，宋体字、圆角放软。',
+    skin: 'ink',
+    primaryColor: '#37474F',
+    fontFamily: 'serif',
+    radiusScale: 'soft',
+    shadowDepth: 'default',
+    background: { type: 'gradient', from: '#e6ebe7', to: '#d3dcd4' },
+    surfaceOpacity: 90,
+    surfaceBlur: 10
+  },
+  {
+    id: 'apricot',
+    name: '杏暖',
+    description: '杏黄强调色配杏色画布，无衬线字、圆润圆角，轻快温暖。',
+    skin: 'sand',
+    primaryColor: '#C98A2B',
+    fontFamily: 'sans',
+    radiusScale: 'round',
+    shadowDepth: 'default',
+    background: { type: 'gradient', from: '#fdf4e3', to: '#f5e3c3' },
+    surfaceOpacity: 88,
+    surfaceBlur: 12
+  },
+  {
+    id: 'moss',
+    name: '青苔',
+    description: '苔绿强调色配淡绿画布，默认圆角与阴影，自然安静。',
+    skin: 'forest',
+    primaryColor: '#3F7A4E',
+    fontFamily: 'sans',
+    radiusScale: 'default',
+    shadowDepth: 'default',
+    background: { type: 'gradient', from: '#eef5ec', to: '#dcead8' },
+    surfaceOpacity: 90,
+    surfaceBlur: 14
+  },
+  {
+    id: 'nightfall',
+    name: '暮色',
+    description: '暖橘强调色的深色画布，锐利圆角、几乎不投影，夜读的另一种选择。',
+    skin: 'dusk',
+    primaryColor: '#E08E68',
+    fontFamily: 'serif',
+    radiusScale: 'sharp',
+    shadowDepth: 'default',
+    background: { type: 'gradient', from: '#312e38', to: '#4a3b41' },
+    surfaceOpacity: 88,
+    surfaceBlur: 12
   }
 ]
 

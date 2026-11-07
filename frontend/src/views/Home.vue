@@ -3,7 +3,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { postApi } from '@/api/post'
 import { tagApi } from '@/api/tag'
-import { useSiteStore } from '@/stores/site'
+import { resolveSidebarOrder, useSiteStore } from '@/stores/site'
 import { getSafeImageUrl } from '@/utils'
 import ArticleList from '@/components/post/ArticleList.vue'
 import Icon from '@/components/common/Icon.vue'
@@ -20,6 +20,14 @@ const { config, text, module: showModule, banner, bannerVars } = usePageConfig('
 const hasSidebar = computed(
   () => showModule('author') || showModule('tags') || showModule('archiveLink')
 )
+/**
+ * 首页侧栏三个模块的渲染顺序：由「外观深度自定义」的 homeSidebarOrder 决定，
+ * 脏数据回落到现有模板顺序（author → tags → archive）。只调顺序，不增删模块，
+ * 每个模块自身的显隐条件不变。
+ */
+const sidebarOrder = computed(() => resolveSidebarOrder(siteStore.settings.homeSidebarOrder))
+/** 顺序字符串拆成模块 id：白名单保证恰好三段，`archive` 对应 showModule('archiveLink') 那一块。 */
+const orderedWidgets = computed(() => sidebarOrder.value.split('-'))
 /**
  * 横幅的版式 class。
  *
@@ -172,34 +180,47 @@ onMounted(() => {
         </template>
       </section>
       <aside v-if="hasSidebar" class="home-sidebar" aria-label="作者与标签">
-        <section v-if="showModule('author')" class="sidebar-block author-card">
-          <div class="author-heading">
-            <img
-              v-if="siteStore.settings.authorAvatar"
-              :src="getSafeImageUrl(siteStore.settings.authorAvatar)"
-              alt=""
-            /><span v-else class="author-initial" aria-hidden="true">{{
-              siteStore.settings.authorName.slice(0, 1)
-            }}</span>
-            <h2>{{ siteStore.settings.authorName }}</h2>
-          </div>
-          <p>{{ siteStore.settings.authorBio }}</p>
-          <router-link to="/about" class="text-link"
-            >关于作者<Icon name="chevron-right" :size="14"
+        <!-- 默认顺序（author-tags-archive）渲染出的 DOM 与固定模板逐字一致：template v-for 不产生额外节点，
+             每个模块自身的 v-if 条件原样保留，只是套上「当前顺序位是否轮到自己」的判断。 -->
+        <template v-for="widget in orderedWidgets" :key="widget">
+          <section
+            v-if="widget === 'author' && showModule('author')"
+            class="sidebar-block author-card"
+          >
+            <div class="author-heading">
+              <img
+                v-if="siteStore.settings.authorAvatar"
+                :src="getSafeImageUrl(siteStore.settings.authorAvatar)"
+                alt=""
+              /><span v-else class="author-initial" aria-hidden="true">{{
+                siteStore.settings.authorName.slice(0, 1)
+              }}</span>
+              <h2>{{ siteStore.settings.authorName }}</h2>
+            </div>
+            <p>{{ siteStore.settings.authorBio }}</p>
+            <router-link to="/about" class="text-link"
+              >关于作者<Icon name="chevron-right" :size="14"
+            /></router-link>
+          </section>
+          <section
+            v-else-if="widget === 'tags' && showModule('tags') && tags.length"
+            class="sidebar-block"
+          >
+            <h2>文章标签</h2>
+            <div class="sidebar-tags">
+              <router-link v-for="tag in tags" :key="tag.id" :to="`/tag/${tag.id}`">{{
+                tag.name
+              }}</router-link>
+            </div>
+          </section>
+          <router-link
+            v-else-if="widget === 'archive' && showModule('archiveLink')"
+            to="/archives"
+            class="archive-callout"
+            ><Icon name="archive" :size="19" /><span>按时间浏览文章</span
+            ><Icon name="chevron-right" :size="15"
           /></router-link>
-        </section>
-        <section v-if="showModule('tags') && tags.length" class="sidebar-block">
-          <h2>文章标签</h2>
-          <div class="sidebar-tags">
-            <router-link v-for="tag in tags" :key="tag.id" :to="`/tag/${tag.id}`">{{
-              tag.name
-            }}</router-link>
-          </div>
-        </section>
-        <router-link v-if="showModule('archiveLink')" to="/archives" class="archive-callout"
-          ><Icon name="archive" :size="19" /><span>按时间浏览文章</span
-          ><Icon name="chevron-right" :size="15"
-        /></router-link>
+        </template>
       </aside>
     </div>
   </PageFrame>

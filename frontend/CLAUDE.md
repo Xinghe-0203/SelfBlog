@@ -112,6 +112,7 @@ src/
 ## 外观深度自定义（2026-10-22，v2.0.29）
 
 - 11 个新设置键分四个维度：**排版**（`fontFamily` `system|sans|serif|mono`、`baseFontSize` 14–19、`bodyLineHeight` 1.5–2.2、`readerWidth` 640–960、`paragraphSpacing` 0–2）、**布局**（`radiusScale` `none|sharp|default|soft|round`、`shadowDepth` `flat|default|deep`、`layoutDensity` `compact|default|comfortable`）、**呈现**（`homeHeroStyle` `default|compact|minimal|off`、`postCoverStyle` `default|wide|hidden`）、**动效**（`motionIntensity` `off|subtle|default|lively`）
+- **v2.0.30 已扩到 20 键**：+`readingProgress`/`blockquoteStyle`/`postRowStyle`/`contentImageStyle`/`tableStyle`（CSS 钩子）、+`homeSidebarOrder`/`tocStyle`/`summaryCallout`/`postLicense`（模板/逻辑驱动，不进 `enumAttrs` 也不进 watch 数组）、+`linkStyle`（CSS 钩子）。watch 数组现为 **19 项**；CSS 规则仍在 `customize.css`（现为 13 节），模板驱动键的判定函数在 `stores/site.ts` 导出（`resolveSidebarOrder` 等）
 - 全部规则在 `src/styles/customize.css`（**排在 `appearance.css` 之后**，作者配置要压过皮肤/深色模式同优先级声明）。7 个枚举键写成 `#selfblog` 上的 `data-ap-*` 属性，4 个数值键写成 `#selfblog` 上的内联 `--ap-*` 变量（**不是 `<html>`**，否则会绕过作用域改到导航栏）；等于默认值即删掉钩子（`delete root.dataset[...]` / `removeProperty`）
 - **硬约束一：导航栏与后台界面完全不动。** 所有选择器限定在 `#selfblog .app-main:not(.app-main--admin)` 内——`Navbar`（`.site-nav-wrap`）与 `Footer` 在 `.app-main` 之外，天然碰不到。改这些规则后必须跑「导航栏逐字符恒定」的真机判据（见 `docs/reviews/2026-10-22-appearance-customization-verification.md`）
 - **硬约束二：默认档必须逐像素等于改造前。** 每条规则的 fallback 就是原来的硬编码值（`var(--ap-reader-width, 760px)` 里的 760px 就是 `PostDetail.vue` 原来的 760px）。不要在默认档顺手加一点「更精致」的阴影或间距——零回归靠的是这一点
@@ -119,7 +120,7 @@ src/
 - **阴影档只给「deep」接线内容卡片**（`.article-list` / `.intro-shell` / `.sidebar-block` / `.author-profile` / `.album-card` / `.state-panel` / `.archive-callout` → `box-shadow: var(--shadow-xs)`）。**不给 default 接线是刻意的**（默认档要零回归）。不碰 `.page-frame` 的 `inset 0 0 0 1px`：那是描边语义，换成外投影会让纸面边缘糊掉
 - 不覆盖 `--radius-full`（9999px）与 `50%`：胶囊导航、圆形头像/圆形按钮必须真圆
 - 11 个键**不进 `PREPAINT_APPEARANCE_VARS`**：它们依赖 `#selfblog` 作用域，预置到 `<html>` 会绕过作用域把导航栏一起改掉
-- `App.vue` 的外观 `watch` 依赖数组必须包含全部 11 个新键（当前 14 项），否则改设置不重新应用
+- `App.vue` 的外观 `watch` 依赖数组必须包含全部 **CSS 钩子类**新键（当前 19 项；模板/逻辑驱动键如 `readingProgress`/`tocStyle`/`summaryCallout`/`postLicense` 刻意不在其中——它们由消费组件的响应式 v-if/computed 直读），否则改设置不重新应用
 - 后台面板在 `views/admin/Settings.vue` 的「外观」分组（`data-tab="appearance"`）里、面板标题「外观深度自定义」；「恢复默认外观」**只改表单不保存**（避免误触）
 
 ## LLM 辅助 SEO（2026-10-22）

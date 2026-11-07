@@ -30,7 +30,13 @@ vi.mock('@/api/seo', () => ({
   seoApi: { getDetail: vi.fn(), update: vi.fn(), generate: vi.fn() }
 }))
 vi.mock('@/api/llm', () => ({
-  llmApi: { generateSummary: vi.fn(), generateTags: vi.fn(), generateTitles: vi.fn() }
+  llmApi: {
+    generateSummary: vi.fn(),
+    generateTags: vi.fn(),
+    generateTitles: vi.fn(),
+    inlineWriting: vi.fn(),
+    suggestLinks: vi.fn()
+  }
 }))
 vi.mock('@/utils/toast', () => ({
   toast: { success: vi.fn(), warning: vi.fn(), error: vi.fn(), info: vi.fn() }
@@ -665,5 +671,156 @@ describe('author editor smoke coverage', () => {
       'AI 辅助功能已关闭，请先在设置中启用'
     )
     expect(wrapper.find('.ai-candidate').exists()).toBe(false)
+  })
+
+  /** 在正文里填入 content 并选中 [start, end)，返回文本域元素供选区断言。 */
+  async function selectContent(
+    wrapper: Awaited<ReturnType<typeof setup>>['wrapper'],
+    content: string,
+    start: number,
+    end: number
+  ) {
+    const input = wrapper.get('.content-input')
+    await input.setValue(content)
+    const textarea = input.element as HTMLTextAreaElement
+    textarea.setSelectionRange(start, end)
+    return textarea
+  }
+
+  /**
+   * 选区改写不依赖 postId，新建草稿也能用；选区在点击时同步捕获，
+   * 模型结果按捕获的位置拼接回去，其余文本原样保留。
+   */
+  it('replaces the selected range on polish and keeps the rest of the content intact', async () => {
+    vi.mocked(llmApi.inlineWriting).mockResolvedValue(
+      response({ action: 'polish', text: '润色后的句子', model: 'deepseek-flash', latencyMs: 100 })
+    )
+    const { wrapper } = await setup()
+    const textarea = await selectContent(wrapper, '保留开头。选中句子。保留结尾。', 5, 10)
+
+    await wrapper.get('[data-action="ai-polish"]').trigger('click')
+    await flushPromises()
+    await nextFrame()
+
+    expect(llmApi.inlineWriting).toHaveBeenCalledWith({ action: 'polish', text: '选中句子。' })
+    expect((wrapper.get('.content-input').element as HTMLTextAreaElement).value).toBe(
+      '保留开头。润色后的句子保留结尾。'
+    )
+    // 光标落在替换后的文本末尾并回到正文，作者可以就地继续输入
+    expect(textarea.selectionStart).toBe(11)
+    expect(textarea.selectionEnd).toBe(11)
+    expect(document.activeElement).toBe(textarea)
+    expect(wrapper.find('.ai-writing .seo-status').text()).toBe('润色完成，已替换选区')
+  })
+
+  it('inserts the continue output right after the selection', async () => {
+    vi.mocked(llmApi.inlineWriting).mockResolvedValue(
+      response({ action: 'continue', text: '续写的内容', model: 'deepseek-flash', latencyMs: 100 })
+    )
+    const { wrapper } = await setup()
+    await selectContent(wrapper, '保留开头。选中句子。保留结尾。', 5, 10)
+
+    await wrapper.get('[data-action="ai-continue"]').trigger('click')
+    await flushPromises()
+
+    expect(llmApi.inlineWriting).toHaveBeenCalledWith({ action: 'continue', text: '选中句子。' })
+    // 选区末尾与续写开头都紧挨非空白字符，插入时补一个空格当边界
+    expect((wrapper.get('.content-input').element as HTMLTextAreaElement).value).toBe(
+      '保留开头。选中句子。 续写的内容保留结尾。'
+    )
+  })
+
+  it('replaces the selected range with the translation on translate', async () => {
+    vi.mocked(llmApi.inlineWriting).mockResolvedValue(
+      response({
+        action: 'translate',
+        text: 'Translated sentence.',
+        model: 'deepseek-flash',
+        latencyMs: 100
+      })
+    )
+    const { wrapper } = await setup()
+    const textarea = await selectContent(wrapper, '保留开头。选中句子。保留结尾。', 5, 10)
+
+    await wrapper.get('[data-action="ai-translate"]').trigger('click')
+    await flushPromises()
+    await nextFrame()
+
+    expect(llmApi.inlineWriting).toHaveBeenCalledWith({ action: 'translate', text: '选中句子。' })
+    expect((wrapper.get('.content-input').element as HTMLTextAreaElement).value).toBe(
+      '保留开头。Translated sentence.保留结尾。'
+    )
+    // 与润色/精简一致：光标落在替换后的文本末尾并回到正文
+    expect(textarea.selectionStart).toBe(25)
+    expect(textarea.selectionEnd).toBe(25)
+    expect(document.activeElement).toBe(textarea)
+    expect(wrapper.find('.ai-writing .seo-status').text()).toBe('翻译完成，已替换选区')
+  })
+
+  it('asks for a selection and skips the API call when nothing is selected', async () => {
+    const { wrapper } = await setup()
+    await wrapper.get('.content-input').setValue('正文内容')
+
+    await wrapper.get('[data-action="ai-polish"]').trigger('click')
+    await flushPromises()
+
+    expect(llmApi.inlineWriting).not.toHaveBeenCalled()
+    expect(vi.mocked(toast.info)).toHaveBeenCalledWith('请先在正文中选中一段文字')
+  })
+
+  it('rejects an over-length selection locally without calling the model', async () => {
+    const { wrapper } = await setup()
+    await selectContent(wrapper, '长'.repeat(3001), 0, 3001)
+
+    await wrapper.get('[data-action="ai-shorten"]').trigger('click')
+    await flushPromises()
+
+    expect(llmApi.inlineWriting).not.toHaveBeenCalled()
+    expect(vi.mocked(toast.info)).toHaveBeenCalledWith('选区过长，请最多选择 3000 字符')
+  })
+
+  it('generates link suggestions for a saved post and inserts the chosen one into the content', async () => {
+    vi.mocked(seoApi.getDetail).mockRejectedValue({ response: { status: 404 } })
+    vi.mocked(llmApi.suggestLinks).mockResolvedValue(
+      response({
+        suggestions: [
+          { targetPostId: 123, targetTitle: '目标文章标题', anchor: '锚点文字', reason: '主题相关' }
+        ],
+        model: 'deepseek-flash',
+        latencyMs: 120
+      })
+    )
+
+    // 新建草稿还没有 postId，内链建议入口不出现
+    const draft = (await setup()).wrapper
+    expect(draft.find('[data-action="ai-links"]').exists()).toBe(false)
+
+    const { wrapper } = await setup('/admin/edit/9')
+    await flushPromises()
+    await wrapper.get('[data-action="ai-links"]').trigger('click')
+    await flushPromises()
+    expect(llmApi.suggestLinks).toHaveBeenCalledWith(9)
+
+    const item = wrapper.get('.ai-link-item')
+    expect(item.text()).toContain('锚点文字')
+    expect(item.text()).toContain('目标文章标题')
+    expect(item.text()).toContain('主题相关')
+
+    // 正文输入框没有焦点（刚点完生成按钮），候选追加到正文末尾的独立段落
+    await wrapper.get('[data-action="ai-link-insert-0"]').trigger('click')
+    await flushPromises()
+    expect((wrapper.get('.content-input').element as HTMLTextAreaElement).value).toBe(
+      '正文\n\n[锚点文字](/post/123)'
+    )
+
+    // 插入过的候选置为禁用，再点也不重复写入
+    const insert = wrapper.get('[data-action="ai-link-insert-0"]')
+    expect(insert.text()).toBe('已插入')
+    expect(insert.attributes('disabled')).toBeDefined()
+    await insert.trigger('click')
+    await flushPromises()
+    expect((wrapper.get('.content-input').element as HTMLTextAreaElement).value).toBe(
+      '正文\n\n[锚点文字](/post/123)'
+    )
   })
 })

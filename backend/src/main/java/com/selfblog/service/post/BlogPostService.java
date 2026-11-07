@@ -8,9 +8,11 @@ import com.selfblog.dto.post.PostCreateRequest;
 import com.selfblog.dto.post.PostQueryRequest;
 import com.selfblog.dto.post.SaveDraftRequest;
 import com.selfblog.entity.BlogPost;
+import com.selfblog.vo.post.ArchivePostVO;
 import com.selfblog.vo.post.AdjacentPostVO;
 import com.selfblog.vo.post.PostDetailResponse;
 import com.selfblog.vo.post.PostListResponse;
+import com.selfblog.vo.post.RelatedPostVO;
 
 import java.util.List;
 import java.util.Map;
@@ -80,6 +82,19 @@ public interface BlogPostService extends IService<BlogPost> {
      * @return 含 "prev" / "next" 两个键，不存在时为 null
      */
     Map<String, AdjacentPostVO> getAdjacentPosts(Long postId);
+
+    /**
+     * 获取相关文章推荐（详情页「相关阅读」），委托给 PostQueryService
+     * @param postId 当前文章ID
+     * @return 最多 5 篇；未发布文章返回空列表，文章不存在抛 404
+     */
+    List<RelatedPostVO> getRelatedPosts(Long postId);
+
+    /**
+     * 获取全站归档（精简字段，已发布文章按创建时间倒序），委托给 PostQueryService
+     * @return 归档条目列表
+     */
+    List<ArchivePostVO> getArchives();
 
     /**
      * 分页查询文章列表

@@ -6,12 +6,15 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.selfblog.common.exception.BusinessException;
+import com.selfblog.config.cache.CaffeineCacheConfig;
 import com.selfblog.dto.site.PageModels.*;
 import com.selfblog.entity.SiteSetting;
 import com.selfblog.mapper.SiteSettingMapper;
 import com.selfblog.service.site.PageService;
 import com.selfblog.service.site.SiteSettingsService;
 import com.selfblog.service.site.page.PageCatalog;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -59,13 +62,20 @@ public class PageServiceImpl implements PageService {
         var published = publicRow == null ? (PageCatalog.builtin(id) ? defaultState(id) : null) : decode(publicRow, PageState.class);
         return new PageEditor(id, PageCatalog.builtin(id), PageCatalog.definition(id).label(), draft, published);
     }
-    @Override public PublicPage getPublished(String id) {
+    // 公开读走 pageCache（TTL 5 分钟）：原先每次公开页渲染都要在 site_setting KV 表上
+    // 多次 selectById / getManifest 全量扫描 / getNavigation 每个导航项一次 selectById。
+    // 写方法全部 allEntries 失效；TTL 兜底 adminPath 等来自设置表的外部输入变化。
+    // 缓存的是 Jackson 反序列化出来的新 record（不可变），getManifest 的列表也做了
+    // 不可变拷贝，见下——Caffeine 缓存共享对象引用，调用方原地修改会污染缓存。
+    @Override @Cacheable(value = CaffeineCacheConfig.PAGE_CACHE, key = "'published:' + #id")
+    public PublicPage getPublished(String id) {
         PageCatalog.definition(id);
         var row = mapper.selectById(PUBLISHED + id);
         var state = row == null ? defaultState(id) : decode(row, PageState.class);
         return publicPage(id, state, false);
     }
-    @Override public PublicPage getBySlug(String slug) {
+    @Override @Cacheable(value = CaffeineCacheConfig.PAGE_CACHE, key = "'slug:' + (#slug == null ? '' : #slug)")
+    public PublicPage getBySlug(String slug) {
         PageCatalog.slug(slug);
         if ("pages".equals(settings.getSettings().get("adminPath"))) throw new BusinessException(404, "页面不存在");
         var reservation = mapper.selectById(SLUG + slug);
@@ -74,7 +84,8 @@ public class PageServiceImpl implements PageService {
         if (!slug.equals(published.slug())) throw new BusinessException(404, "页面不存在");
         return published;
     }
-    @Override public PublicManifest getManifest() {
+    @Override @Cacheable(value = CaffeineCacheConfig.PAGE_CACHE, key = "'manifest'")
+    public PublicManifest getManifest() {
         var pages = new LinkedHashMap<String, PublicPage>();
         PageCatalog.BUILTINS.keySet().forEach(id -> pages.put(id, publicPage(id, defaultState(id), true)));
         for (var row : rows(PUBLISHED)) {
@@ -89,9 +100,14 @@ public class PageServiceImpl implements PageService {
             String path = PageCatalog.builtin(page.id()) ? PageCatalog.definition(page.id()).path() : "/pages/" + page.slug();
             if (path != null) links.add(new PublicNavigationItem(item.pageId(), item.label(), path));
         }
-        return new PublicManifest(List.copyOf(pages.values()), links);
+        // links 必须 List.copyOf：Caffeine 缓存返回引用，原来直接把 ArrayList 交给
+        // PublicManifest，任何调用方对 navigation() 的原地修改都会污染缓存。
+        return new PublicManifest(List.copyOf(pages.values()), List.copyOf(links));
     }
-    @Override @Transactional(rollbackFor = Exception.class)
+    // 页面/导航的每个本地写方法都整体失效 pageCache：createPage/saveDraft 虽然只写草稿，
+    // 但会占用/释放 slug 预约（影响 getBySlug），一并失效最省心且写路径低频。
+    @Override @CacheEvict(value = CaffeineCacheConfig.PAGE_CACHE, allEntries = true)
+    @Transactional(rollbackFor = Exception.class)
     public PageEditor createPage(String slug, String title) {
         if ("pages".equals(settings.getSettings().get("adminPath"))) throw new BusinessException(409, "当前后台路径为pages，请先在网站设置修改后台路径，再创建内容页");
         PageCatalog.slug(slug);
@@ -102,7 +118,8 @@ public class PageServiceImpl implements PageService {
         compareAndSet(DRAFT + id, null, encode(new PageState(1, 1, slug, false, now(), config)));
         return getEditor(id);
     }
-    @Override @Transactional(rollbackFor = Exception.class)
+    @Override @CacheEvict(value = CaffeineCacheConfig.PAGE_CACHE, allEntries = true)
+    @Transactional(rollbackFor = Exception.class)
     public PageEditor saveDraft(String id, long revision, String slug, PageConfig config) {
         PageCatalog.validate(id, config);
         var row = mapper.selectById(DRAFT + id);
@@ -120,7 +137,8 @@ public class PageServiceImpl implements PageService {
         if (!Objects.equals(nextSlug, current.slug())) mapper.deleteById(SLUG + current.slug());
         return getEditor(id);
     }
-    @Override @Transactional(rollbackFor = Exception.class)
+    @Override @CacheEvict(value = CaffeineCacheConfig.PAGE_CACHE, allEntries = true)
+    @Transactional(rollbackFor = Exception.class)
     public PageEditor publish(String id, long revision) {
         var row = mapper.selectById(DRAFT + id);
         var current = checkRevision(id, row, revision);
@@ -130,7 +148,8 @@ public class PageServiceImpl implements PageService {
         compareAndSet(PUBLISHED + id, mapper.selectById(PUBLISHED + id), encode(next));
         return getEditor(id);
     }
-    @Override @Transactional(rollbackFor = Exception.class)
+    @Override @CacheEvict(value = CaffeineCacheConfig.PAGE_CACHE, allEntries = true)
+    @Transactional(rollbackFor = Exception.class)
     public PageEditor unpublish(String id, long revision) {
         requireCustom(id);
         var row = mapper.selectById(DRAFT + id);
@@ -139,7 +158,8 @@ public class PageServiceImpl implements PageService {
         mapper.deleteById(PUBLISHED + id);
         return getEditor(id);
     }
-    @Override @Transactional(rollbackFor = Exception.class)
+    @Override @CacheEvict(value = CaffeineCacheConfig.PAGE_CACHE, allEntries = true)
+    @Transactional(rollbackFor = Exception.class)
     public void deletePage(String id, long revision) {
         requireCustom(id);
         var row = mapper.selectById(DRAFT + id);
@@ -150,16 +170,19 @@ public class PageServiceImpl implements PageService {
         mapper.deleteById(DRAFT + id);
         mapper.deleteById(SLUG + current.slug());
     }
-    @Override public NavigationState getNavigation() {
+    @Override @Cacheable(value = CaffeineCacheConfig.PAGE_CACHE, key = "'nav'")
+    public NavigationState getNavigation() {
         var row = mapper.selectById(NAV);
         var state = row == null ? new NavigationState(1, 0, List.of(new NavigationItem("home", "首页"), new NavigationItem("archives", "归档"), new NavigationItem("gallery", "相册"), new NavigationItem("about", "关于"))) : decode(row, NavigationState.class);
         // Keep author editing and public navigation consistent after a target goes offline.
         // The stored revision still protects the independent navigation configuration.
         var visible = state.items().stream().filter(item -> PageCatalog.builtin(item.pageId())
                 || mapper.selectById(PUBLISHED + item.pageId()) != null).toList();
+        // visible 是 stream.toList() 的不可变列表，缓存共享引用是安全的。
         return new NavigationState(state.schemaVersion(), state.revision(), visible);
     }
-    @Override @Transactional(rollbackFor = Exception.class)
+    @Override @CacheEvict(value = CaffeineCacheConfig.PAGE_CACHE, allEntries = true)
+    @Transactional(rollbackFor = Exception.class)
     public NavigationState saveNavigation(long revision, List<NavigationItem> items) {
         if (items == null || items.isEmpty() || items.size() > 30) throw new BusinessException(400, "导航需为1-30项并包含首页");
         var ids = new HashSet<String>();

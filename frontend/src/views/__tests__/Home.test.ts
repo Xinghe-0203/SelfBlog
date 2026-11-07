@@ -5,8 +5,13 @@ import { createMemoryHistory, createRouter } from 'vue-router'
 import Home from '../Home.vue'
 import { postApi } from '@/api/post'
 import { tagApi } from '@/api/tag'
-import { useSiteStore } from '@/stores/site'
-import type { Post } from '@/types'
+import {
+  resolveSidebarOrder,
+  SIDEBAR_ORDER_VALUES,
+  useSiteStore,
+  type SiteSettings
+} from '@/stores/site'
+import type { Post, Tag } from '@/types'
 
 vi.mock('@/api/post', () => ({ postApi: { getPostList: vi.fn() } }))
 vi.mock('@/api/tag', () => ({ tagApi: { getTagList: vi.fn() } }))
@@ -35,14 +40,15 @@ beforeEach(() => {
   vi.mocked(postApi.getPostList).mockResolvedValue(page([post]))
   vi.mocked(tagApi.getTagList).mockResolvedValue({ code: 200, message: 'ok', data: [] })
 })
-async function setup(path = '/') {
+async function setup(path = '/', settings: Partial<SiteSettings> = {}) {
   const pinia = createPinia()
   setActivePinia(pinia)
   useSiteStore().applySettings({
     siteTitle: 'Brand',
     siteDescription: '我想认真记录的事情',
     authorName: '真实作者',
-    authorBio: '来自站点设置的介绍'
+    authorBio: '来自站点设置的介绍',
+    ...settings
   })
   const router = createRouter({
     history: createMemoryHistory(),
@@ -105,5 +111,60 @@ describe('home spatial introduction and article list', () => {
     await wrapper.get('[role="alert"] button').trigger('click')
     await flushPromises()
     expect(wrapper.get('.intro-visual img').attributes('src')).toBe('/uploads/retry.jpg')
+  })
+})
+
+describe('resolveSidebarOrder', () => {
+  it('passes the default order and every whitelisted permutation through unchanged', () => {
+    // 默认值 = 现有模板顺序；六个合法排列逐一原样返回。
+    expect(resolveSidebarOrder('author-tags-archive')).toBe('author-tags-archive')
+    for (const order of SIDEBAR_ORDER_VALUES) {
+      expect(resolveSidebarOrder(order)).toBe(order)
+    }
+  })
+
+  it('falls back to the current template order on junk, empty or missing input', () => {
+    expect(resolveSidebarOrder('author-tags')).toBe('author-tags-archive')
+    expect(resolveSidebarOrder('author/tags/archive')).toBe('author-tags-archive')
+    expect(resolveSidebarOrder('')).toBe('author-tags-archive')
+    expect(resolveSidebarOrder(undefined)).toBe('author-tags-archive')
+    // 与 pickEnum 同一条归一化规则：前后空白不影响判定
+    expect(resolveSidebarOrder(' archive-tags-author ')).toBe('archive-tags-author')
+  })
+})
+
+describe('home sidebar ordering', () => {
+  const withTags: Tag[] = [
+    { id: 3, name: '前端' },
+    { id: 4, name: '随笔' }
+  ]
+  type HomeWrapper = Awaited<ReturnType<typeof setup>>['wrapper']
+
+  /** 侧栏里渲染出来的模块，按 DOM 顺序给出 id（author / tags / archive）。 */
+  function blockOrder(wrapper: HomeWrapper): string[] {
+    return wrapper.findAll('.home-sidebar > *').map((node) => {
+      if (node.classes().includes('author-card')) return 'author'
+      if (node.classes().includes('archive-callout')) return 'archive'
+      return 'tags'
+    })
+  }
+
+  it('keeps the default template order (author, tags, archive)', async () => {
+    vi.mocked(tagApi.getTagList).mockResolvedValue({ code: 200, message: 'ok', data: withTags })
+    const { wrapper } = await setup()
+    expect(blockOrder(wrapper)).toEqual(['author', 'tags', 'archive'])
+  })
+
+  it('reorders the same three blocks when a non-default order is configured', async () => {
+    vi.mocked(tagApi.getTagList).mockResolvedValue({ code: 200, message: 'ok', data: withTags })
+    const { wrapper } = await setup('/', { homeSidebarOrder: 'archive-tags-author' })
+    expect(blockOrder(wrapper)).toEqual(['archive', 'tags', 'author'])
+  })
+
+  it('still honours each block visibility condition in any order', async () => {
+    // 默认 mock 的标签列表为空：即使 tags 排在最前，空标签块也不渲染，
+    // 其余两块按配置顺序出现（showModule 条件原样生效）。
+    const { wrapper } = await setup('/', { homeSidebarOrder: 'tags-archive-author' })
+    expect(blockOrder(wrapper)).toEqual(['archive', 'author'])
   })
 })

@@ -46,7 +46,9 @@ class ReadingHtmlControllerTest {
                 .andExpect(header().exists("ETag"))
                 .andExpect(content().string(containsString("正文内容段落")))
                 .andExpect(content().string(containsString("index,follow")))
-                .andExpect(content().string(containsString("application/ld+json")));
+                .andExpect(content().string(containsString("application/ld+json")))
+                .andExpect(content().string(containsString("\"@type\":\"BreadcrumbList\"")))
+                .andExpect(content().string(containsString("\"item\":\"http://localhost/post/990001\"")));
     }
 
     /** 未变更的阅读页以 304 结束；改过内容之后同一个 ETag 必须重新返回 200 正文。 */

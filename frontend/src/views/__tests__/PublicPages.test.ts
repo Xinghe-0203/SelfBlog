@@ -11,9 +11,11 @@ import Archives from '../Archives.vue'
 import About from '../About.vue'
 import NotFound from '../common/NotFound.vue'
 import type { Component } from 'vue'
-import type { Post } from '@/types'
+import type { Post, PostArchiveItem } from '@/types'
 
-vi.mock('@/api/post', () => ({ postApi: { getPostList: vi.fn(), advancedSearch: vi.fn() } }))
+vi.mock('@/api/post', () => ({
+  postApi: { getPostList: vi.fn(), advancedSearch: vi.fn(), getArchives: vi.fn() }
+}))
 vi.mock('@/api/tag', () => ({ tagApi: { getTagById: vi.fn() } }))
 enableAutoUnmount(afterEach)
 const post: Post = {
@@ -31,6 +33,15 @@ const post: Post = {
   createdAt: '2026-10-16T10:00:00',
   tags: Array.from({ length: 6 }, (_, id) => ({ id, name: `标签${id}` }))
 }
+const archiveItem = (overrides: Partial<PostArchiveItem> = {}): PostArchiveItem => ({
+  id: 1,
+  title: '一篇笔记',
+  category: '',
+  createTime: '2026-10-16T10:00:00',
+  updateTime: '2026-10-16T10:00:00',
+  viewCount: 1,
+  ...overrides
+})
 const page = (records: Post[], pages = 1) => ({
   code: 200,
   message: 'ok',
@@ -40,6 +51,11 @@ beforeEach(() => {
   vi.resetAllMocks()
   vi.mocked(postApi.advancedSearch).mockResolvedValue(page([post]))
   vi.mocked(postApi.getPostList).mockResolvedValue(page([post]))
+  vi.mocked(postApi.getArchives).mockResolvedValue({
+    code: 200,
+    message: 'ok',
+    data: [archiveItem()]
+  })
   vi.mocked(tagApi.getTagById).mockResolvedValue({
     code: 200,
     message: 'ok',
@@ -86,20 +102,29 @@ describe('public reading pages', () => {
     await flushPromises()
     expect(wrapper.findAll('.article-row')).toHaveLength(2)
   })
-  it('loads every archive page, including older months', async () => {
-    vi.mocked(postApi.getPostList)
-      .mockResolvedValueOnce(page([post], 2))
-      .mockResolvedValueOnce(
-        page([{ ...post, id: 2, title: '旧月份', createdAt: '2025-03-01' }], 2)
-      )
-    const { wrapper } = await setup(Archives, '/archives')
-    expect(wrapper.findAll('.archive-group')).toHaveLength(2)
-    expect(wrapper.find('a[href="/post/2"]').exists()).toBe(true)
-    expect(postApi.getPostList).toHaveBeenLastCalledWith({
-      pageNum: 2,
-      pageSize: 100,
-      sort: 'latest'
+  it('renders every archive month from the single compact endpoint', async () => {
+    vi.mocked(postApi.getArchives).mockResolvedValue({
+      code: 200,
+      message: 'ok',
+      data: [
+        archiveItem(),
+        archiveItem({
+          id: 2,
+          title: '旧月份',
+          category: '手记',
+          createTime: '2025-03-01T09:00:00',
+          updateTime: '2025-03-01T09:00:00'
+        })
+      ]
     })
+    const { wrapper } = await setup(Archives, '/archives')
+    // 后端按创建时间倒序返回，前端保持原序分组：最新月份的分组在前。
+    const [firstGroup, secondGroup] = wrapper.findAll('.archive-group')
+    expect(firstGroup?.find('a[href="/post/1"]').exists()).toBe(true)
+    expect(secondGroup?.find('a[href="/post/2"]').exists()).toBe(true)
+    expect(wrapper.findAll('.archive-group')).toHaveLength(2)
+    expect(postApi.getArchives).toHaveBeenCalledTimes(1)
+    expect(postApi.getPostList).not.toHaveBeenCalled()
   })
   it('makes the about page author-first with configured avatar and biography', async () => {
     const { wrapper } = await setup(About, '/about')

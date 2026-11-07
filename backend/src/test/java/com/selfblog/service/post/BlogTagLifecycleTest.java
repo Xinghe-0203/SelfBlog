@@ -49,6 +49,9 @@ class BlogTagLifecycleTest {
     private void clearCache() {
         var cache = caches.getCache(CaffeineCacheConfig.CATEGORY_CACHE);
         if (cache != null) cache.clear();
+        // listAllTags 现在走 hotTagsCache；测试事务回滚而缓存不回滚，一并清理。
+        var hotTags = caches.getCache(CaffeineCacheConfig.HOT_TAGS_CACHE);
+        if (hotTags != null) hotTags.clear();
     }
 
     @Test

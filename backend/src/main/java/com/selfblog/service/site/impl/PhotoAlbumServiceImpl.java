@@ -28,8 +28,10 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -57,7 +59,9 @@ public class PhotoAlbumServiceImpl implements PhotoAlbumService {
     public List<PhotoAlbumVO> getPublicAlbums() {
         LambdaQueryWrapper<PhotoAlbum> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(PhotoAlbum::getIsDeleted, 0).orderByAsc(PhotoAlbum::getSortOrder).orderByDesc(PhotoAlbum::getCreateTime);
-        return albumMapper.selectList(wrapper).stream().map(album -> toAlbumView(album, null, false)).collect(Collectors.toList());
+        List<PhotoAlbum> albums = albumMapper.selectList(wrapper);
+        Map<Long, List<AlbumPhoto>> photosByAlbum = loadPhotosByAlbum(albums);
+        return albums.stream().map(album -> toAlbumView(album, photosByAlbum.getOrDefault(album.getId(), List.of()), null, false)).collect(Collectors.toList());
     }
 
     @Override
@@ -65,13 +69,15 @@ public class PhotoAlbumServiceImpl implements PhotoAlbumService {
     public List<PhotoAlbumVO> getAdminAlbums() {
         LambdaQueryWrapper<PhotoAlbum> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(PhotoAlbum::getIsDeleted, 0).orderByAsc(PhotoAlbum::getSortOrder).orderByDesc(PhotoAlbum::getCreateTime);
-        return albumMapper.selectList(wrapper).stream().map(album -> {
+        List<PhotoAlbum> albums = albumMapper.selectList(wrapper);
+        Map<Long, List<AlbumPhoto>> photosByAlbum = loadPhotosByAlbum(albums);
+        return albums.stream().map(album -> {
             String token = null;
             if (isPrivate(album)) {
                 token = UUID.randomUUID().toString().replace("-", "");
                 accessGrants.put(token, album.getId());
             }
-            return toAlbumView(album, token, true);
+            return toAlbumView(album, photosByAlbum.getOrDefault(album.getId(), List.of()), token, true);
         }).collect(Collectors.toList());
     }
 
@@ -201,7 +207,10 @@ public class PhotoAlbumServiceImpl implements PhotoAlbumService {
     }
 
     private PhotoAlbumVO toAlbumView(PhotoAlbum album, String accessToken, boolean includePhotos) {
-        List<AlbumPhoto> photoList = getPhotos(album.getId());
+        return toAlbumView(album, getPhotos(album.getId()), accessToken, includePhotos);
+    }
+
+    private PhotoAlbumVO toAlbumView(PhotoAlbum album, List<AlbumPhoto> photoList, String accessToken, boolean includePhotos) {
         boolean privateAlbum = isPrivate(album);
         PhotoAlbumVO vo = new PhotoAlbumVO();
         vo.setId(album.getId());
@@ -266,6 +275,26 @@ public class PhotoAlbumServiceImpl implements PhotoAlbumService {
         wrapper.eq(AlbumPhoto::getAlbumId, albumId).eq(AlbumPhoto::getIsDeleted, 0)
                 .orderByAsc(AlbumPhoto::getSortOrder).orderByAsc(AlbumPhoto::getCreateTime);
         return photoMapper.selectList(wrapper);
+    }
+
+    /**
+     * 一次查询把列表页所有相册的照片按 albumId 分组，替代 toAlbumView 每相册一次的
+     * {@link #getPhotos(Long)}（N+1）。查询条件与单相册查询逐项一致（{@code is_deleted=0}
+     * 由 @TableLogic 全局逻辑删除再叠加一次，与旧实现相同），排序键也一致
+     * （sort_order 升序、create_time 升序），组内相对顺序不变，因此 photoCount 与
+     * 「封面 = 命中 coverPhotoId 否则取第一张」的结果与旧实现逐一相同。
+     */
+    private Map<Long, List<AlbumPhoto>> loadPhotosByAlbum(List<PhotoAlbum> albums) {
+        if (albums.isEmpty()) return Map.of();
+        LambdaQueryWrapper<AlbumPhoto> wrapper = new LambdaQueryWrapper<>();
+        wrapper.in(AlbumPhoto::getAlbumId, albums.stream().map(PhotoAlbum::getId).toList())
+                .eq(AlbumPhoto::getIsDeleted, 0)
+                .orderByAsc(AlbumPhoto::getSortOrder).orderByAsc(AlbumPhoto::getCreateTime);
+        Map<Long, List<AlbumPhoto>> grouped = new LinkedHashMap<>();
+        for (AlbumPhoto photo : photoMapper.selectList(wrapper)) {
+            grouped.computeIfAbsent(photo.getAlbumId(), key -> new ArrayList<>()).add(photo);
+        }
+        return grouped;
     }
 
     private boolean isPrivate(PhotoAlbum album) { return album.getIsPrivate() != null && album.getIsPrivate() == 1; }

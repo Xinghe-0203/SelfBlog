@@ -1,14 +1,20 @@
 package com.selfblog.service.impl;
 
 import com.selfblog.common.exception.BusinessException;
+import com.selfblog.config.cache.CaffeineCacheConfig;
 import com.selfblog.entity.BlogTag;
 import com.selfblog.mapper.BlogTagMapper;
 import com.selfblog.service.post.BlogTagService;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.cache.CacheManager;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -30,9 +36,32 @@ class BlogTagServiceImplTest {
     @Autowired
     private BlogTagMapper blogTagMapper;
 
+    @Autowired
+    private CacheManager caches;
+
     @BeforeEach
     void setUp() {
         blogTagMapper.delete(null);
+        clearTagCaches();
+    }
+
+    @AfterEach
+    void tearDown() {
+        clearTagCaches();
+    }
+
+    /**
+     * listAllTags 现在带 @Cacheable(hotTagsCache)，标签写路径带 @CacheEvict。
+     * 测试 profile 下自定义 CacheManager 依然生效（覆盖 spring.cache.type=none）
+     * 且缓存不参与事务回滚，所以标签相关的两级缓存都要手动清——这也顺带验证了
+     * 「写路径的 allEntries 失效注解 + 读路径缓存键」的装配在真实代理下工作正常
+     * （上面的 createThenListReflectsTheNewTag 用例就是经真实代理跑通的）。
+     */
+    private void clearTagCaches() {
+        for (String name : new String[] {CaffeineCacheConfig.HOT_TAGS_CACHE, CaffeineCacheConfig.CATEGORY_CACHE}) {
+            var cache = caches.getCache(name);
+            if (cache != null) cache.clear();
+        }
     }
 
     private BlogTag createTag(String name) {
@@ -109,5 +138,35 @@ class BlogTagServiceImplTest {
         BusinessException ex = assertThrows(BusinessException.class,
                 () -> blogTagService.createTag("Java"));
         assertTrue(ex.getCode() >= 400);
+    }
+
+    @Test
+    @DisplayName("创建后列表立刻可见（写路径失效缓存，读路径回填）")
+    void createThenListReflectsTheNewTag() {
+        blogTagService.createTag("缓存验证标签");
+
+        List<String> names = blogTagService.listAllTags().stream().map(BlogTag::getName).toList();
+
+        assertTrue(names.contains("缓存验证标签"),
+                "createTag 必须失效 hotTagsCache，listAllTags 才能立刻看到新标签");
+    }
+
+    @Test
+    @DisplayName("软删除后列表不再包含该标签（deleteTag 失效缓存）")
+    void deleteThenListNoLongerContainsTheTag() {
+        // deleteTag 要求管理员身份（与 BlogTagLifecycleTest 同一构造方式）。
+        SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(
+                new com.selfblog.utils.UserContext(1L, "admin"), null, List.of(new SimpleGrantedAuthority("ROLE_admin"))));
+        try {
+            BlogTag tag = blogTagService.createTag("待删除标签");
+
+            blogTagService.deleteTag(tag.getId());
+
+            List<String> names = blogTagService.listAllTags().stream().map(BlogTag::getName).toList();
+            assertFalse(names.contains("待删除标签"),
+                    "deleteTag（软删除）必须失效 hotTagsCache，否则列表在 TTL 内仍显示已删标签");
+        } finally {
+            SecurityContextHolder.clearContext();
+        }
     }
 }

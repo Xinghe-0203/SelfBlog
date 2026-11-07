@@ -4,7 +4,12 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import Settings from '../Settings.vue'
 import SiteAssetField from '@/components/admin/SiteAssetField.vue'
-import { useSiteStore } from '@/stores/site'
+import {
+  LINK_STYLE_VALUES,
+  SIDEBAR_ORDER_VALUES,
+  TOC_STYLE_VALUES,
+  useSiteStore
+} from '@/stores/site'
 
 const { getSettings, updateSettings, testConnection, listModels } = vi.hoisted(() => ({
   getSettings: vi.fn(),
@@ -191,6 +196,7 @@ describe('Settings brand asset fields', () => {
       '互动开关',
       '背景音乐',
       '留言审核',
+      '版权声明',
       '后台入口',
       '访客统计',
       '模型接口'
@@ -217,6 +223,22 @@ describe('Settings brand asset fields', () => {
     expect(updateSettings).not.toHaveBeenCalled()
   })
 
+  it('renders all eight one-click presets including the four new ones', async () => {
+    const wrapper = await mountSettings()
+    // 4 个原有预设 + 墨韵 / 杏暖 / 青苔 / 暮色：预设卡按 THEME_PRESETS 的顺序渲染
+    const ids = wrapper.findAll('[data-preset]').map((card) => card.attributes('data-preset'))
+    expect(ids).toEqual([
+      'paper',
+      'ink',
+      'sand',
+      'dusk',
+      'inkstone',
+      'apricot',
+      'moss',
+      'nightfall'
+    ])
+  })
+
   it('keeps the comment moderation toggle in 内容与互动 and ships it with the save payload', async () => {
     const wrapper = await mountSettings()
     expect(wrapper.find('[data-setting="llmCommentModeration"]').exists()).toBe(true)
@@ -231,6 +253,32 @@ describe('Settings brand asset fields', () => {
     await wrapper.find('form').trigger('submit')
     await flushPromises()
     expect(updateSettings.mock.calls[0]?.[0]).toMatchObject({ llmCommentModeration: 'true' })
+  })
+
+  it('binds the post license field to loaded settings and ships it with the save payload', async () => {
+    getSettings.mockResolvedValue({
+      code: 200,
+      message: 'OK',
+      data: { ...useSiteStore().settings, postLicense: '转载请注明出处' }
+    })
+    const wrapper = await mountSettings()
+    const field = wrapper.get('[data-setting="postLicense"]')
+    // 加载值回填表单；maxlength 与服务端上限一致
+    expect((field.element as HTMLInputElement).value).toBe('转载请注明出处')
+    expect(field.attributes('maxlength')).toBe('200')
+    expect(wrapper.text()).toContain('留空不显示')
+
+    await field.setValue('CC BY-NC-SA 4.0')
+    updateSettings.mockResolvedValue({
+      code: 200,
+      message: 'OK',
+      data: { ...useSiteStore().settings, postLicense: 'CC BY-NC-SA 4.0' }
+    })
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+    expect(updateSettings.mock.calls[0]?.[0]).toMatchObject({ postLicense: 'CC BY-NC-SA 4.0' })
+    // 保存响应回写 store，阅读页立即拿到新声明
+    expect(useSiteStore().settings.postLicense).toBe('CC BY-NC-SA 4.0')
   })
 
   it('points the model endpoint at the SEO page instead of duplicating its form', async () => {
@@ -447,7 +495,7 @@ describe('Settings brand asset fields', () => {
   })
 
   describe('appearance panel', () => {
-    /** 11 个外观键，顺序与面板里的渲染顺序一致。 */
+    /** 20 个外观键，顺序与面板里的渲染顺序一致。 */
     const APPEARANCE_KEYS = [
       'fontFamily',
       'baseFontSize',
@@ -459,7 +507,16 @@ describe('Settings brand asset fields', () => {
       'layoutDensity',
       'homeHeroStyle',
       'postCoverStyle',
-      'motionIntensity'
+      'motionIntensity',
+      'readingProgress',
+      'blockquoteStyle',
+      'postRowStyle',
+      'contentImageStyle',
+      'tableStyle',
+      'homeSidebarOrder',
+      'tocStyle',
+      'linkStyle',
+      'summaryCallout'
     ] as const
 
     /** 与 stores/site.ts 的 defaults、后端 defaults() 三处对齐的重置目标值。 */
@@ -474,7 +531,16 @@ describe('Settings brand asset fields', () => {
       layoutDensity: 'default',
       homeHeroStyle: 'default',
       postCoverStyle: 'default',
-      motionIntensity: 'default'
+      motionIntensity: 'default',
+      readingProgress: 'on',
+      blockquoteStyle: 'default',
+      postRowStyle: 'default',
+      contentImageStyle: 'default',
+      tableStyle: 'default',
+      homeSidebarOrder: 'author-tags-archive',
+      tocStyle: 'default',
+      linkStyle: 'default',
+      summaryCallout: 'off'
     }
 
     function control(wrapper: Awaited<ReturnType<typeof mountSettings>>, name: string) {
@@ -495,7 +561,7 @@ describe('Settings brand asset fields', () => {
       return (control(wrapper, name).element as HTMLInputElement | HTMLSelectElement).value
     }
 
-    it('renders all eleven appearance controls with server-side bounds', async () => {
+    it('renders all twenty appearance controls with server-side bounds', async () => {
       const wrapper = await mountSettings()
       const panel = appearancePanel(wrapper)
       expect(panel.find('.panel-heading p').text()).toContain('只影响前台内容区')
@@ -517,7 +583,7 @@ describe('Settings brand asset fields', () => {
       expect(control(wrapper, 'paragraphSpacing').attributes('max')).toBe('2')
       expect(control(wrapper, 'paragraphSpacing').attributes('step')).toBe('0.1')
 
-      // 7 个 select 的 option value 必须就是后端枚举的字面值
+      // 16 个 select 的 option value 必须就是后端枚举的字面值
       const enumOptions: Record<string, string[]> = {
         fontFamily: ['system', 'sans', 'serif', 'mono'],
         radiusScale: ['none', 'sharp', 'default', 'soft', 'round'],
@@ -525,7 +591,17 @@ describe('Settings brand asset fields', () => {
         layoutDensity: ['compact', 'default', 'comfortable'],
         homeHeroStyle: ['default', 'compact', 'minimal', 'off'],
         postCoverStyle: ['default', 'wide', 'hidden'],
-        motionIntensity: ['off', 'subtle', 'default', 'lively']
+        motionIntensity: ['off', 'subtle', 'default', 'lively'],
+        readingProgress: ['on', 'off'],
+        blockquoteStyle: ['default', 'accent', 'minimal', 'card'],
+        postRowStyle: ['default', 'compact', 'card'],
+        contentImageStyle: ['default', 'framed', 'flat'],
+        tableStyle: ['default', 'striped', 'minimal'],
+        // 侧栏顺序 / 目录显隐 / 链接样式：直接与 stores/site.ts 导出的白名单（= 后端枚举）对齐
+        homeSidebarOrder: [...SIDEBAR_ORDER_VALUES],
+        tocStyle: [...TOC_STYLE_VALUES],
+        linkStyle: [...LINK_STYLE_VALUES],
+        summaryCallout: ['on', 'off']
       }
       for (const [key, values] of Object.entries(enumOptions)) {
         expect(
@@ -552,7 +628,16 @@ describe('Settings brand asset fields', () => {
           layoutDensity: 'compact',
           homeHeroStyle: 'minimal',
           postCoverStyle: 'wide',
-          motionIntensity: 'subtle'
+          motionIntensity: 'subtle',
+          readingProgress: 'off',
+          blockquoteStyle: 'card',
+          postRowStyle: 'compact',
+          contentImageStyle: 'framed',
+          tableStyle: 'striped',
+          homeSidebarOrder: 'archive-tags-author',
+          tocStyle: 'hidden',
+          linkStyle: 'dotted',
+          summaryCallout: 'on'
         }
       })
       const wrapper = await mountSettings()
@@ -560,6 +645,15 @@ describe('Settings brand asset fields', () => {
       expect(value(wrapper, 'fontFamily')).toBe('serif')
       expect(value(wrapper, 'baseFontSize')).toBe('18')
       expect(value(wrapper, 'motionIntensity')).toBe('subtle')
+      expect(value(wrapper, 'readingProgress')).toBe('off')
+      expect(value(wrapper, 'blockquoteStyle')).toBe('card')
+      expect(value(wrapper, 'postRowStyle')).toBe('compact')
+      expect(value(wrapper, 'contentImageStyle')).toBe('framed')
+      expect(value(wrapper, 'tableStyle')).toBe('striped')
+      expect(value(wrapper, 'homeSidebarOrder')).toBe('archive-tags-author')
+      expect(value(wrapper, 'tocStyle')).toBe('hidden')
+      expect(value(wrapper, 'linkStyle')).toBe('dotted')
+      expect(value(wrapper, 'summaryCallout')).toBe('on')
       // 滑杆读数：px / em 单位只出现在读数上，不写回表单
       expect(control(wrapper, 'baseFontSize').element.parentElement?.textContent).toContain('18 px')
       expect(control(wrapper, 'readerWidth').element.parentElement?.textContent).toContain('820 px')
@@ -590,7 +684,7 @@ describe('Settings brand asset fields', () => {
       expect(typeof payload.baseFontSize).toBe('string')
     })
 
-    it('resets the eleven keys locally and never saves on its own', async () => {
+    it('resets the twenty keys locally and never saves on its own', async () => {
       getSettings.mockResolvedValue({
         code: 200,
         message: 'OK',
@@ -606,7 +700,16 @@ describe('Settings brand asset fields', () => {
           layoutDensity: 'comfortable',
           homeHeroStyle: 'off',
           postCoverStyle: 'hidden',
-          motionIntensity: 'lively'
+          motionIntensity: 'lively',
+          readingProgress: 'off',
+          blockquoteStyle: 'accent',
+          postRowStyle: 'card',
+          contentImageStyle: 'flat',
+          tableStyle: 'minimal',
+          homeSidebarOrder: 'tags-archive-author',
+          tocStyle: 'hidden',
+          linkStyle: 'flat',
+          summaryCallout: 'on'
         }
       })
       const wrapper = await mountSettings()

@@ -1,10 +1,11 @@
 /**
  * 外观深度自定义（v2.0.29）
  *
- * 这里消费后台「外观深度自定义」面板的 11 个设置键。分两类：
+ * 这里消费后台「外观深度自定义」面板的 16 个设置键。分两类：
  *
  * 1. 枚举键（fontFamily / radiusScale / shadowDepth / layoutDensity / homeHeroStyle /
- *    postCoverStyle / motionIntensity）——由 stores/site.ts 写成 `#selfblog` 上的
+ *    postCoverStyle / motionIntensity / blockquoteStyle / postRowStyle / contentImageStyle /
+ *    tableStyle / linkStyle）——由 stores/site.ts 写成 `#selfblog` 上的
  *    `data-ap-*` 属性，本文件用属性选择器切换。用属性而不是逐值写内联变量，是因为
  *    圆角/阴影/动效都要成组改十几个 token，写在 CSS 里才能一眼看完每档的取值。
  * 2. 数值键（baseFontSize / bodyLineHeight / readerWidth / paragraphSpacing）——写成
@@ -376,4 +377,156 @@
   animation-iteration-count: 1 !important;
   transition-duration: 0.01ms !important;
   transition-property: none !important;
+}
+
+/* ==========================================================================
+ * 9. 引用块样式
+ * ========================================================================== */
+
+/* 基线（styles/typography.css）：左侧 accent 竖线 + accent-light 底 + 斜体；
+ * PostDetail.vue 的 scoped 覆盖换成了 --primary 竖线 + bg-secondary 底。
+ * 「强调」档把两处统一回 accent 调色板：这里的 ID 前缀特异性高于视图里的
+ * `:deep` 声明，两页从此一致。 */
+#selfblog[data-ap-blockquote='accent'] .app-main:not(.app-main--admin) .markdown-body blockquote {
+  border-left: 3px solid var(--accent);
+  background: var(--accent-light);
+  font-style: italic;
+}
+
+/* 极简：去底色与斜体，竖线降为 2px 的描边色，内边距收窄。 */
+#selfblog[data-ap-blockquote='minimal'] .app-main:not(.app-main--admin) .markdown-body blockquote {
+  border-left: 2px solid var(--border);
+  background: transparent;
+  padding: 6px 12px;
+  font-style: normal;
+}
+
+/* 卡片：竖线换成完整描边 + 圆角，压在 bg-secondary 上。 */
+#selfblog[data-ap-blockquote='card'] .app-main:not(.app-main--admin) .markdown-body blockquote {
+  border-left: none;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  background: var(--bg-secondary);
+  padding: 12px 16px;
+  font-style: normal;
+}
+
+/* ==========================================================================
+ * 10. 文章行样式（ArticleList.vue 的行；只在此覆盖，不改组件本身）
+ * ========================================================================== */
+
+/* 紧凑：行距与列间距同步收窄，摘要钳到一行，封面按原比例缩小约两成。
+ * 移动端 ArticleList 自己有一组更小的封面（77×79），这里按同样比例再缩一档。 */
+#selfblog[data-ap-post-row='compact'] .app-main:not(.app-main--admin) .article-row {
+  padding-block: 14px;
+  gap: 14px;
+}
+
+#selfblog[data-ap-post-row='compact'] .app-main:not(.app-main--admin) .article-summary {
+  -webkit-line-clamp: 1;
+  line-clamp: 1;
+}
+
+#selfblog[data-ap-post-row='compact'] .app-main:not(.app-main--admin) .row-cover {
+  flex-basis: 104px;
+  width: 104px;
+  height: 75px;
+}
+
+@media (max-width: 600px) {
+  #selfblog[data-ap-post-row='compact'] .app-main:not(.app-main--admin) .row-cover {
+    flex-basis: 62px;
+    width: 62px;
+    height: 63px;
+  }
+}
+
+/* 卡片：每行自成一卡。ArticleList 用 `.article-row + .article-row { border-top }`
+ * 画分隔线，这里行上有了完整边框（特异性更高，覆盖那条分隔线），行与行之间
+ * 用 margin 拉开，四边框齐全，不会出现相邻行贴出的双线。 */
+#selfblog[data-ap-post-row='card'] .app-main:not(.app-main--admin) .article-row {
+  background: var(--surface-raised);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-lg);
+  padding: 18px 20px;
+  margin-block: 12px;
+}
+
+/* ==========================================================================
+ * 11. 正文图片样式
+ * ========================================================================== */
+
+/* 描边：相框感 —— 内边距 + 细描边 + raised 底；圆角不动（typography 与
+ * PostDetail 各自的 radius 声明继续生效）。 */
+#selfblog[data-ap-content-image='framed'] .app-main:not(.app-main--admin) .markdown-body img {
+  border: 1px solid var(--border-light);
+  padding: 6px;
+  background: var(--surface-raised);
+}
+
+/* 扁平：去投影去圆角，图片直接嵌进文字流。 */
+#selfblog[data-ap-content-image='flat'] .app-main:not(.app-main--admin) .markdown-body img {
+  box-shadow: none;
+  border-radius: 0;
+}
+
+/* ==========================================================================
+ * 12. 表格样式
+ * ========================================================================== */
+
+/* 斑马纹：偶数行压 bg-secondary（表头本来就是同色，视觉上自然连成一条）。 */
+#selfblog[data-ap-table='striped']
+  .app-main:not(.app-main--admin)
+  .markdown-body
+  tbody
+  tr:nth-child(even) {
+  background: var(--bg-secondary);
+}
+
+/* 极简：外框与格线全部撤掉，只留每行底部的发丝线。 */
+#selfblog[data-ap-table='minimal'] .app-main:not(.app-main--admin) .markdown-body table {
+  border: none;
+}
+
+#selfblog[data-ap-table='minimal'] .app-main:not(.app-main--admin) .markdown-body th {
+  background: transparent;
+}
+
+#selfblog[data-ap-table='minimal'] .app-main:not(.app-main--admin) .markdown-body th,
+#selfblog[data-ap-table='minimal'] .app-main:not(.app-main--admin) .markdown-body td {
+  border: none;
+  border-bottom: 1px solid var(--border-light);
+}
+
+/* ==========================================================================
+ * 13. 正文链接样式
+ * ========================================================================== */
+
+/* 基线（styles/typography.css 的 `.markdown-body a`）：常态就带下划线（3px 偏移、
+ * 30% 透明的装饰色，hover 收紧为实色 accent）；PostDetail.vue 的 `:deep(a)`
+ * 只改了颜色与线粗（1px），不碰线型 —— 所以两页的默认观感一致：常态有下划线。
+ * 两个变体都只动 text-decoration，默认档不写任何规则。
+ *
+ * 注意：第 1 节那类「--font-mono 刻意不动」的等宽例外在这里不存在——链接
+ * 不涉及字体 token；也正因为只碰 text-decoration（不改 color / font-family），
+ * 行内 code 里的 `code a` 链接照常工作。
+ * 标题锚点 `.heading-anchor` 自带 `text-decoration: none`（避免正文排满 #），
+ * 悬浮档的 hover 规则用 :not(.heading-anchor) 排除它，不让 # 在悬停时突然出线。 */
+
+/* 点状：线型换成点状，颜色与偏移行为原样保留（hover 仍收紧为实色）。 */
+#selfblog[data-ap-link='dotted'] .app-main:not(.app-main--admin) .markdown-body a {
+  text-decoration-style: dotted;
+  text-underline-offset: 3px;
+}
+
+/* 悬浮：常态撤线，hover 时下划线回来（装饰色由基线的 hover 规则给 accent）。 */
+#selfblog[data-ap-link='flat'] .app-main:not(.app-main--admin) .markdown-body a {
+  text-decoration-line: none;
+}
+
+#selfblog[data-ap-link='flat']
+  .app-main:not(.app-main--admin)
+  .markdown-body
+  a:hover:not(.heading-anchor) {
+  text-decoration-line: underline;
 }

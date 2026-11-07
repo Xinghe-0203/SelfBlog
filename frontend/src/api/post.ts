@@ -7,6 +7,8 @@ import type {
   ApiResponse,
   PaginatedResponse,
   Post,
+  PostArchiveItem,
+  RelatedPostItem,
   CreatePostRequest,
   UpdatePostRequest,
   PostListParams,
@@ -63,6 +65,20 @@ export const postApi = {
   },
 
   /**
+   * 获取全站文章归档（精简字段，按创建时间倒序）
+   */
+  getArchives(): Promise<ApiResponse<PostArchiveItem[]>> {
+    return api.get('/post/archives')
+  },
+
+  /**
+   * 获取相关阅读（最多 5 条，按相关度排序；无相关文章时为空数组）
+   */
+  getRelated(postId: number): Promise<ApiResponse<RelatedPostItem[]>> {
+    return api.get(`/post/${postId}/related`)
+  },
+
+  /**
    * 保存草稿
    */
   saveDraft(data: CreatePostRequest): Promise<ApiResponse<Draft>> {
@@ -95,5 +111,13 @@ export const postApi = {
    */
   advancedSearch(params: PostSearchParams): Promise<PaginatedResponse<Post>> {
     return api.get('/post/search/advanced', { params })
+  },
+
+  /**
+   * 搜索关键词联想（公开接口；空白/过短关键词返回空数组）。
+   * 普通读请求：默认超时与网络重试，绝不加 _noRetry。
+   */
+  getSearchSuggestions(keyword: string): Promise<ApiResponse<string[]>> {
+    return api.get('/post/search/suggest', { params: { keyword } })
   }
 }

@@ -6,7 +6,8 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.selfblog.common.exception.BusinessException;
 import com.selfblog.config.cache.CaffeineCacheConfig;
 import com.selfblog.dto.site.TrackVisitorRequest;
-import com.selfblog.entity.BlogPost;
+import com.selfblog.dto.site.VisitorDailyStat;
+import com.selfblog.dto.site.VisitorPathCount;
 import com.selfblog.entity.VisitorEvent;
 import com.selfblog.mapper.BlogPostMapper;
 import com.selfblog.mapper.VisitorEventMapper;
@@ -28,7 +29,6 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -103,20 +103,7 @@ public class VisitorServiceImpl implements VisitorService {
         summary.setTodayPageViews(nvl(visitorMapper.selectCount(todayViews)));
         summary.setArticleViews(totalArticleViews());
 
-        List<VisitorSummaryVO.Daily> daily = new ArrayList<>();
-        for (int offset = 13; offset >= 0; offset--) {
-            LocalDate date = today.minusDays(offset);
-            LocalDateTime from = date.atStartOfDay();
-            LocalDateTime until = date.plusDays(1).atStartOfDay();
-            VisitorSummaryVO.Daily item = new VisitorSummaryVO.Daily();
-            item.setDate(date.format(DATE_FORMAT));
-            item.setVisitors(nvl(visitorMapper.countVisitorsBetween(from, until)));
-            LambdaQueryWrapper<VisitorEvent> views = new LambdaQueryWrapper<>();
-            views.ge(VisitorEvent::getCreateTime, from).lt(VisitorEvent::getCreateTime, until);
-            item.setPageViews(nvl(visitorMapper.selectCount(views)));
-            daily.add(item);
-        }
-        summary.setDaily(daily);
+        summary.setDaily(buildDailyStatistics(today));
         summary.setTopPages(getTopPages());
         return summary;
     }
@@ -145,31 +132,71 @@ public class VisitorServiceImpl implements VisitorService {
         return records;
     }
 
+    /**
+     * 热门页面 Top8：GROUP BY 下推到数据库，替代「LIMIT 20000 明细行 + 内存 HashMap」。
+     * 窗口与旧实现一致（只限下界 30 天前的 0 点，无上界）。值语义唯一的差别：旧实现
+     * 超过 20000 行时静默截断少算，新实现始终全量统计（这是修 bug，不是行为差异）；
+     * 同浏览量路径之间的先后顺序旧实现依赖 HashMap 迭代序（本就未定义），新实现交给
+     * 数据库，同样未定义——测试只断言计数与 Top 集合，不断言并列顺序。
+     */
     private List<VisitorSummaryVO.TopPage> getTopPages() {
         LocalDateTime since = LocalDate.now().minusDays(30).atStartOfDay();
-        LambdaQueryWrapper<VisitorEvent> wrapper = new LambdaQueryWrapper<>();
-        wrapper.select(VisitorEvent::getPagePath).ge(VisitorEvent::getCreateTime, since)
-                .last("LIMIT 20000");
-        Map<String, Long> counts = new HashMap<>();
-        for (VisitorEvent event : visitorMapper.selectList(wrapper)) {
-            counts.merge(event.getPagePath(), 1L, Long::sum);
-        }
-        return counts.entrySet().stream()
-                .sorted(Map.Entry.<String, Long>comparingByValue(Comparator.reverseOrder()))
-                .limit(8)
-                .map(entry -> {
-                    VisitorSummaryVO.TopPage item = new VisitorSummaryVO.TopPage();
-                    item.setPath(entry.getKey());
-                    item.setViews(entry.getValue());
-                    return item;
-                }).collect(Collectors.toList());
+        return visitorMapper.selectTopPagePaths(since).stream().map(row -> {
+            VisitorSummaryVO.TopPage item = new VisitorSummaryVO.TopPage();
+            item.setPath(row.getPath());
+            item.setViews(nvl(row.getViews()));
+            return item;
+        }).collect(Collectors.toList());
     }
 
+    /**
+     * 文章总浏览量：SUM 聚合下推，替代「全量已发布文章行拉到内存求和」。
+     * 过滤条件与旧 wrapper 逐项一致（status=1，is_deleted=0 由逻辑删除过滤显式写出）。
+     */
     private long totalArticleViews() {
-        LambdaQueryWrapper<BlogPost> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(BlogPost::getStatus, 1).ne(BlogPost::getIsDeleted, 1)
-                .select(BlogPost::getViewCount);
-        return postMapper.selectList(wrapper).stream().mapToLong(post -> post.getViewCount() == null ? 0 : post.getViewCount()).sum();
+        return nvl(postMapper.sumPublishedPostViews());
+    }
+
+    /**
+     * 14 天趋势：一条按天 GROUP BY 的查询替代「14 天 × 2 条 COUNT」。
+     * 窗口语义与旧循环完全一致——旧实现第 offset 天是 [当日 0 点, 次日 0 点)，
+     * 14 段连续区间拼起来正好是 [today-13 0 点, tomorrow 0 点)，DATE(create_time)
+     * 按自然日分桶与逐日窗口逐行等价；缺失的日期补 0，日期轴仍然是 offset 13..0。
+     */
+    private List<VisitorSummaryVO.Daily> buildDailyStatistics(LocalDate today) {
+        LocalDateTime windowStart = today.minusDays(13).atStartOfDay();
+        LocalDateTime windowEnd = today.plusDays(1).atStartOfDay();
+        Map<String, VisitorDailyStat> byDay = new HashMap<>();
+        for (VisitorDailyStat row : visitorMapper.selectDailyStats(windowStart, windowEnd)) {
+            String day = dayValue(row.getDay());
+            if (day != null) byDay.put(day, row);
+        }
+        List<VisitorSummaryVO.Daily> daily = new ArrayList<>();
+        for (int offset = 13; offset >= 0; offset--) {
+            LocalDate date = today.minusDays(offset);
+            VisitorDailyStat row = byDay.get(date.format(DATE_FORMAT));
+            VisitorSummaryVO.Daily item = new VisitorSummaryVO.Daily();
+            item.setDate(date.format(DATE_FORMAT));
+            item.setVisitors(row == null || row.getVisitors() == null ? 0L : row.getVisitors());
+            item.setPageViews(row == null || row.getViews() == null ? 0L : row.getViews());
+            daily.add(item);
+        }
+        return daily;
+    }
+
+    /**
+     * 日期列跨库取值归一：H2 返回 {@link LocalDate}，MySQL 返回 {@link java.sql.Date}，
+     * SQLite 驱动返回字符串（与 {@code TagLastModified} 的 Object 约定一致）。
+     * 字符串防御性截到前 10 位（ISO 日期），纯 NULL（create_time 为空的极端行）返回
+     * null 并被调用方丢弃——旧实现的窗口比较同样不会统计这类行。
+     */
+    private String dayValue(Object raw) {
+        if (raw == null) return null;
+        if (raw instanceof LocalDate date) return date.format(DATE_FORMAT);
+        if (raw instanceof java.sql.Date date) return date.toLocalDate().format(DATE_FORMAT);
+        if (raw instanceof LocalDateTime dateTime) return dateTime.toLocalDate().format(DATE_FORMAT);
+        String text = String.valueOf(raw);
+        return text.length() > 10 ? text.substring(0, 10) : text;
     }
 
     private String cleanPath(String path) {

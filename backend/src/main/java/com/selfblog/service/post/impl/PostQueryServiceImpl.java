@@ -18,9 +18,11 @@ import com.selfblog.service.post.BlogTagService;
 import com.selfblog.service.post.PostQueryService;
 import com.selfblog.service.content.TopicService;
 import com.selfblog.utils.SqlLikeUtils;
+import com.selfblog.vo.post.ArchivePostVO;
 import com.selfblog.vo.post.AdjacentPostVO;
 import com.selfblog.vo.post.PostDetailResponse;
 import com.selfblog.vo.post.PostListResponse;
+import com.selfblog.vo.post.RelatedPostVO;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -817,5 +819,137 @@ public class PostQueryServiceImpl extends ServiceImpl<BlogPostMapper, BlogPost> 
         vo.setId(adjacent.getId());
         vo.setTitle(adjacent.getTitle());
         return vo;
+    }
+
+    /** 相关文章推荐的目标篇数。 */
+    private static final int RELATED_POST_LIMIT = 5;
+
+    /** 归档条目的安全上限：个人博客量级不分页，超出部分宁可截断也不拖垮归档页。 */
+    private static final int ARCHIVES_SAFETY_CAP = 2000;
+
+    /** 相关文章摘要的展示上限（字符），超出截断。 */
+    private static final int RELATED_SUMMARY_LIMIT = 100;
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<RelatedPostVO> getRelatedPosts(Long postId) {
+        BlogPost current = getById(postId);
+        if (current == null) {
+            // 与 getPostDetail 同一套 404 语义
+            throw new BusinessException(404, "文章不存在");
+        }
+        // 未发布（草稿/待审/驳回）：公开页只对已发布文章调用；作者预览草稿时拿到空推荐
+        if (current.getStatus() == null || current.getStatus() != PostStatus.PUBLISHED.getValue()) {
+            return Collections.emptyList();
+        }
+
+        // 复用既有标签查询取当前文章的标签；再按 blog_post_tag 找共享这些标签的其他文章。
+        // BlogPostTag 带 @TableLogic，selectList 自动过滤 is_deleted=0，与全库语义一致。
+        LinkedHashMap<Long, Integer> sharedTagCounts = new LinkedHashMap<>();
+        List<PostDetailResponse.TagVO> ownTags = self.getTagsByPostId(postId);
+        if (ownTags != null && !ownTags.isEmpty()) {
+            List<Long> ownTagIds = ownTags.stream()
+                    .map(PostDetailResponse.TagVO::getId)
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toList());
+            if (!ownTagIds.isEmpty()) {
+                List<BlogPostTag> relations = blogPostTagMapper.selectList(new LambdaQueryWrapper<BlogPostTag>()
+                        .in(BlogPostTag::getTagId, ownTagIds)
+                        .ne(BlogPostTag::getPostId, postId));
+                for (BlogPostTag relation : relations) {
+                    if (relation.getPostId() != null) {
+                        sharedTagCounts.merge(relation.getPostId(), 1, Integer::sum);
+                    }
+                }
+            }
+        }
+
+        List<RelatedPostVO> result = new ArrayList<>(RELATED_POST_LIMIT);
+        List<Long> pickedIds = new ArrayList<>(RELATED_POST_LIMIT);
+        if (!sharedTagCounts.isEmpty()) {
+            // 共享标签数降序，同数按 id 降序（新文章优先的近因代理）
+            List<Map.Entry<Long, Integer>> ranked = new ArrayList<>(sharedTagCounts.entrySet());
+            ranked.sort((a, b) -> {
+                int byCount = Integer.compare(b.getValue(), a.getValue());
+                return byCount != 0 ? byCount : Long.compare(b.getKey(), a.getKey());
+            });
+            List<Long> rankedIds = ranked.stream()
+                    .map(Map.Entry::getKey)
+                    .collect(Collectors.toList());
+            // 候选只取已发布（status=1）；BlogPost 带 @TableLogic，逻辑删除自动过滤。
+            // 先过滤再排序取前 5：草稿/已删除的候选不能占用排名席位，否则一篇草稿
+            // 会把有效候选挤出前 5。个人博客量级下 rankedIds 规模有限，IN 查询可承受。
+            Map<Long, BlogPost> postMap = list(new LambdaQueryWrapper<BlogPost>()
+                            .eq(BlogPost::getStatus, PostStatus.PUBLISHED.getValue())
+                            .in(BlogPost::getId, rankedIds))
+                    .stream()
+                    .collect(Collectors.toMap(BlogPost::getId, p -> p, (a, b) -> a));
+            for (Long id : rankedIds) {
+                BlogPost candidate = postMap.get(id);
+                if (candidate == null) {
+                    continue; // 草稿/已删除/取数瞬间下架的候选不占席位，直接跳过
+                }
+                result.add(toRelatedPostVO(candidate));
+                pickedIds.add(id);
+                if (result.size() >= RELATED_POST_LIMIT) {
+                    break;
+                }
+            }
+        }
+
+        // 不足 5 篇：用最新已发布文章补齐（排除当前篇与已入选的）
+        if (result.size() < RELATED_POST_LIMIT) {
+            List<Long> excluded = new ArrayList<>(pickedIds);
+            excluded.add(postId); // notIn 列表永不空（至少含当前篇），不会生成非法 SQL
+            int need = RELATED_POST_LIMIT - result.size();
+            List<BlogPost> filler = page(new Page<>(1, need, false), new LambdaQueryWrapper<BlogPost>()
+                            .eq(BlogPost::getStatus, PostStatus.PUBLISHED.getValue())
+                            .notIn(BlogPost::getId, excluded)
+                            .orderByDesc(BlogPost::getCreateTime)
+                            .orderByDesc(BlogPost::getId))
+                    .getRecords();
+            for (BlogPost post : filler) {
+                result.add(toRelatedPostVO(post));
+            }
+        }
+        return result;
+    }
+
+    private RelatedPostVO toRelatedPostVO(BlogPost post) {
+        RelatedPostVO vo = new RelatedPostVO();
+        vo.setId(post.getId());
+        vo.setTitle(post.getTitle());
+        String summary = post.getSummary() == null ? "" : post.getSummary().trim();
+        vo.setSummary(summary.length() > RELATED_SUMMARY_LIMIT
+                ? summary.substring(0, RELATED_SUMMARY_LIMIT) : summary);
+        vo.setCoverUrl(post.getCoverUrl());
+        vo.setCreateTime(post.getCreateTime());
+        return vo;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<ArchivePostVO> getArchives() {
+        // 只投影归档页需要的 6 列，绝不拉取 content；status=1 + @TableLogic 双重过滤
+        List<BlogPost> posts = page(new Page<>(1, ARCHIVES_SAFETY_CAP, false),
+                        new LambdaQueryWrapper<BlogPost>()
+                                .select(BlogPost::getId, BlogPost::getTitle, BlogPost::getCategory,
+                                        BlogPost::getCreateTime, BlogPost::getUpdateTime, BlogPost::getViewCount)
+                                .eq(BlogPost::getStatus, PostStatus.PUBLISHED.getValue())
+                                .orderByDesc(BlogPost::getCreateTime)
+                                .orderByDesc(BlogPost::getId))
+                .getRecords();
+        return posts.stream()
+                .map(post -> {
+                    ArchivePostVO vo = new ArchivePostVO();
+                    vo.setId(post.getId());
+                    vo.setTitle(post.getTitle());
+                    vo.setCategory(post.getCategory());
+                    vo.setCreateTime(post.getCreateTime());
+                    vo.setUpdateTime(post.getUpdateTime());
+                    vo.setViewCount(post.getViewCount() != null ? post.getViewCount() : 0L);
+                    return vo;
+                })
+                .collect(Collectors.toList());
     }
 }

@@ -8,8 +8,10 @@ import com.selfblog.dto.post.PostQueryRequest;
 import com.selfblog.service.post.BlogPostService;
 import com.selfblog.utils.JwtUtils;
 import com.selfblog.utils.UserContext;
+import com.selfblog.vo.post.ArchivePostVO;
 import com.selfblog.vo.post.PostDetailResponse;
 import com.selfblog.vo.post.PostListResponse;
+import com.selfblog.vo.post.RelatedPostVO;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -22,9 +24,12 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.Collections;
+import java.util.List;
 
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -196,6 +201,46 @@ class BlogPostControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
                 .andExpect(jsonPath("$.data.id").value(100));
+    }
+
+    @Test
+    @DisplayName("getRelatedPosts_Success_ReturnsList")
+    void getRelatedPosts_Success_ReturnsList() throws Exception {
+        RelatedPostVO vo = new RelatedPostVO();
+        vo.setId(200L);
+        vo.setTitle("Related Post");
+        vo.setSummary("");
+        when(blogPostService.getRelatedPosts(100L)).thenReturn(List.of(vo));
+
+        mockMvc.perform(get("/post/100/related"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.data[0].id").value(200))
+                .andExpect(jsonPath("$.data[0].title").value("Related Post"));
+    }
+
+    @Test
+    @DisplayName("getArchives_LiteralPathBeatsIdVariable_NeverRoutedToDetail")
+    void getArchives_LiteralPathBeatsIdVariable_NeverRoutedToDetail() throws Exception {
+        // 字面量 /post/archives 与 /post/{id} 并存：MVC 模式比较认为字面量段落更具体，
+        // 归档请求必须命中 getArchives，绝不能落到 getPostDetail 被当成 id 解析
+        ArchivePostVO vo = new ArchivePostVO();
+        vo.setId(300L);
+        vo.setTitle("Archived Post");
+        vo.setCategory("随笔");
+        vo.setViewCount(7L);
+        when(blogPostService.getArchives()).thenReturn(List.of(vo));
+
+        mockMvc.perform(get("/post/archives"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.data[0].id").value(300))
+                .andExpect(jsonPath("$.data[0].title").value("Archived Post"))
+                .andExpect(jsonPath("$.data[0].category").value("随笔"))
+                .andExpect(jsonPath("$.data[0].viewCount").value(7));
+
+        verify(blogPostService, never()).getPostDetail(any());
+        verify(blogPostService, never()).incrementViewCount(any(), any());
     }
 
     @Test

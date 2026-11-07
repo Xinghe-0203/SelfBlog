@@ -449,6 +449,75 @@
               </select>
               <small>关闭后前台不再播放入场与滚动动效。</small></label
             >
+            <label
+              >阅读进度条<select v-model="form.readingProgress" data-setting="readingProgress">
+                <option value="on">显示</option>
+                <option value="off">关闭</option>
+              </select></label
+            >
+            <label
+              >引用块样式<select v-model="form.blockquoteStyle" data-setting="blockquoteStyle">
+                <option value="default">默认</option>
+                <option value="accent">强调</option>
+                <option value="minimal">极简</option>
+                <option value="card">卡片</option>
+              </select></label
+            >
+            <label
+              >文章行样式<select v-model="form.postRowStyle" data-setting="postRowStyle">
+                <option value="default">默认</option>
+                <option value="compact">紧凑</option>
+                <option value="card">卡片</option>
+              </select></label
+            >
+            <label
+              >正文图片样式<select
+                v-model="form.contentImageStyle"
+                data-setting="contentImageStyle"
+              >
+                <option value="default">默认</option>
+                <option value="framed">描边</option>
+                <option value="flat">扁平</option>
+              </select></label
+            >
+            <label
+              >表格样式<select v-model="form.tableStyle" data-setting="tableStyle">
+                <option value="default">默认</option>
+                <option value="striped">斑马纹</option>
+                <option value="minimal">极简</option>
+              </select></label
+            >
+            <label
+              >首页侧栏顺序<select v-model="form.homeSidebarOrder" data-setting="homeSidebarOrder">
+                <option value="author-tags-archive">作者卡 → 标签 → 归档入口</option>
+                <option value="author-archive-tags">作者卡 → 归档入口 → 标签</option>
+                <option value="tags-author-archive">标签 → 作者卡 → 归档入口</option>
+                <option value="tags-archive-author">标签 → 归档入口 → 作者卡</option>
+                <option value="archive-author-tags">归档入口 → 作者卡 → 标签</option>
+                <option value="archive-tags-author">归档入口 → 标签 → 作者卡</option>
+              </select></label
+            >
+            <label
+              >阅读目录<select v-model="form.tocStyle" data-setting="tocStyle">
+                <option value="default">显示</option>
+                <option value="hidden">隐藏</option>
+              </select>
+              <small>隐藏后阅读页不再显示目录侧栏与移动端目录抽屉。</small></label
+            >
+            <label
+              >正文链接样式<select v-model="form.linkStyle" data-setting="linkStyle">
+                <option value="default">默认</option>
+                <option value="dotted">点状下划线</option>
+                <option value="flat">悬浮下划线</option>
+              </select></label
+            >
+            <label
+              >阅读页摘要卡<select v-model="form.summaryCallout" data-setting="summaryCallout">
+                <option value="on">开启</option>
+                <option value="off">关闭</option>
+              </select>
+              <small>需文章填写摘要，配合 AI 摘要生成使用。</small></label
+            >
           </div>
         </section>
       </div>
@@ -540,6 +609,23 @@
             <RouterLink :to="`${siteStore.adminRoot}/seo`">SEO 管理</RouterLink>
             页顶部，生成能力与连接配置现在在同一屏。
           </p>
+        </section>
+
+        <section class="settings-panel" data-panel="license">
+          <div class="panel-heading">
+            <div>
+              <h2>版权声明</h2>
+              <p>一行固定文案，显示在每篇文章末尾。</p>
+            </div>
+          </div>
+          <label
+            >文章版权声明<input
+              v-model.trim="form.postLicense"
+              maxlength="200"
+              data-setting="postLicense"
+              placeholder="CC BY-NC-SA 4.0"
+            /><small>留空不显示；可填 CC 许可或自定义文案，将显示在每篇文章末尾。</small></label
+          >
         </section>
       </div>
 
@@ -651,7 +737,7 @@ const error = ref('')
 const TABS = [
   { id: 'profile', label: '站点资料', hint: '名称、简介与品牌素材' },
   { id: 'appearance', label: '外观', hint: '主题、背景与玻璃感' },
-  { id: 'interaction', label: '内容与互动', hint: '评论、音乐与留言审核' },
+  { id: 'interaction', label: '内容与互动', hint: '评论、音乐、版权与留言审核' },
   { id: 'system', label: '系统与安全', hint: '后台入口与模型接口' }
 ] as const
 
@@ -717,7 +803,7 @@ function isPresetActive(preset: ThemePreset): boolean {
   return isThemePresetActive(form as unknown as Record<string, string | undefined>, preset)
 }
 
-/** 外观深度自定义里四个数值型设置键；其余七个是枚举字符串。 */
+/** 外观深度自定义里四个数值型设置键；其余十六个是枚举字符串。 */
 type AppearanceNumberKey = 'baseFontSize' | 'bodyLineHeight' | 'readerWidth' | 'paragraphSpacing'
 
 /** 数值键的默认值与读数单位；默认值必须与 `stores/site.ts` 的 defaults 一致。 */
@@ -729,7 +815,7 @@ const APPEARANCE_NUMBER_META: Record<AppearanceNumberKey, { fallback: number; un
 }
 
 /**
- * 「恢复默认外观」要写回的 11 个键。
+ * 「恢复默认外观」要写回的 20 个键。
  *
  * <p>只重置本地表单、**不自动保存**：作者仍要点底部保存才落库，避免一次误点
  * 就把线上外观改掉。取值与 `stores/site.ts` 的 defaults / 后端 defaults() 一致。</p>
@@ -745,7 +831,16 @@ const APPEARANCE_DEFAULTS = {
   layoutDensity: 'default',
   homeHeroStyle: 'default',
   postCoverStyle: 'default',
-  motionIntensity: 'default'
+  motionIntensity: 'default',
+  readingProgress: 'on',
+  blockquoteStyle: 'default',
+  postRowStyle: 'default',
+  contentImageStyle: 'default',
+  tableStyle: 'default',
+  homeSidebarOrder: 'author-tags-archive',
+  tocStyle: 'default',
+  linkStyle: 'default',
+  summaryCallout: 'off'
 } as const
 
 /**
@@ -770,7 +865,7 @@ function setAppearanceNumber(key: AppearanceNumberKey, event: Event): void {
   if (target) form[key] = target.value
 }
 
-/** 把 11 个外观键重置为默认值；只改表单，不触发保存。 */
+/** 把 20 个外观键重置为默认值；只改表单，不触发保存。 */
 function resetAppearance(): void {
   Object.assign(form, APPEARANCE_DEFAULTS)
 }
@@ -1304,7 +1399,7 @@ label small {
   font-size: var(--text-2xs);
   line-height: 1.6;
 }
-/* 外观深度自定义：11 个控件走两列网格；range 读数复用 .range-row。 */
+/* 外观深度自定义：20 个控件走两列网格；range 读数复用 .range-row。 */
 .appearance-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

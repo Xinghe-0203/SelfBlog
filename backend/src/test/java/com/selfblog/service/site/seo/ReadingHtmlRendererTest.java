@@ -103,6 +103,58 @@ class ReadingHtmlRendererTest {
         assertTrue(json.contains("required name=search_term_string"));
     }
 
+    /** 文章页 JSON-LD 携带面包屑：站点首页（站点名）→ 文章，URL 与 canonical 同源绝对地址。 */
+    @Test
+    void postJsonLdCarriesBreadcrumbListWithAbsoluteOriginUrls() throws Exception {
+        Document doc = Jsoup.parse(renderer.render(page(SeoModels.Kind.POST, "真实标题", "/post/1", "<p>正文段落</p>", true), base));
+        assertEquals(1, doc.select("script[type=application/ld+json]").size());
+        String json = doc.selectFirst("script[type=application/ld+json]").data();
+        var root = new com.fasterxml.jackson.databind.ObjectMapper().readTree(json);
+        assertEquals("BlogPosting", root.get("@type").asText());
+        var breadcrumb = root.get("breadcrumb");
+        assertNotNull(breadcrumb);
+        assertEquals("BreadcrumbList", breadcrumb.get("@type").asText());
+        var items = breadcrumb.get("itemListElement");
+        assertEquals(2, items.size());
+        assertEquals(1, items.get(0).get("position").asInt());
+        assertEquals("示例博客", items.get(0).get("name").asText());
+        assertEquals("https://blog.example.com/", items.get(0).get("item").asText());
+        assertEquals(2, items.get(1).get("position").asInt());
+        assertEquals("真实标题", items.get(1).get("name").asText());
+        assertEquals("https://blog.example.com/post/1", items.get(1).get("item").asText());
+        // 面包屑第 2 条必须与既有图节点（canonical / mainEntityOfPage）同源同值。
+        assertEquals(root.get("mainEntityOfPage").asText(), items.get(1).get("item").asText());
+    }
+
+    /** 未配置站点域名时 origin 按现状回落（由 SpaController 解析后传入）：面包屑仍是同源绝对地址。 */
+    @Test
+    void breadcrumbUrlsFollowTheResolvedOriginWithoutCanonicalConfig() throws Exception {
+        Document doc = Jsoup.parse(renderer.render(page(SeoModels.Kind.POST, "标题", "/post/9", "<p>x</p>", true), "http://localhost:8080"));
+        String json = doc.selectFirst("script[type=application/ld+json]").data();
+        var root = new com.fasterxml.jackson.databind.ObjectMapper().readTree(json);
+        var items = root.get("breadcrumb").get("itemListElement");
+        assertEquals("http://localhost:8080/", items.get(0).get("item").asText());
+        assertEquals("http://localhost:8080/post/9", items.get(1).get("item").asText());
+        assertEquals("标题", items.get(1).get("name").asText());
+    }
+
+    /** 标题里带 </script> 的文章，其面包屑 name 也要按同一套序列化规则转义，不能提前结束脚本。 */
+    @Test
+    void breadcrumbNamesEscapeHtmlDangerousCharactersLikeTheRestOfTheGraph() throws Exception {
+        var unsafe = new SeoModels.Meta("安全标题", "描述", null, "article", "/post/12", null, null, List.of(), true,
+                List.of(), null);
+        var post = new SeoModels.ReadingPage(200, SeoModels.Kind.POST, "post", PageConfig.empty(), unsafe,
+                "标题</script><script>alert(1)</script>", "<p>x</p>", List.of(), List.of(),
+                new SeoModels.SiteInfo("示例博客", "站点说明", "示例作者", "作者简介"));
+        Document doc = Jsoup.parse(renderer.render(post, base));
+        String json = doc.selectFirst("script[type=application/ld+json]").data();
+        assertFalse(json.contains("</script"));
+        assertTrue(json.contains("\\u003c"));
+        var root = new com.fasterxml.jackson.databind.ObjectMapper().readTree(json);
+        assertEquals("标题</script><script>alert(1)</script>",
+                root.get("breadcrumb").get("itemListElement").get(1).get("name").asText());
+    }
+
     /** 阅读 HTML 必须保留模板里的首屏主题脚本，否则深色读者打开页脚会先闪白再翻黑。 */
     @Test void inlineThemeBootScriptSurvivesRendering() {
         Document doc = Jsoup.parse(renderer.render(page(SeoModels.Kind.POST, "标题", "/post/1", "<p>x</p>", true), base));

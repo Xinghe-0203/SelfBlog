@@ -87,6 +87,26 @@ export interface SiteSettings {
   postCoverStyle: string
   /** 动效强度：`off` | `subtle` | `default` | `lively`。 */
   motionIntensity: string
+  /** 阅读进度条：`on` | `off`。关闭后阅读页顶部不再显示滚动进度条（驱动 v-if，不是 CSS 属性）。 */
+  readingProgress: string
+  /** 引用块样式：`default` | `accent` | `minimal` | `card`。 */
+  blockquoteStyle: string
+  /** 文章列表行样式：`default` | `compact` | `card`。 */
+  postRowStyle: string
+  /** 正文图片样式：`default` | `framed` | `flat`。 */
+  contentImageStyle: string
+  /** 正文表格样式：`default` | `striped` | `minimal`。 */
+  tableStyle: string
+  /** 首页侧栏模块顺序：作者卡/标签块/归档入口三模块的排列（如 `tags-archive-author`），由模板按序渲染（不是 CSS 属性）。 */
+  homeSidebarOrder: string
+  /** 阅读目录显隐：`default` 显示；`hidden` 时阅读页不渲染目录侧栏与移动端目录（驱动 v-if，不是 CSS 属性）。 */
+  tocStyle: string
+  /** 正文链接样式：`default` | `dotted` | `flat`（CSS 属性，作用于 `.markdown-body a`）。 */
+  linkStyle: string
+  /** 阅读页摘要卡：`on` | `off`。开启且文章有摘要时在正文前展示摘要卡（驱动 v-if，不是 CSS 属性）。 */
+  summaryCallout: string
+  /** 文章尾部版权声明行：空 = 不渲染；非空按纯文本展示在正文末尾（如 CC 许可文案）。 */
+  postLicense: string
 }
 
 const defaults: SiteSettings = {
@@ -139,7 +159,20 @@ const defaults: SiteSettings = {
   layoutDensity: 'default',
   homeHeroStyle: 'default',
   postCoverStyle: 'default',
-  motionIntensity: 'default'
+  motionIntensity: 'default',
+  readingProgress: 'on',
+  blockquoteStyle: 'default',
+  postRowStyle: 'default',
+  contentImageStyle: 'default',
+  tableStyle: 'default',
+  // v2.0.30 第二批（模板/逻辑驱动）：默认 = 现有模板顺序与目录常显，保证升级零回归。
+  homeSidebarOrder: 'author-tags-archive',
+  tocStyle: 'default',
+  // v2.0.30 第三批：链接样式默认 = 现有 CSS；摘要卡默认关（新元素，作者显式开启）。
+  linkStyle: 'default',
+  summaryCallout: 'off',
+  // v2.0.30 第四批：默认无版权行 = 改造前行为。
+  postLicense: ''
 }
 
 /** 运行时注入的 favicon 节点标记，用来和 index.html 里的静态兜底区分。 */
@@ -220,9 +253,10 @@ export function isDarkCanvas(skin: string): boolean {
 /* ==========================================================================
  * 外观深度自定义（v2.0.29）
  *
- * 11 个设置键分两类，落点不同：
+ * 16 个设置键分两类，落点不同：
  *
- * - 枚举键（字体族/圆角/阴影/密度/头图/封面/动效）写成 `#selfblog` 上的 `data-ap-*`
+ * - 枚举键（字体族/圆角/阴影/密度/头图/封面/动效/引用块/文章行/正文图片/表格）写成
+ *   `#selfblog` 上的 `data-ap-*`
  *   属性，由 styles/customize.css 用属性选择器整组切换 token。
  * - 数值键（字号/行高/栏宽/段间距）写成 `#selfblog` 上的 `--ap-*` 变量。
  *
@@ -240,11 +274,48 @@ const LAYOUT_DENSITY_VALUES = ['compact', 'default', 'comfortable'] as const
 const HERO_STYLE_VALUES = ['default', 'compact', 'minimal', 'off'] as const
 const POST_COVER_VALUES = ['default', 'wide', 'hidden'] as const
 const MOTION_VALUES = ['off', 'subtle', 'default', 'lively'] as const
+const BLOCKQUOTE_STYLE_VALUES = ['default', 'accent', 'minimal', 'card'] as const
+const POST_ROW_STYLE_VALUES = ['default', 'compact', 'card'] as const
+const CONTENT_IMAGE_STYLE_VALUES = ['default', 'framed', 'flat'] as const
+const TABLE_STYLE_VALUES = ['default', 'striped', 'minimal'] as const
+
+/**
+ * 首页侧栏三模块（作者卡 / 标签块 / 归档入口）的全排列；与后端 validateValue 逐字对应。
+ * 这两个键**不在** applyCustomizations 里：它们由 Home.vue / PostDetail.vue 的模板与
+ * v-if 响应式消费，不落 `data-ap-*` 属性（与 readingProgress 同一处理方式）。
+ */
+export const SIDEBAR_ORDER_VALUES = [
+  'author-tags-archive',
+  'author-archive-tags',
+  'tags-author-archive',
+  'tags-archive-author',
+  'archive-author-tags',
+  'archive-tags-author'
+] as const
+
+/** 侧栏顺序的合法取值（三模块 id 的连字符串）。 */
+export type SidebarOrder = (typeof SIDEBAR_ORDER_VALUES)[number]
+
+/** 阅读目录样式取值；与后端 validateValue 逐字对应，Settings 的选项与测试共用。 */
+export const TOC_STYLE_VALUES = ['default', 'hidden'] as const
+
+/** 正文链接样式取值；与后端 validateValue 逐字对应，Settings 的选项与测试共用。 */
+export const LINK_STYLE_VALUES = ['default', 'dotted', 'flat'] as const
 
 /** 取白名单内的枚举值；脏数据（服务端被绕过、旧缓存）一律回落 fallback。 */
 function pickEnum(raw: string | undefined, allowed: readonly string[], fallback: string): string {
   const value = String(raw ?? '').trim()
   return allowed.includes(value) ? value : fallback
+}
+
+/**
+ * 校验首页侧栏顺序：白名单内的值原样返回，其余（旧缓存、被绕过的服务端、手改存储）
+ * 一律回落到现有模板顺序 `author-tags-archive`，保证脏数据打不乱侧栏渲染。
+ * 独立成纯函数：Home.vue 的 computed 与测试共用同一份判定。
+ */
+export function resolveSidebarOrder(raw: string | undefined): SidebarOrder {
+  // fallback 本身就是白名单成员，返回值必然落在 SidebarOrder 内。
+  return pickEnum(raw, SIDEBAR_ORDER_VALUES, 'author-tags-archive') as SidebarOrder
 }
 
 /** 数值型外观设置：夹到区间；非法输入回落 fallback。不保留小数尾零以外的格式。 */
@@ -255,7 +326,7 @@ function clampNumber(raw: string | undefined, min: number, max: number, fallback
 }
 
 /**
- * 把 11 个外观键写到 `#selfblog`。
+ * 把 16 个外观键写到 `#selfblog`。
  *
  * 两类键都只在**非默认档**时落地：默认档等于改造前的观感，不挂属性/不写变量意味着
  * CSS 里一条覆盖规则都不命中，零回归是结构性的而不是靠取值凑巧相同。
@@ -285,7 +356,12 @@ function applyCustomizations(root: HTMLElement, settings: SiteSettings): void {
     ['apDensity', settings.layoutDensity, LAYOUT_DENSITY_VALUES, 'default'],
     ['apHero', settings.homeHeroStyle, HERO_STYLE_VALUES, 'default'],
     ['apPostCover', settings.postCoverStyle, POST_COVER_VALUES, 'default'],
-    ['apMotion', settings.motionIntensity, MOTION_VALUES, 'default']
+    ['apMotion', settings.motionIntensity, MOTION_VALUES, 'default'],
+    ['apBlockquote', settings.blockquoteStyle, BLOCKQUOTE_STYLE_VALUES, 'default'],
+    ['apPostRow', settings.postRowStyle, POST_ROW_STYLE_VALUES, 'default'],
+    ['apContentImage', settings.contentImageStyle, CONTENT_IMAGE_STYLE_VALUES, 'default'],
+    ['apTable', settings.tableStyle, TABLE_STYLE_VALUES, 'default'],
+    ['apLink', settings.linkStyle, LINK_STYLE_VALUES, 'default']
   ]
   for (const [attr, raw, allowed, fallback] of enumAttrs) {
     const value = pickEnum(raw, allowed, fallback)

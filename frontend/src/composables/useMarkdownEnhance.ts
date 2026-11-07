@@ -7,7 +7,13 @@
  * 再统一加工，组件只负责调用与保存状态。
  *
  * 幂等：对同一 root 重复调用不会重复包装，随内容刷新安全地重复执行。
+ *
+ * 语法高亮是纯客户端的后处理（渐进增强）：highlight.js 只认已知语言、不做自动检测，
+ * 服务端阅读 HTML 保持转义原文不参与。github-dark 主题提供 token 配色，
+ * 代码块表面（背景/文字/边框）始终走 --code-* 语义 token（见 typography.css 的覆写）。
  */
+import hljs from 'highlight.js/lib/common'
+import 'highlight.js/styles/github-dark.css'
 
 export interface MarkdownEnhanceOptions {
   /** 超过该高度（px）的代码块折叠起来，默认 320。 */
@@ -51,6 +57,8 @@ function registerDisposer(root: HTMLElement, dispose: () => void): void {
  *
  * 正文被 v-html 重新渲染或组件卸载时调用：旧的复制按钮节点已经脱离文档，
  * 它排队的回退定时器却还会在 1500ms 后写一次 textContent。幂等，可重复调用。
+ * 高亮不在此列：它只改 code 自身的 innerHTML，旧 DOM 被替换时 hljs class 随之消失，
+ * 不需要（也不应该）在这里手动"撤销"高亮。
  */
 export function disposeMarkdownEnhance(root: HTMLElement): void {
   const list = disposers.get(root)
@@ -62,8 +70,12 @@ export function disposeMarkdownEnhance(root: HTMLElement): void {
 function enhanceCodeBlocks(root: HTMLElement, collapseHeight: number): void {
   root.querySelectorAll<HTMLElement>('pre > code').forEach((code) => {
     const pre = code.parentElement
-    // 已包装过的跳过：重复调用不叠加 wrapper / 头部 / 按钮
+    // 已包装过的跳过：重复调用不叠加 wrapper / 头部 / 按钮（也不会重复高亮）
     if (!pre || pre.closest('.code-block')) return
+
+    // 先高亮再包装：折叠阈值读的是 pre.scrollHeight，高度测量必须发生在
+    // 最终内容（含高亮 span）定型之后、is-collapsed 类加上之前
+    applyHighlight(code)
 
     const wrapper = document.createElement('div')
     wrapper.className = 'code-block'
@@ -82,9 +94,40 @@ function enhanceCodeBlocks(root: HTMLElement, collapseHeight: number): void {
   })
 }
 
-/** marked 把围栏语言写成 class="language-js"；没有语言时给个人类可读的兜底。 */
+/** marked 把围栏语言写成 class="language-js"；提取围栏语言标识，没有语言时返回 undefined。 */
+function extractLanguage(code: HTMLElement): string | undefined {
+  return /language-([\w-]+)/.exec(code.className)?.[1]
+}
+
+/** 语言徽标文案：没有语言时给个人类可读的兜底。 */
 function detectLanguage(code: HTMLElement): string {
-  return /language-([\w-]+)/.exec(code.className)?.[1] ?? '文本'
+  return extractLanguage(code) ?? '文本'
+}
+
+/**
+ * 对声明了已知语言的围栏代码块做语法高亮。
+ *
+ * - 已知语言：hljs 输出（转义文本 + 无属性 class span）写回 innerHTML，并挂 .hljs
+ *   供主题（github-dark）配色；getLanguage 对别名与大小写都能命中（js/JS → javascript）。
+ * - 未知语言 / 纯文本：保持原样 —— 不做自动检测，正文场景误判率高（会把散文当代码）。
+ *
+ * 安全性：输入取自已经 DOMPurify 消毒的 DOM 文本；hljs.highlight 的输出只含转义后的
+ * 文本与 class span，写回 innerHTML 不引入新的注入面。
+ * 高亮只改 code 自己的 innerHTML，不登记任何 dispose 资源 —— 正文随 v-html 重渲染时
+ * 旧 DOM 连同 hljs class 一起被丢弃，不存在残留；幂等守卫（.code-block）挡住重复高亮。
+ */
+function applyHighlight(code: HTMLElement): void {
+  const lang = extractLanguage(code)
+  if (!lang || !hljs.getLanguage(lang)) return
+  try {
+    code.innerHTML = hljs.highlight(code.textContent ?? '', {
+      language: lang,
+      ignoreIllegals: true
+    }).value
+    code.classList.add('hljs')
+  } catch {
+    // 单个坏代码块不能让整段正文增强失败：保持原文即可
+  }
 }
 
 function createCopyButton(root: HTMLElement, code: HTMLElement): HTMLButtonElement {

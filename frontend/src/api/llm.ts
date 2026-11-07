@@ -5,6 +5,9 @@ import type {
   HealthReportVO,
   ImageAltRequest,
   ImageAltVO,
+  InlineWritingAction,
+  InlineWritingVO,
+  LinkSuggestionsVO,
   ModerationCheckRequest,
   ModerationCheckVO,
   ModerationScanRequest,
@@ -70,6 +73,29 @@ export const llmApi = {
       timeout: GENERATE_TIMEOUT,
       ...NO_RETRY
     })
+  },
+
+  /** 对作者在正文里选中的片段做行内改写（润色/续写/精简）；结果由前端拼回编辑器，不落库 */
+  inlineWriting(payload: {
+    action: InlineWritingAction
+    text: string
+  }): Promise<ApiResponse<InlineWritingVO>> {
+    return api.post('/admin/ai/writing/inline', payload, {
+      timeout: GENERATE_TIMEOUT,
+      ...NO_RETRY
+    })
+  },
+
+  /** 为已保存的文章推荐站内互链候选；点「插入」才由前端写进正文 */
+  suggestLinks(postId: number): Promise<ApiResponse<LinkSuggestionsVO>> {
+    return api.post(
+      '/admin/ai/writing/links',
+      { postId },
+      {
+        timeout: GENERATE_TIMEOUT,
+        ...NO_RETRY
+      }
+    )
   },
 
   // --- C 评论审核 ---------------------------------------------------------

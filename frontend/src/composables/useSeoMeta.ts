@@ -64,8 +64,11 @@ function absolute(url: string): string {
  * 服务端渲染的阅读 HTML 会带上 selfblog-site-origin（配置的站点对外地址）。
  * 反向代理/预览域名与正式域名不同时，canonical 与分享图必须沿用它，
  * 否则挂载瞬间就会把服务端写好的地址改回请求主机。Vite 本地开发没有该标记时回落浏览器 origin。
+ *
+ * 导出给需要「站点对外绝对地址」的其它调用方（如文章页的版权声明 permalink）复用，
+ * 避免各处各拼一份 origin。
  */
-function canonicalOrigin(): string {
+export function canonicalOrigin(): string {
   const marker = document.head
     .querySelector<HTMLMetaElement>('meta[name="selfblog-site-origin"]')
     ?.content.trim()

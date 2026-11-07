@@ -19,7 +19,7 @@ import { tagApi } from '@/api/tag'
 import { galleryApi } from '@/api/gallery'
 import { publicInteractionApi } from '@/api/public-interactions'
 import type { PageConfig } from '@/types/page'
-import type { Post } from '@/types'
+import type { Post, PostArchiveItem } from '@/types'
 
 vi.mock('@/api/pages', () => ({ pageApi: { getPage: vi.fn() } }))
 vi.mock('@/api/post', () => ({
@@ -27,7 +27,8 @@ vi.mock('@/api/post', () => ({
     getPostList: vi.fn(),
     advancedSearch: vi.fn(),
     getPostById: vi.fn(),
-    getAdjacentPosts: vi.fn()
+    getAdjacentPosts: vi.fn(),
+    getArchives: vi.fn()
   }
 }))
 vi.mock('@/api/tag', () => ({ tagApi: { getTagList: vi.fn(), getTagById: vi.fn() } }))
@@ -53,11 +54,20 @@ const post: Post = {
   createdAt: '2026-10-16',
   coverImage: '/uploads/a.jpg'
 }
+const archiveItem: PostArchiveItem = {
+  id: 1,
+  title: '真实文章标题',
+  category: 'tech',
+  createTime: '2026-10-16T10:00:00',
+  updateTime: '2026-10-16T10:00:00',
+  viewCount: 1
+}
 beforeEach(() => {
   vi.resetAllMocks()
   vi.mocked(postApi.getPostList).mockResolvedValue(
     response({ records: [post], total: 1, pages: 1, pageNum: 1, pageSize: 10 })
   )
+  vi.mocked(postApi.getArchives).mockResolvedValue(response([archiveItem]))
   vi.mocked(postApi.advancedSearch).mockResolvedValue(
     response({ records: [post], total: 1, pages: 1, pageNum: 1, pageSize: 10 })
   )
@@ -169,6 +179,7 @@ describe('published configuration reaches every public template', () => {
       modules: { category: false, count: false }
     })
     expect(wrapper.get('h1').text()).toBe('写作时间线')
+    expect(wrapper.findAll('.archive-group')).toHaveLength(1)
     expect(wrapper.find('.category, .archive-group h2 span').exists()).toBe(false)
   })
   it('changes Gallery copy without bypassing password locks', async () => {

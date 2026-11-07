@@ -17,6 +17,11 @@
 import DOMPurify from 'dompurify'
 import { marked } from 'marked'
 
+// marked 全局配置放在本模块顶层而不是 main.ts：main.ts 引它只会为了 setOptions，
+// 却把 marked + DOMPurify 变成首屏 modulepreload。所有渲染入口都经由本模块，
+// 配置在任何 parse 之前必然生效。main.ts 的同名配置已并入这里（gfm + breaks）。
+marked.setOptions({ gfm: true, breaks: true })
+
 /** 危险协议直接判空，避免渲染出可执行链接（DOMPurify 通常已拦，这里做二次兜底）。 */
 const DANGEROUS_SCHEME = /^(?:javascript|vbscript|data|file):/i
 

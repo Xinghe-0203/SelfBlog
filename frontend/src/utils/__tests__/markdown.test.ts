@@ -161,6 +161,10 @@ describe('renderMarkdown', () => {
     expect(html).toContain('待办')
   })
 
+  it('单换行渲染成 <br>：gfm/breaks 配置在本模块顶层生效（原 main.ts 配置已并入这里）', () => {
+    expect(renderMarkdown('第一行\n第二行')).toContain('<br>')
+  })
+
   it('裸 URL 与 www 开头地址都能跳对', () => {
     expect(renderMarkdown('https://example.com/x')).toContain('href="https://example.com/x"')
     expect(renderMarkdown('www.example.com/x')).toContain('href="http://www.example.com/x"')

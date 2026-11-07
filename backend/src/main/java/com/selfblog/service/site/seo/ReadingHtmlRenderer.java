@@ -63,7 +63,7 @@ public class ReadingHtmlRenderer {
         if (meta.description() != null && !meta.description().isBlank()) meta(head, "name", "twitter:description", meta.description());
         if (image != null) meta(head, "name", "twitter:image", image);
 
-        if (page.kind() == SeoModels.Kind.POST) appendJsonLd(head, page, canonical, image);
+        if (page.kind() == SeoModels.Kind.POST) appendJsonLd(head, page, canonical, image, origin);
         if (page.kind() == SeoModels.Kind.HOME) appendWebsiteJsonLd(head, page, origin);
 
         Element app = doc.getElementById("app");
@@ -105,7 +105,7 @@ public class ReadingHtmlRenderer {
         return share != null && !share.isBlank() ? share : meta.image();
     }
 
-    private void appendJsonLd(Element head, SeoModels.ReadingPage page, String canonical, String image) {
+    private void appendJsonLd(Element head, SeoModels.ReadingPage page, String canonical, String image, String origin) {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("@context", "https://schema.org");
         payload.put("@type", "BlogPosting");
@@ -119,7 +119,37 @@ public class ReadingHtmlRenderer {
         if (page.site() != null && page.site().title() != null && !page.site().title().isBlank()) {
             payload.put("publisher", Map.of("@type", "Organization", "name", page.site().title()));
         }
+        Map<String, Object> breadcrumb = breadcrumbList(page, canonical, origin);
+        if (breadcrumb != null) payload.put("breadcrumb", breadcrumb);
         writeJsonLd(head, payload, "selfblog-article-jsonld");
+    }
+
+    /**
+     * 面包屑结构化数据（schema.org 的 {@code CreativeWork.breadcrumb}）：站点首页 → 当前文章。
+     *
+     * <p>两条 ListItem：position 1 为站点首页（name = 站点标题，item = {@code <origin>/}），
+     * position 2 为文章本身（name = 文章标题，item = {@code <origin>/post/{id}}，即 canonical）。
+     * URL 一律经 {@link SiteOrigin} 的规范 origin 绝对化，与同一块里的 canonical/mainEntityOfPage
+     * 同源；origin 或 canonical 缺失时整块省略，绝不输出相对地址。
+     * 站点标题未配置时只省略首页的 name，位置与 URL 仍然有效。</p>
+     */
+    private static Map<String, Object> breadcrumbList(SeoModels.ReadingPage page, String canonical, String origin) {
+        if (canonical == null || origin == null || origin.isBlank()) return null;
+        String siteTitle = page.site() == null ? null : page.site().title();
+        Map<String, Object> home = new LinkedHashMap<>();
+        home.put("@type", "ListItem");
+        home.put("position", 1);
+        if (siteTitle != null && !siteTitle.isBlank()) home.put("name", siteTitle);
+        home.put("item", origin + "/");
+        Map<String, Object> article = new LinkedHashMap<>();
+        article.put("@type", "ListItem");
+        article.put("position", 2);
+        article.put("name", page.displayTitle());
+        article.put("item", canonical);
+        Map<String, Object> breadcrumb = new LinkedHashMap<>();
+        breadcrumb.put("@type", "BreadcrumbList");
+        breadcrumb.put("itemListElement", List.of(home, article));
+        return breadcrumb;
     }
 
     /**

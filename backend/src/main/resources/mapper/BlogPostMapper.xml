@@ -57,4 +57,10 @@
         GROUP BY DATE(create_time) ORDER BY "date"
     </select>
 
+    <!-- 访客看板「文章总浏览量」：聚合下推到数据库，替代全量行内存求和。
+         条件与旧实现一致（is_deleted=0 且 status=1）；COALESCE 保证零行返回 0。 -->
+    <select id="sumPublishedPostViews" resultType="java.lang.Long">
+        SELECT COALESCE(SUM(view_count), 0) FROM blog_post WHERE is_deleted = 0 AND status = 1
+    </select>
+
 </mapper>

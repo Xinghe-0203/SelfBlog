@@ -499,6 +499,11 @@ describe('appearance customizations', () => {
     expect(root.dataset.apHero).toBeUndefined()
     expect(root.dataset.apPostCover).toBeUndefined()
     expect(root.dataset.apMotion).toBeUndefined()
+    expect(root.dataset.apBlockquote).toBeUndefined()
+    expect(root.dataset.apPostRow).toBeUndefined()
+    expect(root.dataset.apContentImage).toBeUndefined()
+    expect(root.dataset.apTable).toBeUndefined()
+    expect(root.dataset.apLink).toBeUndefined()
     expect(root.style.getPropertyValue('--ap-base-font-size')).toBe('')
     expect(root.style.getPropertyValue('--ap-body-line-height')).toBe('')
     expect(root.style.getPropertyValue('--ap-reader-width')).toBe('')
@@ -514,6 +519,11 @@ describe('appearance customizations', () => {
       homeHeroStyle: 'minimal',
       postCoverStyle: 'wide',
       motionIntensity: 'subtle',
+      blockquoteStyle: 'card',
+      postRowStyle: 'compact',
+      contentImageStyle: 'framed',
+      tableStyle: 'striped',
+      linkStyle: 'dotted',
       baseFontSize: '18',
       bodyLineHeight: '1.9',
       readerWidth: '820',
@@ -526,6 +536,11 @@ describe('appearance customizations', () => {
     expect(root.dataset.apHero).toBe('minimal')
     expect(root.dataset.apPostCover).toBe('wide')
     expect(root.dataset.apMotion).toBe('subtle')
+    expect(root.dataset.apBlockquote).toBe('card')
+    expect(root.dataset.apPostRow).toBe('compact')
+    expect(root.dataset.apContentImage).toBe('framed')
+    expect(root.dataset.apTable).toBe('striped')
+    expect(root.dataset.apLink).toBe('dotted')
     expect(root.style.getPropertyValue('--ap-base-font-size')).toBe('18px')
     expect(root.style.getPropertyValue('--ap-body-line-height')).toBe('1.9')
     expect(root.style.getPropertyValue('--ap-reader-width')).toBe('820px')
@@ -539,7 +554,8 @@ describe('appearance customizations', () => {
       readerWidth: '10',
       paragraphSpacing: '8',
       fontFamily: 'comic-sans',
-      motionIntensity: ''
+      motionIntensity: '',
+      tableStyle: 'zebra'
     })
     expect(root.style.getPropertyValue('--ap-base-font-size')).toBe('19px')
     expect(root.style.getPropertyValue('--ap-body-line-height')).toBe('1.5')
@@ -547,16 +563,58 @@ describe('appearance customizations', () => {
     expect(root.style.getPropertyValue('--ap-paragraph-spacing')).toBe('2em')
     expect(root.dataset.apFont).toBeUndefined()
     expect(root.dataset.apMotion).toBeUndefined()
+    expect(root.dataset.apTable).toBeUndefined()
+  })
+
+  it('keeps the two template-driven keys hook-free and defaults to the current rendering', () => {
+    // homeSidebarOrder / tocStyle 由模板与 v-if 响应式消费（Home.vue / PostDetail.vue），
+    // 不是 data-ap-* 属性也不是 --ap-* 变量：作者改了它们也不得在任何外观钩子上留痕。
+    const store = useSiteStore()
+    expect(store.settings.homeSidebarOrder).toBe('author-tags-archive')
+    expect(store.settings.tocStyle).toBe('default')
+
+    store.applySettings({ homeSidebarOrder: 'archive-tags-author', tocStyle: 'hidden' })
+    for (const key of Object.keys(root.dataset)) {
+      expect(key.startsWith('ap')).toBe(false)
+    }
+    expect(root.style.getPropertyValue('--ap-reader-width')).toBe('')
+    expect(root.style.getPropertyValue('--ap-base-font-size')).toBe('')
   })
 
   it('removes a hook again when the author returns to the default', () => {
     const store = useSiteStore()
-    store.applySettings({ fontFamily: 'mono', readerWidth: '900' })
+    store.applySettings({
+      fontFamily: 'mono',
+      readerWidth: '900',
+      blockquoteStyle: 'accent',
+      postRowStyle: 'card',
+      contentImageStyle: 'flat',
+      tableStyle: 'minimal',
+      linkStyle: 'flat'
+    })
     expect(root.dataset.apFont).toBe('mono')
     expect(root.style.getPropertyValue('--ap-reader-width')).toBe('900px')
+    expect(root.dataset.apBlockquote).toBe('accent')
+    expect(root.dataset.apPostRow).toBe('card')
+    expect(root.dataset.apContentImage).toBe('flat')
+    expect(root.dataset.apTable).toBe('minimal')
+    expect(root.dataset.apLink).toBe('flat')
 
-    store.applySettings({ fontFamily: 'system', readerWidth: '760' })
+    store.applySettings({
+      fontFamily: 'system',
+      readerWidth: '760',
+      blockquoteStyle: 'default',
+      postRowStyle: 'default',
+      contentImageStyle: 'default',
+      tableStyle: 'default',
+      linkStyle: 'default'
+    })
     expect(root.dataset.apFont).toBeUndefined()
     expect(root.style.getPropertyValue('--ap-reader-width')).toBe('')
+    expect(root.dataset.apBlockquote).toBeUndefined()
+    expect(root.dataset.apPostRow).toBeUndefined()
+    expect(root.dataset.apContentImage).toBeUndefined()
+    expect(root.dataset.apTable).toBeUndefined()
+    expect(root.dataset.apLink).toBeUndefined()
   })
 })

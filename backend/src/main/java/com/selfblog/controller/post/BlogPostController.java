@@ -9,9 +9,11 @@ import com.selfblog.dto.post.PostQueryRequest;
 import com.selfblog.dto.post.SaveDraftRequest;
 import com.selfblog.service.post.BlogPostService;
 import com.selfblog.utils.SecurityUtils;
+import com.selfblog.vo.post.ArchivePostVO;
 import com.selfblog.vo.post.AdjacentPostVO;
 import com.selfblog.vo.post.PostDetailResponse;
 import com.selfblog.vo.post.PostListResponse;
+import com.selfblog.vo.post.RelatedPostVO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
@@ -124,6 +126,29 @@ public class BlogPostController {
     @GetMapping("/{id}/adjacent")
     public Result<Map<String, AdjacentPostVO>> getAdjacentPosts(@PathVariable Long id) {
         return Result.success(blogPostService.getAdjacentPosts(id));
+    }
+
+    /**
+     * 获取相关文章推荐（详情页「相关阅读」，公开只读，不增加阅读量）
+     */
+    @Operation(summary = "获取相关文章推荐")
+    @GetMapping("/{id}/related")
+    public Result<List<RelatedPostVO>> getRelatedPosts(@PathVariable Long id) {
+        return Result.success(blogPostService.getRelatedPosts(id));
+    }
+
+    /**
+     * 获取全站归档（精简字段，已发布文章按创建时间倒序）。
+     *
+     * <p>注意：字面量路径 {@code /post/archives} 与 {@code /post/{id}} 的 GET 映射并存。
+     * Spring MVC 的模式比较器认为字面量段落比路径变量更具体，因此 {@code GET /post/archives}
+     * 总是优先命中本方法，不会落到 {@code getPostDetail} 被当成 id 解析；确认无冲突。
+     * SecurityConfig 对该路径有同名的显式 permitAll 规则。</p>
+     */
+    @Operation(summary = "获取全站归档")
+    @GetMapping("/archives")
+    public Result<List<ArchivePostVO>> getArchives() {
+        return Result.success(blogPostService.getArchives());
     }
 
     /**

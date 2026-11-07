@@ -26,6 +26,12 @@ public class AiPromptBuilder {
     /** 摘要/标签/标题三种写作辅助共用的正文上限。 */
     static final int WRITING_BODY_LIMIT = 3000;
 
+    /** 行内写作的选区长度上限（服务层以此为校验边界，超长直接 400）。 */
+    static final int INLINE_TEXT_LIMIT = 3000;
+
+    /** 内链候选行里「摘要」一栏的截断上限（优先摘要，缺了用正文开头充数）。 */
+    static final int LINK_CANDIDATE_LINE_LIMIT = 120;
+
     /** 评论审核里内容的最大长度，防止一条超长留言吃满上下文。 */
     static final int COMMENT_LIMIT = 2000;
 
@@ -102,6 +108,27 @@ public class AiPromptBuilder {
             6. 只依据给出的数据判断（例如摘要缺失、标签过于集中、分类单一、更新频率骤降、
                标题过长或雷同），不要编造数据里没有的现象。""";
 
+    static final String INLINE_SYSTEM_PROMPT = """
+            你是中文技术博客的编辑助手。请按用户给出的「处理方式」，对「所选文字」进行改写。
+            要求：
+            1. 只输出一个 JSON 对象，不要 Markdown 代码块，不要任何解释。
+            2. 结构为 {"text":"..."}。
+            3. text 是处理后的结果，语言与原文保持一致；如果原文含有 Markdown 等格式标记，
+               原样保留这些标记，不要改成纯文本。
+            4. 不要编造原文没有的事实，不要输出与所选文字无关的解释或前后缀。""";
+
+    static final String LINKS_SYSTEM_PROMPT = """
+            你是中文技术博客的站内链接编辑。请从给定的「候选文章」里，挑出 3 到 5 篇与当前文章
+            相关、值得从当前文章正文里链接过去的文章。
+            要求：
+            1. 只输出一个 JSON 对象，不要 Markdown 代码块，不要任何解释。
+            2. 结构为 {"links":[{"postId":123,"anchor":"...","reason":"..."}]}。
+            3. postId 只能取「候选文章」里原样出现的 id，不要编造不存在的文章，也不要重复推荐同一篇。
+            4. anchor 是放在当前文章正文里的锚文本，2 到 12 个中文字，要与当前文章的行文自然衔接，
+               不要用「这篇文章」「点此查看」这类空泛词。
+            5. reason 用一句中文说明为什么值得链接，不超过 60 字。
+            6. 最多 5 条，按相关度从高到低排列；没有合适的候选时返回空数组 []。""";
+
     private final SiteSettingsService settings;
     private final PostQueryService postQueryService;
 
@@ -172,6 +199,54 @@ public class AiPromptBuilder {
     String healthUserPrompt(String material) {
         return siteContext() + "\n文章元数据：\n" + material
                 + "\n请按系统要求只输出 JSON 对象。";
+    }
+
+    /** 四种行内处理方式的指令文本；{@code AiWritingService} 校验完 action 后按名取用。 */
+    static String inlineInstruction(String action) {
+        return switch (action) {
+            case "polish" -> "润色所选文字，保持原意与语言，修正语病与错别字，让表达更流畅；不新增事实，不改格式标记。";
+            case "continue" -> "从所选文字的结尾自然续写，风格语气一致，输出 150-300 字正文，不要重复已有内容。";
+            case "shorten" -> "把所选文字精简到约一半篇幅，保留核心信息。";
+            case "translate" -> "检测所选文字的语言：中文（或主要为中文）→ 翻译成地道英文；英文（或其他语言）→ 翻译成自然的中文。保持格式标记与专有名词，只输出译文。";
+            default -> throw new IllegalArgumentException("未知 action：" + action);
+        };
+    }
+
+    /**
+     * 行内写作的用户提示词。
+     *
+     * <p>选区<b>不去除标记</b>：润色要求「不改格式标记」，剥离 Markdown 会把
+     * 加粗/代码这类标记喂丢。服务层已保证不超过 {@link #INLINE_TEXT_LIMIT}，这里再截一次兜底。</p>
+     */
+    String inlineUserPrompt(String instruction, String text) {
+        return "处理方式：" + instruction + '\n'
+                + "所选文字：\n" + AiJson.truncate(text, INLINE_TEXT_LIMIT)
+                + "\n\n请按系统要求只输出 JSON 对象。";
+    }
+
+    /** 内链建议的用户提示词：当前文章节选 + 一行一篇候选（id/标题/摘要）。 */
+    String linksUserPrompt(BlogPost current, List<BlogPost> candidates) {
+        StringBuilder sb = new StringBuilder(siteContext());
+        sb.append("当前文章：").append(nullToEmpty(current.getTitle()).trim()).append('\n');
+        sb.append("正文节选（已去除标记）：\n")
+                .append(AiJson.truncate(AiJson.plainText(current.getContent()), WRITING_BODY_LIMIT))
+                .append('\n');
+        sb.append("\n候选文章：\n");
+        for (BlogPost candidate : candidates) {
+            sb.append("- id=").append(candidate.getId())
+                    .append(" 标题=").append(nullToEmpty(candidate.getTitle()).trim())
+                    .append(" 摘要=").append(candidateLineSummary(candidate))
+                    .append('\n');
+        }
+        sb.append("\n请从上面「候选文章」里挑 3 到 5 篇值得从当前文章链接过去的，按系统要求只输出 JSON 对象。");
+        return sb.toString();
+    }
+
+    /** 候选行里的摘要：优先文章摘要，缺了用正文开头充数，都转纯文本后截断。 */
+    private static String candidateLineSummary(BlogPost post) {
+        String source = post.getSummary() == null || post.getSummary().isBlank()
+                ? post.getContent() : post.getSummary();
+        return AiJson.truncate(AiJson.plainText(source), LINK_CANDIDATE_LINE_LIMIT);
     }
 
     /** 拼「文章标题/分类/标签/摘要/正文节选」，正文转纯文本后截断。 */

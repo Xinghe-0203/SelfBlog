@@ -34,6 +34,8 @@ public class CaffeineCacheConfig {
     public static final String SITE_SETTINGS_CACHE = "siteSettingsCache";
     public static final String VISITOR_SUMMARY_CACHE = "visitorSummaryCache";
     public static final String NOTIFICATION_LIST_CACHE = "notificationListCache";
+    public static final String PAGE_CACHE = "pageCache";
+    public static final String FEED_CACHE = "feedCache";
 
     @Bean
     public CacheManager cacheManager() {
@@ -47,7 +49,9 @@ public class CaffeineCacheConfig {
                 new CaffeineCache(STATUS_CACHE, statusCache().build()),
                 new CaffeineCache(SITE_SETTINGS_CACHE, siteSettingsCache().build()),
                 new CaffeineCache(VISITOR_SUMMARY_CACHE, visitorSummaryCache().build()),
-                new CaffeineCache(NOTIFICATION_LIST_CACHE, notificationListCache().build())
+                new CaffeineCache(NOTIFICATION_LIST_CACHE, notificationListCache().build()),
+                new CaffeineCache(PAGE_CACHE, pageCache().build()),
+                new CaffeineCache(FEED_CACHE, feedCache().build())
         ));
         return cacheManager;
     }
@@ -110,6 +114,36 @@ public class CaffeineCacheConfig {
         return Caffeine.newBuilder()
                 .maximumSize(5000)
                 .expireAfterWrite(2, TimeUnit.MINUTES)
+                .recordStats();
+    }
+
+    /**
+     * 页面缓存：PageServiceImpl 的公开读（published:页面id / slug:地址 / manifest / nav）。
+     * 每次公开页渲染原先要在 site_setting KV 表上多次 selectById/getBySlug；页面写路径
+     * （建页/存稿/发布/下线/删除/导航）全部 allEntries 失效，TTL 5 分钟兜底
+     * adminPath 等外部输入的变化。键数量 = 内置页面 + 内容页 + slug + 2，200 足够。
+     */
+    public Caffeine<Object, Object> pageCache() {
+        return Caffeine.newBuilder()
+                .maximumSize(200)
+                .expireAfterWrite(5, TimeUnit.MINUTES)
+                .recordStats();
+    }
+
+    /**
+     * 订阅源缓存：/feed.xml 与 /atom.xml 的整段渲染结果，键 = 解析后的站点源 + ":rss"/":atom"。
+     *
+     * <p>全文订阅源要把最近 100 篇文章的 Markdown 全部渲染一遍（阅读页同一套 SafeMarkdown），
+     * 单次重建是百次详情查询加百次渲染，绝不能每请求都做。键必须带站点源：订阅正文内嵌
+     * 绝对链接，SiteOrigin 在未显式配置时会回落到请求来源，同一实例可能按来源产出不同正文。
+     * 文章写路径（create/update/delete/adminDelete/approve/reject）全部 allEntries 失效；
+     * TTL 5 分钟兜底站点标题等设置变化（siteBaseUrl 变化因入键会自然产出新键）。
+     * 键只有两种后缀 × 少量来源变体，20 足够。
+     */
+    public Caffeine<Object, Object> feedCache() {
+        return Caffeine.newBuilder()
+                .maximumSize(20)
+                .expireAfterWrite(5, TimeUnit.MINUTES)
                 .recordStats();
     }
 }

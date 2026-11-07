@@ -831,11 +831,13 @@
         </div>
 
         <!--
-          AI 写作辅助：模型只返回候选内容，**一律不落库**。
+          AI 写作辅助：模型结果**一律不落库**。
           摘要/标题由作者点选后才写进文章表单，最终仍走文章保存接口；
-          标签只从既有标签池里挑，池外值后端已丢弃，这里再按名字匹配一次本地标签。
+          标签只从既有标签池里挑，池外值后端已丢弃，这里再按名字匹配一次本地标签；
+          选区改写只改正文里选中的片段、内链建议要点「插入」才写进正文，
+          都只改本地表单，未保存前不落库。
         -->
-        <div v-if="editingPostId" class="sidebar-section glass ai-writing">
+        <div class="sidebar-section glass ai-writing">
           <h3 class="sidebar-title">
             <svg
               width="14"
@@ -853,90 +855,167 @@
             模型只给候选，不会自动改你的文章：点选后才回填到上方表单，仍需自己保存。
           </p>
 
-          <div class="ai-writing-actions">
-            <button
-              class="btn btn-ghost btn-sm"
-              :disabled="writing.busy !== ''"
-              data-action="ai-summary"
-              @click="generateSummary"
-            >
-              {{ writing.busy === 'summary' ? '生成中…' : '生成摘要' }}
-            </button>
-            <button
-              class="btn btn-ghost btn-sm"
-              :disabled="writing.busy !== ''"
-              data-action="ai-tags"
-              @click="generateTags"
-            >
-              {{ writing.busy === 'tags' ? '生成中…' : '推荐标签' }}
-            </button>
-            <button
-              class="btn btn-ghost btn-sm"
-              :disabled="writing.busy !== ''"
-              data-action="ai-titles"
-              @click="generateTitles"
-            >
-              {{ writing.busy === 'titles' ? '生成中…' : '标题备选' }}
-            </button>
+          <!-- 选区润色/续写/精简/翻译：只作用于选中的片段，不依赖 postId，新建草稿也能用 -->
+          <div class="ai-inline">
+            <div class="ai-writing-actions">
+              <button
+                class="btn btn-ghost btn-sm"
+                :disabled="writing.busy !== ''"
+                data-action="ai-polish"
+                @click="runInlineWriting('polish')"
+              >
+                {{ writing.busy === 'polish' ? '润色中…' : '润色' }}
+              </button>
+              <button
+                class="btn btn-ghost btn-sm"
+                :disabled="writing.busy !== ''"
+                data-action="ai-continue"
+                @click="runInlineWriting('continue')"
+              >
+                {{ writing.busy === 'continue' ? '续写中…' : '续写' }}
+              </button>
+              <button
+                class="btn btn-ghost btn-sm"
+                :disabled="writing.busy !== ''"
+                data-action="ai-shorten"
+                @click="runInlineWriting('shorten')"
+              >
+                {{ writing.busy === 'shorten' ? '精简中…' : '精简' }}
+              </button>
+              <button
+                class="btn btn-ghost btn-sm"
+                :disabled="writing.busy !== ''"
+                data-action="ai-translate"
+                @click="runInlineWriting('translate')"
+              >
+                {{ writing.busy === 'translate' ? '翻译中…' : '翻译' }}
+              </button>
+            </div>
+            <p class="ai-inline-hint">
+              先在正文里选中一段文字（最多 3000
+              字符）再点动作；润色/精简/翻译会替换选区，续写插入选区之后。
+            </p>
           </div>
+
+          <template v-if="editingPostId">
+            <div class="ai-writing-actions">
+              <button
+                class="btn btn-ghost btn-sm"
+                :disabled="writing.busy !== ''"
+                data-action="ai-summary"
+                @click="generateSummary"
+              >
+                {{ writing.busy === 'summary' ? '生成中…' : '生成摘要' }}
+              </button>
+              <button
+                class="btn btn-ghost btn-sm"
+                :disabled="writing.busy !== ''"
+                data-action="ai-tags"
+                @click="generateTags"
+              >
+                {{ writing.busy === 'tags' ? '生成中…' : '推荐标签' }}
+              </button>
+              <button
+                class="btn btn-ghost btn-sm"
+                :disabled="writing.busy !== ''"
+                data-action="ai-titles"
+                @click="generateTitles"
+              >
+                {{ writing.busy === 'titles' ? '生成中…' : '标题备选' }}
+              </button>
+            </div>
+          </template>
 
           <p v-if="writing.error" class="seo-status" data-state="error">{{ writing.error }}</p>
           <p v-else-if="writing.notice" class="seo-status" data-state="ok">{{ writing.notice }}</p>
 
-          <!-- 摘要候选：点「采用」才回填，避免模型结果覆盖作者已经写好的摘要 -->
-          <div v-if="writing.summary" class="ai-candidate" data-candidate="summary">
-            <p class="ai-candidate-text">{{ writing.summary }}</p>
-            <div class="ai-candidate-actions">
-              <button
-                class="btn btn-ghost btn-xs"
-                data-action="ai-summary-apply"
-                @click="applySummary"
-              >
-                采用这段摘要
-              </button>
-              <button class="btn btn-text btn-xs" @click="writing.summary = ''">忽略</button>
+          <template v-if="editingPostId">
+            <!-- 摘要候选：点「采用」才回填，避免模型结果覆盖作者已经写好的摘要 -->
+            <div v-if="writing.summary" class="ai-candidate" data-candidate="summary">
+              <p class="ai-candidate-text">{{ writing.summary }}</p>
+              <div class="ai-candidate-actions">
+                <button
+                  class="btn btn-ghost btn-xs"
+                  data-action="ai-summary-apply"
+                  @click="applySummary"
+                >
+                  采用这段摘要
+                </button>
+                <button class="btn btn-text btn-xs" @click="writing.summary = ''">忽略</button>
+              </div>
             </div>
-          </div>
 
-          <!-- 标签候选：chip 多选，应用时只把选中的并进已选标签 -->
-          <div v-if="writing.tags.length" class="ai-tags" data-candidate="tags">
-            <button
-              v-for="name in writing.tags"
-              :key="name"
-              class="ai-tag-chip"
-              :data-selected="isTagCandidateSelected(name) ? 'true' : 'false'"
-              @click="toggleTagCandidate(name)"
-            >
-              {{ name }}
-            </button>
-            <div class="ai-candidate-actions">
+            <!-- 标签候选：chip 多选，应用时只把选中的并进已选标签 -->
+            <div v-if="writing.tags.length" class="ai-tags" data-candidate="tags">
               <button
-                class="btn btn-ghost btn-xs"
-                :disabled="!selectedTagCandidates.length"
-                data-action="ai-tags-apply"
-                @click="applyTags"
+                v-for="name in writing.tags"
+                :key="name"
+                class="ai-tag-chip"
+                :data-selected="isTagCandidateSelected(name) ? 'true' : 'false'"
+                @click="toggleTagCandidate(name)"
               >
-                应用选中标签（{{ selectedTagCandidates.length }}）
+                {{ name }}
               </button>
-              <button class="btn btn-text btn-xs" @click="writing.tags = []">忽略</button>
+              <div class="ai-candidate-actions">
+                <button
+                  class="btn btn-ghost btn-xs"
+                  :disabled="!selectedTagCandidates.length"
+                  data-action="ai-tags-apply"
+                  @click="applyTags"
+                >
+                  应用选中标签（{{ selectedTagCandidates.length }}）
+                </button>
+                <button class="btn btn-text btn-xs" @click="writing.tags = []">忽略</button>
+              </div>
             </div>
-          </div>
 
-          <!-- 标题候选：点一条直接填入标题输入框 -->
-          <div v-if="writing.titles.length" class="ai-titles" data-candidate="titles">
-            <button
-              v-for="(candidate, index) in writing.titles"
-              :key="index"
-              class="ai-title-option"
-              :data-action="`ai-title-apply-${index}`"
-              @click="applyTitle(candidate)"
-            >
-              {{ candidate }}
-            </button>
-            <div class="ai-candidate-actions">
-              <button class="btn btn-text btn-xs" @click="writing.titles = []">忽略</button>
+            <!-- 标题候选：点一条直接填入标题输入框 -->
+            <div v-if="writing.titles.length" class="ai-titles" data-candidate="titles">
+              <button
+                v-for="(candidate, index) in writing.titles"
+                :key="index"
+                class="ai-title-option"
+                :data-action="`ai-title-apply-${index}`"
+                @click="applyTitle(candidate)"
+              >
+                {{ candidate }}
+              </button>
+              <div class="ai-candidate-actions">
+                <button class="btn btn-text btn-xs" @click="writing.titles = []">忽略</button>
+              </div>
             </div>
-          </div>
+
+            <!-- 内链建议：需要 postId，后端据此挑选其它已发布文章 -->
+            <div class="ai-links">
+              <button
+                class="btn btn-ghost btn-sm"
+                :disabled="writing.busy !== ''"
+                data-action="ai-links"
+                @click="generateLinks"
+              >
+                {{ writing.busy === 'links' ? '生成中…' : '生成内链建议' }}
+              </button>
+              <div v-if="writing.links.length" class="ai-link-list" data-candidate="links">
+                <div
+                  v-for="(suggestion, index) in writing.links"
+                  :key="`${suggestion.targetPostId}-${index}`"
+                  class="ai-link-item"
+                >
+                  <p class="ai-link-anchor">{{ suggestion.anchor }}</p>
+                  <p class="ai-link-meta">{{ suggestion.targetTitle }}</p>
+                  <p class="ai-link-reason">{{ suggestion.reason }}</p>
+                  <button
+                    class="btn btn-ghost btn-xs"
+                    :disabled="suggestion.used"
+                    :data-action="`ai-link-insert-${index}`"
+                    @click="insertLinkSuggestion(index)"
+                  >
+                    {{ suggestion.used ? '已插入' : '插入' }}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </template>
         </div>
       </div>
     </div>
@@ -958,6 +1037,7 @@ import { useConfirm } from '../../composables/useConfirm'
 import { formatDate } from '../../utils'
 import { estimateReadMinutes } from '../../utils/reading'
 import { renderMarkdown, isInternalMarkdownHref, looksLikeLinkTarget } from '../../utils/markdown'
+import type { InlineWritingAction, LinkSuggestionVO } from '../../types/llm'
 
 const route = useRoute()
 const router = useRouter()
@@ -1400,28 +1480,42 @@ async function generateSeo() {
 
 // ========== AI 写作辅助 ==========
 
+/** 内链候选带上本地「已插入」标记：插入过就禁用按钮，避免同一链接重复出现 */
+type LinkSuggestionRow = LinkSuggestionVO & { used: boolean }
+
 /**
- * 模型只产出候选：摘要/标题点选后才写进 `form`，标签点选后并进 `selectedTags`。
- * 三者都不落库 —— 真正保存仍由作者触发文章保存，避免「AI 悄悄改了我的文章」。
+ * 模型只产出候选：摘要/标题点选后才写进 `form`，标签点选后并进 `selectedTags`，
+ * 选区改写/内链建议也只在作者显式点选后改动正文。全部不落库 ——
+ * 真正保存仍由作者触发文章保存，避免「AI 悄悄改了我的文章」。
  */
 const writing = reactive({
-  busy: '' as '' | 'summary' | 'tags' | 'titles',
+  busy: '' as
+    | ''
+    | 'summary'
+    | 'tags'
+    | 'titles'
+    | 'polish'
+    | 'continue'
+    | 'shorten'
+    | 'translate'
+    | 'links',
   error: '',
   notice: '',
   summary: '',
   tags: [] as string[],
-  titles: [] as string[]
+  titles: [] as string[],
+  links: [] as LinkSuggestionRow[]
 })
 const selectedTagCandidates = ref<string[]>([])
 
-/** 当前文章 id；新建草稿时还没有 postId，AI 卡片不出现（后端要求文章必须存在）。 */
+/** 需要 postId 的生成动作共用；新建草稿时还没有 postId，这些动作不可用。 */
 function currentPostId(): number | null {
   const postId = editingPostId.value
   return postId ? Number(postId) : null
 }
 
-/** 三个生成动作共用的收尾：忙标记、错误文案、提示文案。 */
-async function runWriting(kind: 'summary' | 'tags' | 'titles') {
+/** 四个生成动作共用的收尾：忙标记、错误文案、提示文案。 */
+async function runWriting(kind: 'summary' | 'tags' | 'titles' | 'links') {
   const postId = currentPostId()
   if (!postId || writing.busy) return
   writing.busy = kind
@@ -1438,10 +1532,20 @@ async function runWriting(kind: 'summary' | 'tags' | 'titles') {
       // 新一批候选重置勾选状态，避免上一批的选中项残留
       selectedTagCandidates.value = []
       writing.notice = writing.tags.length ? '已推荐标签，点选后应用' : '模型没有给出可用的已有标签'
-    } else {
+    } else if (kind === 'titles') {
       const res = await llmApi.generateTitles({ postId })
       writing.titles = res.data?.titles || []
       writing.notice = writing.titles.length ? '已生成标题备选，点击即填入' : '模型没有给出标题'
+    } else {
+      const res = await llmApi.suggestLinks(postId)
+      // 重新生成就整体换新数组，「已插入」标记自然归零，与候选一一对应
+      writing.links = (res.data?.suggestions || []).map((suggestion) => ({
+        ...suggestion,
+        used: false
+      }))
+      writing.notice = writing.links.length
+        ? '已生成内链建议，点「插入」写进正文'
+        : '模型没有给出可用的内链建议'
     }
   } catch (err) {
     const detail = err as {
@@ -1465,6 +1569,113 @@ function generateTags() {
 
 function generateTitles() {
   void runWriting('titles')
+}
+
+function generateLinks() {
+  void runWriting('links')
+}
+
+// --- 选区行内改写（润色/续写/精简/翻译） ------------------------------------
+
+/** 后端对选区文本的硬上限；超长在前端直接拦下，省一次注定失败的模型调用 */
+const INLINE_TEXT_LIMIT = 3000
+
+/**
+ * 选区改写共用入口。选区必须在 `await` 之前同步捕获：点按钮会把焦点带走，
+ * 等模型返回后再读 `selectionStart` 拿到的可能已经是别处的光标。
+ */
+async function runInlineWriting(action: InlineWritingAction) {
+  if (writing.busy) return
+  const ta = contentTextarea.value
+  const start = ta?.selectionStart ?? 0
+  const end = ta?.selectionEnd ?? 0
+  const selected = form.content.substring(start, end)
+  if (!selected.trim()) {
+    toast.info('请先在正文中选中一段文字')
+    return
+  }
+  if (selected.length > INLINE_TEXT_LIMIT) {
+    toast.info('选区过长，请最多选择 3000 字符')
+    return
+  }
+  writing.busy = action
+  writing.error = ''
+  writing.notice = ''
+  try {
+    const res = await llmApi.inlineWriting({ action, text: selected })
+    const output = res.data?.text || ''
+    if (!output) {
+      writing.notice = '模型没有返回文本'
+      return
+    }
+    // 请求期间作者可能继续编辑；选区原文对不上就放弃拼接 —— 宁可不改，也不能替换错位置
+    if (form.content.substring(start, end) !== selected) {
+      writing.error = '正文在生成期间被修改，未应用模型结果，请重新选择后再试'
+      return
+    }
+    saveHistory()
+    if (action === 'continue') {
+      // 前后都紧挨着非空白字符时补一个空格当边界，避免新句子粘在旧词上
+      const charBefore = end > 0 ? form.content.charAt(end - 1) : ''
+      const inserted =
+        charBefore && !/\s/.test(charBefore) && !/^\s/.test(output) ? ` ${output}` : output
+      form.content = form.content.substring(0, end) + inserted + form.content.substring(end)
+      nextTick(() => {
+        ta?.focus()
+        ta?.setSelectionRange(end + inserted.length, end + inserted.length)
+      })
+      writing.notice = '续写完成，已插入选区之后'
+    } else {
+      form.content = form.content.substring(0, start) + output + form.content.substring(end)
+      nextTick(() => {
+        ta?.focus()
+        // 光标落在替换后的文本末尾，作者可以就地继续输入
+        ta?.setSelectionRange(start + output.length, start + output.length)
+      })
+      writing.notice =
+        action === 'polish'
+          ? '润色完成，已替换选区'
+          : action === 'translate'
+            ? '翻译完成，已替换选区'
+            : '精简完成，已替换选区'
+    }
+  } catch (err) {
+    const detail = err as {
+      userMessage?: string
+      response?: { data?: { message?: string } }
+    }
+    writing.error =
+      detail.userMessage || detail.response?.data?.message || '模型生成失败，请稍后重试'
+  } finally {
+    writing.busy = ''
+  }
+}
+
+/**
+ * 插入内链候选：正文输入框有焦点时插在光标处（与 insertLink 同一套光标逻辑，
+ * 有选区则整体替换），没有焦点（比如刚点完按钮或正在预览）就追加到正文末尾。
+ * 插入过一次就置 `used` 禁用按钮，避免同一链接重复出现。
+ */
+function insertLinkSuggestion(index: number) {
+  const suggestion = writing.links[index]
+  if (!suggestion || suggestion.used) return
+  const markdown = `[${suggestion.anchor}](/post/${suggestion.targetPostId})`
+  const ta = contentTextarea.value
+  saveHistory()
+  if (ta && document.activeElement === ta) {
+    const start = ta.selectionStart
+    const end = ta.selectionEnd
+    form.content = form.content.substring(0, start) + markdown + form.content.substring(end)
+    nextTick(() => {
+      ta.focus()
+      ta.setSelectionRange(start + markdown.length, start + markdown.length)
+    })
+  } else {
+    // 追加成独立段落，避免链接直接粘在最后一行文字后面
+    form.content = form.content ? `${form.content}\n\n${markdown}` : markdown
+  }
+  suggestion.used = true
+  writing.notice = '内链已插入正文，记得保存文章'
 }
 
 /** 采用摘要候选：写进摘要输入框并清空候选（摘要同时计入未保存状态）。 */
@@ -2156,7 +2367,7 @@ onBeforeRouteLeave((_to, _from) => {
   flex: 1;
 }
 
-/* AI 写作：三个入口并排，候选区各自一块，点选前不改动任何表单字段 */
+/* AI 写作：动作入口并排，候选区各自一块，点选前不改动任何表单字段 */
 .ai-writing-actions {
   display: flex;
   flex-wrap: wrap;
@@ -2253,6 +2464,69 @@ onBeforeRouteLeave((_to, _from) => {
 .ai-title-option:hover {
   border-color: var(--accent);
   color: var(--accent);
+}
+
+/* 选区改写：动作行 + 一句话说明，常驻卡片（不依赖是否已保存文章） */
+.ai-inline {
+  margin-bottom: 12px;
+}
+
+.ai-inline .ai-writing-actions {
+  margin-bottom: 6px;
+}
+
+.ai-inline-hint {
+  margin: 0;
+  font-size: var(--text-2xs);
+  line-height: 1.6;
+  color: var(--text-muted);
+}
+
+/* 内链建议：逐条一块，结构与其它候选区一致 */
+.ai-links {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.ai-link-list {
+  display: grid;
+  gap: 8px;
+}
+
+.ai-link-item {
+  display: grid;
+  gap: 4px;
+  padding: 11px 12px;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius);
+  background: var(--bg-secondary);
+}
+
+.ai-link-anchor {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
+}
+
+.ai-link-meta {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+}
+
+.ai-link-reason {
+  margin: 0;
+  font-size: var(--text-xs);
+  line-height: 1.6;
+  color: var(--text-muted);
+}
+
+.ai-link-item .btn {
+  justify-self: start;
+  margin-top: 2px;
 }
 
 /* 封面图上传 */

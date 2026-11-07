@@ -2,7 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { postApi } from '@/api/post'
 import { formatDate } from '@/utils'
-import type { Post } from '@/types'
+import type { PostArchiveItem } from '@/types'
 import PageFrame from '@/components/pages/PageFrame.vue'
 import { usePageConfig } from '@/composables/usePageConfig'
 import { usePageSeo } from '@/composables/usePageSeo'
@@ -17,20 +17,19 @@ usePageSeo('archives', () => ({
 interface ArchiveGroup {
   key: string
   label: string
-  posts: Post[]
+  posts: PostArchiveItem[]
 }
 
-const posts = ref<Post[]>([])
+const posts = ref<PostArchiveItem[]>([])
 const loading = ref(true)
 const error = ref('')
-const pageSize = 100
 /** 挂载与「重新加载」都会发请求：被取代的那一次不得再追加或覆盖列表。 */
 const beginArchiveRequest = useLatestRequest().begin
 
 const archiveGroups = computed<ArchiveGroup[]>(() => {
-  const groups = new Map<string, Post[]>()
+  const groups = new Map<string, PostArchiveItem[]>()
   for (const post of posts.value) {
-    const date = post.createTime || post.createdAt || ''
+    const date = post.createTime || ''
     const key = date.slice(0, 7) || 'undated'
     const monthPosts = groups.get(key) || []
     monthPosts.push(post)
@@ -51,27 +50,9 @@ const fetchArchives = async () => {
   loading.value = true
   error.value = ''
   try {
-    const firstResponse = await postApi.getPostList({ pageNum: 1, pageSize, sort: 'latest' })
+    const response = await postApi.getArchives()
     if (!isLatest()) return
-    const firstPage = firstResponse.data || {}
-    const allPosts: Post[] = firstPage.records || []
-    const totalPages = Math.max(1, firstPage.pages || 1)
-
-    // Fetch older pages in small batches so larger archives do not create a request burst.
-    for (let firstPageNumber = 2; firstPageNumber <= totalPages; firstPageNumber += 5) {
-      const pageNumbers = Array.from(
-        { length: Math.min(5, totalPages - firstPageNumber + 1) },
-        (_, index) => firstPageNumber + index
-      )
-      const responses = await Promise.all(
-        pageNumbers.map((pageNum) => postApi.getPostList({ pageNum, pageSize, sort: 'latest' }))
-      )
-      if (!isLatest()) return
-      for (const response of responses) allPosts.push(...(response.data?.records || []))
-    }
-
-    // 两次加载可能交叠，且分页边界处可能重复返回同一条：按 id 去重，避免重复的 v-for key。
-    posts.value = [...new Map(allPosts.map((item) => [item.id, item])).values()]
+    posts.value = response.data || []
   } catch {
     if (!isLatest()) return
     error.value = '归档暂时无法加载，请稍后重试。'
@@ -106,8 +87,8 @@ onMounted(fetchArchives)
         </h2>
         <ol>
           <li v-for="post in group.posts" :key="post.id">
-            <time :datetime="post.createTime || post.createdAt">
-              {{ formatDate(post.createTime || post.createdAt, 'MM月DD日') }}
+            <time :datetime="post.createTime">
+              {{ formatDate(post.createTime, 'MM月DD日') }}
             </time>
             <router-link :to="`/post/${post.id}`">{{ post.title }}</router-link>
             <span v-if="showModule('category') && post.category" class="category">{{

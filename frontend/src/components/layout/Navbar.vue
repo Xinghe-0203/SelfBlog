@@ -125,9 +125,17 @@ function onOutside(event: Event): void {
   if (event.target instanceof Node && !root.value?.contains(event.target)) closePanel()
 }
 const onDialog = () => closePanel()
+// resize 是高频事件，fitLinks 每次都要读 getComputedStyle/getBoundingClientRect；
+// 用 rAF 合并同一帧内的多次触发（同 useScrollState / BackToTop 的 ticking 模式），
+// 拖拽窗口时不会每像素一次强制同步布局。
+let resizeFrame = 0
 const onResize = () => {
-  closePanel()
-  fitLinks()
+  if (resizeFrame) return
+  resizeFrame = requestAnimationFrame(() => {
+    resizeFrame = 0
+    closePanel()
+    fitLinks()
+  })
 }
 watch(
   () => route.fullPath,
@@ -163,6 +171,11 @@ onBeforeUnmount(() => {
   document.removeEventListener('selfblog:dialog-open', onDialog)
   window.removeEventListener('resize', onResize)
   resizeObserver?.disconnect()
+  // 卸载前排队的 rAF 仍会执行并触碰已销毁的 DOM，必须取消。
+  if (resizeFrame) {
+    cancelAnimationFrame(resizeFrame)
+    resizeFrame = 0
+  }
 })
 </script>
 

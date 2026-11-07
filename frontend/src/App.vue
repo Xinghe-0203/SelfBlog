@@ -21,9 +21,10 @@
 
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useThemeStore } from '@/stores/theme'
 import { destroyLogger } from '@/utils/logger'
+import { shouldOpenSearch } from '@/utils/searchShortcut'
 import Navbar from '@/components/layout/Navbar.vue'
 import Footer from '@/components/layout/Footer.vue'
 import BackToTop from '@/components/common/BackToTop.vue'
@@ -34,6 +35,7 @@ import { siteApi } from '@/api/site'
 import { applySeoMeta, setSeoSiteTitle } from '@/composables/useSeoMeta'
 
 const route = useRoute()
+const router = useRouter()
 const themeStore = useThemeStore()
 const siteStore = useSiteStore()
 
@@ -67,16 +69,32 @@ const onBeforeEnter = () => {
   window.scrollTo({ top: 0, behavior: 'instant' })
 }
 
+// 匿名统计开关：作者关闭时服务端本来就会拒掉上报，前端再发就是一次注定失败的
+// POST。只有显式 'false' 才跳过，其余取值（含脏数据）按开启处理，与服务端读法一致。
+const canTrackVisitors = computed(() => siteStore.settings.visitorTrackingEnabled !== 'false')
+
+/**
+ * 全局搜索快捷键（文档类站点惯例）：Ctrl/Cmd+K 或 `/` 直达搜索页。
+ * 是否命中由 utils/searchShortcut.ts 的纯函数判定（编辑态、长按重复都让路）；
+ * 已在搜索页时只吞掉默认行为，不重复跳转。
+ */
+function onGlobalKeydown(event: KeyboardEvent): void {
+  if (!shouldOpenSearch(event.target, event.key, event)) return
+  event.preventDefault()
+  if (route.path !== '/search') void router.push('/search')
+}
+
 onMounted(async () => {
   themeStore.initTheme()
   applySiteTheme()
-  if (!isAdminPage.value) void recordVisitor()
+  window.addEventListener('keydown', onGlobalKeydown)
+  if (!isAdminPage.value && canTrackVisitors.value) void recordVisitor()
 })
 
 watch(
   () => route.path,
   () => {
-    if (!isAdminPage.value) void recordVisitor()
+    if (!isAdminPage.value && canTrackVisitors.value) void recordVisitor()
   }
 )
 
@@ -97,8 +115,10 @@ watch(
 
 watch(
   // isDarkMode 也在依赖里：深色画布要撤掉作者的浅色背景，否则浅底浅字不可读。
-  // 外观深度自定义的 11 个键同样要进依赖：它们由 applyAppearance() 写成
+  // 外观深度自定义的枚举键同样要进依赖：它们由 applyAppearance() 写成
   // #selfblog 的 data-ap-* 属性，不进依赖数组的话后台保存后要刷新才看得到。
+  // readingProgress、summaryCallout 与 postLicense 刻意不在依赖里：它们由 PostDetail 的
+  // v-if 响应式消费，无需重放外观。
   () =>
     [
       siteStore.settings.themeSkin,
@@ -114,7 +134,12 @@ watch(
       siteStore.settings.layoutDensity,
       siteStore.settings.homeHeroStyle,
       siteStore.settings.postCoverStyle,
-      siteStore.settings.motionIntensity
+      siteStore.settings.motionIntensity,
+      siteStore.settings.blockquoteStyle,
+      siteStore.settings.postRowStyle,
+      siteStore.settings.contentImageStyle,
+      siteStore.settings.tableStyle,
+      siteStore.settings.linkStyle
     ] as const,
   applySiteTheme
 )
@@ -135,6 +160,7 @@ function recordVisitor() {
 }
 
 onUnmounted(() => {
+  window.removeEventListener('keydown', onGlobalKeydown)
   themeStore.destroyTheme()
   destroyLogger()
 })

@@ -106,7 +106,8 @@ server:
     max-part-count: ${UPLOAD_MAX_PART_COUNT:20}
   compression:
     enabled: true
-    mime-types: application/json,application/xml,text/html,text/css,text/javascript,application/javascript
+    # image/svg+xml：站点 logo/图标是纯文本矢量，不走压缩时白白多传数倍字节。
+    mime-types: application/json,application/xml,text/html,text/css,text/javascript,application/javascript,image/svg+xml
     min-response-size: 1024
 
 # ==================== Knife4j (Swagger) API 文档配置 ====================

@@ -31,6 +31,9 @@ class ReadingPageServiceTest {
     void clearSiteCache() {
         var cache = caches.getCache(com.selfblog.config.cache.CaffeineCacheConfig.SITE_SETTINGS_CACHE);
         if (cache != null) cache.clear();
+        // 本类用 SQL 删 page.% 行且测试事务回滚，pageCache（公开页面读）不参与回滚。
+        var pageCache = caches.getCache(com.selfblog.config.cache.CaffeineCacheConfig.PAGE_CACHE);
+        if (pageCache != null) pageCache.clear();
     }
 
     @BeforeEach void data() {

@@ -36,7 +36,18 @@ public class SiteSettingsServiceImpl implements SiteSettingsService {
             // 默认值全部等于「改造前的观感」，因此老站点升级后零视觉回归。
             "fontFamily", "baseFontSize", "bodyLineHeight", "readerWidth", "paragraphSpacing",
             "radiusScale", "shadowDepth", "layoutDensity",
-            "homeHeroStyle", "postCoverStyle", "motionIntensity"
+            "homeHeroStyle", "postCoverStyle", "motionIntensity",
+            // 外观深度自定义（v2.0.30）：阅读与内容呈现。默认档同样等于改造前观感
+            // （阅读进度条常开、引用块/文章行/正文图片/表格保持原样式）。
+            "readingProgress", "blockquoteStyle", "postRowStyle", "contentImageStyle", "tableStyle",
+            // 外观深度自定义（v2.0.30 第二批）：首页侧栏排序 + 阅读目录显隐。
+            // 都是模板/逻辑驱动（非 CSS 钩子），默认档等于现有渲染。
+            "homeSidebarOrder", "tocStyle",
+            // 外观深度自定义（v2.0.30 第三批）：正文链接样式 + 阅读页摘要卡。
+            // linkStyle 是 CSS 钩子；summaryCallout 是模板开关（默认关，不改变既有渲染）。
+            "linkStyle", "summaryCallout",
+            // v2.0.30 第四批（借鉴 Hexo/Halo）：文章尾部版权声明行，空 = 不渲染。
+            "postLicense"
     );
 
     /**
@@ -228,6 +239,21 @@ public class SiteSettingsServiceImpl implements SiteSettingsService {
         values.put("homeHeroStyle", "default");
         values.put("postCoverStyle", "default");
         values.put("motionIntensity", "default");
+        // v2.0.30 阅读与内容呈现：默认档 = 改造前行为（进度条显示、引用块/文章行/
+        // 正文图片/表格保持原样式），保证升级零回归。
+        values.put("readingProgress", "on");
+        values.put("blockquoteStyle", "default");
+        values.put("postRowStyle", "default");
+        values.put("contentImageStyle", "default");
+        values.put("tableStyle", "default");
+        // v2.0.30 第二批：默认 = 现有模板顺序与目录常显，保证升级零回归。
+        values.put("homeSidebarOrder", "author-tags-archive");
+        values.put("tocStyle", "default");
+        // v2.0.30 第三批：链接样式默认 = 现有 CSS；摘要卡默认关（新元素，作者显式开启）。
+        values.put("linkStyle", "default");
+        values.put("summaryCallout", "off");
+        // v2.0.30 第四批：默认无版权行 = 改造前行为。
+        values.put("postLicense", "");
         // LLM（SEO 自动生成）：默认全关，作者在后台显式打开并填入密钥后才生效。
         values.put("llmEnabled", "false");
         values.put("llmBaseUrl", "");
@@ -389,6 +415,60 @@ public class SiteSettingsServiceImpl implements SiteSettingsService {
             case "motionIntensity" -> {
                 if (!Set.of("off", "subtle", "default", "lively").contains(value)) {
                     throw new BusinessException(400, "动效强度必须为 off、subtle、default 或 lively");
+                }
+            }
+            case "readingProgress" -> {
+                if (!Set.of("on", "off").contains(value)) {
+                    throw new BusinessException(400, "阅读进度条必须为 on 或 off");
+                }
+            }
+            case "blockquoteStyle" -> {
+                if (!Set.of("default", "accent", "minimal", "card").contains(value)) {
+                    throw new BusinessException(400, "引用块样式必须为 default、accent、minimal 或 card");
+                }
+            }
+            case "postRowStyle" -> {
+                if (!Set.of("default", "compact", "card").contains(value)) {
+                    throw new BusinessException(400, "文章行样式必须为 default、compact 或 card");
+                }
+            }
+            case "contentImageStyle" -> {
+                if (!Set.of("default", "framed", "flat").contains(value)) {
+                    throw new BusinessException(400, "正文图片样式必须为 default、framed 或 flat");
+                }
+            }
+            case "tableStyle" -> {
+                if (!Set.of("default", "striped", "minimal").contains(value)) {
+                    throw new BusinessException(400, "表格样式必须为 default、striped 或 minimal");
+                }
+            }
+            case "homeSidebarOrder" -> {
+                // 三个侧栏模块（作者卡/标签块/归档入口）的全排列之一，写成可读的连字符串；
+                // 前端按此顺序渲染，默认值就是现有模板顺序。
+                if (!Set.of("author-tags-archive", "author-archive-tags", "tags-author-archive",
+                        "tags-archive-author", "archive-author-tags", "archive-tags-author").contains(value)) {
+                    throw new BusinessException(400, "首页侧栏顺序需为 author/tags/archive 三模块的排列");
+                }
+            }
+            case "tocStyle" -> {
+                if (!Set.of("default", "hidden").contains(value)) {
+                    throw new BusinessException(400, "目录样式必须为 default 或 hidden");
+                }
+            }
+            case "linkStyle" -> {
+                if (!Set.of("default", "dotted", "flat").contains(value)) {
+                    throw new BusinessException(400, "链接样式必须为 default、dotted 或 flat");
+                }
+            }
+            case "summaryCallout" -> {
+                if (!Set.of("on", "off").contains(value)) {
+                    throw new BusinessException(400, "阅读页摘要卡必须为 on 或 off");
+                }
+            }
+            case "postLicense" -> {
+                // 留空 = 不渲染版权行；非空按纯文本渲染（前端插值，不做 HTML），限长防滥用。
+                if (value.length() > 200) {
+                    throw new BusinessException(400, "版权声明不能超过200个字符");
                 }
             }
             case "llmEnabled", "llmAutoOnPublish" -> {

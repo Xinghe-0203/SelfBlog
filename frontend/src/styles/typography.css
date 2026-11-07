@@ -125,21 +125,35 @@ b {
   color: var(--accent);
   font-variant-ligatures: none;
 }
+/* 围栏代码块：两种主题下都保持「永远深色」的 --code-* 语义 token。
+   不能用 --bg-secondary：浅色模式下它是亮底，会把深色 token 配色（github-dark）
+   衬成不可读的亮底浅字；--code-bg 由 variables.css 显式定义为反转观感的深色块。 */
 .markdown-body pre {
   padding: var(--spacing-md);
   margin: var(--spacing-md) 0;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-light);
+  background: var(--code-bg);
+  border: 1px solid var(--code-border);
   border-radius: var(--radius-md);
   overflow-x: auto;
   position: relative;
+  color: var(--code-text);
 }
 .markdown-body pre code {
   padding: 0;
   background: transparent;
-  color: var(--text-primary);
+  color: var(--code-text);
   font-size: var(--text-sm);
   line-height: 1.7;
+}
+/* highlight.js（github-dark token 色板，由 useMarkdownEnhance 引入主题 CSS）：
+   主题自带的 .hljs 背景 / 内边距 / 横向内滚动在这条更高优先级的 pre 链上覆写掉。
+   最终效果：token 配色来自 github-dark，表面来自本站 --code-* token；
+   横向滚动仍由 pre 自己负责。行内 code（单反引号）没有 .hljs 类，不受影响。 */
+.markdown-body pre code.hljs {
+  background: transparent;
+  color: var(--code-text);
+  padding: 0;
+  overflow-x: visible;
 }
 /* Code block copy button */
 .markdown-body pre .copy-btn {

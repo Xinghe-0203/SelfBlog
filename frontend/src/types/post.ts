@@ -50,6 +50,25 @@ export interface Post {
   updateTime?: string
 }
 
+/** 归档条目：公开归档接口返回的精简文章行，按创建时间倒序 */
+export interface PostArchiveItem {
+  id: number
+  title: string
+  category: string
+  createTime: string
+  updateTime: string
+  viewCount: number
+}
+
+/** 相关阅读条目：公开相关接口返回的精简文章行，按相关度排序（最多 5 条） */
+export interface RelatedPostItem {
+  id: number
+  title: string
+  summary: string
+  coverUrl: string
+  createTime: string
+}
+
 /** 创建文章请求 */
 export interface CreatePostRequest {
   title: string

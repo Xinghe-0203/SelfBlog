@@ -249,6 +249,22 @@ class RateLimitInterceptorTest {
         assertTrue(callWithMethod("GET", "/api/post/1", "203.0.113.76", new MockHttpServletResponse()));
     }
 
+    @Test
+    void searchSuggestTypeaheadGetsItsOwnLooserReadBudget() throws Exception {
+        // 回归：GET /api/post/search/suggest 原先只能落 /api/post 的 60/min 读桶（等长胜出），
+        // 而前端联想每 300ms 停顿就发一次请求，快速输入不到半分钟就 429。
+        // 读表新增更长的 /api/post/search 前缀（120/min）后，最长前缀直接胜出。
+        for (int i = 0; i < 120; i++) {
+            assertTrue(callWithMethod("GET", "/api/post/search/suggest", "203.0.113.77", new MockHttpServletResponse()),
+                    "第 " + (i + 1) + " 次联想请求不应被 429");
+        }
+        assertFalse(callWithMethod("GET", "/api/post/search/suggest", "203.0.113.77", new MockHttpServletResponse()),
+                "联想读阈值自己的 120/min 仍然生效");
+        // 与文章详情读桶相互独立：联想打满后文章阅读不受牵连。
+        assertTrue(callWithMethod("GET", "/api/post/1", "203.0.113.77", new MockHttpServletResponse()),
+                "联想配额用尽不应牵连同 IP 的文章详情阅读");
+    }
+
     // ==================== 路径变量不得各自成桶 ====================
 
     @Test

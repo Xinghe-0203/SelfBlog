@@ -103,6 +103,90 @@ describe('enhanceMarkdown — 代码块', () => {
   })
 })
 
+describe('enhanceMarkdown — 语法高亮', () => {
+  it('highlights a known-language block with hljs classes and keeps the text intact', () => {
+    const root = fixture('<pre><code class="language-js">const a = 1</code></pre>')
+
+    enhanceMarkdown(root)
+
+    const code = query<HTMLElement>(root, 'pre code')
+    expect(code.classList.contains('hljs')).toBe(true)
+    // 'const' 是 js 关键字：github-dark 通过 token span 上色
+    expect(code.querySelector('.hljs-keyword')?.textContent).toBe('const')
+    // 高亮只是包 span：复制按钮读的 textContent 必须仍是源文本
+    expect(code.textContent).toBe('const a = 1')
+    expect(query(root, '.code-lang').textContent).toBe('js')
+  })
+
+  it('escapes HTML-sensitive characters in the highlighted output', () => {
+    // fixture 里的 &lt;div&gt; 解析成文本 "<div>"；高亮后若未转义，写回 innerHTML
+    // 会被当成真实 <div> 标签，文本内容就会丢失
+    const root = fixture('<pre><code class="language-js">const s = "&lt;div&gt;"</code></pre>')
+
+    enhanceMarkdown(root)
+
+    const code = query<HTMLElement>(root, 'pre code')
+    expect(code.textContent).toBe('const s = "<div>"')
+    expect(code.innerHTML).toContain('&lt;div&gt;')
+    expect(code.innerHTML).not.toContain('<div')
+    expect(code.querySelectorAll('div')).toHaveLength(0)
+  })
+
+  it('leaves an unknown-language block unhighlighted but still wraps it with copy and collapse', () => {
+    const root = fixture('<pre><code class="language-notalang">weird but plain</code></pre>')
+    Object.defineProperty(query(root, 'pre'), 'scrollHeight', { value: 500, configurable: true })
+
+    enhanceMarkdown(root)
+
+    const code = query<HTMLElement>(root, 'pre code')
+    expect(code.classList.contains('hljs')).toBe(false)
+    expect(code.innerHTML).toBe('weird but plain')
+    expect(root.querySelector('.hljs-keyword')).toBeNull()
+    // 徽标沿用既有映射：显示原始 slug，不因未知语言回退成 文本
+    expect(query(root, '.code-lang').textContent).toBe('notalang')
+    expect(query(root, '.code-copy')).toBeTruthy()
+    expect(query(root, '.code-block').classList.contains('is-collapsed')).toBe(true)
+  })
+
+  it('never touches inline code outside pre', () => {
+    const root = fixture('<p>运行 <code>npm run build</code> 即可</p>')
+
+    enhanceMarkdown(root)
+
+    const inline = query<HTMLElement>(root, 'p code')
+    expect(inline.classList.contains('hljs')).toBe(false)
+    expect(inline.textContent).toBe('npm run build')
+    expect(root.querySelector('.hljs-keyword')).toBeNull()
+    expect(root.querySelector('.code-block')).toBeNull()
+  })
+
+  it('highlights before collapse measurement so a tall known-language block still collapses', () => {
+    const root = fixture('<pre><code class="language-js">const a = 1</code></pre>')
+    Object.defineProperty(query(root, 'pre'), 'scrollHeight', { value: 500, configurable: true })
+
+    enhanceMarkdown(root)
+
+    expect(query(root, 'pre code').classList.contains('hljs')).toBe(true)
+    expect(query(root, '.code-block').classList.contains('is-collapsed')).toBe(true)
+  })
+
+  it('re-highlights fresh DOM after content refresh without leaking classes or wrappers', () => {
+    const root = fixture('<pre><code class="language-js">let a = 1</code></pre>')
+    enhanceMarkdown(root)
+
+    // 正文被 v-html 整体替换：旧 DOM（连同 hljs class）一起丢弃，新 DOM 重新走增强
+    root.innerHTML = '<pre><code class="language-js">let b = 2</code></pre>'
+    disposeMarkdownEnhance(root)
+    enhanceMarkdown(root)
+
+    const code = query<HTMLElement>(root, 'pre code')
+    expect(code.classList.contains('hljs')).toBe(true)
+    expect(code.textContent).toBe('let b = 2')
+    expect(code.querySelectorAll('.hljs-keyword')).toHaveLength(1)
+    expect(root.querySelectorAll('.code-block')).toHaveLength(1)
+  })
+})
+
 describe('enhanceMarkdown — 长代码折叠', () => {
   it('collapses an over-height code block and toggles it from the expand button', () => {
     const root = fixture('<pre><code>long</code></pre>')

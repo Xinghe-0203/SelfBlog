@@ -184,10 +184,12 @@ Covering high-frequency queries: user post lists, category filtering, hot/latest
 | `statsCache` | System stats | 15 min |
 | `statusCache` | Interaction status | 2 min |
 | `siteSettingsCache` | Site settings | 10 min |
+| `pageCache` | Published pages, manifest, navigation | 5 min |
 | `visitorSummaryCache` | Visitor dashboard summary | 30 sec |
 
-- `@Cacheable` on 12+ query methods
-- `@CacheEvict` on 15+ write methods
+- `@Cacheable` on 17+ query methods (public tag list, published pages/manifest/nav and
+  post lists among them); `@CacheEvict` on 20+ write methods — tag writes evict
+  `hotTagsCache` **and** `categoryCache`, every page mutation evicts `pageCache`
 - TTLs follow `CaffeineCacheConfig.java`; actual performance gains require workload-specific measurement.
 
 ## Testing
@@ -282,6 +284,58 @@ so validator and consumer must agree on exactly one grammar. Integer keys keep u
 
 These keys **are** returned by `GET /api/site/public` (they are cosmetic and public pages need
 them); `LLM_SETTING_KEYS` remains the only filtered group.
+
+### Reading & content presentation (v2.0.30)
+
+Five more keys, same three hard rules (scoped to `#selfblog[data-ap-*] .app-main:not(.app-main--admin)`,
+no rule for the default tier, none of them in `PREPAINT_APPEARANCE_VARS`):
+
+| Key | Values | Default | Effect |
+|---|---|---|---|
+| `readingProgress` | `on \| off` | `on` | `off` removes the reading-progress bar (PostDetail renders it via a reactive `v-if`, not CSS — deliberately absent from `App.vue`'s watch array) |
+| `blockquoteStyle` | `default \| accent \| minimal \| card` | `default` | accent unifies both rendering sites on the accent palette (out-specifies PostDetail's `:deep` override); minimal = hairline left border only; card = boxed |
+| `postRowStyle` | `default \| compact \| card` | `default` | compact = tighter rows, one-line summary, smaller cover; card = per-row raised card, dividers gone |
+| `contentImageStyle` | `default \| framed \| flat` | `default` | framed = hairline frame + padding; flat = no shadow/radius |
+| `tableStyle` | `default \| striped \| minimal` | `default` | striped = zebra rows; minimal = no outer frame, horizontal hairlines only |
+
+The four style keys are pure CSS in `customize.css` sections 9–12; `readingProgress` is
+interface + defaults only. Admin UI: the 外观深度自定义 panel now exposes 16 keys;
+恢复默认外观 covers all of them.
+
+### Sidebar order & TOC visibility (v2.0.30, batch 2)
+
+Two more template/logic-driven keys (not CSS hooks — absent from `enumAttrs`, the `App.vue`
+watch array and `PREPAINT_APPEARANCE_VARS`):
+
+| Key | Values | Default | Effect |
+|---|---|---|---|
+| `homeSidebarOrder` | one of the 6 permutations of author/tags/archive, hyphen-joined | `author-tags-archive` | Home renders the three sidebar blocks (author card / tag block / archive callout) in this order; each block's `showModule` visibility condition is unchanged |
+| `tocStyle` | `default \| hidden` | `default` | `hidden` removes the desktop TOC aside, the mobile sheet and its FAB, and collapses the reading grid to a single column (reuses the existing `reader-layout--no-toc` modifier) |
+
+The 外观深度自定义 panel now exposes **18 keys**.
+
+### Link style & summary callout (v2.0.30, batch 3)
+
+| Key | Values | Default | Effect |
+|---|---|---|---|
+| `linkStyle` | `default \| dotted \| flat` | `default` | CSS hook `data-ap-link` on `.markdown-body a` — dotted keeps the always-on underline but dotted; flat hides the rest-state line and restores it on hover (heading anchors excluded) |
+| `summaryCallout` | `on \| off` | `off` | PostDetail renders a plain-text 「摘要」 callout between cover and body when the post has a summary — pair it with the AI summary generator |
+
+Panel now exposes **20 keys**. Post reading HTML's JSON-LD `BlogPosting` node also gained a
+`breadcrumb` (`BreadcrumbList`, 首页 → article, canonical-origin URLs only — omitted entirely
+when origin/canonical are missing), and `GET /api/post/search/suggest` got its own read budget
+(120/min, previously shared with advanced search at 60/min).
+
+### Full-text feeds (v2.0.30, batch 4 — borrowed from Ghost/WordPress)
+
+`/feed.xml` (RSS 2.0) and `/atom.xml` now carry the **full rendered article body**:
+RSS `content:encoded` (CDATA, `]]>` split) and Atom `content type="html"` (XML-escaped),
+both rendered through the **same `SafeMarkdown` entry point the reader HTML uses** — the
+GFM parity invariant extends to feeds. The original `<description>` summary stays.
+Bodies are cached in a new `feedCache` (5 min TTL, key **includes the resolved origin**
+since `SiteOrigin` may fall back to the request origin and feed links are absolute);
+`BlogPostServiceImpl`'s nine write methods (create×2/update×2/delete×2/adminDelete/
+approve/reject) all evict it. Both formats are XML-parser-verified in tests.
 
 ## Page management
 
@@ -400,7 +454,7 @@ environment (no Docker daemon); treat image execution as unverified.
 |-------|-----------|-------|-----------|
 | Auth | 5 | Follow | 5 |
 | User | 8 | Notification | 5 |
-| Post | 12 | Message | 5 |
+| Post | 14 | Message | 5 |
 | Comment | 6 | Circle | 8 |
 | Like | 4 | Topic | 5 |
 | Collect | 4 | Report | 4 |
@@ -450,6 +504,8 @@ Nine `POST /api/admin/ai/**` endpoints behind `hasRole('admin')`, all returning 
 | `POST /api/admin/ai/writing/summary` | `AiSummaryVO` — 80–200 char Chinese summary |
 | `POST /api/admin/ai/writing/tags` | `AiTagsVO` — 3–6 tags **picked only from the existing tag pool** (top 60 by usage); out-of-pool names are discarded, all discarded → 502, empty pool → 400 |
 | `POST /api/admin/ai/writing/titles` | `AiTitlesVO` — exactly 3 distinct ≤60-char titles |
+| `POST /api/admin/ai/writing/inline` | `AiInlineWritingVO` — selection rewrite (`action ∈ polish\|continue\|shorten\|translate`; translate auto-detects the language and renders it in the other), input ≤3000 chars, output `{"text": …}`; works on unsaved drafts (no postId needed) |
+| `POST /api/admin/ai/writing/links` | `AiLinkSuggestionsVO` — 3–5 internal-link suggestions drawn from the latest 40 other published posts (metadata only); unknown postIds and blank anchors are discarded, `targetTitle` is always backfilled server-side, no candidates → 400 |
 | `POST /api/admin/ai/moderation/check` | `AiModerationVO` — `verdict ∈ pass|flag|block`, `reason`, `categories` |
 | `POST /api/admin/ai/moderation/scan` | `AiModerationScanVO` — scans only `status=1` guest comments; `limit` default 20, cap 50 |
 | `POST /api/admin/ai/proofread/{postId}` | `AiProofreadVO` — ≤20 issues `{type,excerpt≤120,suggestion≤200,severity}`; body >6000 chars truncated with `truncated=true` |

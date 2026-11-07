@@ -4,6 +4,244 @@
 
 ---
 
+## 未发布 — 语法高亮 + 全文订阅 + 版权行（借鉴成熟博客）(2026-11-07)
+
+### 说明
+
+v2.0.30 开发批次第四批，主题是**借鉴 Hexo / Halo / Ghost 等成熟博客项目的标配体验**：代码高亮、全文订阅、版权声明、快捷搜索。新增唯一依赖 `highlight.js@11.12.0`（前端）。数据库 schema 仍零变动。
+
+### 新增（借鉴 Hexo：代码块阅读体验）
+
+- **语法高亮**：`highlight.js/lib/common`（~35 常用语言）接入既有 `useMarkdownEnhance` 管线——已知语言高亮（`hljs.getLanguage` 判定，**不做自动探测**，散文误判率不可接受）、未知语言保持原样、单行内联 code 不碰；try/catch 隔离单块失败。**高亮先于折叠测量**（保住 `scrollHeight` 先读后折叠的不变量）、复制按钮仍读 `textContent`（高亮 span 不污染复制内容）、v-html 刷新随旧 DOM 丢弃高亮类（无泄漏，测试钉死）。
+- **主题贴合设计系统**：github-dark 只出 token 颜色，`.hljs` 的自带背景被 `.markdown-body pre code.hljs` 高特异性覆盖为透明——**表面仍是 `--code-bg/--code-border/--code-text` 房子 token**（两种模式都恒暗）。顺带统一：`typography.css` 的 `pre` 原用 `--bg-secondary`（浅色模式下是亮面，与 PostDetail 的恒暗代码块不一致），改用 code token——内容页代码块从此与阅读页一致。
+- **构建证据**：hljs 落在独立异步 chunk（55.85 KB gzip，仅 PostDetail/MarkdownContent 加载），入口 chunk **零增长**（grep 验证）；语言徽标复用既有 `.code-lang`。
+
+### 新增（借鉴 Ghost/WordPress：全文订阅）
+
+- RSS 加 `xmlns:content` + 每项 `<content:encoded><![CDATA[…]]></content:encoded>`，Atom 加 `<content type="html">`（XML 转义）——正文经 **SafeMarkdown 渲染**，与读者 HTML 完全同源（GFM 奇偶性保证）；原 `<description>` 摘要保留。CDATA 内 `]]>` 强制分段（`]]]]><![CDATA[>`，单测钉死）。
+- **新增 `feedCache`**（5min TTL，maximumSize 20）：**键含解析后 origin**（`SiteOrigin` 可回落请求 origin，链接是绝对地址，不同 origin 必须各存一份）；`BlogPostServiceImpl` 的 9 个写方法全部补入 FEED_CACHE 逐出（创建/更新×2/删除×2/admin 删除/批准/驳回）。两种 feed 均用 `DocumentBuilderFactory` 解析验证合法 XML。
+
+### 新增（借鉴 Hexo/Ghost：版权行 + 字数 + 快捷搜索）
+
+- **文章尾部版权行**（新键 `postLicense`，空 = 不渲染）：正文之后、相关阅读之前，渲染声明文本 + 自链接 permalink（origin 复用 SEO 的 `canonicalOrigin()`，`referrerpolicy="no-referrer"`、长 URL 强制断行）；后台「内容与互动」新增文本框（≤200 字符，纯文本渲染不做 HTML）。
+- **字数统计**：阅读页 meta 追加 `· 约 N 字`（复用既有 `countWords()`，0 时省略）。
+- **快捷搜索**（docs 类项目标配）：全局 **Ctrl/Cmd+K** 或 **`/`** 跳转搜索页（输入框聚焦时忽略、`event.repeat` 忽略、已在 /search 不重复跳转；判定抽成纯函数 `shouldOpenSearch` 带 6 用例）；Search 页挂载后自动聚焦输入框。
+
+### 影响文件
+
+| 文件 | 改动类型 |
+|------|----------|
+| `frontend/package.json` / `package-lock.json` | 修改（+highlight.js@11.12.0） |
+| `frontend/src/composables/useMarkdownEnhance.ts` | 修改（hljs 高亮 + 主题引入） |
+| `frontend/src/styles/typography.css` | 修改（pre 统一 code token + `.hljs` 表面覆盖） |
+| `frontend/src/composables/__tests__/useMarkdownEnhance.test.ts` | 修改（+6：高亮/转义/未知语言/内联/顺序/幂等） |
+| `frontend/src/views/post/PostDetail.vue` | 修改（版权行 + 字数） |
+| `frontend/src/composables/useSeoMeta.ts` | 修改（导出既有 `canonicalOrigin()`） |
+| `frontend/src/utils/searchShortcut.ts` + `__tests__/searchShortcut.test.ts` | 新增（纯函数判定 + 6 用例） |
+| `frontend/src/App.vue` / `views/search/Search.vue`（+挂载聚焦） | 修改 |
+| `frontend/src/views/admin/Settings.vue` | 修改（「版权声明」字段） |
+| `frontend/src/stores/site.ts` | 修改（`postLicense` interface/defaults） |
+| 前端测试：`PostDetail.test.ts`（+6）/ `Search.test.ts`（+1）/ `Settings.test.ts`（+1） | 修改 |
+| `backend/.../controller/site/SeoController.java` | 修改（全文 + 缓存） |
+| `backend/.../config/cache/CaffeineCacheConfig.java` | 修改（`feedCache`） |
+| `backend/.../service/post/impl/BlogPostServiceImpl.java` | 修改（9 写方法补 FEED_CACHE 逐出） |
+| `backend/.../service/site/impl/SiteSettingsServiceImpl.java` | 修改（`postLicense` 三处登记） |
+| `backend/src/test/.../DiscoveryControllerTest.java`（+4）/ `SiteSettingsServiceImplTest.java`（+3） | 修改 |
+
+### 验证
+
+- 后端全量：**1427 tests / 0 failures，BUILD SUCCESS**（上批 1420，本批 +7）。
+- 前端全量：**58 files / 609 tests 全通过**（上批 57/589，本批 +1 文件 +20 tests）；`vue-tsc` 0 错误；`eslint` 0 error / 42 warning（持平）；`prettier --check` 通过；`test:deployment` 27/27；`vite build` 通过（hljs 独立异步 chunk 55.85 KB gzip，入口零增长）。
+
+---
+
+## 未发布 — 摘要卡 + 搜索联想 + 面包屑 SEO + 链接样式 (2026-11-07)
+
+### 说明
+
+v2.0.30 开发批次第三批（同日第三波）：让 AI 产出可见（摘要卡）、接通沉睡的后端能力（搜索联想）、补齐结构化 SEO（面包屑）、外观继续加档（20 键）。**数据库 schema 仍零变动**。
+
+### 新增（阅读体验）
+
+- **阅读页摘要卡**（新键 `summaryCallout` `on|off`，默认 `off`）：开启且文章有摘要时，在封面与正文之间渲染「摘要」卡（纯文本插值，绝不 v-html；语义 token，深色模式安全）。摘要可由作者手填，也可用既有 AI 摘要一键生成——**这是 AI 产出第一次直接出现在访客面前**。
+- **搜索联想**：后端 `GET /api/post/search/suggest` 早已存在（公开、返回 Top 10 已发布文章标题）但**前端从未消费**——本次接到搜索页做 typeahead：300ms 尾随防抖、`role="combobox/listbox"` ARIA、↓/↑ 环绕高亮、Enter 选中复用既有 `submitSearch()`（不复制搜索逻辑）、Esc/失焦关闭、`mousedown.prevent` 防止 blur 吃掉点击。
+- **顺带修掉一个真问题**：suggest 原与 `GET /api/post/search/advanced` 共享 `/api/post#2:read` 60/min 桶——按 typeahead 节奏连续打字 ~18 秒即 429。新增读表专属条目 `/api/post/search` → **120/min**（最长前缀优先，独立分桶；写预算未动，拦截器测试钉死 120 过 121 拒、文章阅读不受影响）。
+
+### 新增（SEO）
+
+- 阅读页 JSON-LD 的 BlogPosting 节点新增 **`breadcrumb` 属性**（schema.org 认可的 CreativeWork.breadcrumb 链）：`BreadcrumbList` 两级——站点首页（`<origin>/`）→ 文章（canonical）。URL 全部走既有 SiteOrigin 解析（后台 `siteBaseUrl` → `SITE_BASE_URL` → 请求 origin），**缺 origin/缺 canonical 时整个 breadcrumb 不输出，绝不落相对地址**。选嵌套属性而非独立 script 块：沿用现有 builder 风格、零形状变化，且 SPA 路由切换时随整个块一起被前端清理，不残留。其余内联脚本（主题引导/外观转发）逐字节不动（既有测试钉死）。
+
+### 新增（外观 20 键）
+
+- `linkStyle`（`default|dotted|flat`，CSS 钩子 `data-ap-link`）：dotted = 常显下划线变点状（offset 3px）；flat = 静止无下划线、悬浮恢复（悬浮装饰色沿用基线的 `--accent` 加重）。基线核实：typography.css 常显下划线 + PostDetail `:deep` 覆盖颜色——default 档零规则零回归；flat 的悬浮规则用 `:not(.heading-anchor)` 排除标题锚点，保住标题 `#` 标记刻意的无下划线设计。
+- **4 套新成品主题**：墨韵（ink 皮肤 · 墨蓝 · 衬线）、杏暖（sand · 杏金）、青苔（forest · 苔绿）、暮色（dusk 深色画布 · 暖琥珀），一键只写既有设置键，预设卡色板如实反映深色画布。
+- `summaryCallout` 的开关在后台「外观深度自定义」（现 **20 键**），提示文案注明配合 AI 摘要使用。
+
+### 影响文件
+
+| 文件 | 改动类型 |
+|------|----------|
+| `backend/.../service/site/seo/ReadingHtmlRenderer.java` | 修改（BlogPosting 节点新增 breadcrumb） |
+| `backend/.../config/web/RateLimitProperties.java` | 修改（`/api/post/search` 读预算 120/min） |
+| `backend/.../service/site/impl/SiteSettingsServiceImpl.java` | 修改（`linkStyle`/`summaryCallout` 三处登记） |
+| `backend/src/test/.../ReadingHtmlRendererTest.java` / `ReadingHtmlControllerTest.java` / `RateLimitPropertiesTest.java` / `RateLimitInterceptorTest.java` | 修改（面包屑 3+e2e、限流 2） |
+| `backend/src/test/.../SearchSuggestTest.java` | 新增（空白/短词/草稿过滤 4 用例） |
+| `frontend/src/stores/site.ts` | 修改（两键 + `LINK_STYLE_VALUES` + `apLink` 枚举钩子） |
+| `frontend/src/App.vue` | 修改（watch +linkStyle，19 项） |
+| `frontend/src/styles/customize.css` | 修改（第 13 节链接样式） |
+| `frontend/src/views/admin/Settings.vue` / `constants/themePresets.ts` | 修改（20 键面板 + 4 新预设） |
+| `frontend/src/views/post/PostDetail.vue` | 修改（摘要卡） |
+| `frontend/src/views/search/Search.vue` | 修改（联想下拉 + 键盘导航） |
+| `frontend/src/api/post.ts` | 修改（`getSearchSuggestions`） |
+| 前端测试：`Search.test.ts`（新增 7）/ `PostDetail.test.ts`（+4）/ `site.test.ts` / `Settings.test.ts`（含 8 预设断言） | 修改 |
+
+### 验证
+
+- 后端全量：**1420 tests / 0 failures，BUILD SUCCESS**（上批 1393，本批 +27）。
+- 前端全量：**57 files / 589 tests 全通过**（上批 56/577，本批 +1 文件 +12 tests）；`vue-tsc` 0 错误；`eslint` 0 error / 42 warning（持平）；`prettier --check` 通过；`test:deployment` 27/27；`vite build` 通过。
+
+---
+
+## 未发布 — 相关阅读 + 归档轻量端点 + AI 翻译 + 侧栏/目录自定义 (2026-11-07)
+
+### 说明
+
+v2.0.30 开发批次第二批（同日第二波迭代）：补齐「读路径的内容发现」与「外观的自定义面」，**数据库 schema 仍零变动**（两个新外观键继续走 `site_setting` KV 表，两个新公开端点全部 SELECT-only）。
+
+### 新增（内容发现）
+
+- **相关阅读** `GET /api/post/{postId}/related`（公开、只读、不计阅读数）：按「共享标签数 DESC → id DESC」排序取 5 篇已发布文章（草稿/删除行先过滤再排名，不会挤占推荐位），不足时按发布时间倒序补齐；当前文章未发布 → 空列表，缺失 → 404；`summary` 截断 ≤100 字符。阅读页文末新增「相关阅读」区块（非空才渲染，预览模式不拉取，失败静默）。
+- **归档轻量端点** `GET /api/post/archives`（公开、只读）：单查询 6 列投影（id/title/category/createTime/updateTime/viewCount，**绝不拉取正文**），按时间倒序、2000 条安全上限。前端归档页从「5 次分页爬取完整 VO」改为**一次轻量请求**，视觉输出零变化。
+- 路由与安全：`/post/archives` 字面路径优先于 `{id}` 变量（Spring 模式比较器，控制器测试钉死「永不路由到详情」）；`SecurityConfig` 为两个 GET 补了显式放行（此前 `/archives` 只是被 `{id}` 规则**碰巧**覆盖、`/{id}/related` 则会落进 anyRequest 管理员兜底）；限流经核实走既有 `/api/post` 读预算（60/min，按路径深度分桶），**写预算未动**。
+
+### 新增（AI）
+
+- 选区写作新增 **translate 动作**：自动检测语言——中文（或以中文为主）→ 地道英文，英文（或其他语言）→ 自然中文；保持格式标记与专有名词。与润色/精简同样走「替换选区」流程（选区快照守卫、>3000 拦截、单飞 busy）。
+
+### 新增（外观 18 键）
+
+- `homeSidebarOrder`：首页侧栏三模块（作者卡/标签块/归档入口）**渲染顺序**，值为 6 种全排列之一的连字符串（默认 `author-tags-archive` = 现有模板顺序，DOM 逐字不变）；各模块的 `showModule` 显隐条件不变。
+- `tocStyle`：`default|hidden`——hidden 同时隐藏桌面端目录栏、移动端目录抽屉与悬浮按钮，并把阅读栅格收敛为单列（复用既有 `reader-layout--no-toc` 修饰类，零新 CSS 规则）。
+- 两键均为**模板/逻辑驱动**（非 CSS 钩子）：不进 `enumAttrs`、不进 `App.vue` watch 数组、不进 `PREPAINT_APPEARANCE_VARS`；后台「外观深度自定义」面板现暴露 **18 键**。
+
+### 影响文件
+
+| 文件 | 改动类型 |
+|------|----------|
+| `backend/.../vo/post/RelatedPostVO.java` / `ArchivePostVO.java` | 新增 |
+| `backend/.../service/post/PostQueryService(.Impl)` | 修改（`getRelatedPosts` + `getArchives`） |
+| `backend/.../service/post/BlogPostService(.Impl)` | 修改（门面委托） |
+| `backend/.../controller/post/BlogPostController.java` | 修改（两个公开 GET） |
+| `backend/.../config/security/SecurityConfig.java` | 修改（`/post/archives`、`/post/{id}/related` 显式 GET 放行） |
+| `backend/.../service/ai/AiWritingService.java` / `AiPromptBuilder.java` / `vo/ai/AiInlineWritingVO.java` | 修改（translate 动作） |
+| `backend/.../service/site/impl/SiteSettingsServiceImpl.java` | 修改（`homeSidebarOrder`/`tocStyle` 三处登记） |
+| `backend/src/test/.../PostRelatedAndArchivesTest.java` | 新增（排序/排除/回填/404/截断 + 归档投影） |
+| `backend/src/test/.../BlogPostControllerTest.java`（+2 路由）/ `AiWritingServiceTest.java`（+translate）/ `AdminAiControllerTest.java` / `SiteSettingsServiceImplTest.java`（+21） | 修改 |
+| `frontend/src/types/post.ts` / `types/llm.ts` / `types/index.ts` | 修改（`PostArchiveItem`/`RelatedPostItem`/translate 动作） |
+| `frontend/src/api/post.ts` | 修改（`getArchives` + `getRelated`） |
+| `frontend/src/views/Archives.vue` | 修改（单次轻量请求，视觉零变化） |
+| `frontend/src/views/post/PostDetail.vue` | 修改（相关阅读区块 + `tocStyle` 隐藏目录/收敛栅格） |
+| `frontend/src/views/Home.vue` | 修改（侧栏按 `homeSidebarOrder` 渲染） |
+| `frontend/src/views/post/PostEdit.vue` | 修改（「翻译」按钮） |
+| `frontend/src/stores/site.ts` / `views/admin/Settings.vue` | 修改（两键 + 面板 18 键） |
+| 前端测试：`PublicPages.test.ts` / `PageConfiguration.test.ts` / `Home.test.ts` / `site.test.ts` / `Settings.test.ts` / `PostDetail.test.ts` / `PostEdit.test.ts` | 修改 |
+
+### 验证
+
+- 后端全量：**1393 tests / 0 failures，BUILD SUCCESS**（上批 1362，本批 +31）。
+- 前端全量：**56 files / 577 tests 全通过**（上批 565，本批 +12）；`vue-tsc` 0 错误；`eslint` 0 error / 42 warning（持平）；`prettier --check` 通过；`test:deployment` **27/27**；`vite build` 通过。
+- 实施中抓到并修复的真问题：①相关推荐初版先对原始 join 行（含草稿/删除）排名再取前 5，未发布文章会挤掉有效候选——改为先取已发布候选再排名；②`/api/post/archives` 原先只被 `/api/post/{id}` 碰巧覆盖，`/{id}/related` 会落进 anyRequest 管理员兜底——两者均已显式放行并用测试钉死。
+
+---
+
+## 未发布 — AI 写作助手扩展 + 读写路径提速 + 外观呈现五维 (2026-11-07)
+
+### 说明
+
+v2.0.30 开发批次（版本号随下一次发版统一 bump），三个方向并行推进，**数据库 schema 零变动**（新设置键全部走 `site_setting` KV 表，访客/文章统计只用 SELECT 聚合）：
+
+1. **AI 更智能**：编辑器 AI 能力从「对已保存文章做生成」扩展到「对正在写的内容直接动手」——选区润色/续写/精简不要求先保存；同时新增基于站内已发布文章的内链建议（模型只拿标题+摘要清单，锚文本与目标标题由服务端回填，模型输出不可信字段一律丢弃）。
+2. **性能**：前端把 markdown 渲染链路（marked + DOMPurify，66KB）整体移出首屏关键路径；后端消灭相册列表 N+1、给公开标签列表与站点页面 KV 读取加缓存、访客仪表盘 28 次串行计数合并为 2 次 GROUP BY。
+3. **自定义继续增强**：外观深度自定义从 11 键扩到 16 键，新增「阅读与内容呈现」维度（进度条开关、引用块/文章行/正文图片/表格样式），默认档仍逐像素等于改造前观感。
+
+### 新增（AI 写作助手）
+
+- **选区写作** `POST /api/admin/ai/writing/inline`（`AiInlineWritingRequest{action,text}` → `AiInlineWritingVO{action,text,model,latencyMs}`）：`action ∈ polish|continue|shorten`，选区 ≤3000 字符；`polish` 润色保持原意、`continue` 续写 150–300 字、`shorten` 压缩到约一半。模型输出 `{"text": "…"}`，结构化解析走 `AiModelCaller` 的一次修复往返。
+- **内链建议** `POST /api/admin/ai/writing/links`（`AiLinkSuggestionRequest{postId}` → `AiLinkSuggestionsVO`）：候选 = 最近 40 篇其他已发布文章（仅 id/标题/摘要，不送正文）；返回 3–5 条 `{targetPostId,targetTitle,anchor,reason}`，**postId 不在候选集或锚文本为空的建议直接丢弃，targetTitle 永远来自服务端候选映射**（模型给的 title 字段不读）。无候选时 400。
+- 两个端点都在 `AdminAiController`（`/api/admin/` 60/min 通配限流覆盖），服务层延续惯例：**无 `@Transactional`**（模型调用绝不占连接）、`AiAvailability.requireUsable()` 前置、错误文案固定中文目录（绝不回显上游地址/密钥）、系统提示词含「只输出一个 JSON 对象」。
+- 前端 `PostEdit.vue` 的「AI 写作」卡片重排：「润色/续写/精简」**不要求文章已保存**（选区在点击瞬间同步捕获，请求期间作者改动会用快照守卫拒绝拼接而不是错位覆盖）；「内链建议」仅已保存文章可用，点「插入」把 `[锚文本](/post/{id})` 写进光标处、用过即禁用。`api/llm.ts` 两个新方法都带 `timeout: 130000` + `_noRetry`（模型调用绝不自动重试）。
+
+### 新增（外观呈现五维，`site_setting` 零迁移）
+
+- 5 个新键（`ALLOWED_KEYS` / `defaults()` / `validateValue()` 三处同改）：
+  - `readingProgress` `on|off`（默认 `on` = 现状常显）：关闭后阅读页不再渲染顶部进度条；
+  - `blockquoteStyle` `default|accent|minimal|card`：accent 统一引用块为强调色底（压过 PostDetail 的 `:deep` 覆盖）、minimal 去底色细边条、card 卡片化；
+  - `postRowStyle` `default|compact|card`：compact 收紧行距/摘要单行/封面缩小、card 每行独立卡片去掉分隔线；
+  - `contentImageStyle` `default|framed|flat`：framed 细边相框、flat 无阴影无圆角；
+  - `tableStyle` `default|striped|minimal`：striped 斑马纹、minimal 去外框仅留横向发丝线。
+- 硬约束与 v2.0.29 完全一致：所有规则限定 `#selfblog[data-ap-*] .app-main:not(.app-main--admin)`（导航栏/Footer/后台碰不到），**default 档零规则、零回归**，5 键全部进 `getPublicSettings()` 但**不进 `PREPAINT_APPEARANCE_VARS`**（`readingProgress` 是 PostDetail 的响应式 `v-if`，不是 CSS 钩子，刻意不进 App.vue watch）。
+- 后台入口：网站设置 → 外观 → 外观深度自定义（16 键），「恢复默认外观」一并覆盖。
+
+### 性能（前端）
+
+- **markdown chunk 移出首屏**：`marked.setOptions` 从 `main.ts` 顶部迁到 `utils/markdown.ts` 模块顶层——`dist/index.html` 不再对 66KB 的 markdown chunk 做 modulepreload，Home/Search/Archives/Tag 首屏不再解析执行 marked+DOMPurify（构建产物已验证）。
+- Navbar resize 监听改为 rAF 合帧（`fitLinks()` 每次 resize 做多次强制布局读取，拖拽窗口时是同步循环）；`ArticleList` 的每篇阅读时长从模板内重复计算改为一次 `computed` Map。
+
+### 性能（后端，全部 SELECT-only，无 DDL）
+
+- **相册 N+1**：`PhotoAlbumServiceImpl` 公开/管理列表原先每相册一次 `album_photo` 查询只为算 photoCount+封面 → 单查询 `IN(…)` 分组在内存聚合，单相册路径不变。
+- **公开标签列表缓存**：`listAllTags()` 挂 `hotTagsCache`，`createTag/getOrCreateTag/deleteTag` 逐出 `hotTagsCache` + `categoryCache`（顺带修掉「标签改名后 `tagsByPost:*` 30 分钟陈旧」的老问题）。
+- **站点页面缓存**：新 `pageCache`（5min），`getPublished/getBySlug/getManifest/getNavigation` 四读全挂缓存，六个写方法全部 allEntries 逐出；`getManifest` 返回 `List.copyOf` 防缓存引用被改。
+- **访客仪表盘**：TopPages 的 LIMIT 20000 全表内存计数 → `GROUP BY page_path ORDER BY COUNT(*) DESC LIMIT 8`；总阅读量全行加载求和 → `SUM(view_count)`；14 天日循环 28 次计数 → 2 次 GROUP BY（日期函数与返回类型完全沿用 `countPostsGroupByDate` 的跨库范式，H2/MySQL/SQLite 三库可移植）。
+- gzip `mime-types` 增加 `image/svg+xml`（站点 Logo/图标此前不压缩）。
+- `visitorTrackingEnabled=false` 时前端直接跳过记录 POST（后端本来就会拒绝，省一次往返）。
+
+### 影响文件
+
+| 文件 | 改动类型 |
+|------|----------|
+| `backend/.../dto/ai/AiInlineWritingRequest.java` | 新增（选区写作请求） |
+| `backend/.../dto/ai/AiLinkSuggestionRequest.java` | 新增（内链建议请求） |
+| `backend/.../vo/ai/AiInlineWritingVO.java` / `AiLinkSuggestionVO.java` / `AiLinkSuggestionsVO.java` | 新增（AI 写作 VO） |
+| `backend/.../service/ai/AiWritingService.java` | 修改（`inlineWrite` + `suggestLinks`） |
+| `backend/.../service/ai/AiPromptBuilder.java` | 修改（选区/内链提示词与动作指令） |
+| `backend/.../service/ai/AiJson.java` | 修改（`longValue` 宽容读取） |
+| `backend/.../controller/admin/AdminAiController.java` | 修改（`POST /admin/ai/writing/inline`、`/links`） |
+| `backend/.../service/site/impl/SiteSettingsServiceImpl.java` | 修改（5 个新外观键三处登记） |
+| `backend/.../service/site/impl/PhotoAlbumServiceImpl.java` | 修改（相册照片单查询分组） |
+| `backend/.../service/post/impl/BlogTagServiceImpl.java` | 修改（`listAllTags` 缓存 + 写路径双缓存逐出） |
+| `backend/.../service/site/impl/PageServiceImpl.java` | 修改（四读挂 `pageCache` + 六写逐出） |
+| `backend/.../config/cache/CaffeineCacheConfig.java` | 修改（`pageCache` 注册） |
+| `backend/.../service/site/impl/VisitorServiceImpl.java` | 修改（仪表盘三个聚合改 SQL 化） |
+| `backend/.../mapper/VisitorEventMapper.java` | 修改（`selectTopPagePaths`/`selectDailyStats`） |
+| `backend/.../mapper/BlogPostMapper.java` + `mapper/BlogPostMapper.xml` | 修改（`sumPublishedPostViews`） |
+| `backend/.../dto/site/VisitorDailyStat.java` / `VisitorPathCount.java` | 新增（聚合投影类型化 DTO） |
+| `backend/src/main/resources/application.yml` | 修改（gzip 增加 svg） |
+| `frontend/src/types/llm.ts` / `types/index.ts` / `api/llm.ts` | 修改（inline/suggestLinks 契约） |
+| `frontend/src/views/post/PostEdit.vue` | 修改（AI 卡片：选区写作 + 内链建议插入） |
+| `frontend/src/main.ts` / `utils/markdown.ts` | 修改（marked 配置迁出首屏） |
+| `frontend/src/components/layout/Navbar.vue` | 修改（resize rAF 合帧） |
+| `frontend/src/components/post/ArticleList.vue` | 修改（阅读时长 computed 记忆化） |
+| `frontend/src/stores/site.ts` | 修改（5 键 interface/defaults/enumAttrs） |
+| `frontend/src/App.vue` | 修改（watch 数组 +4 键；访客记录开关守卫） |
+| `frontend/src/views/post/PostDetail.vue` | 修改（进度条 `readingProgress` v-if） |
+| `frontend/src/views/admin/Settings.vue` | 修改（外观面板 16 键） |
+| `frontend/src/styles/customize.css` | 修改（引用块/文章行/正文图片/表格四节） |
+| `backend/src/test/.../AiWritingServiceTest.java`（+18）/ `AdminAiControllerTest.java`（+3） | 修改 |
+| `backend/src/test/.../SiteSettingsServiceImplTest.java` | 修改（5 键默认值/公开下发/取值矩阵） |
+| `backend/src/test/.../PhotoAlbumServiceImplBatchTest.java` / `VisitorDashboardSummaryTest.java` | 新增 |
+| `backend/src/test/.../BlogTagServiceImplTest.java` / `BlogTagLifecycleTest.java` / `PageServiceImplTest.java` / `ReadingPageServiceTest.java` / `SitemapServiceTest.java` / `DiscoveryControllerTest.java` | 修改（缓存逐出与聚合断言） |
+| `frontend/src/stores/__tests__/site.test.ts` / `views/admin/__tests__/Settings.test.ts` / `views/post/__tests__/PostDetail.test.ts` / `views/post/__tests__/PostEdit.test.ts` / `utils/__tests__/markdown.test.ts` | 修改 |
+
+### 验证
+
+- 后端全量：**1362 tests / 0 failures / 0 errors，BUILD SUCCESS**（基线 1291，本批 +71：AI 写作 21、外观 5 键约 14、性能批次约 36）。
+- 前端全量：**56 files / 565 tests 全通过**（基线 558，本批 +7）；`vue-tsc --noEmit` 0 错误；`eslint src` 0 error / 42 warning（与基线持平）；`prettier --check` 通过；`test:deployment` **27/27**；`vite build` 通过。
+- 构建产物证据：`dist/index.html` 的 modulepreload 列表只剩 `vendor` chunk，markdown chunk（66.08 kB / 22.82 kB gzip）转为懒加载消费者的动态 import。
+- 新 AI 端点测试全部走 `AiStubLlmServer`（回环真 HTTP），不出网；新 SQL 全部为可移植 SELECT（H2 兜底语句覆盖，CI mysql job 复核）。
+
+---
+
 ## 未发布 — 编辑器「链接」按钮方向修正 (2026-10-24)
 
 ### 说明

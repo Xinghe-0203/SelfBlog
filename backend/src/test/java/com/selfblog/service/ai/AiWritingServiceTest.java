@@ -3,6 +3,9 @@ package com.selfblog.service.ai;
 import com.selfblog.common.exception.BusinessException;
 import com.selfblog.config.cache.CaffeineCacheConfig;
 import com.selfblog.service.site.SiteSettingsService;
+import com.selfblog.vo.ai.AiInlineWritingVO;
+import com.selfblog.vo.ai.AiLinkSuggestionVO;
+import com.selfblog.vo.ai.AiLinkSuggestionsVO;
 import com.selfblog.vo.ai.AiSummaryVO;
 import com.selfblog.vo.ai.AiTagsVO;
 import com.selfblog.vo.ai.AiTitlesVO;
@@ -30,6 +33,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *
  * <p>重点覆盖契约里那些「错了会静默」的约束：摘要长度区间、标签只能出自已有池、
  * 池外值必须丢弃、全丢弃报 502、池空报 400、标题恰好 3 个且互不相同。</p>
+ *
+ * <p>行内写作覆盖四种处理方式的提示词、选区校验（非法 action/空白/超长都 400 且不发上游）、
+ * 修复往返与 502；内链建议覆盖候选外 postId 丢弃、标题取候选回填、空候选 400、
+ * 修复往返与显式空数组的合法放行。</p>
  */
 @SpringBootTest
 @ActiveProfiles("test")
@@ -38,6 +45,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class AiWritingServiceTest {
 
     private static final long POST_ID = 881001L;
+    private static final long LINK_POST_A = 881201L;
+    private static final long LINK_POST_B = 881202L;
+    private static final long LINK_POST_C = 881203L;
     private static final String API_KEY = "sk-ai-writing-secret-abcdefgh";
 
     @Autowired
@@ -60,6 +70,7 @@ class AiWritingServiceTest {
         clearSiteCache();
         jdbc.update("DELETE FROM blog_post_tag WHERE post_id = ?", POST_ID);
         jdbc.update("DELETE FROM blog_post WHERE id = ?", POST_ID);
+        jdbc.update("DELETE FROM blog_post WHERE id IN (?, ?, ?)", LINK_POST_A, LINK_POST_B, LINK_POST_C);
         jdbc.update("INSERT INTO blog_post (id, user_id, title, summary, content, category, cover_url, status, "
                         + "create_time, update_time, is_deleted) VALUES (?, 1, ?, ?, ?, ?, ?, 1, "
                         + "TIMESTAMP '2026-10-15 10:00:00', TIMESTAMP '2026-10-15 10:00:00', 0)",
@@ -102,6 +113,15 @@ class AiWritingServiceTest {
         for (String name : names) {
             jdbc.update("INSERT INTO blog_tag (id, name, is_deleted) VALUES (?, ?, 0)", id++, name);
         }
+    }
+
+    /** 造一篇给内链候选用的已发布文章；时间用远期字面量，保证排在测试库其他行前面。 */
+    private void seedPublishedPost(long id, String title, String summary, String content,
+                                   String updateTimestamp) {
+        jdbc.update("INSERT INTO blog_post (id, user_id, title, summary, content, category, cover_url, status, "
+                        + "create_time, update_time, is_deleted) VALUES (?, 1, ?, ?, ?, '后端', '/uploads/cover.jpg', 1, "
+                        + "TIMESTAMP '2026-10-15 10:00:00', TIMESTAMP '" + updateTimestamp + "', 0)",
+                id, title, summary, content);
     }
 
     @Test
@@ -322,5 +342,330 @@ class AiWritingServiceTest {
         assertEquals(502, error.getCode());
         assertEquals("模型鉴权失败，请检查 API Key 是否有效", error.getMessage());
         assertFalse(error.getMessage().contains(API_KEY));
+    }
+
+    // ---- 行内写作（inline）：选区润色/续写/精简 ----
+
+    @Test
+    @DisplayName("inline_Polish_HappyPath_SendsInstructionAndSelection")
+    void inline_Polish_HappyPath_SendsInstructionAndSelection() throws Exception {
+        server = new AiStubLlmServer((index, body) ->
+                AiStubLlmServer.Reply.ok("{\"text\":\"润色后的句子\"}"));
+        configureLlm(server.baseUrl());
+
+        AiInlineWritingVO vo = writingService.inlineWrite("polish", "这个句子有点不通顺的。");
+
+        assertEquals("polish", vo.action());
+        assertEquals("润色后的句子", vo.text());
+        assertEquals("deepseek-flash", vo.model());
+        assertTrue(vo.latencyMs() >= 0);
+        assertEquals(1, server.callCount());
+        String body = server.bodies().get(0);
+        assertTrue(body.contains(AiPromptBuilder.inlineInstruction("polish")), "请求体要带上润色指令");
+        assertTrue(body.contains("这个句子有点不通顺的。"), "请求体要带上所选文字");
+    }
+
+    @Test
+    @DisplayName("inline_Continue_HappyPath_ActionCaseInsensitive")
+    void inline_Continue_HappyPath_ActionCaseInsensitive() throws Exception {
+        server = new AiStubLlmServer((index, body) ->
+                AiStubLlmServer.Reply.ok("{\"text\":\"续写出来的一段正文。\"}"));
+        configureLlm(server.baseUrl());
+
+        AiInlineWritingVO vo = writingService.inlineWrite("CONTINUE", "REQUIRED 是默认行为，");
+
+        assertEquals("continue", vo.action(), "action 大小写不敏感，返回归一化的小写值");
+        assertEquals("续写出来的一段正文。", vo.text());
+        String body = server.bodies().get(0);
+        assertTrue(body.contains(AiPromptBuilder.inlineInstruction("continue")), "请求体要带上续写指令");
+        assertTrue(body.contains("REQUIRED 是默认行为，"));
+    }
+
+    @Test
+    @DisplayName("inline_Shorten_HappyPath_SendsShortenInstruction")
+    void inline_Shorten_HappyPath_SendsShortenInstruction() throws Exception {
+        server = new AiStubLlmServer((index, body) ->
+                AiStubLlmServer.Reply.ok("{\"text\":\"精简后的句子\"}"));
+        configureLlm(server.baseUrl());
+
+        AiInlineWritingVO vo = writingService.inlineWrite("shorten", "一段比较啰嗦的长句，可以砍掉一半。");
+
+        assertEquals("shorten", vo.action());
+        assertEquals("精简后的句子", vo.text());
+        String body = server.bodies().get(0);
+        assertTrue(body.contains(AiPromptBuilder.inlineInstruction("shorten")), "请求体要带上精简指令");
+        assertTrue(body.contains("一段比较啰嗦的长句，可以砍掉一半。"));
+    }
+
+    @Test
+    @DisplayName("inline_Translate_HappyPath_SendsInstructionAndSelection")
+    void inline_Translate_HappyPath_SendsInstructionAndSelection() throws Exception {
+        server = new AiStubLlmServer((index, body) ->
+                AiStubLlmServer.Reply.ok("{\"text\":\"This is an idiomatic English sentence.\"}"));
+        configureLlm(server.baseUrl());
+
+        AiInlineWritingVO vo = writingService.inlineWrite("translate", "这是一段需要翻译的中文。");
+
+        assertEquals("translate", vo.action());
+        assertEquals("This is an idiomatic English sentence.", vo.text());
+        assertEquals("deepseek-flash", vo.model());
+        assertEquals(1, server.callCount());
+        String body = server.bodies().get(0);
+        assertTrue(body.contains(AiPromptBuilder.inlineInstruction("translate")), "请求体要带上翻译指令");
+        assertTrue(body.contains("这是一段需要翻译的中文。"), "请求体要带上所选文字");
+    }
+
+    @Test
+    @DisplayName("inline_Translate_ActionCaseInsensitive")
+    void inline_Translate_ActionCaseInsensitive() throws Exception {
+        server = new AiStubLlmServer((index, body) ->
+                AiStubLlmServer.Reply.ok("{\"text\":\"翻译成的一段自然中文。\"}"));
+        configureLlm(server.baseUrl());
+
+        AiInlineWritingVO vo = writingService.inlineWrite("TRANSLATE", "An English sentence to translate.");
+
+        assertEquals("translate", vo.action(), "action 大小写不敏感，返回归一化的小写值");
+        assertEquals("翻译成的一段自然中文。", vo.text());
+        assertTrue(server.bodies().get(0).contains(AiPromptBuilder.inlineInstruction("translate")));
+    }
+
+    @Test
+    @DisplayName("inline_InvalidAction_Throws400WithoutUpstreamCall")
+    void inline_InvalidAction_Throws400WithoutUpstreamCall() throws Exception {
+        server = new AiStubLlmServer((index, body) -> AiStubLlmServer.Reply.ok("{\"text\":\"x\"}"));
+        configureLlm(server.baseUrl());
+
+        BusinessException error = assertThrows(BusinessException.class,
+                () -> writingService.inlineWrite("expand", "随便一段文字"));
+
+        assertEquals(400, error.getCode());
+        assertEquals("处理方式仅支持 polish、continue、shorten、translate", error.getMessage());
+        assertEquals(0, server.callCount(), "非法 action 不该白花一次上游调用");
+    }
+
+    @Test
+    @DisplayName("inline_BlankText_Throws400WithoutUpstreamCall")
+    void inline_BlankText_Throws400WithoutUpstreamCall() throws Exception {
+        server = new AiStubLlmServer((index, body) -> AiStubLlmServer.Reply.ok("{\"text\":\"x\"}"));
+        configureLlm(server.baseUrl());
+
+        BusinessException error = assertThrows(BusinessException.class,
+                () -> writingService.inlineWrite("polish", "   "));
+
+        assertEquals(400, error.getCode());
+        assertEquals("请提供需要处理的文本", error.getMessage());
+        assertEquals(0, server.callCount());
+    }
+
+    @Test
+    @DisplayName("inline_Over3000Chars_Throws400WithoutUpstreamCall")
+    void inline_Over3000Chars_Throws400WithoutUpstreamCall() throws Exception {
+        server = new AiStubLlmServer((index, body) -> AiStubLlmServer.Reply.ok("{\"text\":\"x\"}"));
+        configureLlm(server.baseUrl());
+
+        BusinessException error = assertThrows(BusinessException.class,
+                () -> writingService.inlineWrite("polish", "字".repeat(3001)));
+
+        assertEquals(400, error.getCode());
+        assertEquals("选区内容过长，请最多选择 3000 字符", error.getMessage());
+        assertEquals(0, server.callCount());
+    }
+
+    @Test
+    @DisplayName("inline_GarbageThenValid_RepairsOnce")
+    void inline_GarbageThenValid_RepairsOnce() throws Exception {
+        server = new AiStubLlmServer((index, body) -> index == 0
+                ? AiStubLlmServer.Reply.ok("好的，这是润色结果，仅供参考")
+                : AiStubLlmServer.Reply.ok("{\"text\":\"润色后的句子\"}"));
+        configureLlm(server.baseUrl());
+
+        AiInlineWritingVO vo = writingService.inlineWrite("polish", "原句");
+
+        assertEquals("润色后的句子", vo.text());
+        assertEquals(2, server.callCount(), "垃圾输出要触发一次修复往返");
+        assertTrue(server.bodies().get(1).contains("好的，这是润色结果，仅供参考"),
+                "修复请求要带上上一次的原始输出");
+    }
+
+    @Test
+    @DisplayName("inline_PersistentGarbage_Throws502")
+    void inline_PersistentGarbage_Throws502() throws Exception {
+        server = new AiStubLlmServer((index, body) ->
+                AiStubLlmServer.Reply.ok("两轮都不是 JSON 的输出"));
+        configureLlm(server.baseUrl());
+
+        BusinessException error = assertThrows(BusinessException.class,
+                () -> writingService.inlineWrite("polish", "原句"));
+
+        assertEquals(502, error.getCode());
+        assertEquals("模型返回的内容不符合要求，请重试或手动填写", error.getMessage());
+        assertFalse(error.getMessage().contains(API_KEY), "错误文案绝不回显密钥");
+        assertFalse(error.getMessage().contains(server.baseUrl()), "错误文案绝不回显上游地址");
+        assertEquals(2, server.callCount(), "结构不合规只重试一次");
+    }
+
+    @Test
+    @DisplayName("inline_BlankOutputText_RepairsThenThrows502")
+    void inline_BlankOutputText_RepairsThenThrows502() throws Exception {
+        server = new AiStubLlmServer((index, body) ->
+                AiStubLlmServer.Reply.ok("{\"text\":\"   \"}"));
+        configureLlm(server.baseUrl());
+
+        BusinessException error = assertThrows(BusinessException.class,
+                () -> writingService.inlineWrite("shorten", "原句"));
+
+        assertEquals(502, error.getCode());
+        assertEquals("模型返回的内容不符合要求，请重试或手动填写", error.getMessage());
+        assertEquals(2, server.callCount(), "空白 text 也要回给模型修一次");
+    }
+
+    // ---- 内链建议（links）----
+
+    @Test
+    @DisplayName("links_HappyPath_KeepsOnlyValidCandidates_TitleFromCandidateMap")
+    void links_HappyPath_KeepsOnlyValidCandidates_TitleFromCandidateMap() throws Exception {
+        seedPublishedPost(LINK_POST_A, "MyBatis Plus 批量插入实践", "批量插入的正确姿势",
+                "批量插入可以减少网络往返。", "2026-12-30 10:00:00");
+        // B 无摘要：候选行退回用正文开头充数
+        seedPublishedPost(LINK_POST_B, "H2 与 MySQL 的差异清单", null,
+                "H2 与 MySQL 在函数与隐式转换上有不少差异。", "2026-12-31 10:00:00");
+        server = new AiStubLlmServer((index, body) -> AiStubLlmServer.Reply.ok("{\"links\":["
+                + "{\"postId\":" + LINK_POST_A + ",\"anchor\":\"事务传播\","
+                + "\"reason\":\"讲清楚了 REQUIRED 与 REQUIRES_NEW 的差异\",\"title\":\"模型编造的标题一\"},"
+                + "{\"postId\":99999999,\"anchor\":\"不存在的文章\","
+                + "\"reason\":\"候选里没有这篇，必须丢弃\",\"title\":\"模型编造的标题二\"},"
+                + "{\"postId\":" + LINK_POST_B + ",\"anchor\":\"索引优化\","
+                + "\"reason\":\"与查询性能直接相关\",\"title\":\"模型编造的标题三\"}]}"));
+        configureLlm(server.baseUrl());
+
+        AiLinkSuggestionsVO vo = writingService.suggestLinks(POST_ID);
+
+        assertEquals(2, vo.suggestions().size(), "候选外的 postId 必须丢弃");
+        assertEquals(LINK_POST_A, vo.suggestions().get(0).targetPostId());
+        assertEquals("MyBatis Plus 批量插入实践", vo.suggestions().get(0).targetTitle(),
+                "标题取候选列表回填，绝不采信模型输出的 title");
+        assertEquals("事务传播", vo.suggestions().get(0).anchor());
+        assertEquals("讲清楚了 REQUIRED 与 REQUIRES_NEW 的差异", vo.suggestions().get(0).reason());
+        assertEquals(LINK_POST_B, vo.suggestions().get(1).targetPostId());
+        assertEquals("H2 与 MySQL 的差异清单", vo.suggestions().get(1).targetTitle());
+        assertEquals("deepseek-flash", vo.model());
+        assertTrue(vo.latencyMs() >= 0);
+        String prompt = server.bodies().get(0);
+        assertTrue(prompt.contains("候选文章"));
+        assertTrue(prompt.contains("id=" + LINK_POST_A));
+        assertTrue(prompt.contains("id=" + LINK_POST_B));
+        assertTrue(prompt.contains("MyBatis Plus 批量插入实践"));
+        assertTrue(prompt.contains("H2 与 MySQL 在函数与隐式转换上有不少差异"),
+                "没有摘要的候选要用正文开头充数");
+        assertTrue(prompt.contains("REQUIRED 是默认行为"), "提示词要带上当前文章的正文节选");
+        assertTrue(prompt.indexOf("H2 与 MySQL 的差异清单") < prompt.indexOf("MyBatis Plus 批量插入实践"),
+                "候选按更新时间倒序排列");
+        assertEquals(1, server.callCount());
+    }
+
+    @Test
+    @DisplayName("links_CappedAtFive_BlankAnchorDropped")
+    void links_CappedAtFive_BlankAnchorDropped() throws Exception {
+        seedPublishedPost(LINK_POST_A, "候选甲", "摘要甲", "正文甲。", "2026-12-30 10:00:00");
+        seedPublishedPost(LINK_POST_B, "候选乙", "摘要乙", "正文乙。", "2026-12-29 10:00:00");
+        seedPublishedPost(LINK_POST_C, "候选丙", "摘要丙", "正文丙。", "2026-12-28 10:00:00");
+        server = new AiStubLlmServer((index, body) -> AiStubLlmServer.Reply.ok("{\"links\":["
+                + "{\"postId\":" + LINK_POST_C + ",\"anchor\":\"   \",\"reason\":\"空白锚文本\"},"
+                + "{\"postId\":" + LINK_POST_A + ",\"anchor\":\"锚一\",\"reason\":\"理由\"},"
+                + "{\"postId\":" + LINK_POST_B + ",\"anchor\":\"锚二\",\"reason\":\"理由\"},"
+                + "{\"postId\":" + LINK_POST_C + ",\"anchor\":\"锚三\",\"reason\":\"理由\"},"
+                + "{\"postId\":" + LINK_POST_A + ",\"anchor\":\"锚四\",\"reason\":\"理由\"},"
+                + "{\"postId\":" + LINK_POST_B + ",\"anchor\":\"锚五\",\"reason\":\"理由\"},"
+                + "{\"postId\":" + LINK_POST_C + ",\"anchor\":\"锚六\",\"reason\":\"理由\"}]}"));
+        configureLlm(server.baseUrl());
+
+        AiLinkSuggestionsVO vo = writingService.suggestLinks(POST_ID);
+
+        assertEquals(5, vo.suggestions().size(), "最多 5 条");
+        assertEquals(List.of(LINK_POST_A, LINK_POST_B, LINK_POST_C, LINK_POST_A, LINK_POST_B),
+                vo.suggestions().stream().map(AiLinkSuggestionVO::targetPostId).toList(),
+                "空白锚文本整条丢弃，其余按给出顺序取前 5");
+    }
+
+    @Test
+    @DisplayName("links_EmptyLinksArray_ReturnsEmptySuggestions")
+    void links_EmptyLinksArray_ReturnsEmptySuggestions() throws Exception {
+        seedPublishedPost(LINK_POST_A, "候选甲", "摘要甲", "正文甲。", "2026-12-30 10:00:00");
+        server = new AiStubLlmServer((index, body) ->
+                AiStubLlmServer.Reply.ok("{\"links\":[]}"));
+        configureLlm(server.baseUrl());
+
+        AiLinkSuggestionsVO vo = writingService.suggestLinks(POST_ID);
+
+        assertTrue(vo.suggestions().isEmpty(), "模型明确返回空数组是合法结果，不能报错");
+        assertEquals("deepseek-flash", vo.model());
+        assertEquals(1, server.callCount());
+    }
+
+    @Test
+    @DisplayName("links_NoOtherPublished_Throws400BeforeCallingModel")
+    void links_NoOtherPublished_Throws400BeforeCallingModel() throws Exception {
+        jdbc.update("UPDATE blog_post SET status = 0 WHERE id <> ?", POST_ID);
+        server = new AiStubLlmServer((index, body) ->
+                AiStubLlmServer.Reply.ok("{\"links\":[]}"));
+        configureLlm(server.baseUrl());
+
+        BusinessException error = assertThrows(BusinessException.class,
+                () -> writingService.suggestLinks(POST_ID));
+
+        assertEquals(400, error.getCode());
+        assertEquals("暂无其他已发布文章，无法生成内链建议", error.getMessage());
+        assertEquals(0, server.callCount(), "候选为空时不该白花一次上游调用");
+    }
+
+    @Test
+    @DisplayName("links_MissingPost_Throws404")
+    void links_MissingPost_Throws404() throws Exception {
+        server = new AiStubLlmServer((index, body) ->
+                AiStubLlmServer.Reply.ok("{\"links\":[]}"));
+        configureLlm(server.baseUrl());
+
+        BusinessException error = assertThrows(BusinessException.class,
+                () -> writingService.suggestLinks(99999999L));
+
+        assertEquals(404, error.getCode());
+        assertEquals("文章不存在", error.getMessage(),
+                "与摘要/标签/标题端点同一套 404 语义");
+        assertEquals(0, server.callCount());
+    }
+
+    @Test
+    @DisplayName("links_NullPostId_Throws400")
+    void links_NullPostId_Throws400() throws Exception {
+        server = new AiStubLlmServer((index, body) ->
+                AiStubLlmServer.Reply.ok("{\"links\":[]}"));
+        configureLlm(server.baseUrl());
+
+        BusinessException error = assertThrows(BusinessException.class,
+                () -> writingService.suggestLinks(null));
+
+        assertEquals(400, error.getCode());
+        assertEquals("请指定文章", error.getMessage());
+        assertEquals(0, server.callCount());
+    }
+
+    @Test
+    @DisplayName("links_UnparseableThenRepaired")
+    void links_UnparseableThenRepaired() throws Exception {
+        seedPublishedPost(LINK_POST_A, "候选甲", "摘要甲", "正文甲。", "2026-12-30 10:00:00");
+        server = new AiStubLlmServer((index, body) -> index == 0
+                ? AiStubLlmServer.Reply.ok("抱歉，这次输出里没有 JSON 对象")
+                : AiStubLlmServer.Reply.ok("{\"links\":[{\"postId\":" + LINK_POST_A
+                        + ",\"anchor\":\"事务传播\",\"reason\":\"理由\"}]}"));
+        configureLlm(server.baseUrl());
+
+        AiLinkSuggestionsVO vo = writingService.suggestLinks(POST_ID);
+
+        assertEquals(1, vo.suggestions().size());
+        assertEquals(LINK_POST_A, vo.suggestions().get(0).targetPostId());
+        assertEquals("事务传播", vo.suggestions().get(0).anchor());
+        assertEquals(2, server.callCount(), "解析失败要触发一次修复往返");
+        assertTrue(server.bodies().get(1).contains("抱歉，这次输出里没有 JSON 对象"),
+                "修复请求要带上上一次的原始输出");
     }
 }

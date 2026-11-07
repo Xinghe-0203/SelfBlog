@@ -499,6 +499,239 @@ class SiteSettingsServiceImplTest {
         assertEquals(400, error.getCode(), level);
     }
 
+    // ---------- 外观深度自定义（v2.0.30：阅读与内容呈现，5 个新键） ----------
+
+    /**
+     * v2.0.30 五键的默认档就是改造前行为：进度条显示、引用块/文章行/正文图片/表格
+     * 保持原样式。改这里的期望值等于故意制造升级回归。
+     */
+    @Test
+    @DisplayName("readingAppearanceKeys_ArePresentInDefaultsWithFrozenDefaults")
+    void readingAppearanceKeys_ArePresentInDefaultsWithFrozenDefaults() {
+        Map<String, String> settings = siteSettingsService.getSettings();
+        assertEquals("on", settings.get("readingProgress"));
+        assertEquals("default", settings.get("blockquoteStyle"));
+        assertEquals("default", settings.get("postRowStyle"));
+        assertEquals("default", settings.get("contentImageStyle"));
+        assertEquals("default", settings.get("tableStyle"));
+    }
+
+    @Test
+    @DisplayName("readingAppearanceKeys_AreAllExposedByPublicSettings")
+    void readingAppearanceKeys_AreAllExposedByPublicSettings() {
+        Map<String, String> publicSettings = siteSettingsService.getPublicSettings();
+        assertTrue(publicSettings.keySet().containsAll(java.util.List.of(
+                "readingProgress", "blockquoteStyle", "postRowStyle", "contentImageStyle", "tableStyle")));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"on", "off"})
+    @DisplayName("readingProgress_AcceptsOnAndOff")
+    void readingProgress_AcceptsOnAndOff(String mode) {
+        assertEquals(mode, siteSettingsService.updateSettings(Map.of("readingProgress", mode)).get("readingProgress"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"", "ON", "Off", "true", "1", "hidden"})
+    @DisplayName("readingProgress_RejectsAnythingElse")
+    void readingProgress_RejectsAnythingElse(String mode) {
+        var error = assertThrows(BusinessException.class,
+                () -> siteSettingsService.updateSettings(Map.of("readingProgress", mode)), mode);
+        assertEquals(400, error.getCode(), mode);
+        assertEquals("阅读进度条必须为 on 或 off", error.getMessage());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"default", "accent", "minimal", "card"})
+    @DisplayName("blockquoteStyle_AcceptsEveryDocumentedStyle")
+    void blockquoteStyle_AcceptsEveryDocumentedStyle(String style) {
+        assertEquals(style, siteSettingsService.updateSettings(Map.of("blockquoteStyle", style)).get("blockquoteStyle"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"", "DEFAULT", "border", "flat", "quote"})
+    @DisplayName("blockquoteStyle_RejectsAnythingElse")
+    void blockquoteStyle_RejectsAnythingElse(String style) {
+        var error = assertThrows(BusinessException.class,
+                () -> siteSettingsService.updateSettings(Map.of("blockquoteStyle", style)), style);
+        assertEquals(400, error.getCode(), style);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"default", "compact", "card"})
+    @DisplayName("postRowStyle_AcceptsEveryDocumentedStyle")
+    void postRowStyle_AcceptsEveryDocumentedStyle(String style) {
+        assertEquals(style, siteSettingsService.updateSettings(Map.of("postRowStyle", style)).get("postRowStyle"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"", "DEFAULT", "list", "magazine", "grid"})
+    @DisplayName("postRowStyle_RejectsAnythingElse")
+    void postRowStyle_RejectsAnythingElse(String style) {
+        var error = assertThrows(BusinessException.class,
+                () -> siteSettingsService.updateSettings(Map.of("postRowStyle", style)), style);
+        assertEquals(400, error.getCode(), style);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"default", "framed", "flat"})
+    @DisplayName("contentImageStyle_AcceptsEveryDocumentedStyle")
+    void contentImageStyle_AcceptsEveryDocumentedStyle(String style) {
+        assertEquals(style, siteSettingsService.updateSettings(Map.of("contentImageStyle", style)).get("contentImageStyle"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"", "DEFAULT", "round", "shadow", "polaroid"})
+    @DisplayName("contentImageStyle_RejectsAnythingElse")
+    void contentImageStyle_RejectsAnythingElse(String style) {
+        var error = assertThrows(BusinessException.class,
+                () -> siteSettingsService.updateSettings(Map.of("contentImageStyle", style)), style);
+        assertEquals(400, error.getCode(), style);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"default", "striped", "minimal"})
+    @DisplayName("tableStyle_AcceptsEveryDocumentedStyle")
+    void tableStyle_AcceptsEveryDocumentedStyle(String style) {
+        assertEquals(style, siteSettingsService.updateSettings(Map.of("tableStyle", style)).get("tableStyle"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"", "DEFAULT", "zebra", "bordered", "none"})
+    @DisplayName("tableStyle_RejectsAnythingElse")
+    void tableStyle_RejectsAnythingElse(String style) {
+        var error = assertThrows(BusinessException.class,
+                () -> siteSettingsService.updateSettings(Map.of("tableStyle", style)), style);
+        assertEquals(400, error.getCode(), style);
+    }
+
+    // ---------- 外观深度自定义（v2.0.30 第二批：首页侧栏排序 + 目录显隐） ----------
+
+    /** 默认档 = 现有模板顺序（作者卡 → 标签块 → 归档入口）与目录常显。 */
+    @Test
+    @DisplayName("layoutOrderKeys_ArePresentInDefaultsWithFrozenDefaults")
+    void layoutOrderKeys_ArePresentInDefaultsWithFrozenDefaults() {
+        Map<String, String> settings = siteSettingsService.getSettings();
+        assertEquals("author-tags-archive", settings.get("homeSidebarOrder"));
+        assertEquals("default", settings.get("tocStyle"));
+    }
+
+    @Test
+    @DisplayName("layoutOrderKeys_AreAllExposedByPublicSettings")
+    void layoutOrderKeys_AreAllExposedByPublicSettings() {
+        Map<String, String> publicSettings = siteSettingsService.getPublicSettings();
+        assertTrue(publicSettings.keySet().containsAll(java.util.List.of("homeSidebarOrder", "tocStyle")));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"author-tags-archive", "author-archive-tags", "tags-author-archive",
+            "tags-archive-author", "archive-author-tags", "archive-tags-author"})
+    @DisplayName("homeSidebarOrder_AcceptsEveryPermutation")
+    void homeSidebarOrder_AcceptsEveryPermutation(String order) {
+        assertEquals(order, siteSettingsService.updateSettings(Map.of("homeSidebarOrder", order)).get("homeSidebarOrder"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"", "author", "author-tags", "tags-tags-author", "archive-tags-archive", "random"})
+    @DisplayName("homeSidebarOrder_RejectsNonPermutations")
+    void homeSidebarOrder_RejectsNonPermutations(String order) {
+        var error = assertThrows(BusinessException.class,
+                () -> siteSettingsService.updateSettings(Map.of("homeSidebarOrder", order)), order);
+        assertEquals(400, error.getCode(), order);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"default", "hidden"})
+    @DisplayName("tocStyle_AcceptsDocumentedValues")
+    void tocStyle_AcceptsDocumentedValues(String style) {
+        assertEquals(style, siteSettingsService.updateSettings(Map.of("tocStyle", style)).get("tocStyle"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"", "DEFAULT", "left", "right", "off"})
+    @DisplayName("tocStyle_RejectsAnythingElse")
+    void tocStyle_RejectsAnythingElse(String style) {
+        var error = assertThrows(BusinessException.class,
+                () -> siteSettingsService.updateSettings(Map.of("tocStyle", style)), style);
+        assertEquals(400, error.getCode(), style);
+    }
+
+    // ---------- 外观深度自定义（v2.0.30 第三批：链接样式 + 摘要卡） ----------
+
+    @Test
+    @DisplayName("presentationKeys3_ArePresentInDefaultsWithFrozenDefaults")
+    void presentationKeys3_ArePresentInDefaultsWithFrozenDefaults() {
+        Map<String, String> settings = siteSettingsService.getSettings();
+        assertEquals("default", settings.get("linkStyle"));
+        assertEquals("off", settings.get("summaryCallout"));
+    }
+
+    @Test
+    @DisplayName("presentationKeys3_AreAllExposedByPublicSettings")
+    void presentationKeys3_AreAllExposedByPublicSettings() {
+        Map<String, String> publicSettings = siteSettingsService.getPublicSettings();
+        assertTrue(publicSettings.keySet().containsAll(java.util.List.of("linkStyle", "summaryCallout")));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"default", "dotted", "flat"})
+    @DisplayName("linkStyle_AcceptsEveryDocumentedStyle")
+    void linkStyle_AcceptsEveryDocumentedStyle(String style) {
+        assertEquals(style, siteSettingsService.updateSettings(Map.of("linkStyle", style)).get("linkStyle"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"", "DEFAULT", "dashes", "underline", "none"})
+    @DisplayName("linkStyle_RejectsAnythingElse")
+    void linkStyle_RejectsAnythingElse(String style) {
+        var error = assertThrows(BusinessException.class,
+                () -> siteSettingsService.updateSettings(Map.of("linkStyle", style)), style);
+        assertEquals(400, error.getCode(), style);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"on", "off"})
+    @DisplayName("summaryCallout_AcceptsOnAndOff")
+    void summaryCallout_AcceptsOnAndOff(String mode) {
+        assertEquals(mode, siteSettingsService.updateSettings(Map.of("summaryCallout", mode)).get("summaryCallout"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"", "ON", "Off", "true", "1", "visible"})
+    @DisplayName("summaryCallout_RejectsAnythingElse")
+    void summaryCallout_RejectsAnythingElse(String mode) {
+        var error = assertThrows(BusinessException.class,
+                () -> siteSettingsService.updateSettings(Map.of("summaryCallout", mode)), mode);
+        assertEquals(400, error.getCode(), mode);
+    }
+
+    // ---------- v2.0.30 第四批：文章尾部版权声明行 ----------
+
+    @Test
+    @DisplayName("postLicense_DefaultEmptyAndExposedByPublicSettings")
+    void postLicense_DefaultEmptyAndExposedByPublicSettings() {
+        assertEquals("", siteSettingsService.getSettings().get("postLicense"));
+        assertTrue(siteSettingsService.getPublicSettings().containsKey("postLicense"));
+    }
+
+    @Test
+    @DisplayName("postLicense_AcceptsTextAndBlankClears")
+    void postLicense_AcceptsTextAndBlankClears() {
+        assertEquals("本文采用 CC BY-NC-SA 4.0 许可，转载请注明出处。",
+                siteSettingsService.updateSettings(Map.of("postLicense", "本文采用 CC BY-NC-SA 4.0 许可，转载请注明出处。"))
+                        .get("postLicense"));
+        assertEquals("", siteSettingsService.updateSettings(Map.of("postLicense", "")).get("postLicense"));
+    }
+
+    @Test
+    @DisplayName("postLicense_RejectsOver200Chars")
+    void postLicense_RejectsOver200Chars() {
+        var error = assertThrows(BusinessException.class,
+                () -> siteSettingsService.updateSettings(Map.of("postLicense", "长".repeat(201))));
+        assertEquals(400, error.getCode());
+        assertEquals("版权声明不能超过200个字符", error.getMessage());
+    }
+
     @ParameterizedTest
     @ValueSource(strings = {"14", "16", "19"})
     @DisplayName("baseFontSize_AcceptsInclusiveRange")

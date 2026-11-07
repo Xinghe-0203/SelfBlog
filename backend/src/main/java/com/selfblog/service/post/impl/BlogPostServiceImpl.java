@@ -24,9 +24,11 @@ import com.selfblog.service.post.PostQueryService;
 import com.selfblog.service.social.NotificationService;
 import com.selfblog.service.seo.SeoAutoGenerationTrigger;
 import com.selfblog.utils.HtmlSanitizer;
+import com.selfblog.vo.post.ArchivePostVO;
 import com.selfblog.vo.post.AdjacentPostVO;
 import com.selfblog.vo.post.PostDetailResponse;
 import com.selfblog.vo.post.PostListResponse;
+import com.selfblog.vo.post.RelatedPostVO;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.annotation.CacheEvict;
@@ -134,7 +136,7 @@ public class BlogPostServiceImpl extends ServiceImpl<BlogPostMapper, BlogPost> i
     // ==================== 核心 CRUD ====================
 
     @Override
-    @CacheEvict(value = {CaffeineCacheConfig.TRENDING_CACHE, CaffeineCacheConfig.STATS_CACHE}, allEntries = true)
+    @CacheEvict(value = {CaffeineCacheConfig.TRENDING_CACHE, CaffeineCacheConfig.STATS_CACHE, CaffeineCacheConfig.FEED_CACHE}, allEntries = true)
     @Transactional(rollbackFor = Exception.class)
     public Long createPost(PostCreateRequest request, Long userId, boolean isAdmin) {
         validatePostRequest(request);
@@ -185,7 +187,7 @@ public class BlogPostServiceImpl extends ServiceImpl<BlogPostMapper, BlogPost> i
     }
 
     @Override
-    @CacheEvict(value = {CaffeineCacheConfig.TRENDING_CACHE, CaffeineCacheConfig.STATS_CACHE}, allEntries = true)
+    @CacheEvict(value = {CaffeineCacheConfig.TRENDING_CACHE, CaffeineCacheConfig.STATS_CACHE, CaffeineCacheConfig.FEED_CACHE}, allEntries = true)
     @Transactional(rollbackFor = Exception.class)
     public Long createPost(PostCreateRequest request, Long userId) {
         // 两参重载若只靠三参方法上的注解，内部调用属于自调用，注解不会生效，故此处同样声明驱逐
@@ -193,7 +195,7 @@ public class BlogPostServiceImpl extends ServiceImpl<BlogPostMapper, BlogPost> i
     }
 
     @Override
-    @CacheEvict(value = {CaffeineCacheConfig.TRENDING_CACHE, CaffeineCacheConfig.STATS_CACHE, CaffeineCacheConfig.CATEGORY_CACHE}, allEntries = true)
+    @CacheEvict(value = {CaffeineCacheConfig.TRENDING_CACHE, CaffeineCacheConfig.STATS_CACHE, CaffeineCacheConfig.CATEGORY_CACHE, CaffeineCacheConfig.FEED_CACHE}, allEntries = true)
     @Transactional(rollbackFor = Exception.class)
     public void updatePost(PostCreateRequest request, Long userId, boolean isAdmin) {
         if (request.getId() == null) {
@@ -282,7 +284,7 @@ public class BlogPostServiceImpl extends ServiceImpl<BlogPostMapper, BlogPost> i
     }
 
     @Override
-    @CacheEvict(value = {CaffeineCacheConfig.TRENDING_CACHE, CaffeineCacheConfig.STATS_CACHE, CaffeineCacheConfig.CATEGORY_CACHE}, allEntries = true)
+    @CacheEvict(value = {CaffeineCacheConfig.TRENDING_CACHE, CaffeineCacheConfig.STATS_CACHE, CaffeineCacheConfig.CATEGORY_CACHE, CaffeineCacheConfig.FEED_CACHE}, allEntries = true)
     @Transactional(rollbackFor = Exception.class)
     public void updatePost(PostCreateRequest request, Long userId) {
         // 两参重载若只靠三参方法上的注解，内部调用属于自调用，注解不会生效，故此处同样声明驱逐
@@ -290,7 +292,7 @@ public class BlogPostServiceImpl extends ServiceImpl<BlogPostMapper, BlogPost> i
     }
 
     @Override
-    @CacheEvict(value = {CaffeineCacheConfig.TRENDING_CACHE, CaffeineCacheConfig.STATS_CACHE, CaffeineCacheConfig.CATEGORY_CACHE}, allEntries = true)
+    @CacheEvict(value = {CaffeineCacheConfig.TRENDING_CACHE, CaffeineCacheConfig.STATS_CACHE, CaffeineCacheConfig.CATEGORY_CACHE, CaffeineCacheConfig.FEED_CACHE}, allEntries = true)
     @Transactional(rollbackFor = Exception.class)
     public void deletePost(Long postId, Long userId, boolean isAdmin) {
         BlogPost post = this.getById(postId);
@@ -350,7 +352,7 @@ public class BlogPostServiceImpl extends ServiceImpl<BlogPostMapper, BlogPost> i
     }
 
     @Override
-    @CacheEvict(value = {CaffeineCacheConfig.TRENDING_CACHE, CaffeineCacheConfig.STATS_CACHE, CaffeineCacheConfig.CATEGORY_CACHE}, allEntries = true)
+    @CacheEvict(value = {CaffeineCacheConfig.TRENDING_CACHE, CaffeineCacheConfig.STATS_CACHE, CaffeineCacheConfig.CATEGORY_CACHE, CaffeineCacheConfig.FEED_CACHE}, allEntries = true)
     @Transactional(rollbackFor = Exception.class)
     public void deletePost(Long postId, Long userId) {
         // 两参重载若只靠三参方法上的注解，内部调用属于自调用，注解不会生效，故此处同样声明驱逐
@@ -457,7 +459,7 @@ public class BlogPostServiceImpl extends ServiceImpl<BlogPostMapper, BlogPost> i
     // ==================== 管理员操作 ====================
 
     @Override
-    @CacheEvict(value = {CaffeineCacheConfig.TRENDING_CACHE, CaffeineCacheConfig.STATS_CACHE, CaffeineCacheConfig.CATEGORY_CACHE}, allEntries = true)
+    @CacheEvict(value = {CaffeineCacheConfig.TRENDING_CACHE, CaffeineCacheConfig.STATS_CACHE, CaffeineCacheConfig.CATEGORY_CACHE, CaffeineCacheConfig.FEED_CACHE}, allEntries = true)
     @Transactional(rollbackFor = Exception.class)
     public void adminDeletePost(Long postId, Long adminId) {
         BlogPost post = this.getById(postId);
@@ -491,7 +493,7 @@ public class BlogPostServiceImpl extends ServiceImpl<BlogPostMapper, BlogPost> i
     }
 
     @Override
-    @CacheEvict(value = {CaffeineCacheConfig.TRENDING_CACHE, CaffeineCacheConfig.STATS_CACHE, CaffeineCacheConfig.CATEGORY_CACHE}, allEntries = true)
+    @CacheEvict(value = {CaffeineCacheConfig.TRENDING_CACHE, CaffeineCacheConfig.STATS_CACHE, CaffeineCacheConfig.CATEGORY_CACHE, CaffeineCacheConfig.FEED_CACHE}, allEntries = true)
     @Transactional(rollbackFor = Exception.class)
     public void approvePost(Long postId, Long reviewerId) {
         BlogPost post = this.getById(postId);
@@ -524,7 +526,7 @@ public class BlogPostServiceImpl extends ServiceImpl<BlogPostMapper, BlogPost> i
     }
 
     @Override
-    @CacheEvict(value = {CaffeineCacheConfig.TRENDING_CACHE, CaffeineCacheConfig.STATS_CACHE, CaffeineCacheConfig.CATEGORY_CACHE}, allEntries = true)
+    @CacheEvict(value = {CaffeineCacheConfig.TRENDING_CACHE, CaffeineCacheConfig.STATS_CACHE, CaffeineCacheConfig.CATEGORY_CACHE, CaffeineCacheConfig.FEED_CACHE}, allEntries = true)
     @Transactional(rollbackFor = Exception.class)
     public void rejectPost(Long postId, Long reviewerId, String reason) {
         if (reason == null || reason.trim().isEmpty()) {
@@ -570,6 +572,18 @@ public class BlogPostServiceImpl extends ServiceImpl<BlogPostMapper, BlogPost> i
     @Transactional(readOnly = true)
     public Map<String, AdjacentPostVO> getAdjacentPosts(Long postId) {
         return postQueryService.getAdjacentPosts(postId);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<RelatedPostVO> getRelatedPosts(Long postId) {
+        return postQueryService.getRelatedPosts(postId);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<ArchivePostVO> getArchives() {
+        return postQueryService.getArchives();
     }
 
     @Override

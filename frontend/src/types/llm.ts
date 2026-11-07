@@ -70,6 +70,32 @@ export interface WritingTitlesVO {
   latencyMs: number
 }
 
+/** 选区行内改写动作：润色 / 续写 / 精简 / 翻译（作用于作者在正文里选中的片段） */
+export type InlineWritingAction = 'polish' | 'continue' | 'shorten' | 'translate'
+
+/** 行内改写结果：`text` 由前端拼回正文选区，不落库；选区文本上限 3000 字符 */
+export interface InlineWritingVO {
+  action: InlineWritingAction
+  text: string
+  model: string
+  latencyMs: number
+}
+
+/** 单条内链建议：把 `anchor` 链到 `targetPostId` 对应的文章 */
+export interface LinkSuggestionVO {
+  targetPostId: number
+  targetTitle: string
+  anchor: string
+  reason: string
+}
+
+/** 内链建议结果：`suggestions` 为空表示没有可互链的其它已发布文章 */
+export interface LinkSuggestionsVO {
+  suggestions: LinkSuggestionVO[]
+  model: string
+  latencyMs: number
+}
+
 // ---------------------------------------------------------------------------
 // C — 评论审核
 // ---------------------------------------------------------------------------

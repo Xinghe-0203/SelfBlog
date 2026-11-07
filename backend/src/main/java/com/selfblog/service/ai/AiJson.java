@@ -91,6 +91,25 @@ public class AiJson {
         return node == null || !node.isTextual() ? null : node.asText();
     }
 
+    /** 读一个长整数字段（postId 之类）；缺失或非数字返回 {@code null}，宽容接受纯数字字符串。 */
+    static Long longValue(JsonNode root, String field) {
+        JsonNode node = root == null ? null : root.get(field);
+        if (node == null || node.isNull()) {
+            return null;
+        }
+        if (node.isNumber()) {
+            return node.asLong();
+        }
+        if (node.isTextual()) {
+            try {
+                return Long.parseLong(node.asText().trim());
+            } catch (NumberFormatException e) {
+                return null;
+            }
+        }
+        return null;
+    }
+
     /** 读一个整数字段；缺失、非数字或越界返回 {@code null}。 */
     static Integer integer(JsonNode root, String field) {
         JsonNode node = root == null ? null : root.get(field);
