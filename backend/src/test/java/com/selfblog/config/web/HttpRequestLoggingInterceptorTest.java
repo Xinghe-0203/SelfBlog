@@ -39,6 +39,12 @@ class HttpRequestLoggingInterceptorTest {
         interceptor = new HttpRequestLoggingInterceptor();
         interceptorLogger = (ch.qos.logback.classic.Logger)
                 LoggerFactory.getLogger(HttpRequestLoggingInterceptor.class);
+        // 本类是纯单元测试：Spring 切片测试类在同一 surefire fork 里先行启动/关闭
+        // Spring 上下文后，logback 的有效级别可能不再是默认 DEBUG（CI 的类顺序与本地
+        // 文件系统序不同时会踩中）。显式 DEBUG 保证 INFO 的 [REQUEST]/[RESPONSE] 事件
+        // 一定能到达本类自挂的 ListAppender；@AfterEach 恢复原级别，不影响其他测试。
+        originalLevel = interceptorLogger.getLevel();
+        interceptorLogger.setLevel(ch.qos.logback.classic.Level.DEBUG);
         appender = new ListAppender<>();
         appender.start();
         interceptorLogger.addAppender(appender);
@@ -47,8 +53,11 @@ class HttpRequestLoggingInterceptorTest {
     @AfterEach
     void tearDown() {
         interceptorLogger.detachAppender(appender);
+        interceptorLogger.setLevel(originalLevel);
         MDC.clear();
     }
+
+    private ch.qos.logback.classic.Level originalLevel;
 
     private List<String> messages() {
         return appender.list.stream().map(ILoggingEvent::getFormattedMessage).toList();

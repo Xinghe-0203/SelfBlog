@@ -16,7 +16,6 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.sql.Timestamp;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -86,8 +85,13 @@ class VisitorDashboardSummaryTest {
                 {"v-visitor-6", "/d", recent}          // 25 天前：热门页面（30 天窗）仍统计
         };
         for (Object[] event : events) {
+            // 必须用 LocalDateTime 绑定，不能用 Timestamp：生产写入走 MyBatis-Plus 的
+            // LocalDateTime（字面量直发，无时区换算），而 setTimestamp 在 MySQL
+            // serverTimezone != JVM 时区时会把值按连接时区平移存储——行整体偏移而
+            // WHERE 边界（同样是 LocalDateTime 字面量）不偏移，边界行的分桶就会跨日。
+            // 本地 H2 无换算所以假绿，只有 CI 的真实 MySQL 能暴露（2026-11-07 实录）。
             jdbc.update("INSERT INTO visitor_event(visitor_hash, ip_hash, user_agent, page_path, referrer, create_time) "
-                    + "VALUES(?, ?, 'JUnit', ?, NULL, ?)", event[0], event[0], event[1], Timestamp.valueOf((LocalDateTime) event[2]));
+                    + "VALUES(?, ?, 'JUnit', ?, NULL, ?)", event[0], event[0], event[1], event[2]);
         }
 
         // 文章总浏览量只算 status=1 且未删除；草稿与已删除行带着大 view_count 作哨兵。
