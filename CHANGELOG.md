@@ -4,6 +4,232 @@
 
 ---
 
+## 未发布 — 全站 UI 重做 + 动效系统 + 性能与 SEO 优化 + 标签索引（v2.0.30 第五批）
+
+### 说明
+
+一次面向「好看」的完整重做：从设计 token 到每一个公开页面重排版式，重建全站动效体系，
+补上路由预取、接口内存缓存、首页排序切换、公开标签索引页与结构化数据增强。
+**数据库 schema 仍零变动**（新增的标签计数走一条 LEFT JOIN 聚合查询，不是新表）。
+
+### 重做（UI）
+
+- **设计 token 重写**（`styles/variables.css`）：画布退后、纸面浮起、层级靠留白与 1px 发丝线表达；
+  最小字号 12px（原 11px，中文在高分屏上发虚）、圆角 8/12/18/22 四档、阴影改成「短接触 + 长弥散」两段式、
+  新增第三层表面 `--surface-tertiary`（芯片/输入区）。深色模式与全部 7 套皮肤同步补齐 `--surface-tertiary` ——
+  此前浅色画布的 `#f3f5f8` 会在深色模式里变成一块刺眼的白片。
+- **首页**：首屏改为「文案 + 数据条（文章数/标签数/最近更新）+ 封面」三段式，作者名加呼吸点，
+  纯色画布下补一层极慢漂移的柔光装饰；文章列表第一行升级为「封面故事」（两栏 + 大标题），
+  **只有真的带封面时才分栏**（`:has(.row-cover)`），无封面不留空地；侧栏改 sticky 并加了
+  「查看全部标签」出口；分页按钮改胶囊。
+- **阅读页**：标题区加「分类 chip + 标签」一行；元信息行改「图标 + 文字」（日历/时钟/眼睛/文件）；
+  正文标题启用 `text-wrap: balance`（中文标题不再出现孤字行）、段落启用 `text-wrap: pretty`；
+  目录卡改「左侧导轨 + 当前项强调条」；新增**分享按钮**（系统分享面板，不支持时复制永久链接）。
+- **其它公开页**：归档、关于、相册、标签、搜索、404 全部重排版式（统一标题层级、卡片阴影、
+  分段控件、焦点环）；**页脚新增 RSS / Atom / 站点地图**三个订阅入口。
+- **后台**：侧边导航按「内容 / 数据 / 站点」分组，当前项加左侧强调条；概览页四张统计卡
+  加说明文字与悬停浮起；导航图标悬停微位移。
+
+### 新增（动效系统）
+
+- **新 `styles/motion.css`**：统一的三类动效词汇表 —— 入场（`enter-up/fade/scale/left/right`）、
+  环境（`ambient-drift` 极慢背景漂移、`pulse-ring` 呼吸圈）、反馈（`press`/`lift`/`sheen` 主按钮高光扫过）。
+  **只动 transform 与 opacity**，不动会触发布局的属性；时长与缓动一律取设计 token，
+  因此后台「动效强度」档位仍能真正改变全站节奏。
+- **`useScrollReveal` 重写**：早先每个元素各建一个 IntersectionObserver（一页 20 张卡 = 20 个观察器），
+  现在按 threshold/rootMargin **分桶共用观察器**；初始态由 JS 加类（脚本被拦时元素仍可见，
+  不会留下一片空白）；环境不支持 IntersectionObserver 或用户开了「减少动态效果」时直接判定为可见。
+- **`CountUp` 数字滚动**：首屏与后台概览的数字从 0 滚到目标值（easeOutCubic + 等宽数字，不抖布局）。
+- **路由过渡**改为淡入 + 上移 + 轻微缩放 + 模糊；首页按行错开 45ms 依次入场；封面故事、目录、
+  相关阅读、相邻文章、留言区接入滚动入场。
+
+### 新增（功能）
+
+- **公开标签索引页** `/tags`：每个标签 + **已发布**文章数，按文章数倒序，字号与圆点按热度分级。
+  后端新增 `GET /api/tag/with-counts`（一条 `LEFT JOIN + GROUP BY` 聚合查询，不是 N+1）、
+  `TagWithCountVO` 与 `BlogTagMapper.selectTagsWithPostCounts()`；
+  服务端渲染（`SeoModels.Kind.TAGS`）让搜索引擎与禁用 JS 的读者都能读到；
+  进入站点地图（`sitemap-site.xml`）与 `PageCatalog` 内置页清单（后台「页面管理」可配置标题/介绍）。
+  **计数只含 status=1 的已发布文章** —— 草稿与已删除文章不公开，计数里也不出现。
+- **首页排序切换**：最新 / 最热 / 精选三档分段控件（后端本就支持这三种 sort），
+  排序写进 URL（`?sort=hot` 可直接分享），脏值回落「最新」，切换时回到第一页。
+
+### 优化（性能）
+
+- **路由分块预取**（新 `src/router/prefetch.ts`）：首屏渲染完成后在空闲时段拉回全部公开页面 chunk，
+  另有「悬停/聚焦站内链接」预取（更早命中第一次点击）。**只预取公开路由** ——
+  后台 chunk 提前下载等于把后台代码发给未授权访客。
+- **公开只读接口内存缓存**（新 `src/utils/apiCache.ts`）：文章列表 30s、归档与标签 120s，
+  并发同 key 自动去重。三条边界写死在文件头：只缓存公开只读幂等 GET、
+  写操作后按前缀失效、失败不缓存。
+- **长列表渲染优化**：`content-visibility: auto` + `contain-intrinsic-size: auto`，
+  离屏的行跳过渲染，滚动条长度不跳。
+- **`scrollbar-gutter: stable`**：避免长页与短页之间内容宽度跳动。
+
+### 优化（SEO / 可发现性）
+
+- **首页 JSON-LD 增补 `ItemList`**：把「最新文章」这条列表本身结构化（URL 一律绝对化，
+  position 从 1 连续递增）；归档页不声明 —— 它的语义是时间线，不是「最新文章」。
+- **`og:image:alt` / `twitter:image:alt`**：社交平台据此决定卡片版式与无图回退文案。
+- **`article:modified_time` / `article:section`**：文章页补齐发布时间线与分类。
+- **SPA 侧的 meta 同步**：与 SSR 侧同源（`useSeoMeta` 统一出口）。
+
+### 修复
+
+- **匿名请求的 401 不再踢人进登录页**：访客访问公开接口返回 401 时，
+  旧逻辑会清掉会话并把读者弹到后台登录表单。现在只对**带 Authorization 头**的请求
+  走刷新/登出流程 —— 带了头才说明令牌可能过期。
+- **壁纸画布下正文不再压在照片上**：纸面档（页面框架）不透明度新增下限
+  （浅色 92% / 深色 95%），卡片与控件两档仍保持通透，玻璃感依然读得出来。
+- **移动端首屏改为堆叠**：侧置封面会占掉 69% 宽度，文字只能压在图上；改为「文字在上、封面在下」。
+
+### 修复（复查批次：Markdown 实体 / 焦点环 / 薄内容）
+
+- **正文里直接显示 `&nbsp;` 这类实体（根因修复）**：`HtmlSanitizer.sanitizeMarkdown` 曾在**保存时**
+  用 `HtmlUtils.htmlEscape` 把整篇正文转义，于是
+  - 引用块标记 `>` 变成 `&gt;`（不再是引用块）、
+  - 代码块里的 `>` 与 `'` 变成 `&gt;` / `&#39;`（读者在代码块里看到的是实体而不是代码）、
+  - 段落里的 `&` 变成 `&amp;`。
+  代码块按规范不解码实体，所以它们以**字面量**出现在读者眼前。
+  现在正文**原样保存**（只统一换行符、去 BOM），安全边界移到渲染时（服务端 Jsoup 白名单 /
+  前端 DOMPurify 两侧都已覆盖）。新增 `backend/src/main/resources/fix-markdown-escaping.sql`
+  还原历史数据（只处理带转义特征的行，可重复执行；本地库 16 行已还原并逐篇核对）。
+- **服务端渲染与浏览器的 Markdown 差异（补齐三处）**：
+  1. `SafeMarkdown` 关闭 `escapeHtml` —— 否则文本里的 `&nbsp;` 会被二次转义成 `&amp;nbsp;`，
+     服务端 HTML 里显示字面量「&nbsp;」而浏览器里是空格；
+  2. 软换行显式渲染成 `<br />` —— 否则「第一行
+第二行」在服务端被折叠成一行（前端 `breaks: true` 是两行）；
+  3. `seo-reading.css` 补齐 `blockquote` / 行内 `code` / `ul` `ol` / `hr` / `del` / `pre code` 的样式 ——
+     此前服务端阅读页的引用块只是一段普通文字。
+- **键盘焦点环被组件的 `outline: none` 吃掉**：全局规则特异性 0,1,1 输给
+  `.comment-form input:focus`（0,2,1），键盘用户看不见焦点在哪。用 `:is()` 把全局规则抬到同级，
+  并给每个写了 `outline: none` 的组件补 `:focus-visible` 描边环（导航搜索框、留言表单、
+  文章编辑器三处输入框、标签管理输入框、返回顶部按钮）。真机 Tab 一圈 12 个站点全部可见焦点环。
+- **图片可能停在半透明**：`img[loading=lazy]{opacity:0}` 与 `:not([src=''])` 互相抵消，
+  既没有淡入效果又多一层语义负担。改为**默认可见**，只对 `transform` 做过渡。
+- **公开标签索引只列有文章的标签**：0 篇的标签点进去是空白页（对读者浪费一次点击，
+  对搜索引擎是薄内容）。前端 `/tags` 与后端服务端渲染的 `/tags` 同时过滤；
+  标签本身仍在后台「标签管理」里可见可管理。
+- **空标签页改为 noindex**（仍可访问）：只有标题的清单页不该进索引；挂上第一篇文章后
+  下次抓取自动恢复 `index,follow`（前后端同一判定）。
+
+### 新增（第三轮迭代：打印 / 结构化数据对齐 / 背景图瘦身 / 无障碍细节）
+
+- **打印样式**（新 `styles/print.css`，最后导入）：一条 `@media print` 分支把「文章」印在纸上 ——
+  纯白纸面、去掉壁纸/阴影/圆角，隐藏导航栏·页脚·目录·浮动按钮·留言区·相关阅读·阅读进度条；
+  正文 11pt / 行距 1.6，代码块强制展开并转成纯黑（屏幕折叠态在纸上点不开、彩色 token 在黑白
+  打印机上是灰点），表格恢复 `display: table`，代码块·表格·引用块·图片 `break-inside: avoid`，
+  站外链接在括号里补 URL。`@page` 版心 16mm/14mm。
+- **SPA 与 SSR 的结构化数据对齐**：Vue 挂载会用同一 id 重建文章 JSON-LD，此前少写
+  `breadcrumb`，等于**把服务端刚写好的结构化数据降级掉了**。现在客户端也写
+  `breadcrumb`（首页→文章，URL 取规范 origin）、`dateModified`（仅更新晚于发布时）、
+  `keywords`、`articleSection`、`inLanguage`，与服务端 `ReadingHtmlRenderer` 同形状。
+- **上传背景图时按需瘦身**（`SiteAssetServiceImpl.optimizeBackground`）：背景图是整页铺满的
+  装饰照片，屏幕上最多按 2560px 宽显示。现在 **JPEG** 背景超过 700KB 时会等比缩到 2560px、
+  质量 0.82 重编码（重编码后反而更大则保留原图）；**PNG/WebP/SVG 一律不动**（可能带透明通道），
+  logo/头像/图标等其它类型也完全不动。解码前有像素炸弹闸门，**任何失败都保留原文件**，
+  绝不让一次上传失败。
+
+### 修复（第三轮复查：无障碍与空态）
+
+- **路由切换后的焦点**：键盘用户点完导航，旧焦点随旧页面一起消失、下一次 Tab 从头开始
+  （等于丢了阅读位置）。现在成功的**路径级**导航后把焦点移到 `<main tabindex="-1">`
+  （`preventScroll`，不抢 router 的滚动）；首次进入、只改 query（翻页/切排序）、带 hash 的
+  导航都不抢焦点（判定抽成纯函数 `shouldMoveFocusToMain` + 4 条用例）。
+- **Toast 的朗读语义**：整条通知此前没有 `role`，读屏不会播报。现在 error/warning 用
+  `role="alert"`、success/info 用 `role="status"`，并加 `aria-atomic`（整条读，不念变化部分）。
+- **排序分段控件的键盘模式**：`role="radiogroup"` 此前只是语义标注 —— 三个按钮各占一个 Tab 位、
+  方向键无效。现在按 ARIA 单选组实现 roving tabindex（只有选中项在 Tab 序里）+ 方向键循环切换
+  + Home/End，焦点随手选项移动。
+- **点赞按钮**补 `aria-pressed`（读屏能念出「已点赞」状态）。
+- **相册空态**：从一行孤零零的文字改成「图标 + 说明 + 去看文章」的链接，与其它空态一致。
+
+### 修复（第二轮复查：文档大纲 / 对比度）
+
+- **正文标题统一降一级**（`#`→`h2`、`##`→`h3` …，`h6` 封顶）：每个页面原本有两个 `h1`
+  （页面标题 + 正文里的 `#`），文档大纲被读成「并列的两个主题」。前端
+  `demoteMarkdownHeadings`（`utils/markdown.ts`）与服务端 `SafeMarkdown.demoteHeadings`
+  **同一策略**，阅读目录（`section-N` 锚点）、标题锚点、`h2–h6` 字阶同步调整；
+  服务端阅读页也因此只剩一个 `h1`。
+- **对比度清扫（WCAG AA）**：用探针逐页量「文字/背景」实际合成比（玻璃感让表面半透明，
+  合成后比标称色更深），修掉三类真实不达标：
+  1. **白字压强调色**：深色主题下强调色被提亮（62% 主色 + 38% 白），白字只有 2.7:1。
+     新增约定：**压在强调色上的文字用 `--contrast-fg`**（浅色 #fff / 深色 #111），
+     应用到跳过链接、返回顶部悬停、搜索提交、留言提交、站点资产上传。
+  2. **同色淡底上的语义文字**：绿字压淡绿底只有 2.7:1。新增四枚 `--success-ink` /
+     `--warning-ink` / `--error-ink` / `--info-ink`（浅色为深一档、深色为亮一档，
+     对各自淡底 ≥ 5:1），替换 24 处「淡底 + 同色文字」的徽章/状态标签/
+     校验结果/评论审核标记；表格表头改用次级档。
+  3. **弱化文字**：`--text-muted` 与壁纸模式下的覆盖值在半透明表面上只有 4.43–4.46:1。
+     两档文字（次级 / 弱化）整体调深一档（浅色 `#4d5563` / `#5a6371`，壁纸模式同步），
+     深色 `--text-muted` 微调；5 套浅色皮肤与 2 套深色皮肤的弱化档按各自芯片面重算。
+     另：标签计数、点赞心形（半透明底上）分别改次级档与加强档。
+- 结果：**公开 9 页 × 亮/暗 + 后台 10 页 × 亮/暗 全部 0 处低于 AA**（探针脚本在
+  `.tmp-gate/contrast.mjs`、`adminaudit.mjs`，跳转链接因只有聚焦时出现且底色是渐变而排除）。
+
+### 优化（复查批次）
+
+- **服务端首屏使用作者的主色**：`--seo-accent` 此前写死 `#165DFF`，改过主色的站点首屏会先闪一下蓝色
+  再被 Vue 换掉。现在「页面未单独指定强调色」时回落到后台「强调色」设置，脏值丢弃。
+- **浏览器界面色跟随主色**：`applyThemeColor()` 同步 `<meta name="theme-color">` 的浅色那一条
+  （深色那一条保持深灰，深色下界面色要的是「暗」而不是「品牌色」）。
+- **服务端标签索引改多列网格**：十几个标签排成单列会把页面拉得很长、宽屏右侧整片空白，
+  改为 `auto-fill minmax(230px,1fr)` 并让名称与文章数两端对齐。
+- **标签页标题说明量程**从 56ch 调到 72ch（中文一句话被压成两三行窄条）。
+
+### 影响文件
+
+| 文件 | 改动类型 |
+|------|----------|
+| `frontend/src/styles/{variables,base,typography,components,animations,motion,skins,dark-mode}.css` | 修改（设计 token 重写 + 动效词汇表） |
+| `frontend/src/styles/main.css` | 修改（导入 motion.css） |
+| `frontend/src/views/{Home,Archives,About,Search}.vue`、`views/post/PostDetail.vue`、`views/gallery/Gallery.vue`、`views/tag/TagDetail.vue` | 修改（版式重做 + 入场动效） |
+| `frontend/src/views/TagsIndex.vue` | 新增（公开标签索引页） |
+| `frontend/src/components/post/ArticleList.vue`、`components/layout/{Navbar,Footer}.vue`、`components/common/{BackToTop,CountUp,icons}.vue` | 修改 / 新增 |
+| `frontend/src/composables/useScrollReveal.ts` | 重写（观察器分桶 + 环境降级） |
+| `frontend/src/router/prefetch.ts`、`src/utils/{apiCache,clipboard}.ts` | 新增 |
+| `frontend/src/api/{post,tag,index}.ts` | 修改（缓存 + 匿名 401） |
+| `frontend/src/stores/site.ts` | 修改（壁纸纸面下限） |
+| `frontend/src/composables/useSeoMeta.ts` | 修改（og/twitter/article 元数据） |
+| `frontend/src/views/admin/{AdminLayout,Dashboard}.vue` | 修改（导航分组 + 统计卡） |
+| `backend/.../vo/post/TagWithCountVO.java` | 新增 |
+| `backend/.../mapper/BlogTagMapper.java` | 修改（`selectTagsWithPostCounts`） |
+| `backend/.../service/post/{BlogTagService,impl/BlogTagServiceImpl}.java` | 修改 |
+| `backend/.../controller/post/BlogTagController.java` | 修改（`/tag/with-counts`） |
+| `backend/.../service/site/{page/PageCatalog,seo/SeoModels,seo/ReadingPageService,seo/ReadingContent,seo/ReadingHtmlRenderer,seo/SitemapService}.java` | 修改（标签页 + ItemList + og:image:alt） |
+| `backend/.../utils/HtmlSanitizer.java` | 修改（正文改原样保存，不再整篇转义） |
+| `backend/src/main/resources/static/seo-reading.css` | 修改（引用块 / 行内代码 / 列表 / 标签网格） |
+| `backend/src/main/resources/fix-markdown-escaping.sql` | 新增（历史正文还原脚本） |
+| `frontend/src/stores/site.ts` | 修改（`applyThemeColor`） |
+| `frontend/src/views/{TagsIndex,TagDetail}.vue` | 修改（0 篇标签过滤 / 空标签 noindex） |
+| `frontend/src/utils/markdown.ts` | 修改（`demoteMarkdownHeadings`：正文标题降一级） |
+| `frontend/src/styles/{variables,dark-mode,skins,appearance,base,components,typography}.css` | 修改（语义墨色 / 文字两档调深 / 强调色上的文字） |
+| `frontend/src/views/admin/*.vue`、`components/admin/*.vue` | 修改（表头、徽章、链接按钮的对比度） |
+| `frontend/src/styles/print.css` | 新增（打印分支，最后导入） |
+| `frontend/src/router/guards.ts`、`src/App.vue` | 修改（路由后焦点落到 `<main>`） |
+| `frontend/src/components/common/{Toast,ArticleList}.vue`、`composables/{useSeoMeta,usePageSeo}.ts` | 修改（朗读语义 / 结构化数据对齐） |
+| `frontend/src/views/{Home,gallery/Gallery}.vue` | 修改（单选组键盘模式 / 空态） |
+| `frontend/scripts/__tests__/styles-order.test.mjs` | 新增（样式导入顺序契约） |
+| `backend/.../service/site/impl/SiteAssetServiceImpl.java` | 修改（背景图按需瘦身） |
+| `backend/src/test/.../SiteAssetBackgroundOptimizeTest.java` | 新增（5 条边界） |
+| 前端测试：新增 `utils/__tests__/{apiCache,clipboard}.test.ts`、`router/__tests__/prefetch.test.ts`、`views/__tests__/TagsIndex.test.ts`；修改 `Home.test.ts`（+2）、`PostDetail.test.ts`、`AdminLayout.test.ts`、`api/__tests__/index.test.ts` | 新增 / 修改 |
+| 后端测试：新增 `TagPostCountTest`、`ReadingPageServiceTest`（+1）、`ReadingHtmlRendererTest`（+1）；修改 `PageServiceImplTest` | 新增 / 修改 |
+
+### 验证
+
+- 后端全量：**1449 tests / 0 failures，BUILD SUCCESS**。
+- 前端全量：**63 files / 674 tests 全通过**；`vue-tsc` 0 错误；`eslint` 0 error；
+  `prettier --check` 通过；`vite build` 通过（入口 chunk 46.93 KB gzip，markdown 22.82 KB gzip 独立异步块）。
+- 真机视觉验证：Playwright 逐页截图（首页/文章/归档/搜索/关于/标签/标签详情/相册/404 × 亮色/暗色/390px 移动端），
+  控制台 0 错误；禁用 JS 的服务端阅读页同样逐页核对（含代码块与引用块）。
+- 收尾复查（2026-11-19 晚）：后端 **1449** / 前端 **63 files / 674 tests** + `test:deployment` 29/29，全部 gate 绿灯；
+  WCAG 对比度探针在公开 9 页 + 后台 10 页 + 文章编辑器（亮/暗）均为 0 处不达标；
+  生产产物实测 **CLS = 0**（首页/文章/归档/标签），FCP 96–600ms，HTML 8–10KB。
+
+---
+
+---
+
 ## 未发布 — 语法高亮 + 全文订阅 + 版权行（借鉴成熟博客）(2026-11-07)
 
 ### 说明

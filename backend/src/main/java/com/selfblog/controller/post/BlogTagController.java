@@ -7,6 +7,7 @@ import com.selfblog.dto.content.TagCreateRequest;
 import com.selfblog.entity.BlogTag;
 import com.selfblog.service.post.BlogTagService;
 import com.selfblog.utils.SecurityUtils;
+import com.selfblog.vo.post.TagWithCountVO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -47,6 +48,18 @@ public class BlogTagController {
         List<BlogTag> tags = blogTagService.listAllTags();
         List<Map<String, Object>> result = tags.stream().map(this::toTagMap).collect(Collectors.toList());
         return Result.success(result);
+    }
+
+    /**
+     * 公开标签索引：标签 + 已发布文章数（按文章数倒序）。
+     *
+     * <p>给「标签」页用：读者能看到每个标签下有多少篇已发布的文章，
+     * 而不是只看到一个没有量级的词云。计数只含已发布文章，草稿不计入。</p>
+     */
+    @Operation(summary = "获取标签及其已发布文章数")
+    @GetMapping("/with-counts")
+    public Result<List<TagWithCountVO>> listTagsWithCounts() {
+        return Result.success(blogTagService.listTagsWithCounts());
     }
 
     /**

@@ -12,6 +12,7 @@ import org.jsoup.nodes.Element;
 import org.jsoup.safety.Safelist;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
@@ -57,9 +58,44 @@ public class SafeMarkdown {
             "htm", "xml", "yml", "yaml", "csv", "zip", "tar", "gz", "mp4", "mov", "avi", "mp3",
             "wav", "m4a", "ogg", "exe", "apk");
 
+    /** 正文标题降级映射，顺序从高到低（见 {@link #demoteHeadings}）。 */
+    private static final List<String[]> HEADING_DEMOTION = List.of(
+            new String[]{"h5", "h6"},
+            new String[]{"h4", "h5"},
+            new String[]{"h3", "h4"},
+            new String[]{"h2", "h3"},
+            new String[]{"h1", "h2"});
+
     private final Parser parser = Parser.builder().extensions(EXTENSIONS).build();
+    /**
+     * {@code escapeHtml(false)}：**文本里的 HTML 实体不转义**，与前端的 marked 一致。
+     *
+     * <p>为什么必须关掉：CommonMark 默认把文本里的 {@code &} 转义成 {@code &amp;}，
+     * 于是作者写的 {@code &nbsp;} 在服务端 HTML 里变成字面量「&amp;nbsp;」——
+     * 读者看到的就是「&nbsp;」这七个字符，而不是一个不换行空格。
+     * 而前端的 marked 保留实体原样，浏览器渲染成真正的空格：<b>同一篇文章在
+     * 服务端渲染的 HTML 里与浏览器里长得不一样</b>（禁用 JS 的读者与搜索引擎
+     * 看到的还是错的那一份）。关掉转义后两侧一致：{@code &nbsp;} → U+00A0、
+     * {@code &amp;} → {@code &}、{@code &lt;} → 字面的 {@code <}。</p>
+     *
+     * <p>安全性不受影响：原始 HTML 仍会原样进入输出，但紧接着就交给
+     * {@link Jsoup#clean} 的白名单清洗 —— {@code <script>}、{@code <style>}、
+     * {@code onclick}、{@code style} 属性全部被剔除（与前端 DOMPurify 的
+     * FORBID_TAGS / FORBID_ATTR 同等效果）。本类的职责边界一直是
+     *「Jsoup 白名单是唯一信任的净化器」。</p>
+     */
     private final HtmlRenderer renderer = HtmlRenderer.builder().extensions(EXTENSIONS)
-            .escapeHtml(true).sanitizeUrls(true).build();
+            .escapeHtml(false).sanitizeUrls(true)
+            /**
+             * 软换行渲染成 {@code <br />}：与前端 marked 的 {@code breaks: true} 对齐。
+             *
+             * <p>CommonMark 默认的软换行是「输出一个换行符」，而 HTML 里的换行符
+             * 只是空白，会被折叠成空格——于是服务端把「第一行\n第二行」渲染成**一行**，
+             * 前端却渲染成**两行**。同一篇文章在服务端 HTML 与浏览器里长得不一样。
+             * 这里显式指定 {@code <br />}，两侧就一致了。</p>
+             */
+            .softbreak("<br />\n")
+            .build();
     private final Safelist allow = Safelist.relaxed().preserveRelativeLinks(true)
             .addTags("del")
             .addProtocols("a", "href", "http", "https", "mailto")
@@ -67,20 +103,39 @@ public class SafeMarkdown {
 
     public String render(String source) {
         if (source == null || source.isEmpty()) return "";
+        Document doc = Jsoup.parseBodyFragment(renderer.render(parser.parse(source)));
+        normalizeLinks(doc);
+        demoteHeadings(doc);
         // Jsoup needs an absolute base to check relative URL protocols; keep their original spelling.
-        return Jsoup.clean(normalizeLinks(renderer.render(parser.parse(source))),
-                "https://selfblog.invalid/", allow);
+        return Jsoup.clean(doc.body().html(), "https://selfblog.invalid/", allow);
     }
 
     /** 把「缺协议的裸域名」补成 https://，其余 href 原样返回；危险协议交给白名单清掉。 */
-    private String normalizeLinks(String html) {
-        Document doc = Jsoup.parseBodyFragment(html);
+    private void normalizeLinks(Document doc) {
         for (Element anchor : doc.select("a[href]")) {
             String href = normalizeHref(anchor.attr("href"));
             if (href.isEmpty()) anchor.removeAttr("href");
             else anchor.attr("href", href);
         }
-        return doc.body().html();
+    }
+
+    /**
+     * 正文标题统一降一级（{@code #}→{@code h2}、{@code ##}→{@code h3} …，{@code h6} 封顶）。
+     *
+     * <p>每个阅读页已经有**一个** {@code h1}（文章标题）。正文里的 {@code #} 若也输出成
+     * {@code h1}，服务端 HTML 里就有两个一级标题，文档大纲会被读成「并列的两个主题」。
+     * 降级后 {@code h1} 只剩页面标题，正文从 {@code h2} 起，相对层级不变。</p>
+     *
+     * <p>必须与前端 {@code utils/markdown.ts} 的 {@code demoteMarkdownHeadings} 一致，
+     * 否则服务端 HTML 与浏览器里的大纲不同。处理顺序从 {@code h5} 向下降到 {@code h1}：
+     * 先动「源级别更深」的，新产生的 {@code h5} 不会被 {@code h5 → h6} 再动一次。</p>
+     */
+    private static void demoteHeadings(Document doc) {
+        for (String[] pair : HEADING_DEMOTION) {
+            for (Element heading : new ArrayList<>(doc.select(pair[0]))) {
+                heading.tagName(pair[1]);
+            }
+        }
     }
 
     static String normalizeHref(String raw) {

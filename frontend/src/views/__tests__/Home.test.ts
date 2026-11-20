@@ -133,6 +133,64 @@ describe('resolveSidebarOrder', () => {
   })
 })
 
+describe('home article sorting', () => {
+  it('switches the list to the chosen sort and keeps it in the URL', async () => {
+    const { wrapper, router } = await setup()
+    expect(postApi.getPostList).toHaveBeenLastCalledWith({
+      pageNum: 1,
+      pageSize: 9,
+      sort: 'latest'
+    })
+
+    await wrapper.findAll('.sort-switch button')[1]?.trigger('click')
+    await flushPromises()
+
+    expect(router.currentRoute.value.query.sort).toBe('hot')
+    expect(postApi.getPostList).toHaveBeenLastCalledWith({
+      pageNum: 1,
+      pageSize: 9,
+      sort: 'hot'
+    })
+    // 当前档在 DOM 上标出来（aria-checked 供读屏念出「已选中」）。
+    const radios = wrapper.findAll('.sort-switch button')
+    expect(radios[1]?.attributes('aria-checked')).toBe('true')
+    expect(radios[0]?.attributes('aria-checked')).toBe('false')
+  })
+
+  it('keeps only the selected option in the tab order and supports arrow keys', async () => {
+    const { wrapper, router } = await setup()
+    const buttons = wrapper.findAll('.sort-switch button')
+    // roving tabindex：未选中的两枚不进 Tab 序
+    expect(buttons[0]?.attributes('tabindex')).toBe('0')
+    expect(buttons[1]?.attributes('tabindex')).toBe('-1')
+    expect(buttons[2]?.attributes('tabindex')).toBe('-1')
+
+    await wrapper.get('.sort-switch').trigger('keydown', { key: 'ArrowRight' })
+    await flushPromises()
+    expect(router.currentRoute.value.query.sort).toBe('hot')
+    expect(wrapper.findAll('.sort-switch button')[1]?.attributes('aria-checked')).toBe('true')
+
+    // 循环：从末项再往右回到首项
+    await wrapper.get('.sort-switch').trigger('keydown', { key: 'End' })
+    await flushPromises()
+    expect(router.currentRoute.value.query.sort).toBe('essence')
+    await wrapper.get('.sort-switch').trigger('keydown', { key: 'ArrowRight' })
+    await flushPromises()
+    expect(router.currentRoute.value.query.sort).toBeUndefined()
+  })
+
+  it('falls back to the newest-first order on an unsupported sort value', async () => {
+    const { wrapper } = await setup('/?sort=nonsense')
+    await flushPromises()
+    expect(postApi.getPostList).toHaveBeenLastCalledWith({
+      pageNum: 1,
+      pageSize: 9,
+      sort: 'latest'
+    })
+    expect(wrapper.findAll('.sort-switch button')[0]?.attributes('aria-checked')).toBe('true')
+  })
+})
+
 describe('home sidebar ordering', () => {
   const withTags: Tag[] = [
     { id: 3, name: '前端' },

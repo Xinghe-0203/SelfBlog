@@ -1,5 +1,10 @@
 <template>
   <Teleport :to="overlayTarget()">
+    <!--
+      容器本身不说话（避免每个 toast 都被朗读两遍），由每一条自己带语义：
+      error / warning 用 role="alert"（打断当前朗读），success / info 用 role="status"
+      （排队播报）。aria-atomic 保证整条消息被一次读完，而不是只念变化的部分。
+    -->
     <div class="toast-container">
       <TransitionGroup name="toast" tag="div">
         <div
@@ -7,6 +12,8 @@
           :key="toast.id"
           class="toast"
           :class="[`toast-${toast.type}`]"
+          :role="toast.type === 'error' || toast.type === 'warning' ? 'alert' : 'status'"
+          aria-atomic="true"
           @mouseenter="pauseToast(toast.id)"
           @mouseleave="resumeToast(toast.id)"
         >
@@ -268,7 +275,7 @@ onBeforeUnmount(() => {
 
 .toast-close:hover {
   background: var(--error-light);
-  color: var(--error);
+  color: var(--error-ink);
   transform: rotate(90deg);
 }
 

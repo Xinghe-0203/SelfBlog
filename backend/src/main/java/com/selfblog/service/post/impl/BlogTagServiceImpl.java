@@ -10,6 +10,7 @@ import com.selfblog.service.post.BlogTagService;
 import com.selfblog.utils.HtmlSanitizer;
 import com.selfblog.utils.SecurityUtils;
 import com.selfblog.utils.SqlLikeUtils;
+import com.selfblog.vo.post.TagWithCountVO;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
@@ -42,6 +43,23 @@ public class BlogTagServiceImpl extends ServiceImpl<BlogTagMapper, BlogTag> impl
         LambdaQueryWrapper<BlogTag> wrapper = new LambdaQueryWrapper<>();
         wrapper.orderByAsc(BlogTag::getName);
         return this.list(wrapper);
+    }
+
+    /**
+     * 公开标签索引（标签 + 已发布文章数）。
+     *
+     * <p>与 listAllTags 共用 hotTagsCache 的另一个键：标签的写路径（create /
+     * update / delete / getOrCreate）都用 allEntries=true 整体失效这两个缓存，
+     * 所以计数不会与标签列表不同步。</p>
+     *
+     * <p>计数来自一条 LEFT JOIN + GROUP BY 的聚合查询，不是逐标签 N+1：
+     * 标签页一次请求只打一条 SQL。</p>
+     */
+    @Override
+    @Cacheable(value = CaffeineCacheConfig.HOT_TAGS_CACHE, key = "'tagsWithCounts'")
+    @Transactional(readOnly = true)
+    public List<TagWithCountVO> listTagsWithCounts() {
+        return baseMapper.selectTagsWithPostCounts();
     }
 
     @Override

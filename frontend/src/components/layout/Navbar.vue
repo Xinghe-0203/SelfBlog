@@ -352,17 +352,23 @@ onBeforeUnmount(() => {
 .site-nav-wrap {
   position: fixed;
   z-index: var(--z-sticky);
-  top: 16px;
-  inset-inline: 16px;
+  top: 14px;
+  inset-inline: 20px;
 }
 .site-nav {
   position: relative;
   max-width: 1200px;
   margin-inline: auto;
   border-radius: var(--radius-full);
+  /* 顶栏是全站唯一允许「浮在内容之上」的表面：半透 + 模糊 + 一圈发丝边，
+     滚动后加深投影，避免下方文字透上来。 */
+  border-color: color-mix(in srgb, var(--border-light) 80%, transparent);
   box-shadow:
-    var(--shadow-xs),
+    var(--shadow-sm),
     inset 0 1px 0 var(--functional-glass-edge);
+  transition:
+    box-shadow var(--transition),
+    background var(--transition);
 }
 .is-scrolled .site-nav {
   box-shadow:
@@ -373,18 +379,19 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   gap: 12px;
-  height: 50px;
-  padding-inline: 18px;
+  height: 52px;
+  padding-inline: 20px;
 }
 .brand {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 9px;
   min-width: 0;
   flex-shrink: 1;
   color: var(--text-primary);
   font-size: var(--text-sm);
   font-weight: 650;
+  letter-spacing: -0.01em;
 }
 .brand-mark {
   display: grid;
@@ -393,6 +400,11 @@ onBeforeUnmount(() => {
   width: 23px;
   height: 27px;
   color: var(--accent);
+  /* 悬停时品牌图标轻轻转一下：一个小到几乎察觉不到、但会让界面「活」起来的动作。 */
+  transition: transform var(--duration-slow) var(--ease-spring);
+}
+.brand:hover .brand-mark {
+  transform: rotate(14deg) scale(1.06);
 }
 .brand-mark--image {
   object-fit: contain;
@@ -406,24 +418,38 @@ onBeforeUnmount(() => {
 }
 .nav-search {
   display: flex;
-  flex: 0 1 208px;
+  flex: 0 1 216px;
   align-items: center;
   gap: 8px;
-  width: 208px;
+  width: 216px;
   min-width: 128px;
-  height: 34px;
-  padding-inline: 11px;
-  border: 1px solid transparent;
+  height: 36px;
+  padding-inline: 13px;
+  border: 1px solid var(--border-light);
   border-radius: var(--radius-full);
-  background: var(--bg-primary);
+  background: var(--surface-tertiary);
   color: var(--text-muted);
-  transition: flex-basis var(--transition);
+  transition:
+    flex-basis var(--transition),
+    border-color var(--transition),
+    background var(--transition),
+    box-shadow var(--transition);
+}
+.nav-search:hover {
+  border-color: color-mix(in srgb, var(--border-light) 60%, var(--accent));
 }
 .nav-search:focus-within {
-  flex-basis: 242px;
+  flex-basis: 250px;
   border-color: var(--accent);
-  outline: 3px solid var(--accent-light);
+  outline: none;
+  box-shadow: 0 0 0 3px var(--accent-ring);
   background: var(--surface-primary);
+}
+/* 键盘焦点环：输入框本身要看得见焦点。 */
+.nav-search input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+  border-radius: var(--radius-xs);
 }
 .nav-search input,
 .panel-search input {
@@ -456,14 +482,15 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 5px;
+  gap: 6px;
   height: 44px;
-  padding-inline: 12px;
+  padding-inline: 13px;
   border-radius: var(--radius-full);
   color: var(--text-secondary);
   font-size: var(--text-sm);
   font-weight: 500;
   white-space: nowrap;
+  transition: color var(--transition-fast);
 }
 .nav-measure {
   position: absolute;
@@ -514,45 +541,38 @@ onBeforeUnmount(() => {
 .more-panel > a:hover,
 .more-panel > a.active {
   color: var(--accent);
-  background: var(--accent-light);
+  background: var(--accent-soft);
 }
 .nav-links a::before {
   position: absolute;
   content: '';
   z-index: -1;
-  inset: 5px 0;
+  inset: 6px 0;
   border-radius: inherit;
   transition: background var(--transition-fast);
 }
-.nav-links a::after {
-  position: absolute;
-  content: '';
-  inset-inline: 36%;
-  bottom: 6px;
-  height: 2px;
-  border-radius: var(--radius-full);
-  background: var(--accent);
-  transform: scaleX(0);
-  transition: transform var(--transition-fast);
-}
 .nav-links a .icon {
-  opacity: 0.55;
+  opacity: 0.5;
+  transition:
+    opacity var(--transition-fast),
+    transform var(--duration-slow) var(--ease-spring);
 }
 .nav-links a.active,
 .nav-links a:hover {
   color: var(--accent);
 }
-.nav-links a.active::before,
+.nav-links a.active::before {
+  background: var(--accent-soft);
+}
 .nav-links a:hover::before {
-  background: var(--accent-light);
+  background: var(--surface-tertiary);
+}
+.nav-links a:hover .icon {
+  transform: translateY(-1px) scale(1.08);
 }
 .nav-links a.active .icon,
 .nav-links a:hover .icon {
   opacity: 1;
-}
-.nav-links a.active::after,
-.nav-links a:hover::after {
-  transform: scaleX(1);
 }
 .nav-actions {
   display: flex;
@@ -567,13 +587,16 @@ onBeforeUnmount(() => {
   place-items: center;
   width: 44px;
   height: 44px;
-  border-radius: var(--radius);
+  border-radius: var(--radius-full);
   color: var(--text-secondary);
+  transition:
+    color var(--transition-fast),
+    background var(--transition-fast);
 }
 .nav-tool:hover,
 .nav-tool[aria-expanded='true'] {
   color: var(--accent);
-  background: var(--accent-light);
+  background: var(--accent-soft);
 }
 .search-toggle,
 .menu-toggle {
@@ -585,11 +608,12 @@ onBeforeUnmount(() => {
   right: 0;
   z-index: var(--z-nav-panel);
   width: min(340px, calc(100vw - 32px));
-  padding: 14px;
+  padding: 10px;
   border-radius: var(--radius-xl);
   max-height: calc(100dvh - 90px);
   overflow-y: auto;
   overscroll-behavior: contain;
+  box-shadow: var(--shadow-lg);
 }
 .panel-search {
   display: flex;
@@ -631,7 +655,7 @@ onBeforeUnmount(() => {
 .mobile-panel > a.active,
 .mobile-panel > a:hover,
 .menu-theme:hover {
-  background: var(--accent-light);
+  background: var(--accent-soft);
   color: var(--accent);
 }
 .menu-theme {
@@ -679,7 +703,7 @@ onBeforeUnmount(() => {
     inset-inline: 10px;
   }
   .nav-shell {
-    height: 48px;
+    height: 50px;
     padding-inline: 10px;
     gap: 6px;
   }

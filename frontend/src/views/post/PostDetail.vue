@@ -16,6 +16,7 @@ import { usePageSeo } from '@/composables/usePageSeo'
 import { canonicalOrigin } from '@/composables/useSeoMeta'
 import { enhanceMarkdown, disposeMarkdownEnhance } from '@/composables/useMarkdownEnhance'
 import { toast } from '@/utils/toast'
+import { copyText } from '@/utils/clipboard'
 import ImagePreview from '@/components/common/ImagePreview.vue'
 import MobileTocSheet from '@/components/post/MobileTocSheet.vue'
 import Icon from '@/components/common/Icon.vue'
@@ -45,8 +46,10 @@ usePageSeo('post', () => ({
   url: `/post/${post.value?.id || route.params.id}`,
   type: post.value ? 'article' : 'website',
   publishedTime: post.value?.createTime || post.value?.createdAt,
+  modifiedTime: post.value?.updateTime,
   author: post.value?.nickname || post.value?.authorName,
   tags: post.value?.tags?.map((tag) => tag.name),
+  section: post.value?.category,
   indexable: !!post.value
 }))
 /** 上一篇 / 下一篇，缺失的方向为 null */
@@ -150,6 +153,37 @@ const postPermalink = computed(() => {
   const id = post.value?.id ?? route.params.id
   return id ? `${canonicalOrigin()}/post/${id}` : ''
 })
+
+/**
+ * 分享按钮的三种状态：默认「分享」→ 系统分享面板 / 复制成功 → 「已复制」。
+ * 不支持的浏览器（桌面端大多没有 navigator.share）直接复制永久链接，
+ * 读者至少能拿到可转发的地址。
+ */
+const shareLabel = ref('分享')
+let shareRevertTimer: ReturnType<typeof setTimeout> | null = null
+
+async function sharePost(): Promise<void> {
+  const url = postPermalink.value
+  if (!url) return
+  const title = post.value?.title || ''
+  try {
+    if (typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
+      await navigator.share({ title, url })
+      return
+    }
+    const ok = await copyText(url)
+    shareLabel.value = ok ? '已复制链接' : '复制失败'
+    if (!ok) toast.error('复制失败，请手动复制地址栏链接。')
+  } catch {
+    // 用户取消系统分享面板不算错误，不给错误提示。
+  } finally {
+    if (shareRevertTimer) clearTimeout(shareRevertTimer)
+    shareRevertTimer = setTimeout(() => {
+      shareLabel.value = '分享'
+      shareRevertTimer = null
+    }, 2000)
+  }
+}
 
 const fetchPost = async () => {
   const isLatest = beginPostRequest()
@@ -314,7 +348,8 @@ const extractToc = (markdown: string): TocItem[] => {
 
 const setHeadingIds = async () => {
   await nextTick()
-  const headings = contentRef.value?.querySelectorAll('h1, h2, h3') || []
+  // 正文标题已被 `demoteMarkdownHeadings` 整体降级：源文的 # / ## / ### 现在是 h2 / h3 / h4。
+  const headings = contentRef.value?.querySelectorAll('h2, h3, h4') || []
   headings.forEach((heading, index) => {
     heading.id = `section-${index}`
   })
@@ -331,7 +366,7 @@ function observeHeadings(): void {
   headingObserver?.disconnect()
   // 不支持 IntersectionObserver 的环境（如 jsdom）由 scroll 扫描兜底，见 updateReadingProgress
   if (typeof IntersectionObserver === 'undefined' || !contentRef.value) return
-  const headings = contentRef.value.querySelectorAll('h1, h2, h3')
+  const headings = contentRef.value.querySelectorAll('h2, h3, h4')
   if (!headings.length) return
   headingObserver = new IntersectionObserver(
     (entries) => {
@@ -417,7 +452,7 @@ const updateReadingProgress = () => {
   // 标题高亮已交给 IntersectionObserver；只有它不可用时才回退到整表扫描，
   // 避免长文里每次 scroll 都遍历全部标题。
   if (typeof IntersectionObserver !== 'undefined') return
-  const headings = contentRef.value?.querySelectorAll('h1, h2, h3') || []
+  const headings = contentRef.value?.querySelectorAll('h2, h3, h4') || []
   let activeId = ''
   headings.forEach((heading) => {
     if (heading.getBoundingClientRect().top <= 120) activeId = heading.id
@@ -453,6 +488,7 @@ onMounted(() => {
 onUnmounted(() => {
   window.removeEventListener('scroll', scheduleReadingProgress)
   if (progressFrame) cancelAnimationFrame(progressFrame)
+  if (shareRevertTimer) clearTimeout(shareRevertTimer)
   headingObserver?.disconnect()
   if (contentRef.value) disposeMarkdownEnhance(contentRef.value)
 })
@@ -493,12 +529,12 @@ onUnmounted(() => {
     >
       <div class="article-column">
         <header class="article-header">
-          <div v-if="post.tags?.length" class="article-tags">
+          <div v-if="post.tags?.length || post.category" class="article-kicker">
+            <span v-if="post.category" class="article-category">{{ post.category }}</span>
             <router-link v-for="tag in post.tags" :key="tag.id" :to="`/tag/${tag.id}`"
               >#{{ tag.name }}</router-link
             >
           </div>
-          <p v-if="post.category" class="article-category">{{ post.category }}</p>
           <h1>{{ post.title }}</h1>
           <p v-if="text('description', '')" class="article-summary">
             {{ text('description', '') }}
@@ -506,19 +542,24 @@ onUnmounted(() => {
           <p v-if="post.summary" class="article-summary">{{ post.summary }}</p>
           <div v-if="showModule('meta')" class="article-meta">
             <time :datetime="post.createTime || post.createdAt">
+              <Icon name="calendar" :size="14" />
               {{ formatDate(post.createTime || post.createdAt, 'YYYY年MM月DD日') }}
             </time>
-            <span class="meta-dot" aria-hidden="true"></span>
-            <span>约 {{ estimatedReadMinutes }} 分钟阅读</span>
-            <span class="meta-dot" aria-hidden="true"></span>
-            <span>{{ post.viewCount || 0 }} 次阅读</span>
+            <span class="meta-item"
+              ><Icon name="clock" :size="14" />约 {{ estimatedReadMinutes }} 分钟阅读</span
+            >
+            <span class="meta-item"
+              ><Icon name="eye" :size="14" />{{ post.viewCount || 0 }} 次阅读</span
+            >
             <template v-if="estimatedWordCount > 0">
-              <span class="meta-dot" aria-hidden="true"></span>
-              <span>约 {{ estimatedWordCount }} 字</span>
+              <span class="meta-item"
+                ><Icon name="file-text" :size="14" />约 {{ estimatedWordCount }} 字</span
+              >
             </template>
             <template v-if="lastUpdated">
-              <span class="meta-dot" aria-hidden="true"></span>
-              <span>最后更新于 {{ lastUpdated }}</span>
+              <span class="meta-item"
+                ><Icon name="refresh" :size="14" />最后更新于 {{ lastUpdated }}</span
+              >
             </template>
           </div>
         </header>
@@ -552,7 +593,7 @@ onUnmounted(() => {
         </footer>
 
         <!-- 相关阅读：取不到数据时整块不渲染，不打扰只有一两篇文章的博客 -->
-        <section v-if="relatedPosts.length" class="related-posts">
+        <section v-if="relatedPosts.length" class="related-posts" v-scroll-reveal>
           <h2>相关阅读</h2>
           <ul class="related-list">
             <li v-for="item in relatedPosts" :key="item.id" class="related-item">
@@ -574,6 +615,7 @@ onUnmounted(() => {
           v-if="showModule('adjacent') && (adjacent.prev || adjacent.next)"
           class="post-adjacent"
           aria-label="相邻文章"
+          v-scroll-reveal
         >
           <router-link v-if="adjacent.prev" class="adjacent-link" :to="`/post/${adjacent.prev.id}`">
             <span class="adjacent-label"><Icon name="chevron-left" :size="14" />上一篇</span>
@@ -595,15 +637,24 @@ onUnmounted(() => {
             :class="{ active: likeInfo.liked }"
             type="button"
             :disabled="liking"
+            :aria-pressed="likeInfo.liked"
             @click="toggleAnonymousLike"
           >
             <span aria-hidden="true">{{ likeInfo.liked ? '♥' : '♡' }}</span>
             {{ likeInfo.liked ? '已点赞' : '匿名点赞' }} <strong>{{ likeInfo.likeCount }}</strong>
           </button>
+          <button class="share-action" type="button" @click="sharePost">
+            <Icon name="share" :size="15" />{{ shareLabel }}
+          </button>
           <span class="interaction-note">无需登录，点赞状态保存在本设备</span>
         </section>
 
-        <section v-if="siteStore.isCommentsEnabled" class="comments-section">
+        <section
+          v-if="siteStore.isCommentsEnabled"
+          class="comments-section"
+          :aria-label="`《${post.title}》的留言`"
+          v-scroll-reveal
+        >
           <header class="comments-heading">
             <h2>
               读者留言 <span>{{ commentsTotal }}</span>
@@ -660,7 +711,7 @@ onUnmounted(() => {
           </button>
         </section>
 
-        <footer class="article-end">
+        <footer class="article-end" v-scroll-reveal>
           <span class="end-rule"></span>
           <p>感谢阅读</p>
           <router-link to="/archives"
@@ -710,8 +761,8 @@ onUnmounted(() => {
   z-index: var(--z-sticky);
   top: 0;
   left: 0;
-  height: 2px;
-  background: var(--primary);
+  height: 3px;
+  background: linear-gradient(90deg, var(--accent), var(--accent-dark));
   transition: width 90ms linear;
 }
 .reader-page {
@@ -760,10 +811,13 @@ onUnmounted(() => {
 .article-cover {
   display: block;
   width: 100%;
-  max-height: 410px;
-  margin-block: 24px 0;
-  border-radius: var(--radius-lg);
+  max-height: 420px;
+  margin-block: 26px 0;
+  border-radius: var(--radius-xl);
   object-fit: cover;
+  box-shadow: var(--shadow-sm);
+  animation: enter-scale 520ms var(--ease-out) both;
+  animation-delay: 60ms;
 }
 /* 摘要卡（TL;DR）：封面/元信息与正文之间的轻量导读卡，左色条与 blockquote 呼应 */
 .summary-callout {
@@ -792,14 +846,83 @@ onUnmounted(() => {
   overflow-wrap: anywhere;
 }
 .article-header {
-  padding: 4px 0 25px;
+  padding: 4px 0 26px;
   border-bottom: 1px solid var(--border-solid);
+  /* 阅读页入场：标题先落定，封面与正文随后。 */
+  animation: enter-up 460ms var(--ease-out) both;
+}
+/* 顶部的分类与标签：同一行里用小圆点分隔，分类是实心 chip，标签是文字链接。 */
+.article-kicker {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  margin-bottom: 16px;
+}
+.article-kicker a {
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+  text-decoration: none;
+  transition: color var(--transition-fast);
+}
+.article-kicker a:hover {
+  color: var(--accent);
+}
+.article-category {
+  padding: 2px 10px;
+  border-radius: var(--radius-full);
+  background: var(--accent-light);
+  color: var(--accent);
+  font-size: var(--text-2xs);
+  font-weight: 600;
+}
+.article-header h1 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(30px, 3.4vw, 42px);
+  font-weight: 700;
+  line-height: 1.32;
+  letter-spacing: -0.03em;
+  overflow-wrap: anywhere;
+}
+.article-summary {
+  margin: 18px 0 0;
+  color: var(--text-secondary);
+  font-size: var(--text-base);
+  line-height: 1.85;
+}
+/* 元信息行：图标 + 文字，用小圆点分隔，弱化但可读。 */
+.article-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 18px;
+  margin-top: 20px;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+.article-meta time,
+.meta-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.article-meta .icon {
+  opacity: 0.7;
+}
+.meta-dot {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  opacity: 0.55;
 }
 .reader-interactions {
   display: flex;
   align-items: center;
-  gap: 14px;
-  margin: 25px 0 30px;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 28px 0 32px;
   padding: 16px 0;
   border-top: 1px solid var(--border-solid);
   border-bottom: 1px solid var(--border-solid);
@@ -810,18 +933,27 @@ onUnmounted(() => {
   flex-shrink: 0;
   gap: 7px;
   min-height: 44px;
-  padding: 9px 13px;
+  padding: 9px 15px;
   border: 1px solid var(--border-solid);
-  border-radius: var(--radius);
+  border-radius: var(--radius-full);
   background: var(--surface-primary);
   color: var(--text-secondary);
   font: inherit;
   font-size: var(--text-sm);
   cursor: pointer;
+  transition:
+    border-color var(--transition-fast),
+    background var(--transition-fast),
+    color var(--transition-fast);
 }
 .like-action span {
-  color: var(--like-accent);
+  /* 用加强档而不是基础档：基础档 #dc4762 对白只有 3.4:1（18px 非粗体要 4.5）。 */
+  color: var(--like-accent-strong);
   font-size: var(--text-lg);
+}
+.like-action:hover:not(:disabled) {
+  border-color: var(--like-accent-border);
+  color: var(--like-accent-strong);
 }
 .like-action.active {
   border-color: var(--like-accent-border);
@@ -834,6 +966,31 @@ onUnmounted(() => {
 }
 .like-action strong {
   font-size: var(--text-xs);
+}
+/* 分享按钮：与点赞同一档的控件，行为不同（复制链接 / 系统分享面板）。 */
+.share-action {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 7px;
+  min-height: 44px;
+  padding: 9px 15px;
+  border: 1px solid var(--border-solid);
+  border-radius: var(--radius-full);
+  background: var(--surface-primary);
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: var(--text-sm);
+  cursor: pointer;
+  transition:
+    border-color var(--transition-fast),
+    background var(--transition-fast),
+    color var(--transition-fast);
+}
+.share-action:hover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
 }
 .interaction-note {
   color: var(--text-muted);
@@ -988,10 +1145,11 @@ onUnmounted(() => {
 .comment-form {
   display: grid;
   gap: 12px;
-  padding: 17px;
+  padding: 20px;
   border: 1px solid var(--border-solid);
-  border-radius: var(--radius);
+  border-radius: var(--radius-lg);
   background: var(--surface-primary);
+  box-shadow: var(--shadow-xs);
 }
 .comment-form label {
   display: grid;
@@ -1002,13 +1160,25 @@ onUnmounted(() => {
 .comment-form input,
 .comment-form textarea {
   width: 100%;
-  padding: 10px 12px;
+  padding: 10px 13px;
   border: 1px solid var(--border-solid);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius);
   background: var(--bg-primary);
   color: var(--text-primary);
   font: inherit;
   font-size: var(--text-sm);
+}
+.comment-form input:focus,
+.comment-form textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-ring);
+}
+/* 键盘焦点环：不能被上面的 `outline: none` 吃掉（后写且特异性相同）。 */
+.comment-form input:focus-visible,
+.comment-form textarea:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
 }
 .comment-form textarea {
   resize: vertical;
@@ -1028,7 +1198,7 @@ onUnmounted(() => {
   border: 0;
   border-radius: var(--radius-sm);
   background: var(--primary);
-  color: white;
+  color: var(--contrast-fg);
   font-size: var(--text-xs);
   font-weight: 700;
   cursor: pointer;
@@ -1116,35 +1286,6 @@ onUnmounted(() => {
 .article-tags a:hover {
   text-decoration: underline;
 }
-.article-category {
-  margin: 0 0 9px;
-  color: var(--primary);
-  font-size: var(--text-2xs);
-  font-weight: 700;
-}
-.article-header h1 {
-  margin: 0;
-  font-family: var(--font-display);
-  font-size: clamp(28px, 3.2vw, 38px);
-  line-height: 1.4;
-  letter-spacing: -0.045em;
-  overflow-wrap: anywhere;
-}
-.article-summary {
-  margin: 17px 0 0;
-  color: var(--text-secondary);
-  font-size: var(--text-base);
-  line-height: 1.8;
-}
-.article-meta {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 10px;
-  margin-top: 18px;
-  color: var(--text-muted);
-  font-size: var(--text-xs);
-}
 .meta-dot {
   width: 3px;
   height: 3px;
@@ -1153,46 +1294,76 @@ onUnmounted(() => {
   opacity: 0.55;
 }
 .markdown-body {
-  padding-top: 28px;
+  padding-top: 30px;
   color: var(--text-primary);
   font-family: var(--font-display);
   font-size: var(--text-lg);
   line-height: 1.9;
   overflow-wrap: anywhere;
+  animation: enter-fade 480ms var(--ease-out) both;
+  animation-delay: 100ms;
 }
-.markdown-body :deep(h1),
+/* 正文标题已被 `demoteMarkdownHeadings` 整体降一级（# → h2、## → h3 …），
+   因此这里从 h2 起定义：h1 只属于文章标题，不该在正文里出现。 */
 .markdown-body :deep(h2),
-.markdown-body :deep(h3) {
-  margin: 2em 0 0.7em;
+.markdown-body :deep(h3),
+.markdown-body :deep(h4),
+.markdown-body :deep(h5),
+.markdown-body :deep(h6) {
+  margin: 2.1em 0 0.8em;
   font-family: var(--font-display);
+  font-weight: 650;
   line-height: 1.35;
   scroll-margin-top: 0;
 }
-.markdown-body :deep(h1) {
-  font-size: var(--text-3xl);
-}
 .markdown-body :deep(h2) {
-  padding-bottom: 0.45em;
+  padding-bottom: 0.5em;
   border-bottom: 1px solid var(--border-solid);
   font-size: var(--text-2xl);
 }
 .markdown-body :deep(h3) {
   font-size: var(--text-xl);
 }
+.markdown-body :deep(h4) {
+  font-size: var(--text-lg);
+}
+.markdown-body :deep(h5) {
+  font-size: var(--text-base);
+}
+.markdown-body :deep(h6) {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
 .markdown-body :deep(p) {
-  margin: 0 0 1.35em;
+  margin: 0 0 1.4em;
 }
 .markdown-body :deep(a) {
   color: var(--primary);
   text-decoration-thickness: 1px;
   text-underline-offset: 3px;
 }
+.markdown-body :deep(ul),
+.markdown-body :deep(ol) {
+  padding-left: 1.35em;
+}
+.markdown-body :deep(li) {
+  margin: 0.45em 0;
+}
+.markdown-body :deep(li)::marker {
+  color: var(--text-muted);
+}
 .markdown-body :deep(blockquote) {
   margin: 1.7em 0;
-  padding: 12px 18px;
+  padding: 14px 20px;
   border-left: 3px solid var(--primary);
+  border-radius: 0 var(--radius) var(--radius) 0;
   background: var(--bg-secondary);
   color: var(--text-secondary);
+}
+.markdown-body :deep(hr) {
+  margin: 2.6em 0;
+  border: none;
+  border-top: 1px solid var(--border-light);
 }
 .markdown-body :deep(pre) {
   overflow-x: auto;
@@ -1347,12 +1518,14 @@ onUnmounted(() => {
   gap: 8px;
   padding: 46px 0 22px;
   text-align: center;
+  animation: enter-fade 620ms var(--ease-out) both;
 }
 .end-rule {
   width: 46px;
   height: 2px;
   background: var(--primary);
   opacity: 0.55;
+  border-radius: var(--radius-full);
 }
 .article-end p {
   margin: 8px 0 0;
@@ -1376,24 +1549,32 @@ onUnmounted(() => {
   position: sticky;
   top: var(--anchor-offset);
 }
+/* 目录卡：左侧一条导轨，当前小节用强调色短条标记。
+   纯色画布下靠发丝线分节，壁纸模式下由 appearance.css 补成完整卡片。 */
 .toc-card {
-  padding: 17px 0;
-  border-top: 1px solid var(--border-solid);
-  border-bottom: 1px solid var(--border-solid);
+  padding: 18px 0 18px 18px;
+  border-left: 2px solid var(--border-light);
+  animation: enter-right 460ms var(--ease-out) both;
+  animation-delay: 140ms;
 }
 .toc-card h2 {
-  margin: 0 0 11px;
+  margin: 0 0 12px;
   font-family: var(--font-display);
-  font-size: var(--text-base);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
 }
 .toc-card nav {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 2px;
   max-height: 60vh;
   overflow: auto;
 }
 .toc-card button {
+  position: relative;
   display: flex;
   align-items: center;
   min-height: 34px;
@@ -1406,16 +1587,30 @@ onUnmounted(() => {
   font-size: var(--text-xs);
   line-height: 1.5;
   text-align: left;
+  transition: color var(--transition-fast);
 }
 .toc-card button:hover,
 .toc-card button.active {
-  color: var(--primary);
+  color: var(--accent);
+}
+/* 当前小节：导轨上的强调色短条 + 文字加粗。 */
+.toc-card button.active::before {
+  position: absolute;
+  content: '';
+  left: -20px;
+  top: 50%;
+  width: 3px;
+  height: 18px;
+  border-radius: var(--radius-full);
+  background: var(--accent);
+  transform: translateY(-50%);
+  animation: enter-fade 260ms var(--ease-out) both;
 }
 .toc-card button.level-2 {
-  padding-left: 10px;
+  padding-left: 12px;
 }
 .toc-card button.level-3 {
-  padding-left: 20px;
+  padding-left: 24px;
 }
 .state-panel {
   max-width: 620px;

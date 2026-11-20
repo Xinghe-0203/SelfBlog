@@ -144,18 +144,22 @@ describe('AdminLayout', () => {
     expect(trigger.attributes('aria-expanded')).toBe('true')
 
     const hrefs = wrapper.findAll('.sidebar-nav a').map((link) => link.attributes('href'))
+    // 导航按「内容 / 数据 / 站点」分组，DOM 顺序即分组顺序：
+    // 内容（概览、文章、标签、页面）→ 数据（访客、评论、相册）→ 站点（SEO、体检、设置）。
     expect(hrefs).toEqual([
       '/admin/dashboard',
       '/admin/posts',
       '/admin/tags',
+      '/admin/pages',
       '/admin/visitors',
       '/admin/comments',
       '/admin/albums',
-      '/admin/pages',
       '/admin/seo',
       '/admin/health',
       '/admin/settings'
     ])
+    // 分组标题只做分段，不产生额外的导航入口。
+    expect(wrapper.findAll('.sidebar-group')).toHaveLength(3)
     const theme = useThemeStore()
     expect(theme.isDarkMode).toBe(false)
     await wrapper.get('.admin-theme-toggle').trigger('click')

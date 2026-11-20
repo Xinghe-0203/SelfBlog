@@ -49,7 +49,9 @@ class PageServiceImplTest {
 
     @Test void defaultsDoNotWriteOrOverrideGlobalAppearance() {
         long count = mapper.selectCount(null);
-        assertEquals(8, pages.listPages().size());
+        // 9 = 8 个内置页面（home / about / archives / gallery / search / post / tag / notFound）
+        // + 新增的「标签」内置页（/tags）。
+        assertEquals(9, pages.listPages().size());
         assertNull(pages.getPublished("about").config().title());
         assertEquals(List.of("home", "archives", "gallery", "about"),
                 pages.getManifest().navigation().stream().map(PublicNavigationItem::pageId).toList());

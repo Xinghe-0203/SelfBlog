@@ -24,7 +24,10 @@ usePageSeo('tag', () => ({
   title: tag.value?.name || '标签详情',
   description: text('description', ''),
   url: `/tag/${tag.value?.id || route.params.id}`,
-  indexable: !!tag.value
+  // 与服务端渲染同一判定：标签存在**且**有已发布文章才收录。
+  // 空标签页仍然可访问（作者可能刚建好就分享链接），但只有标题的清单页是薄内容。
+  // totalPosts 来自列表接口的 total，翻到第 2 页时也仍然正确。
+  indexable: !!tag.value && totalPosts.value > 0
 }))
 const pageSize = 12
 
@@ -140,13 +143,14 @@ watch(() => route.params.id, fetchTag, { immediate: true })
   color: var(--primary);
 }
 .tag-heading {
-  padding: 8px 0 25px;
+  padding: 8px 0 28px;
 }
 .tag-heading h1 {
   margin: 0;
   font-family: var(--font-display);
-  font-size: var(--text-3xl);
-  letter-spacing: -0.045em;
+  font-size: var(--text-4xl);
+  font-weight: 700;
+  letter-spacing: -0.03em;
   overflow-wrap: anywhere;
 }
 .tag-heading h1 span {
@@ -154,7 +158,7 @@ watch(() => route.params.id, fetchTag, { immediate: true })
   color: var(--primary);
 }
 .tag-heading > p:last-child {
-  margin: 10px 0 0;
+  margin: 12px 0 0;
   color: var(--text-muted);
   font-size: var(--text-sm);
 }
@@ -162,7 +166,7 @@ watch(() => route.params.id, fetchTag, { immediate: true })
   margin-top: 25px;
   padding: 35px 20px;
   border: 1px dashed var(--border-solid);
-  border-radius: var(--radius);
+  border-radius: var(--radius-lg);
   color: var(--text-muted);
   text-align: center;
 }
@@ -176,14 +180,17 @@ watch(() => route.params.id, fetchTag, { immediate: true })
 }
 .load-more button {
   min-height: 44px;
-  padding: 9px 15px;
+  padding: 9px 20px;
   border: 1px solid var(--border-solid);
-  border-radius: var(--radius-sm);
-  background: transparent;
+  border-radius: var(--radius-full);
+  background: var(--surface-primary);
   color: var(--text-primary);
   cursor: pointer;
   font: inherit;
   font-size: var(--text-sm);
+  transition:
+    border-color var(--transition-fast),
+    color var(--transition-fast);
 }
 .load-more button:hover:not(:disabled) {
   border-color: var(--primary);

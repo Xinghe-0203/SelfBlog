@@ -299,10 +299,9 @@ onMounted(() => {
   font-size: var(--text-base);
   outline: none;
 }
-
 .form-input:focus-visible {
   border-color: var(--accent);
-  outline: 2px solid var(--accent-light);
+  outline: 2px solid var(--accent);
   outline-offset: 1px;
 }
 
@@ -333,7 +332,8 @@ onMounted(() => {
 
 .data-table th {
   background: var(--bg-secondary);
-  color: var(--text-muted);
+  /* 表头压在次级面上：弱化档 4.46，用次级档过 AA。 */
+  color: var(--text-secondary);
   font-size: var(--text-xs);
   font-weight: 600;
 }

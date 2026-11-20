@@ -3,7 +3,13 @@
     <div id="overlay-root" />
     <a href="#main-content" class="skip-link">跳转到主要内容</a>
     <Navbar v-if="!isAdminPage" />
-    <main id="main-content" class="app-main" :class="{ 'app-main--admin': isAdminPage }">
+    <!-- tabindex="-1"：让路由切换后可以把焦点移到这里（见 guards.ts），但不进 Tab 序。 -->
+    <main
+      id="main-content"
+      class="app-main"
+      :class="{ 'app-main--admin': isAdminPage }"
+      tabindex="-1"
+    >
       <router-view v-slot="{ Component, route }">
         <Transition :name="transitionName" mode="out-in" @before-enter="onBeforeEnter">
           <div :key="route.path" class="page-wrapper">
@@ -189,7 +195,9 @@ onUnmounted(() => {
   top: -48px;
   left: var(--spacing-md);
   background: linear-gradient(135deg, var(--primary-start), var(--primary-end));
-  color: white;
+  /* 强调色在深色主题下会提亮（62% 主色 + 38% 白），白字会掉到 2.7:1；
+     --contrast-fg 由各主题给出「压在强调色上可读」的那一档（浅色 #fff / 深色 #111）。 */
+  color: var(--contrast-fg);
   padding: 0.5rem 1rem;
   font-size: var(--text-sm);
   font-weight: 500;

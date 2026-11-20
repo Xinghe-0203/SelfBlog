@@ -18,6 +18,10 @@ h6 {
   color: var(--text-primary);
   line-height: var(--leading-tight);
   letter-spacing: var(--tracking-tight);
+  /* 标题换行均分：中文标题经常在最后一个字上断行（孤字），
+     balance 会把各行长度拉平，避免出现「…发现。」这种孤零零的一行。
+     浏览器不支持时自动回落，不影响可读性。 */
+  text-wrap: balance;
 }
 h1 {
   font-size: var(--text-4xl);
@@ -64,6 +68,9 @@ p {
   font-size: var(--text-base);
   line-height: var(--leading-relaxed);
   color: var(--text-secondary);
+  /* pretty：避免段落最后一行只剩一两个字的「孤字」。
+     不支持时无副作用。 */
+  text-wrap: pretty;
 }
 small {
   font-size: var(--text-xs);
@@ -98,8 +105,17 @@ b {
 .markdown-body h3 {
   font-size: var(--text-xl);
 }
+/* 正文标题已整体降一级（# → h2 …），因此 h5 / h6 也要有确定的字阶，
+   否则 `#####` / `######` 会落到浏览器默认字号（比上一级还大或一样大）。 */
 .markdown-body h4 {
   font-size: var(--text-lg);
+}
+.markdown-body h5 {
+  font-size: var(--text-base);
+}
+.markdown-body h6 {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
 }
 .markdown-body p {
   margin-bottom: 1em;

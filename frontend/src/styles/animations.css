@@ -35,19 +35,24 @@
   transform: translateX(0);
 }
 /* ==================== 页面过渡 (Page Transitions) ==================== */
+/* 路由切换：淡入 + 轻微上移 + 一点缩放，读起来像「翻页」而不是「闪屏」。
+   只动 transform / opacity / filter —— 动 width/height 会在切换时触发一次布局。 */
 .page-enter-active,
 .page-leave-active {
   transition:
-    opacity 200ms ease,
-    transform 200ms ease;
+    opacity 260ms var(--ease-out),
+    transform 260ms var(--ease-out),
+    filter 260ms var(--ease-out);
 }
 .page-enter-from {
   opacity: 0;
-  transform: translateY(8px);
+  transform: translate3d(0, 10px, 0) scale(0.995);
+  filter: blur(3px);
 }
 .page-leave-to {
   opacity: 0;
-  transform: translateY(-8px);
+  transform: translate3d(0, -6px, 0) scale(0.998);
+  filter: blur(2px);
 }
 /* ==================== 尊重减少动效偏好 ==================== */
 @media (prefers-reduced-motion: reduce) {
@@ -56,6 +61,11 @@
     opacity: 1;
     transform: none;
     transition: none;
+  }
+  .page-enter-from,
+  .page-leave-to {
+    transform: none;
+    filter: none;
   }
 }
 /* 淡入 */

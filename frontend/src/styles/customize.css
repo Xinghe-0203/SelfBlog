@@ -253,9 +253,11 @@
   font-size: var(--text-3xl);
 }
 
-/* 极简：去掉封面图，只留文字卡。遮罩层也要撤掉——它是为压在照片上才存在的。 */
+/* 极简：去掉封面图，只留文字卡。遮罩层也要撤掉——它是为压在照片上才存在的。
+   装饰柔光同样要撤：极简档的诉求是「干净」，一团光晕与它相悖。 */
 #selfblog[data-ap-hero='minimal'] .intro-visual,
-#selfblog[data-ap-hero='minimal'] .intro-shell::after {
+#selfblog[data-ap-hero='minimal'] .intro-shell::after,
+#selfblog[data-ap-hero='minimal'] .intro-decor {
   display: none;
 }
 
@@ -279,8 +281,10 @@
 
 #selfblog[data-ap-hero='off'] .intro-visual,
 #selfblog[data-ap-hero='off'] .intro-shell::after,
+#selfblog[data-ap-hero='off'] .intro-decor,
 #selfblog[data-ap-hero='off'] .intro-author,
-#selfblog[data-ap-hero='off'] .intro-description {
+#selfblog[data-ap-hero='off'] .intro-description,
+#selfblog[data-ap-hero='off'] .intro-stats {
   display: none;
 }
 
@@ -289,7 +293,7 @@
 }
 
 @media (max-width: 600px) {
-  /* 移动端 Home.vue 自己会把 `.intro-visual` 放到 69% 宽并降不透明度；
+  /* 移动端 Home.vue 自己会把首屏改成「文字在上、封面在下」的堆叠；
    * 上面的紧凑档特异性更高，会把它压回 34%，所以这里补一组移动端取值。 */
   #selfblog[data-ap-hero='compact'] .intro-shell {
     min-height: 180px;
@@ -297,8 +301,9 @@
   }
 
   #selfblog[data-ap-hero='compact'] .intro-visual {
-    width: 55%;
-    opacity: 0.6;
+    width: 100%;
+    height: 132px;
+    opacity: 1;
   }
 }
 

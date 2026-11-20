@@ -199,10 +199,27 @@ class DiscoveryControllerTest {
         assertEquals("<![CDATA[plain]]>", SeoController.cdata("plain"));
     }
 
-    @Test void atomFeedEscapesRenderedHtmlContent() throws Exception {
+    /**
+     * Atom 的 {@code content type="html"} 必须是「已渲染 + 已净化」的 HTML，且整份文档合法。
+     *
+     * <p>两条与浏览器侧（DOMPurify）逐字一致的契约：</p>
+     * <ul>
+     *   <li><b>裸 HTML 被整体丢弃</b>：段落里的 {@code <script>alert(1)</script>}
+     *       连同内容一起消失（Jsoup 与 DOMPurify 都这样处理非白名单标签），
+     *       任何一层都不能出现活的 {@code script} 元素；</li>
+     *   <li><b>代码段里的同名字面量必须保留</b>：作者讲安全时会把
+     *       {@code <script>} 写在反引号里，那属于「文本」而不是「标记」，
+     *       必须以 {@code &lt;script&gt;} 的转义形态可见。</li>
+     * </ul>
+     *
+     * <p>历史背景：这里曾经断言 {@code &amp;lt;script&amp;gt;}（「SafeMarkdown 先转义成实体、
+     * XML 层再升级成 &amp;」的双层形状）。正文不再整篇转义后（那是「正文里出现
+     * {@code &nbsp;} 字面量」的根因），净化纯粹发生在渲染时，双层形状不复存在。</p>
+     */
+    @Test void atomFeedCarriesSanitizedHtmlAndKeepsCodeSpanLiterals() throws Exception {
         jdbc.update("INSERT INTO blog_post(id,user_id,title,content,status,is_deleted,create_time) "
                         + "VALUES(991005,1,'脚本文章',?,1,0,TIMESTAMP '2026-10-15 09:00:00')",
-                "A & B\n\n<script>alert(1)</script>\n");
+                "A & B\n\n<script>alert(1)</script>\n\n行内 `<script>guard()</script>` 示例\n");
 
         MvcResult result = mvc.perform(get("/atom.xml")).andExpect(status().isOk())
                 .andExpect(content().contentTypeCompatibleWith("application/atom+xml"))
@@ -210,10 +227,7 @@ class DiscoveryControllerTest {
         String atom = utf8(result);
 
         assertTrue(atom.contains("<content type=\"html\">"));
-        // 双层转义的精确形状：SafeMarkdown 把 <script> 转成 HTML 实体文本（&lt;script&gt;），
-        // XML 层再把每个 & 升级成 &amp; —— 原样 &lt;script&gt; 在 XML 里必须是 &amp;lt;script&amp;gt;
-        assertTrue(atom.contains("&amp;lt;script&amp;gt;"), "content type=html 必须是 XML 转义后的渲染 HTML");
-
+        // 整份文档必须是合法 XML（脚本载荷若没净化干净，解析就会失败）
         Document doc = parseXml(atom);
         assertEquals("feed", doc.getDocumentElement().getTagName());
         assertEquals(0, doc.getElementsByTagName("script").getLength(), "任何层都不允许出现活的 script 元素");
@@ -222,11 +236,18 @@ class DiscoveryControllerTest {
         boolean scriptItemFound = false;
         for (int i = 0; i < contents.getLength(); i++) {
             String html = contents.item(i).getTextContent();
-            if (!html.contains("alert(1)")) continue;
+            if (!html.contains("guard()") && !html.contains("A & B")) continue;
             scriptItemFound = true;
-            assertTrue(html.contains("&lt;script&gt;"), "HTML 载荷里 script 是被转义的文本");
-            assertTrue(html.contains("&amp;"), "正文里的 & 以 HTML 实体形式保留");
-            assertFalse(html.contains("<script>"));
+            // 代码段里的 <script> 是文本：必须以转义形态可见（XML 解码一层后就是 &lt;script&gt;）
+            assertTrue(html.contains("&lt;script&gt;guard()&lt;/script&gt;"),
+                    "代码段内的 <script> 必须是可见的转义文本");
+            // 段落里的裸 <script> 连同内容一起被清洗：payload 文本不得残留
+            assertFalse(html.contains("alert(1)"),
+                    "段落里的裸 <script> 必须连同内容一起丢弃（与 DOMPurify 一致）");
+            assertFalse(html.contains("<script>"), "载荷里不允许出现裸 script 标签");
+            // 正文里的 & 以 HTML 实体形式出现（HTML 序列化的一层，不是二次转义）
+            assertTrue(html.contains("A &amp; B"), "段落里的 & 应做 HTML 序列化");
+            assertFalse(html.contains("A &amp;amp; B"), "不应把 & 二次转义");
         }
         assertTrue(scriptItemFound, "991005 的全文必须出现在 atom content 里");
     }

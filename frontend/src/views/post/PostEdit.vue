@@ -2023,6 +2023,11 @@ onBeforeRouteLeave((_to, _from) => {
 .title-input:focus {
   outline: none;
 }
+/* 键盘焦点环：`:focus` 的 outline:none 会吃掉全局焦点环，这里补回来。 */
+.title-input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
 
 .title-input::placeholder {
   color: var(--text-muted);
@@ -2220,6 +2225,10 @@ onBeforeRouteLeave((_to, _from) => {
 
 .content-input:focus {
   outline: none;
+}
+.content-input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .content-input::placeholder {
@@ -2666,6 +2675,10 @@ onBeforeRouteLeave((_to, _from) => {
 
 .tag-input:focus {
   outline: none;
+}
+.tag-input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .tag-input::placeholder {

@@ -9,6 +9,9 @@
   /* Surfaces */
   --surface-primary: #20242c;
   --surface-secondary: #272c36;
+  /* 第三层表面（芯片 / 输入区）：深色画布下必须比 secondary 更深一档，
+     否则浅色画布遗留的 #f3f5f8 会变成一块刺眼的白片（深色模式里的「亮块」）。 */
+  --surface-tertiary: #2f3540;
 
   /* Contrast Surface — 深色模式下反转为浅底深字，
      既保持足够对比，又不会像纯黑按钮那样与背景糊在一起。 */
@@ -29,7 +32,8 @@
   /* Text */
   --text-primary: #edf0f5;
   --text-secondary: #a7afbc;
-  --text-muted: #939dad;
+  /* 对 #20242c 纸面、#2f3540 芯片面都 ≥ 4.5:1（旧值在芯片面只有 4.50，正好压线）。 */
+  --text-muted: #959faf;
   --text-inverse: #111111;
 
   /* Accent — Slightly brighter blue for dark backgrounds */
@@ -58,6 +62,13 @@
   --info: #4ba3d4;
   --info-light: rgba(75, 163, 212, 0.12);
   --info-hover: #6bb8e2;
+
+  /* 深色画布上的「墨色」要**更亮**：淡底是深色上的 12% 同色，深色文字会糊成一片。
+     四枚对各自 12% 淡底 ≥ 5:1。 */
+  --success-ink: #6fbb75;
+  --warning-ink: #d9ab54;
+  --error-ink: #ef7d7b;
+  --info-ink: #66b5e2;
 
   /* Neutral Gray Scale — Inverted */
   --gray-50: #191919;

@@ -1,7 +1,7 @@
 /**
  * 路由守卫
  */
-import type { Router } from 'vue-router'
+import type { RouteLocationNormalized, Router } from 'vue-router'
 import { isNavigationFailure, NavigationFailureType } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { useLogger } from '@/utils/logger'
@@ -62,10 +62,42 @@ export function setupGuards(router: Router): void {
   })
 
   // afterEach 的成功导航是常态；只有真正的导航失败（重复导航除外）才值得告警。
-  router.afterEach((to, _from, failure) => {
+  router.afterEach((to, from, failure) => {
     logger.debug('Navigation completed', { to: to.path })
     if (failure && !isNavigationFailure(failure, NavigationFailureType.duplicated)) {
       logger.warn('Navigation failed', { to: to.fullPath, failure: String(failure) })
+      return
     }
+    if (failure) return
+    // 键盘用户点完导航后，旧焦点会随旧页面一起消失（落在 <body> 上），
+    // 下一次 Tab 会从头开始 —— 相当于把阅读位置丢了。这里把焦点搬到主内容容器。
+    if (shouldMoveFocusToMain(to, from)) focusMainContent()
   })
+}
+
+/**
+ * 一次成功的导航之后，是否应该把焦点移到 `<main>`。
+ *
+ * <p>三条排除理由：</p>
+ * <ul>
+ *   <li>**首次进入**（`from` 还没匹配到任何路由）：此时焦点本来就该从文档开头开始，
+ *       抢焦点反而会打断读屏对页面标题的朗读；</li>
+ *   <li>**带 hash 的导航**：浏览器要滚到目标锚点，焦点移走会打断它；</li>
+ *   <li>**只有 query 变化**（翻页、切排序）：页面主体没换，焦点留在刚点的控件上更自然。</li>
+ * </ul>
+ */
+export function shouldMoveFocusToMain(
+  to: RouteLocationNormalized,
+  from: RouteLocationNormalized
+): boolean {
+  if (from.matched.length === 0) return false
+  if (to.hash) return false
+  return to.path !== from.path
+}
+
+/** 把焦点交给主内容容器（`tabindex="-1"` 使其可编程聚焦，但不进 Tab 序）。 */
+function focusMainContent(): void {
+  const main = document.getElementById('main-content')
+  // preventScroll：滚动位置由 router 的 scrollBehavior 决定，这里不许抢。
+  main?.focus({ preventScroll: true })
 }

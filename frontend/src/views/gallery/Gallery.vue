@@ -121,8 +121,12 @@ onBeforeUnmount(() => {
         {{ text('description', '把途中的光影，慢慢收进记忆。') }}
       </p>
     </header>
-    <div v-if="loading" class="gallery-state" role="status">正在整理相册…</div>
+    <div v-if="loading" class="gallery-state" role="status">
+      <span class="state-icon" aria-hidden="true"><Icon name="image" :size="22" /></span>
+      <p>正在整理相册…</p>
+    </div>
     <div v-else-if="error" class="gallery-state" role="alert">
+      <span class="state-icon" aria-hidden="true"><Icon name="image" :size="22" /></span>
       <p>{{ error }}</p>
       <button type="button" class="btn btn-secondary" @click="loadAlbums">重新加载</button>
     </div>
@@ -132,6 +136,7 @@ onBeforeUnmount(() => {
         :key="album.id"
         class="album-card"
         type="button"
+        v-scroll-reveal="{ variant: 'reveal-scale', stagger: true }"
         @click="openAlbum(album)"
       >
         <span class="album-cover"
@@ -155,7 +160,13 @@ onBeforeUnmount(() => {
         }}</span>
       </button>
     </div>
-    <div v-else class="gallery-state">相册还在准备中，欢迎稍后再来。</div>
+    <div v-else class="gallery-state">
+      <span class="state-icon" aria-hidden="true"><Icon name="image" :size="22" /></span>
+      <p>相册还在准备中，欢迎稍后再来。</p>
+      <router-link class="state-link" to="/"
+        >先去看看文章<Icon name="chevron-right" :size="14"
+      /></router-link>
+    </div>
 
     <Modal
       :show="selectedAlbum !== null"
@@ -226,14 +237,19 @@ onBeforeUnmount(() => {
   padding: var(--page-padding-block, 24px) 30px 48px;
 }
 .gallery-hero {
-  margin-bottom: 28px;
+  margin-bottom: 30px;
 }
 .gallery-hero h1 {
-  font-size: var(--text-3xl);
+  font-size: var(--text-4xl);
+  font-weight: 700;
+  letter-spacing: -0.03em;
 }
 .gallery-hero p {
-  margin-top: 12px;
+  margin-top: 14px;
+  max-width: 56ch;
+  color: var(--text-secondary);
   font-size: var(--text-sm);
+  line-height: 1.8;
 }
 .album-grid {
   display: grid;
@@ -253,9 +269,16 @@ onBeforeUnmount(() => {
   background: var(--surface-raised);
   color: var(--text-primary);
   text-align: left;
+  box-shadow: var(--shadow-xs);
+  transition:
+    border-color var(--transition-fast),
+    box-shadow var(--transition-fast),
+    transform var(--transition-fast);
 }
 .album-card:hover {
   border-color: var(--accent);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
 }
 .album-cover {
   position: relative;
@@ -271,6 +294,10 @@ onBeforeUnmount(() => {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  transition: transform var(--transition-slow);
+}
+.album-card:hover .album-cover img {
+  transform: scale(1.05);
 }
 .lock-badge {
   position: absolute;
@@ -312,12 +339,36 @@ onBeforeUnmount(() => {
 .gallery-state {
   display: grid;
   justify-items: center;
-  gap: 16px;
-  padding: 48px 20px;
-  border-radius: var(--radius-lg);
+  gap: 14px;
+  padding: 56px 20px;
+  border: 1px dashed var(--border-light);
+  border-radius: var(--radius-xl);
+  background: var(--surface-paper);
   color: var(--text-secondary);
   font-size: var(--text-sm);
   text-align: center;
+}
+/* 空态图标：一个弱化的方块，让空页有个视觉落点而不是一行孤零零的文字。 */
+.state-icon {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border-radius: var(--radius-full);
+  background: var(--surface-tertiary);
+  color: var(--text-muted);
+}
+.state-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 40px;
+  color: var(--accent);
+  font-size: var(--text-sm);
+  text-decoration: none;
+}
+.state-link:hover {
+  text-decoration: underline;
 }
 .gallery-state p {
   font-size: var(--text-sm);

@@ -28,6 +28,12 @@ const homeRoutes: RouteRecordRaw[] = [
     name: 'Gallery',
     component: lazyLoad(() => import('@/views/gallery/Gallery.vue')),
     meta: { title: '相册' }
+  },
+  {
+    path: '/tags',
+    name: 'TagsIndex',
+    component: lazyLoad(() => import('@/views/TagsIndex.vue')),
+    meta: { title: '标签' }
   }
 ]
 

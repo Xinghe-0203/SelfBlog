@@ -1438,11 +1438,11 @@ label small {
 }
 .alert {
   background: var(--error-light);
-  color: var(--error);
+  color: var(--error-ink);
 }
 .success {
   background: var(--success-light);
-  color: var(--success);
+  color: var(--success-ink);
 }
 .skin-preview[data-skin='forest'] {
   --primary: #2d7c54;

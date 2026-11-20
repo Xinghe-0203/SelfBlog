@@ -2,6 +2,7 @@ package com.selfblog.service.post;
 
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.selfblog.entity.BlogTag;
+import com.selfblog.vo.post.TagWithCountVO;
 
 /**
  * 标签服务接口
@@ -13,6 +14,12 @@ public interface BlogTagService extends IService<BlogTag> {
      * @return 标签列表
      */
     java.util.List<BlogTag> listAllTags();
+
+    /**
+     * 公开标签索引：标签 + 已发布文章数（按文章数倒序，同数按名称升序）。
+     * @return 带计数的标签列表
+     */
+    java.util.List<TagWithCountVO> listTagsWithCounts();
 
     /**
      * 创建标签

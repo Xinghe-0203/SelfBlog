@@ -184,7 +184,9 @@ function applyCollapse(wrapper: HTMLElement, pre: HTMLElement, collapseHeight: n
 }
 
 function enhanceHeadingAnchors(root: HTMLElement): void {
-  root.querySelectorAll<HTMLElement>('h1, h2, h3').forEach((heading) => {
+  // 正文标题已被 `demoteMarkdownHeadings` 整体降级（# → h2 …），所以这里从 h2 起查；
+  // h1 只属于页面标题，不该出现正文锚点。
+  root.querySelectorAll<HTMLElement>('h2, h3, h4, h5, h6').forEach((heading) => {
     const id = heading.id
     // 没有 id 的标题无法被锚定（setHeadingIds 会给正文标题补 id）
     if (!id || heading.querySelector('.heading-anchor')) return

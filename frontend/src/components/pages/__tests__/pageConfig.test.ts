@@ -38,7 +38,8 @@ describe('public page configuration', () => {
           '## 正文\n\n<script>alert(1)</script>\n\n[危险](javascript:alert(1))\n\n<img src="/uploads/a.jpg" onerror="alert(1)"><iframe src="https://evil.example"></iframe><style>*{display:none}</style>'
       }
     })
-    expect(wrapper.find('h2').text()).toBe('正文')
+    // 正文标题统一降一级（#→h2、##→h3）：页面自身已经有 h1。
+    expect(wrapper.find('h3').text()).toBe('正文')
     expect(wrapper.find('script,iframe,style,[onerror],a[href^="javascript:"]').exists()).toBe(
       false
     )

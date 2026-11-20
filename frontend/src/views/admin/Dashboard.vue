@@ -1,13 +1,31 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { siteApi, type VisitorSummary } from '@/api/site'
 import { useSiteStore } from '@/stores/site'
+import CountUp from '@/components/common/CountUp.vue'
 import Icon from '@/components/common/Icon.vue'
 import type { IconName } from '@/components/common/icons'
 
 const siteStore = useSiteStore()
 const stats = ref<VisitorSummary | null>(null)
 const statsError = ref(false)
+
+/**
+ * 概览的四张数字卡。
+ *
+ * 「今日」那两张额外带一句说明（tone=today），因为「今日 25 / 累计 163」
+ * 单独看两个数字没有意义，旁边一句才说得清它们的关系。
+ */
+const statCards = computed(() => {
+  const value = stats.value
+  if (!value) return []
+  return [
+    { label: '累计访客', value: value.totalVisitors, hint: '自建站以来', tone: 'total' },
+    { label: '今日访客', value: value.todayVisitors, hint: '今天', tone: 'today' },
+    { label: '页面浏览', value: value.totalPageViews, hint: '含重复浏览', tone: 'total' },
+    { label: '文章阅读', value: value.articleViews, hint: '正文页打开次数', tone: 'total' }
+  ]
+})
 const workspaceLinks: Array<{
   segment: string
   label: string
@@ -89,17 +107,10 @@ onMounted(async () => {
     </section>
 
     <section v-if="stats" class="summary-grid" aria-label="网站访问概况">
-      <article>
-        <small>累计访客</small><strong>{{ stats.totalVisitors.toLocaleString() }}</strong>
-      </article>
-      <article>
-        <small>今日访客</small><strong>{{ stats.todayVisitors.toLocaleString() }}</strong>
-      </article>
-      <article>
-        <small>页面浏览</small><strong>{{ stats.totalPageViews.toLocaleString() }}</strong>
-      </article>
-      <article>
-        <small>文章阅读</small><strong>{{ stats.articleViews.toLocaleString() }}</strong>
+      <article v-for="stat in statCards" :key="stat.label">
+        <small>{{ stat.label }}</small>
+        <strong><CountUp :value="stat.value" /></strong>
+        <span class="stat-trend" :class="`stat-trend--${stat.tone}`">{{ stat.hint }}</span>
       </article>
     </section>
     <p v-else-if="statsError" class="dashboard-note">
@@ -169,8 +180,25 @@ onMounted(async () => {
   background: var(--surface-primary);
   color: var(--text-primary);
 }
+.workspace-card {
+  transition:
+    border-color var(--transition-fast),
+    transform var(--duration-slow) var(--ease-out),
+    box-shadow var(--duration-slow) var(--ease-out);
+}
 .workspace-card:hover {
   border-color: var(--accent);
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-md);
+}
+/* 图标在悬停时轻轻转一下，与前台的品牌图标是同一套小动作。 */
+.card-icon {
+  transition:
+    background var(--transition-fast),
+    transform var(--duration-slow) var(--ease-spring);
+}
+.workspace-card:hover .card-icon {
+  transform: scale(1.06) rotate(-6deg);
 }
 .card-icon {
   display: grid;
@@ -215,10 +243,19 @@ onMounted(async () => {
 .summary-grid article {
   display: grid;
   gap: 7px;
-  padding: 17px;
+  padding: 18px;
   border: 1px solid var(--border-light);
   border-radius: var(--radius-lg);
   background: var(--surface-primary);
+  transition:
+    border-color var(--transition-fast),
+    transform var(--transition-fast),
+    box-shadow var(--transition-fast);
+}
+.summary-grid article:hover {
+  border-color: color-mix(in srgb, var(--border-light) 55%, var(--accent));
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-sm);
 }
 .summary-grid small {
   color: var(--text-muted);
@@ -227,6 +264,16 @@ onMounted(async () => {
 .summary-grid strong {
   font-size: var(--text-2xl);
   font-variant-numeric: tabular-nums;
+}
+/* 数字下方的一句说明：让「累计」与「今日」的区别一眼可见。 */
+.stat-trend {
+  color: var(--text-muted);
+  font-size: var(--text-2xs);
+}
+.stat-trend--today {
+  /* accent 压在（玻璃感的）半透明卡片上只有 4.47，深一档即可过 AA。 */
+  color: var(--accent-dark);
+  font-weight: 600;
 }
 @media (max-width: 860px) {
   .workspace-grid {

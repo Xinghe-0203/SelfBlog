@@ -15,6 +15,8 @@ html {
   scroll-padding-top: var(--anchor-offset);
   -webkit-text-size-adjust: 100%;
   color-scheme: light;
+  /* 纵向滚动条占位：避免内容宽度在长页与短页之间跳动。 */
+  scrollbar-gutter: stable;
 }
 
 body {
@@ -27,6 +29,7 @@ body {
   color: var(--text-primary);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
   min-height: 100vh;
   overflow-x: hidden;
   position: relative;
@@ -36,12 +39,39 @@ body {
   min-height: 100vh;
   background: var(--bg-primary);
   color: var(--text-primary);
+  /* 纸面上的内容统一用一条极淡的发丝线兜底，避免大面积纯白显得「平」。
+     纯色画布下这条线几乎不可见，壁纸画布下由 appearance.css 的 inset 描边接管。 */
+  isolation: isolate;
+}
+
+/* ==================== Focus Ring — 统一键盘焦点样式 ==================== */
+/*
+  键盘焦点环必须**压过**组件里的 `outline: none`。
+  组件规则常写成 `.comment-form input:focus { outline: none; … }`（特异性 0,2,1），
+  而这里的 `input:focus-visible` 只有 0,1,1 —— 焦点环会被吃掉，键盘用户就「看不见焦点在哪」。
+  这里用 `:is()` 把选择器的特异性抬到与组件规则同级（0,2,1），再靠**后写**取胜；
+  组件里的 `outline: none` 若在更晚的样式表里，仍可能反超 —— 所以组件侧一律改成
+  「`:focus` 去掉描边 + `:focus-visible` 补回描边」的两段式写法。
+*/
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+a:is(:focus-visible),
+button:is(:focus-visible),
+input:is(:focus-visible),
+textarea:is(:focus-visible),
+select:is(:focus-visible),
+[tabindex]:is(:focus-visible) {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 /* ==================== Scrollbar — Minimal ==================== */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 10px;
+  height: 10px;
 }
 
 ::-webkit-scrollbar-track {
@@ -50,20 +80,25 @@ body {
 
 ::-webkit-scrollbar-thumb {
   background: var(--gray-300);
+  border: 3px solid transparent;
   border-radius: var(--radius-full);
+  background-clip: content-box;
   transition: background var(--transition);
 }
 
 ::-webkit-scrollbar-thumb:hover {
   background: var(--gray-400);
+  background-clip: content-box;
 }
 
 .dark-mode ::-webkit-scrollbar-thumb {
   background: var(--gray-600);
+  background-clip: content-box;
 }
 
 .dark-mode ::-webkit-scrollbar-thumb:hover {
   background: var(--gray-500);
+  background-clip: content-box;
 }
 
 /* ==================== Text Selection ==================== */
@@ -77,17 +112,17 @@ body {
 }
 
 /* ==================== Image Loading ==================== */
+/*
+  图片**默认可见**。
+  曾经这里是「`img[loading=lazy]` 先 opacity:0，加载完成再加 `.loaded` 显形」——
+  但没有任何地方会给图片加 `.loaded`，而 `:not([src=''])` 又会匹配几乎所有图片，
+  于是那两条规则实际互相抵消：既没有淡入效果，又多一层语义负担。
+  阅读页里图片突然出现确实不好，但「图片消失」比「图片直接出现」糟糕得多，
+  所以这里选择确定可见，而不是用一个不生效的占位淡入。 */
 img {
-  transition: opacity 0.3s ease;
-}
-
-img[loading='lazy'] {
-  opacity: 0;
-}
-
-img[loading='lazy'].loaded,
-img[loading='lazy']:not([src='']) {
-  opacity: 1;
+  /* 只对 transform 做过渡（封面缩放等），不碰 opacity：
+     避免任何路径把图片留在半透明状态。 */
+  transition: transform var(--transition-slow) var(--ease-out);
 }
 
 /* ==================== Form Base ==================== */
@@ -104,4 +139,18 @@ button {
   cursor: pointer;
   border: none;
   background: none;
+}
+
+/* ==================== Reduced Motion — 全局兜底 ==================== */
+/* a11y.css 里有关键帧的降级；这里补上「交互动效」的降级：
+   悬停位移、缩放等 transform 在关闭动效时应当完全消失。 */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

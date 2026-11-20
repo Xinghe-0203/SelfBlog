@@ -15,8 +15,10 @@ export interface SeoMeta {
   url?: string
   type?: 'website' | 'article'
   publishedTime?: string
+  modifiedTime?: string
   author?: string
   tags?: string[]
+  section?: string
   indexable?: boolean
 }
 
@@ -93,16 +95,22 @@ export function applySeoMeta(meta: SeoMeta): void {
   upsertMeta('property', 'og:description', description)
   upsertMeta('property', 'og:image', image)
   upsertMeta('property', 'og:url', url)
+  upsertMeta('property', 'og:locale', 'zh_CN')
+  // 图片的替代文字：社交平台用它决定卡片版式，缺省时会随机裁切。
+  upsertMeta('property', 'og:image:alt', meta.title)
   if (siteTitle) upsertMeta('property', 'og:site_name', siteTitle)
 
   upsertMeta('name', 'twitter:card', 'summary_large_image')
   upsertMeta('name', 'twitter:title', fullTitle)
   upsertMeta('name', 'twitter:description', description)
   upsertMeta('name', 'twitter:image', image)
+  upsertMeta('name', 'twitter:image:alt', meta.title)
 
   if (meta.type === 'article') {
     upsertMeta('property', 'article:published_time', meta.publishedTime || '')
+    upsertMeta('property', 'article:modified_time', meta.modifiedTime || meta.publishedTime || '')
     upsertMeta('property', 'article:author', meta.author || '')
+    upsertMeta('property', 'article:section', meta.section || '')
     // article:tag 可能有多条：先清掉旧的再写，避免上一篇的标签残留
     document.head.querySelectorAll('meta[property="article:tag"]').forEach((n) => n.remove())
     for (const tag of meta.tags || []) {
@@ -135,7 +143,10 @@ export function applyArticleJsonLd(data: {
   image?: string
   url?: string
   publishedTime?: string
+  modifiedTime?: string
   author?: string
+  tags?: string[]
+  section?: string
 }): void {
   let el = document.getElementById(JSONLD_ID) as HTMLScriptElement | null
   if (!el) {
@@ -144,17 +155,46 @@ export function applyArticleJsonLd(data: {
     el.type = 'application/ld+json'
     document.head.appendChild(el)
   }
+  const canonical = absolute(data.url || window.location.pathname)
   const payload: Record<string, unknown> = {
     '@context': 'https://schema.org',
     '@type': 'BlogPosting',
     headline: data.title,
-    mainEntityOfPage: absolute(data.url || window.location.pathname),
+    mainEntityOfPage: canonical,
     image: [absolute(data.image || OG_IMAGE_FALLBACK)]
   }
   if (data.description) payload.description = data.description
   if (data.publishedTime) payload.datePublished = data.publishedTime
+  // 更新晚于发布时才值得单独声明（否则两个日期一样，阅读器会误以为「刚改过」）。
+  if (data.modifiedTime && data.modifiedTime !== data.publishedTime) {
+    payload.dateModified = data.modifiedTime
+  }
   if (data.author) payload.author = { '@type': 'Person', name: data.author }
   if (siteTitle) payload.publisher = { '@type': 'Organization', name: siteTitle }
+  if (data.tags?.length) payload.keywords = data.tags.join(', ')
+  if (data.section) payload.articleSection = data.section
+  if (document.documentElement.lang) payload.inLanguage = document.documentElement.lang
+
+  /*
+    面包屑必须由**客户端**也写一份：服务端阅读 HTML 里已经有 breadcrumb，
+    但 Vue 挂载后会用本函数重建这枚 JSON-LD（同 id、整个节点替换），
+    少写就等于把服务端刚写好的结构化数据降级掉了。形状与服务端
+    ReadingHtmlRenderer.breadcrumbList 保持一致（首页 → 文章，URL 均为规范 origin 的绝对地址）。
+  */
+  if (siteTitle || canonical) {
+    payload.breadcrumb = {
+      '@type': 'BreadcrumbList',
+      itemListElement: [
+        {
+          '@type': 'ListItem',
+          position: 1,
+          name: siteTitle || undefined,
+          item: `${canonicalOrigin()}/`
+        },
+        { '@type': 'ListItem', position: 2, name: data.title, item: canonical }
+      ]
+    }
+  }
   el.textContent = JSON.stringify(payload)
 }
 

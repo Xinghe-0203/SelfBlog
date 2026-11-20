@@ -152,7 +152,7 @@ public class SitemapService {
     /** 首页/归档/关于/相册：遵循各页面已发布配置的 indexable。 */
     List<Url> siteEntries() {
         List<Url> urls = new ArrayList<>();
-        for (String id : List.of("home", "archives", "about", "gallery")) {
+        for (String id : List.of("home", "archives", "about", "gallery", "tags")) {
             PublicPage page = pages.getPublished(id);
             if (!indexable(page)) continue;
             String path = PageCatalog.definition(id).path();

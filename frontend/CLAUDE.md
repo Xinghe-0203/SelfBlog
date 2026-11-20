@@ -75,7 +75,7 @@ src/
 
 ## 设计系统
 
-- 入口 `src/styles/main.css`，按顺序 `@import` **14** 个模块；设计 token 在 `variables.css`，深色模式覆盖在 `dark-mode.css`，皮肤在 `skins.css`。**`appearance.css` 与 `customize.css` 必须排在最后且 `customize.css` 更后**（作者配置的背景/不透明度/排版要压过皮肤与深色模式里同优先级的声明）
+- 入口 `src/styles/main.css`，按顺序 `@import` **15** 个模块（2026-11-19 新增 `motion.css` 动效词汇表，排在 `animations.css` 之后）；设计 token 在 `variables.css`，深色模式覆盖在 `dark-mode.css`，皮肤在 `skins.css`。**`appearance.css` 与 `customize.css` 必须排在最后且 `customize.css` 更后**（作者配置的背景/不透明度/排版要压过皮肤与深色模式里同优先级的声明）
 - 深色模式通过 `.dark-mode` 类生效（`stores/theme.ts` 加在 `<html>`，`App.vue` 同时绑在 `#selfblog` 上）
 - 皮肤通过 `#selfblog[data-skin='...']` 生效：`ocean`(默认)/`forest`/`lavender`/`sunset`/`midnight`/`ink`/`sand`/`dusk`（`midnight` 与 `dusk` 是自带深色画布的皮肤，各自声明 `color-scheme: dark`）
 - 动画工具类: `.fade-in`, `.slide-up`, `.pulse`
@@ -88,12 +88,21 @@ src/
   - `--contrast-bg` / `--contrast-bg-hover` / `--contrast-bg-active` / `--contrast-fg` — 高对比实心按钮（浅色模式近黑，深色模式自动反转为浅底深字）
 - 组件只引用语义 token，不直接写十六进制色值
 - **字号一律走 `--text-*` 字阶，不要在组件里写裸 px / rem。** 十档，唯一定义处 `src/styles/variables.css`
-  （`--text-2xs: 0.6875rem` 11px / `--text-xs` 12 / `--text-sm` 14 / `--text-base` 16 / `--text-lg` 18 /
-  `--text-xl` 20 / `--text-2xl` 24 / `--text-3xl` 30 / `--text-4xl` 36 / `--text-5xl` 48）。
+  （2026-11-19 起：`--text-2xs: 0.75rem` 12px / `--text-xs` 0.8125rem 13 / `--text-sm` 14 / `--text-base` 16 /
+  `--text-lg` 18 / `--text-xl` 20 / `--text-2xl` 24 / `--text-3xl` 30 / `--text-4xl` 36 / `--text-5xl` 48。
+  最小两档各上调 1px：11px/12px 的中文在高分屏上边缘发虚，是「界面显旧」的主要来源之一）。
   只有三类例外可保留非 token 写法：`html` 根字号（`base.css` 的 `16px`，rem 的基准）、
   相对父级缩放的 `em`（正文代码与标题锚点）、以及需要随视口流动的 `clamp()`（首页与阅读页大标题）。
   新增档位要连 `variables.css` 注释一起加，不要就地写魔数。
-- 圆角：按钮/输入框 8px，内容分组 12–14px，面板 16px；细长导航、圆形头像/播放键才用 `--radius-full`
+- 圆角（2026-11-19 起）：控件 9–10px，内容分组 14–18px，面板 22px；细长导航、圆形头像/播放键才用 `--radius-full`
+- **对比度**：`--text-secondary` / `--text-muted` 是按「玻璃感半透明表面合成后」的底色算的；
+  压在强调色上的文字用 `--contrast-fg`，压在同色淡底上的语义文字用 `*-ink`（见
+  `docs/agents/frontend.md`）。新增彩色徽章时必须挑 ink 档而不是色板档。
+- **焦点环**：全局规则是 `:focus-visible` + `input:is(:focus-visible)` 一组（`base.css`），
+  目的是压过组件里的 `outline: none`。**新增 `outline: none` 必须同时写 `:focus-visible` 描边**，
+  否则键盘用户看不见焦点；`outline` 不得写在 `:focus-visible` 之外去改 `border-radius`
+  （那会改变元素本身的圆角）。
+  （旧值 8/12–14/16 已随 UI 重做调整；`customize.css` 的 `radiusScale` 四档仍独立覆盖这八个档位）
 - `.functional-glass` 是显式功能层，不要把旧 `.glass` 正文卡片改为半透明；透明/高对比降级在 glassmorphism.css
 - `#overlay-root` 在 App 的主题根内、路由过渡外；模态层用 `useDialog`，不要另建 body 滚动计数或直接传送到裸 body
 - `MusicPlayer` 是唯一音频宿主，常驻 App；共享动作在 `stores/music.ts`，NavbarMusicControl 只消费状态。不可恢复自动播放或把音频移进面板
@@ -114,8 +123,10 @@ src/
 - 11 个新设置键分四个维度：**排版**（`fontFamily` `system|sans|serif|mono`、`baseFontSize` 14–19、`bodyLineHeight` 1.5–2.2、`readerWidth` 640–960、`paragraphSpacing` 0–2）、**布局**（`radiusScale` `none|sharp|default|soft|round`、`shadowDepth` `flat|default|deep`、`layoutDensity` `compact|default|comfortable`）、**呈现**（`homeHeroStyle` `default|compact|minimal|off`、`postCoverStyle` `default|wide|hidden`）、**动效**（`motionIntensity` `off|subtle|default|lively`）
 - **v2.0.30 已扩到 20 键**：+`readingProgress`/`blockquoteStyle`/`postRowStyle`/`contentImageStyle`/`tableStyle`（CSS 钩子）、+`homeSidebarOrder`/`tocStyle`/`summaryCallout`/`postLicense`（模板/逻辑驱动，不进 `enumAttrs` 也不进 watch 数组）、+`linkStyle`（CSS 钩子）。watch 数组现为 **19 项**；CSS 规则仍在 `customize.css`（现为 13 节），模板驱动键的判定函数在 `stores/site.ts` 导出（`resolveSidebarOrder` 等）
 - 全部规则在 `src/styles/customize.css`（**排在 `appearance.css` 之后**，作者配置要压过皮肤/深色模式同优先级声明）。7 个枚举键写成 `#selfblog` 上的 `data-ap-*` 属性，4 个数值键写成 `#selfblog` 上的内联 `--ap-*` 变量（**不是 `<html>`**，否则会绕过作用域改到导航栏）；等于默认值即删掉钩子（`delete root.dataset[...]` / `removeProperty`）
-- **硬约束一：导航栏与后台界面完全不动。** 所有选择器限定在 `#selfblog .app-main:not(.app-main--admin)` 内——`Navbar`（`.site-nav-wrap`）与 `Footer` 在 `.app-main` 之外，天然碰不到。改这些规则后必须跑「导航栏逐字符恒定」的真机判据（见 `docs/reviews/2026-10-22-appearance-customization-verification.md`）
+- **硬约束一：作者的外观配置不得影响导航栏与后台界面。** 所有 `customize.css` 选择器限定在 `#selfblog .app-main:not(.app-main--admin)` 内——`Navbar`（`.site-nav-wrap`）与 `Footer` 在 `.app-main` 之外，天然碰不到。改这些规则后必须跑「导航栏逐字符恒定」的真机判据（见 `docs/reviews/2026-10-22-appearance-customization-verification.md`）
+  - **注意边界（2026-11-19 起）**：这条约束说的是「**作者的外观配置**不得影响导航栏」，不是「导航栏的样式永远不许改」。v2.0.30 第五批的全站 UI 重做**有意重画了导航栏与后台**（静态设计，不是作者配置）。改 `Navbar.vue` / `Footer.vue` / `views/admin/**` 的样式是可以的；改 `customize.css` 让作者配置渗进导航栏不行。
 - **硬约束二：默认档必须逐像素等于改造前。** 每条规则的 fallback 就是原来的硬编码值（`var(--ap-reader-width, 760px)` 里的 760px 就是 `PostDetail.vue` 原来的 760px）。不要在默认档顺手加一点「更精致」的阴影或间距——零回归靠的是这一点
+  - **注意基线（2026-11-19 起）**：这里的「改造前」指 **v2.0.30 第五批 UI 重做之后**的基线。设计 token（`variables.css`）与各视图的静态样式在那一批被有意重写，因此旧版本记录里的具体像素值（旧的 11px 最小字号、旧圆角档位等）已不再是基线；但 `customize.css` 里 20 个外观键的 fallback 与默认值语义未变，仍然必须逐档等于「该键未配置时」的观感
 - **改字体必须重定向 token，不能靠继承**：`PostDetail.vue` 等视图有 11 处 `font-family: var(--font-display)` 的**直接声明**，继承永远输。`customize.css` 在该作用域内重新赋值 `--font-sans` / `--font-display`（标题族用 `--ap-font-heading`），既有声明自动跟随。`--font-mono` **刻意不动**：代码块与行内 code 必须保持等宽
 - **阴影档只给「deep」接线内容卡片**（`.article-list` / `.intro-shell` / `.sidebar-block` / `.author-profile` / `.album-card` / `.state-panel` / `.archive-callout` → `box-shadow: var(--shadow-xs)`）。**不给 default 接线是刻意的**（默认档要零回归）。不碰 `.page-frame` 的 `inset 0 0 0 1px`：那是描边语义，换成外投影会让纸面边缘糊掉
 - 不覆盖 `--radius-full`（9999px）与 `50%`：胶囊导航、圆形头像/圆形按钮必须真圆

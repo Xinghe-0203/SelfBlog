@@ -29,6 +29,7 @@ public final class PageCatalog {
         definitions.put("archives", new Definition("归档", "/archives", Set.of(), Set.of("category", "count")));
         definitions.put("gallery", new Definition("相册", "/gallery", Set.of(), Set.of("description", "count")));
         definitions.put("search", new Definition("搜索", null, Set.of("placeholder", "empty"), Set.of("count")));
+        definitions.put("tags", new Definition("标签", "/tags", Set.of(), Set.of("count")));
         definitions.put("post", new Definition("文章详情模板", null, Set.of(), Set.of("cover", "meta", "toc", "adjacent")));
         definitions.put("tag", new Definition("标签详情模板", null, Set.of(), Set.of("count")));
         definitions.put("notFound", new Definition("404 页面", null, Set.of(), Set.of("homeLink", "search")));

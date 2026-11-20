@@ -31,9 +31,28 @@
   font-size: 28px;
   line-height: 1.35;
 }
+/* 正文标题已整体降一级（# → h2 …）：h1 只属于文章标题，这里补齐 h2–h6 的字阶，
+   否则 `##` / `###` 会落到浏览器默认字号，层级读不出来。 */
 .seo-reading h2 {
   margin: 32px 0 12px;
   font-size: 19px;
+}
+.seo-reading h3 {
+  margin: 26px 0 10px;
+  font-size: 17px;
+}
+.seo-reading h4 {
+  margin: 22px 0 8px;
+  font-size: 16px;
+}
+.seo-reading h5 {
+  margin: 20px 0 8px;
+  font-size: 15px;
+}
+.seo-reading h6 {
+  margin: 18px 0 8px;
+  font-size: 14px;
+  color: #52606d;
 }
 .seo-reading .seo-heading p,
 .seo-reading .seo-post-meta,
@@ -70,6 +89,33 @@
 .seo-reading .seo-count {
   margin-left: 8px;
 }
+/* 标签索引：多列网格 + 「名称 … 文章数」两端对齐。
+   十几个标签排成单列会把页面拉得很长，宽屏右侧整片空白。 */
+.seo-reading .seo-entries.seo-tags {
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 8px 20px;
+  margin: 20px 0 28px;
+}
+.seo-reading .seo-tags li {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 14px;
+  border: 1px solid rgba(128, 128, 128, 0.22);
+  border-radius: 10px;
+  background: rgba(128, 128, 128, 0.04);
+}
+.seo-reading .seo-tags a {
+  font-size: 16px;
+  font-weight: 600;
+}
+.seo-reading .seo-tags .seo-count {
+  margin-left: 0;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
 .seo-reading .seo-body {
   font-size: 16px;
 }
@@ -88,6 +134,48 @@
 }
 .seo-reading .seo-body code {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+/* 行内代码：与前端 typography.css 同一档（浅底 + 强调色文字） */
+.seo-reading .seo-body p code,
+.seo-reading .seo-body li code,
+.seo-reading .seo-body td code {
+  padding: 0.12em 0.36em;
+  border-radius: 4px;
+  background: rgba(22, 93, 255, 0.1);
+  color: #165dff;
+  font-size: 0.9em;
+}
+.seo-reading .seo-body pre code {
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  font-size: 14px;
+}
+/* 引用块：左侧强调色竖线 + 淡底，与前端的 blockquote 一致 */
+.seo-reading .seo-body blockquote {
+  margin: 1.6em 0;
+  padding: 12px 18px;
+  border-left: 3px solid var(--seo-accent);
+  border-radius: 0 8px 8px 0;
+  background: rgba(128, 128, 128, 0.08);
+  color: #52606d;
+}
+.seo-reading .seo-body ul,
+.seo-reading .seo-body ol {
+  margin: 1em 0;
+  padding-left: 1.5em;
+}
+.seo-reading .seo-body li {
+  margin: 0.35em 0;
+}
+.seo-reading .seo-body hr {
+  margin: 2.4em 0;
+  border: none;
+  border-top: 1px solid rgba(128, 128, 128, 0.25);
+}
+.seo-reading .seo-body del {
+  color: #7b8794;
 }
 .seo-reading .seo-links {
   display: flex;
@@ -273,12 +361,29 @@ html.dark-mode .seo-reading .seo-count {
 html.dark-mode .seo-reading .seo-entries p {
   color: #cbd2d9;
 }
+html.dark-mode .seo-reading .seo-tags li {
+  border-color: rgba(154, 165, 177, 0.3);
+  background: rgba(154, 165, 177, 0.08);
+}
 html.dark-mode .seo-reading .seo-body th,
 html.dark-mode .seo-reading .seo-body td {
   border-color: rgba(154, 165, 177, 0.35);
 }
 html.dark-mode .seo-reading .seo-body thead th {
   background: rgba(154, 165, 177, 0.12);
+}
+html.dark-mode .seo-reading .seo-body blockquote {
+  background: rgba(154, 165, 177, 0.12);
+  color: #cbd2d9;
+}
+html.dark-mode .seo-reading .seo-body p code,
+html.dark-mode .seo-reading .seo-body li code,
+html.dark-mode .seo-reading .seo-body td code {
+  background: rgba(22, 93, 255, 0.18);
+  color: #8fb6ee;
+}
+html.dark-mode .seo-reading .seo-body del {
+  color: #9aa5b1;
 }
 html.dark-mode .seo-reading .seo-banner {
   background: rgba(154, 165, 177, 0.14);

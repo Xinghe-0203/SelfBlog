@@ -4,6 +4,7 @@ export type BuiltinPageId =
   | 'archives'
   | 'gallery'
   | 'search'
+  | 'tags'
   | 'post'
   | 'tag'
   | 'notFound'

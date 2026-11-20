@@ -47,6 +47,7 @@ public class ReadingContent {
             case ABOUT -> about(main, page);
             case GALLERY -> gallery(main, page);
             case SEARCH -> search(main, page);
+            case TAGS -> tags(main, page);
             case POST -> post(main, page);
             case TAG -> list(main, page, page.displayTitle());
             case NOT_FOUND -> notFound(main, page);
@@ -131,6 +132,32 @@ public class ReadingContent {
         if (placeholder != null && !placeholder.isBlank()) main.appendElement("p").addClass("seo-hint").text(placeholder);
         String empty = text(page.config(), "empty");
         if (empty != null && !empty.isBlank()) main.appendElement("p").addClass("seo-hint").text(empty);
+    }
+
+    /**
+     * 公开标签索引：标签名 + 已发布文章数，链接到对应标签页。
+     *
+     * <p>结构与归档页一致（标题 + 链接列表），但条目是标签而不是文章：
+     * 链接指向 /tag/{id}，右侧的数字是该标签下的已发布文章数。</p>
+     */
+    private void tags(Element main, SeoModels.ReadingPage page) {
+        heading(main, page.displayTitle(), text(page.config(), "description", page.meta().description()));
+        if (page.entries().isEmpty()) {
+            main.appendElement("p").addClass("seo-empty").text("还没有任何标签。");
+            return;
+        }
+        // 标签索引用多列网格（`seo-tags`），而文章清单用单列（`seo-entries`）：
+        // 十几个标签排成一列会把页面拉得很长，右侧留出大片空白。
+        Element list = main.appendElement("ul").addClass("seo-entries").addClass("seo-tags");
+        for (SeoModels.Entry entry : page.entries()) {
+            Element item = list.appendElement("li");
+            Element anchor = item.appendElement("a").text(entry.title());
+            String url = safeUrl(entry.url());
+            if (url != null) anchor.attr("href", url);
+            if (module(page.config(), "count", true) && entry.summary() != null && !entry.summary().isBlank()) {
+                item.appendElement("span").addClass("seo-count").text(entry.summary());
+            }
+        }
     }
 
     private void post(Element main, SeoModels.ReadingPage page) {

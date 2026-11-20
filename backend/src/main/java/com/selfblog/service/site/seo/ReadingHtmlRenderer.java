@@ -7,6 +7,7 @@ import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -58,10 +59,14 @@ public class ReadingHtmlRenderer {
         String image = absolute(origin, shareImage(meta));
         if (image != null) meta(head, "property", "og:image", image);
         if (canonical != null) meta(head, "property", "og:url", canonical);
+        meta(head, "property", "og:locale", "zh_CN");
+        // 分享图的替代文字：社交平台用它决定卡片版式与无图时的回退文案。
+        if (image != null) meta(head, "property", "og:image:alt", meta.title());
         meta(head, "name", "twitter:card", "summary_large_image");
         meta(head, "name", "twitter:title", meta.title());
         if (meta.description() != null && !meta.description().isBlank()) meta(head, "name", "twitter:description", meta.description());
         if (image != null) meta(head, "name", "twitter:image", image);
+        if (image != null) meta(head, "name", "twitter:image:alt", meta.title());
 
         if (page.kind() == SeoModels.Kind.POST) appendJsonLd(head, page, canonical, image, origin);
         if (page.kind() == SeoModels.Kind.HOME) appendWebsiteJsonLd(head, page, origin);
@@ -173,6 +178,28 @@ public class ReadingHtmlRenderer {
         action.put("target", target);
         action.put("query-input", "required name=search_term_string");
         payload.put("potentialAction", action);
+        // 首页额外声明一个 ItemList：把「最新文章」这条列表本身结构化，
+        // 搜索引擎可以据此把首页当成一个文章集合来理解（而不只是一个页面）。
+        // 条目 URL 一律绝对化；绝对化失败（origin 缺失）的条目整条跳过。
+        if (page.kind() == SeoModels.Kind.HOME && !page.entries().isEmpty()) {
+            List<Map<String, Object>> items = new ArrayList<>();
+            for (SeoModels.Entry entry : page.entries()) {
+                String url = absolute(origin, entry.url());
+                if (url == null) continue;
+                Map<String, Object> item = new LinkedHashMap<>();
+                item.put("@type", "ListItem");
+                item.put("position", items.size() + 1);
+                item.put("url", url);
+                if (entry.title() != null && !entry.title().isBlank()) item.put("name", entry.title());
+                items.add(item);
+            }
+            if (!items.isEmpty()) {
+                Map<String, Object> list = new LinkedHashMap<>();
+                list.put("@type", "ItemList");
+                list.put("itemListElement", items);
+                payload.put("mainEntity", list);
+            }
+        }
         writeJsonLd(head, payload, "selfblog-site-jsonld");
     }
 

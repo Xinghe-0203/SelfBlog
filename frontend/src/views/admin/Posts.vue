@@ -315,7 +315,8 @@ onMounted(fetchPosts)
   white-space: nowrap;
 }
 .post-table th {
-  color: var(--text-muted);
+  /* 表头压在 --bg-secondary 上：弱化档只有 4.46，用次级档过 AA。 */
+  color: var(--text-secondary);
   background: var(--bg-secondary);
   font-size: var(--text-xs);
   font-weight: 600;

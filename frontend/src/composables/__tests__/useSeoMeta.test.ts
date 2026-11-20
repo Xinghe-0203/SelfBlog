@@ -42,6 +42,41 @@ describe('page metadata lifecycle', () => {
       'index,follow'
     )
   })
+  it('keeps the server breadcrumb after hydration instead of downgrading it', () => {
+    // 服务端阅读 HTML 已经写过 breadcrumb；Vue 挂载会用同 id 重建这个节点，
+    // 少写就等于把结构化数据降级掉。
+    applyArticleJsonLd({
+      title: '真实文章',
+      url: '/post/9',
+      publishedTime: '2026-10-01',
+      modifiedTime: '2026-10-20',
+      tags: ['技术', '设计'],
+      author: '作者'
+    })
+    const raw = document.getElementById('selfblog-article-jsonld')?.textContent ?? '{}'
+    const payload = JSON.parse(raw) as Record<string, unknown>
+    const breadcrumb = payload.breadcrumb as { itemListElement: Array<Record<string, unknown>> }
+    expect(breadcrumb.itemListElement[0]?.position).toBe(1)
+    expect(breadcrumb.itemListElement[0]?.name).toBe('博客')
+    expect(breadcrumb.itemListElement[0]?.item).toBe(`${window.location.origin}/`)
+    expect(breadcrumb.itemListElement[1]?.position).toBe(2)
+    expect(breadcrumb.itemListElement[1]?.item).toBe(`${window.location.origin}/post/9`)
+    expect(payload.dateModified).toBe('2026-10-20')
+    expect(payload.keywords).toBe('技术, 设计')
+  })
+
+  it('omits dateModified when the article was never updated', () => {
+    applyArticleJsonLd({
+      title: '只发过一次',
+      publishedTime: '2026-10-01',
+      modifiedTime: '2026-10-01'
+    })
+    const payload = JSON.parse(
+      document.getElementById('selfblog-article-jsonld')?.textContent ?? '{}'
+    ) as Record<string, unknown>
+    expect(payload.dateModified).toBeUndefined()
+  })
+
   it('respects explicit noindex and drops old optional author/date fields', () => {
     applySeoMeta({
       title: '旧文章',

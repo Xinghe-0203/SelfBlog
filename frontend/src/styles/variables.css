@@ -1,27 +1,38 @@
 /* =============================================================================
-   SelfBlog Design System — 清透空间 / Compact Glass
+   SelfBlog Design System — Editorial Paper
    =============================================================================
 
-   Quiet neutral reading surfaces; translucent functional chrome only.
-   Author-configured primary colors remain authoritative.
-   Accessibility targets: WCAG 2.1 AA contrast on all text/surface pairs.
+   「纸面 + 细线 + 克制阴影」的编辑部式阅读体验：画布退后，内容浮起，
+   层级靠留白与发丝线表达，而不是靠一堆灰底卡片。
+
+   设计原则：
+   1. **纸面优先** —— 画布是低饱和的中性灰，卡片是纯白纸面，边界只用 1px 发丝线。
+   2. **层级靠留白** —— 段落、卡片、页面之间用间距分层，不用底色堆叠。
+   3. **颜色克制** —— 强调色只用于「可交互」与「当前项」，正文一律中性灰阶。
+   4. **中文优先** —— 最小字号 12px，正文 16px/1.75；标题字距归零（全角字不需要）。
+   5. **对比度达标** —— 所有正文/次级文字对纸面 ≥ 4.5:1（WCAG 2.1 AA）。
+
+   作者配置的主色仍然是权威：`--accent` 会被后台「网站设置」覆盖，
+   所有派生色都由它 color-mix 出来，换主色不需要改这里。
    ============================================================================= */
 
-/* ==================== CSS Variables — 清爽科技蓝 Theme ==================== */
+/* ==================== CSS Variables — 默认「晴空蓝」主题 ==================== */
 :root,
 #selfblog {
   /* ---------------------------------------------------------------
      Canvas / Background
      --------------------------------------------------------------- */
-  --bg-primary: #f5f6f8;
-  --bg-secondary: #eef0f4;
-  --bg-tertiary: #e7eaf0;
+  --bg-primary: #f4f5f7;
+  --bg-secondary: #ebedf2;
+  --bg-tertiary: #e1e4ea;
 
   /* ---------------------------------------------------------------
-     Surfaces
+     Surfaces — 三层纸面
+     paper（页面）→ raised（卡片）→ control（控件）
      --------------------------------------------------------------- */
-  --surface-primary: #ffffff; /* 卡片背景 — 纯白，与页面背景形成轻微对比 */
-  --surface-secondary: #f9fafc;
+  --surface-primary: #ffffff; /* 卡片纸面 */
+  --surface-secondary: #fafbfc; /* 纸面上的次级面 */
+  --surface-tertiary: #f3f5f8; /* 控件 / 芯片底 */
 
   /* ---------------------------------------------------------------
      Contrast Surface — 高对比实心表面（主按钮 / 反色块）
@@ -29,9 +40,9 @@
      --gray-900 会变成 #EBEBEB，导致按钮/代码块在深色页面上变成刺眼的亮块。
      这两个 token 由各自主题显式定义，语义稳定。
      --------------------------------------------------------------- */
-  --contrast-bg: #111111;
-  --contrast-bg-hover: #333333;
-  --contrast-bg-active: #0a0a0a;
+  --contrast-bg: #171b22;
+  --contrast-bg-hover: #2c323c;
+  --contrast-bg-active: #0b0e13;
   --contrast-fg: #ffffff;
 
   /* ---------------------------------------------------------------
@@ -39,22 +50,28 @@
      浅色模式下为深色块（反转观感）；深色模式下同样保持深色，
      避免整页最亮的元素是一段代码。
      --------------------------------------------------------------- */
-  --code-bg: #1d2129;
-  --code-text: #e5e6eb;
-  --code-border: #2c333d;
+  --code-bg: #171b22;
+  --code-text: #e7ecf3;
+  --code-border: #272d38;
 
   /* ---------------------------------------------------------------
-     Borders / Dividers
+     Borders / Dividers — 发丝线
      --------------------------------------------------------------- */
-  --border-light: #e3e6ec;
-  --border-ultra-light: #edf0f4;
+  --border-light: #e5e8ee;
+  --border-ultra-light: #eef0f4;
 
   /* ---------------------------------------------------------------
      Text — 三级灰度梯度
+     三档都对**所有**表面（纸面 #fff / 次级 #f3f5f8 / 芯片 #ebedf2）≥ 4.5:1，
+     因为弱化文字经常压在芯片与次级面上（标签计数、说明行、辅助信息）。
+     旧值 #6b7484 在芯片面上只有 4.31:1 —— 12px 的辅助文字过不了 AA。
      --------------------------------------------------------------- */
-  --text-primary: #262a31;
-  --text-secondary: #67707e;
-  --text-muted: #707a88;
+  --text-primary: #1b1f27;
+  /* 次级/弱化两档都留了余量：玻璃感默认开启时表面是**半透明**的，
+     合成后比标称色更深（实测次级面 #ebedf2 落到 L≈0.80），
+     所以数值比「对纯白刚好 4.5」再深一档，半透明面上仍有 ≥4.6。 */
+  --text-secondary: #4d5563;
+  --text-muted: #5a6371;
   --text-inverse: #ffffff;
 
   /* ---------------------------------------------------------------
@@ -63,6 +80,9 @@
   --accent: #165dff;
   --accent-light: color-mix(in srgb, var(--accent) 10%, var(--surface-primary));
   --accent-dark: color-mix(in srgb, var(--accent) 82%, black);
+  /* 派生档：chip 底、焦点环、极浅的装饰底色 */
+  --accent-soft: color-mix(in srgb, var(--accent) 7%, transparent);
+  --accent-ring: color-mix(in srgb, var(--accent) 28%, transparent);
 
   /* ---------------------------------------------------------------
      Secondary — 活力橙 #FF7D00（点赞、评论、热门标签点缀）
@@ -89,6 +109,19 @@
   --info: #165dff;
   --info-light: #e8f3ff;
   --info-hover: #0e42d2;
+
+  /* ---------------------------------------------------------------
+     语义「墨色」— 压在同色淡底上的文字
+     ---------------------------------------------------------------
+     `--success` 等是**色板色**（用在图标、边框、实心块上），直接当文字压在
+     `--success-light` 这类淡底上过不了 AA（绿 #00b42a 压 #e8ffea 只有 2.7:1），
+     徽章/状态标签正是这么用的。这四枚是专门给「淡底 + 同色文字」准备的深一档：
+     对各自淡底 ≥ 5:1，同时仍明确是绿/橙/红/蓝。
+     --------------------------------------------------------------- */
+  --success-ink: #056017;
+  --warning-ink: #8f4400;
+  --error-ink: #b21e1e;
+  --info-ink: #0b3fb2;
 
   /* ---------------------------------------------------------------
      Neutral Gray Scale — 统一灰度梯度
@@ -202,9 +235,11 @@
     ui-monospace, SFMono-Regular, Menlo, Consolas, 'JetBrains Mono', 'Sarasa Mono SC',
     'Courier New', monospace;
 
-  /* Font Sizes */
-  --text-2xs: 0.6875rem; /* 11px */
-  --text-xs: 0.75rem; /* 12px */
+  /* Font Sizes — 中文最小 12px；正文 16px。
+     --text-2xs / --text-xs 比旧版各大 1px：11px/12px 的中文在高分屏上
+     边缘发虚，是「界面显旧」的主要来源之一。 */
+  --text-2xs: 0.75rem; /* 12px */
+  --text-xs: 0.8125rem; /* 13px */
   --text-sm: 0.875rem; /* 14px */
   --text-base: 1rem; /* 16px */
   --text-lg: 1.125rem; /* 18px */
@@ -283,32 +318,33 @@
   --spacing-4xl: var(--space-24);
 
   /* ---------------------------------------------------------------
-     Border Radius — Compact
-     ---------------------------------------------------------------
-      8px controls, 12–14px content groups, 16px panels.
-      Capsules are reserved for the slim navbar and circular controls. */
+     Border Radius — 柔和但不过圆
+     8px 控件 / 12–14px 内容组 / 18–22px 面板。
+     胶囊只留给导航条与圆形控件。 */
   --radius-none: 0;
   --radius-xs: 4px;
-  --radius-sm: 6px;
-  --radius: 8px;
-  --radius-md: 8px;
-  --radius-lg: 12px;
-  --radius-xl: 14px;
-  --radius-2xl: 16px;
-  --radius-3xl: 20px;
+  --radius-sm: 7px;
+  --radius: 9px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 18px;
+  --radius-2xl: 22px;
+  --radius-3xl: 28px;
   --radius-full: 9999px;
 
   /* ---------------------------------------------------------------
      Shadows — Quiet depth, mostly for functional layers
+     两段式：短距离的接触阴影 + 长距离的弥散阴影。纯黑投影会显脏，
+     因此统一用偏蓝的深色 rgb(20 32 51 / …)。
      --------------------------------------------------------------- */
-  --shadow-xs: 0 1px 2px rgb(20 32 51 / 3%);
-  --shadow-sm: 0 2px 6px rgb(20 32 51 / 4%);
-  --shadow: 0 4px 12px rgb(20 32 51 / 6%);
-  --shadow-md: 0 6px 20px rgb(20 32 51 / 8%);
-  --shadow-lg: 0 8px 28px rgb(20 32 51 / 10%);
-  --shadow-xl: 0 12px 36px rgb(20 32 51 / 12%);
-  --shadow-2xl: 0 16px 48px rgba(0, 0, 0, 0.2);
-  --shadow-inner: inset 0 2px 4px rgba(0, 0, 0, 0.06);
+  --shadow-xs: 0 1px 2px rgb(20 32 51 / 4%);
+  --shadow-sm: 0 1px 2px rgb(20 32 51 / 4%), 0 2px 6px rgb(20 32 51 / 4%);
+  --shadow: 0 2px 4px rgb(20 32 51 / 4%), 0 6px 14px rgb(20 32 51 / 6%);
+  --shadow-md: 0 4px 8px rgb(20 32 51 / 5%), 0 12px 26px rgb(20 32 51 / 8%);
+  --shadow-lg: 0 8px 18px rgb(20 32 51 / 7%), 0 20px 40px rgb(20 32 51 / 9%);
+  --shadow-xl: 0 12px 26px rgb(20 32 51 / 9%), 0 28px 56px rgb(20 32 51 / 11%);
+  --shadow-2xl: 0 16px 36px rgba(0, 0, 0, 0.16);
+  --shadow-inner: inset 0 2px 4px rgba(0, 0, 0, 0.05);
 
   --shadow-glow-primary: none;
   --shadow-glow-accent: none;
@@ -375,7 +411,9 @@
   /* 点赞按钮的心形强调色。不要把这些值直接写死在组件里：
      浅色下的 #fff0f3 之类浅底在深色模式下会变成刺眼的亮块。 */
   --like-accent: #dc4762;
-  --like-accent-strong: #c82f50;
+  /* 心形图标用它：按钮底是**半透明**的纸面（玻璃感默认开启），合成后偏深，
+     所以要比「纯白底」时更深一档才能在 18px 时过 4.5:1（实测 #c82f50 只有 4.34）。 */
+  --like-accent-strong: #b02443;
   --like-accent-soft: #fff0f3;
   --like-accent-border: #f0bdc9;
 

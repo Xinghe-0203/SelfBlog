@@ -4,6 +4,7 @@ import com.selfblog.common.exception.BusinessException;
 import com.selfblog.dto.post.PostAdvancedSearchRequest;
 import com.selfblog.dto.post.PostQueryRequest;
 import com.selfblog.dto.site.PageModels.PageConfig;
+import com.selfblog.dto.site.PageModels.PageStyle;
 import com.selfblog.dto.site.PageModels.PublicPage;
 import com.selfblog.entity.BlogPost;
 import com.selfblog.entity.BlogTag;
@@ -48,6 +49,10 @@ public class ReadingPageService {
     private static final int MAX_LIST = 100;
     private static final Pattern ID = Pattern.compile("\\d{1,19}");
     private static final Pattern PAGE = Pattern.compile("[1-9]\\d{0,5}");
+    /** 强调色格式：与 PageCatalog 的校验保持一致（`#RRGGBB`，大小写均可）。 */
+    private static final java.util.regex.Pattern ACCENT_PATTERN =
+            java.util.regex.Pattern.compile("#[a-fA-F0-9]{6}");
+
     private static final Set<String> SHELL_PATHS = Set.of(
             "/login", "/profile", "/profile-edit", "/password-change", "/drafts", "/collections",
             "/following", "/followers", "/my-reports", "/notifications", "/messages");
@@ -83,6 +88,7 @@ public class ReadingPageService {
             case "/about": return about(site);
             case "/gallery": return gallery(site);
             case "/search": return search(site);
+            case "/tags": return tags(site);
             default:
                 if (SHELL_PATHS.contains(normalized) || normalized.startsWith("/user/") || normalized.startsWith("/report/")) {
                     return shell(site);
@@ -154,6 +160,29 @@ public class ReadingPageService {
                 title, "", entries, navigation(), site);
     }
 
+    /**
+     * 公开标签索引页：每个标签 + 它的已发布文章数。
+     *
+     * <p>服务端渲染这一页有两个好处：搜索引擎能直接读到标签与文章数，
+     * 禁用 JavaScript 的读者也能浏览标签（并点进对应文章）。</p>
+     */
+    private SeoModels.ReadingPage tags(SeoModels.SiteInfo site) {
+        PageConfig config = config("tags");
+        List<SeoModels.Entry> entries = new ArrayList<>();
+        for (var tag : tags.listTagsWithCounts()) {
+            long count = tag.getPostCount() == null ? 0L : tag.getPostCount();
+            // 只列有已发布文章的标签：0 篇的标签页是空白页（对读者浪费一次点击，
+            // 对搜索引擎是薄内容）。标签本身仍在后台可见、可管理。
+            if (count <= 0) continue;
+            entries.add(new SeoModels.Entry("/tag/" + tag.getId(), tag.getName(), count + " 篇文章", null));
+        }
+        String title = config.title() != null ? config.title() : "标签";
+        String fallback = "按主题浏览这个博客写过的全部标签。";
+        return page(200, SeoModels.Kind.TAGS, "tags", config,
+                meta(title, description(config, fallback), null, "website", "/tags", null, null, List.of(), indexable(config, false)),
+                title, "", entries, navigation(), site);
+    }
+
     private SeoModels.ReadingPage search(SeoModels.SiteInfo site) {
         PageConfig config = config("search");
         String title = config.title() != null ? config.title() : "搜索文章";
@@ -222,9 +251,13 @@ public class ReadingPageService {
         List<SeoModels.Entry> entries = new ArrayList<>();
         for (PostListResponse record : posts.advancedSearch(request).getRecords()) entries.add(entry(record));
         String title = suffix(tag.getName(), config);
+        // 空标签页（0 篇已发布文章）保持可访问（作者可能刚建好标签就分享链接），
+        // 但**不收录**：一张只有标题的清单页是典型的薄内容，进索引只会稀释整站质量。
+        // 有文章后无需任何手工操作，下一次抓取就会变成 index,follow。
+        boolean indexable = indexable(config, false) && !entries.isEmpty();
         return page(200, SeoModels.Kind.TAG, "tag", config,
                 meta(documentTitle(title, site), description(config, ""), null, "website", "/tag/" + id,
-                        null, null, List.of(), indexable(config, false)),
+                        null, null, List.of(), indexable),
                 tag.getName(), "", entries, navigation(), site);
     }
 
@@ -267,7 +300,31 @@ public class ReadingPageService {
                                        SeoModels.Meta meta, String displayTitle, String bodyHtml,
                                        List<SeoModels.Entry> entries, List<SeoModels.NavLink> navigation,
                                        SeoModels.SiteInfo site) {
-        return new SeoModels.ReadingPage(status, kind, id, config, meta, displayTitle, bodyHtml, entries, navigation, site);
+        return new SeoModels.ReadingPage(status, kind, id, withSiteAccent(config), meta, displayTitle,
+                bodyHtml, entries, navigation, site);
+    }
+
+    /**
+     * 把站点主色（后台「网站设置 → 强调色」）作为**页面没有单独指定**强调色时的缺省值。
+     *
+     * <p>服务端阅读 HTML 会先于 Vue 挂载出现：导航链接、引用块竖线、行内代码都用
+     * {@code --seo-accent}。如果这里始终回落到写死的 {@code #165DFF}，作者把主色改成
+     * 墨绿之后，首屏会先闪一下蓝色再被 Vue 换掉 —— 与外观预置脚本要解决的闪烁是同一类问题。</p>
+     *
+     * <p>只做「没有就补上」，作者的页面级配置永远优先；颜色不是 {@code #RRGGBB} 时
+     * 原样丢弃（脏数据不写进样式）。返回新对象，**不改**从中获取的缓存配置（
+     * {@code PageService} 的 {@code pageCache} 会把它交回给别的调用方）。</p>
+     */
+    private PageConfig withSiteAccent(PageConfig config) {
+        var style = config.style();
+        if (style != null && style.accent() != null && !style.accent().isBlank()) return config;
+        String accent = settings.getSettings().getOrDefault("themePrimaryColor", "");
+        if (!ACCENT_PATTERN.matcher(accent).matches()) return config;
+        var next = style == null
+                ? new PageStyle(accent, null, null, null, null)
+                : new PageStyle(accent, style.background(), style.width(), style.density(), style.banner());
+        return new PageConfig(config.title(), config.description(), config.body(),
+                config.text(), config.modules(), next, config.seo());
     }
 
     private SeoModels.Meta meta(String title, String description, String image, String type, String path,

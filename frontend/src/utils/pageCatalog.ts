@@ -79,6 +79,11 @@ export const pageCatalog: Record<BuiltinPageId, PageCapability> = {
     ],
     modules: modules({ count: '结果数量' })
   },
+  tags: {
+    label: '标签',
+    fields: [title, description],
+    modules: modules({ count: '文章数量' })
+  },
   post: {
     label: '文章详情模板',
     fields: [description],

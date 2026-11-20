@@ -76,4 +76,23 @@ describe('api response interceptor', () => {
     // 仍然给出面向用户的中文文案，而不是把 axios 原文抛给页面。
     expect(error.userMessage).toBeTruthy()
   })
+
+  it('does not tear down the session when an anonymous request is rejected with 401', async () => {
+    // 访客访问公开接口时后端返回 401（例如某个尚未开放的公开路由），
+    // 不能因此清掉会话并把他弹到后台登录页 —— 读者只是想看文章。
+    api.defaults.adapter = (async (config) => {
+      throw Object.assign(new Error('Request failed with status code 401'), {
+        response: { status: 401, data: { message: '认证失败，请先登录' } },
+        config
+      })
+    }) as AxiosAdapter
+
+    const error = (await api
+      .get('/post/14/related')
+      .catch((reason: unknown) => reason)) as RejectedRequest
+
+    expect(error.userMessage).toBe('认证失败，请先登录')
+    // 没有触发 handleAuthError：本地存储里的登录痕迹仍然在原处。
+    expect(window.location.pathname).not.toContain('/admin')
+  })
 })

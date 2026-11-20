@@ -3,6 +3,7 @@
  */
 
 import api from './index'
+import { cachedGet, invalidateApiCache } from '@/utils/apiCache'
 import type {
   ApiResponse,
   PaginatedResponse,
@@ -16,26 +17,61 @@ import type {
   Draft
 } from '@/types'
 
+/**
+ * 文章列表的缓存键。
+ *
+ * 参数按**固定顺序**拼接，而不是 JSON.stringify(params)：对象的键序取决于写入顺序，
+ * 同一个语义的请求可能因为参数对象构造顺序不同而算出两个键，缓存就失效了。
+ */
+function listCacheKey(params: PostListParams): string {
+  return [
+    'post:list',
+    params.pageNum ?? 1,
+    params.pageSize ?? 10,
+    params.sort ?? '',
+    params.sortBy ?? '',
+    params.tagId ?? '',
+    params.category ?? '',
+    params.keyword ?? '',
+    params.userId ?? '',
+    params.status ?? ''
+  ].join('|')
+}
+
+/** 公开只读列表的缓存时长（毫秒）。取短到「作者刚发的一篇文章不会被藏太久」。 */
+const LIST_CACHE_TTL = 30_000
+/** 归档与标签的缓存时长：这两份数据变动极少，可以多留一会儿。 */
+const ARCHIVE_CACHE_TTL = 120_000
+
 export const postApi = {
   /**
    * 创建文章
+   *
+   * 显式写出响应泛型：`.finally()` 会丢掉调用点的上下文类型，
+   * axios 的 `post<T, R>` 里 R 就回落到默认的 AxiosResponse<T>，与本函数的返回类型不符。
    */
   createPost(data: CreatePostRequest): Promise<ApiResponse<Post>> {
-    return api.post('/post', data)
+    return api
+      .post<unknown, ApiResponse<Post>>('/post', data)
+      .finally(() => invalidateApiCache('post:'))
   },
 
   /**
    * 更新文章
    */
   updatePost(id: number | string, data: UpdatePostRequest): Promise<ApiResponse<Post>> {
-    return api.put(`/post/${id}`, data)
+    return api
+      .put<unknown, ApiResponse<Post>>(`/post/${id}`, data)
+      .finally(() => invalidateApiCache('post:'))
   },
 
   /**
    * 删除文章
    */
   deletePost(id: number | string): Promise<ApiResponse> {
-    return api.delete(`/post/${id}`)
+    return api
+      .delete<unknown, ApiResponse>(`/post/${id}`)
+      .finally(() => invalidateApiCache('post:'))
   },
 
   /**
@@ -59,16 +95,19 @@ export const postApi = {
 
   /**
    * 获取文章列表
+   *
+   * 公开只读接口，走 30 秒的短期内存缓存：读者在文章页与首页之间来回切换时
+   * 不必每次都等一次网络往返（见 utils/apiCache 的边界说明）。
    */
   getPostList(params: PostListParams): Promise<PaginatedResponse<Post>> {
-    return api.get('/post/list', { params })
+    return cachedGet(listCacheKey(params), LIST_CACHE_TTL, () => api.get('/post/list', { params }))
   },
 
   /**
    * 获取全站文章归档（精简字段，按创建时间倒序）
    */
   getArchives(): Promise<ApiResponse<PostArchiveItem[]>> {
-    return api.get('/post/archives')
+    return cachedGet('post:archives', ARCHIVE_CACHE_TTL, () => api.get('/post/archives'))
   },
 
   /**

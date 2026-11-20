@@ -35,17 +35,43 @@ onMounted(() => window.addEventListener('resize', updateViewport))
 onBeforeUnmount(() => window.removeEventListener('resize', updateViewport))
 
 const authorName = computed(() => userStore.nickname || userStore.username || '作者管理')
-const navLinks: Array<{ segment: string; label: string; icon: IconName }> = [
-  { segment: 'dashboard', label: '概览', icon: 'gauge' },
-  { segment: 'posts', label: '文章管理', icon: 'file-text' },
-  { segment: 'tags', label: '标签管理', icon: 'tag' },
-  { segment: 'visitors', label: '访客记录', icon: 'users' },
-  { segment: 'comments', label: '评论管理', icon: 'message' },
-  { segment: 'albums', label: '相册管理', icon: 'image' },
-  { segment: 'pages', label: '页面管理', icon: 'file-text' },
-  { segment: 'seo', label: 'SEO 管理', icon: 'sparkle' },
-  { segment: 'health', label: '内容体检', icon: 'gauge' },
-  { segment: 'settings', label: '网站设置', icon: 'settings' }
+interface NavLink {
+  segment: string
+  label: string
+  icon: IconName
+}
+/**
+ * 后台导航分组：内容 / 数据 / 站点。
+ *
+ * 十个入口平铺在一起时，「SEO 管理」和「内容体检」挨着「网站设置」，
+ * 找起来很费劲。分成三组之后，位置感来自「组」而不是「顺序」。
+ */
+const navGroups: Array<{ label: string; links: NavLink[] }> = [
+  {
+    label: '内容',
+    links: [
+      { segment: 'dashboard', label: '概览', icon: 'gauge' },
+      { segment: 'posts', label: '文章管理', icon: 'file-text' },
+      { segment: 'tags', label: '标签管理', icon: 'tag' },
+      { segment: 'pages', label: '页面管理', icon: 'layers' }
+    ]
+  },
+  {
+    label: '数据',
+    links: [
+      { segment: 'visitors', label: '访客记录', icon: 'users' },
+      { segment: 'comments', label: '评论管理', icon: 'message' },
+      { segment: 'albums', label: '相册管理', icon: 'image' }
+    ]
+  },
+  {
+    label: '站点',
+    links: [
+      { segment: 'seo', label: 'SEO 管理', icon: 'sparkle' },
+      { segment: 'health', label: '内容体检', icon: 'gauge' },
+      { segment: 'settings', label: '网站设置', icon: 'settings' }
+    ]
+  }
 ]
 const closeOnMobile = (): void => {
   mobileOpen.value = false
@@ -100,15 +126,20 @@ watch(() => route.path, closeOnMobile)
       </div>
 
       <nav class="sidebar-nav" aria-label="后台导航">
-        <router-link
-          v-for="link in navLinks"
-          :key="link.segment"
-          :to="`${siteStore.adminRoot}/${link.segment}`"
-          active-class="active"
-          @click="closeOnMobile"
-        >
-          <Icon :name="link.icon" :size="17" />{{ link.label }}
-        </router-link>
+        <!-- 分组：内容 / 数据 / 站点。当前项用左侧强调条 + 强调色底标出，
+             分组之间有一条发丝线，长列表里不会「找不着那一项」。 -->
+        <template v-for="group in navGroups" :key="group.label">
+          <p class="sidebar-group">{{ group.label }}</p>
+          <router-link
+            v-for="link in group.links"
+            :key="link.segment"
+            :to="`${siteStore.adminRoot}/${link.segment}`"
+            active-class="active"
+            @click="closeOnMobile"
+          >
+            <Icon :name="link.icon" :size="17" />{{ link.label }}
+          </router-link>
+        </template>
       </nav>
 
       <div class="sidebar-footer">
@@ -222,32 +253,74 @@ watch(() => route.path, closeOnMobile)
 .sidebar-nav {
   display: flex;
   flex-direction: column;
-  gap: 3px;
-  padding-top: 14px;
+  gap: 2px;
+  padding-top: 10px;
+  overflow-y: auto;
+  min-height: 0;
+}
+/* 分组标题：小号、大写、弱化；它只负责「分段」，不承担导航。 */
+.sidebar-group {
+  margin: 14px 0 4px;
+  padding-inline: 11px;
+  color: var(--text-muted);
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+}
+.sidebar-group:first-child {
+  margin-top: 4px;
 }
 .sidebar-nav a,
 .sidebar-footer a,
 .admin-theme-toggle {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 10px;
-  min-height: 44px;
+  min-height: 42px;
   padding-inline: 11px;
   border-radius: var(--radius);
   color: var(--text-secondary);
   font-size: var(--text-sm);
   text-align: left;
+  transition:
+    background var(--transition-fast),
+    color var(--transition-fast),
+    transform var(--transition-fast);
 }
 .sidebar-nav a:hover,
 .sidebar-footer a:hover,
 .admin-theme-toggle:hover {
-  background: var(--bg-secondary);
+  background: var(--surface-tertiary);
   color: var(--text-primary);
 }
+/* 图标在悬停时轻微右移：给「可点」一个即时反馈。 */
+.sidebar-nav a .icon,
+.sidebar-footer a .icon,
+.admin-theme-toggle .icon {
+  transition: transform var(--duration-fast) var(--ease-out);
+}
+.sidebar-nav a:hover .icon,
+.sidebar-footer a:hover .icon,
+.admin-theme-toggle:hover .icon {
+  transform: translateX(2px);
+}
 .sidebar-nav a.active {
-  background: var(--accent-light);
+  background: var(--accent-soft);
   color: var(--accent);
   font-weight: 600;
+}
+/* 当前项左侧的强调条：比背景色更明确的位置指示。 */
+.sidebar-nav a.active::before {
+  position: absolute;
+  content: '';
+  left: -14px;
+  top: 50%;
+  width: 3px;
+  height: 20px;
+  border-radius: 0 var(--radius-full) var(--radius-full) 0;
+  background: var(--accent);
+  transform: translateY(-50%);
 }
 .sidebar-footer {
   display: grid;

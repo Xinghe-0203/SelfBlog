@@ -299,27 +299,33 @@ onMounted(() => {
   color: var(--text-primary);
 }
 .search-heading {
-  padding-bottom: 26px;
+  padding-bottom: 24px;
 }
 .search-heading h1 {
   margin: 0;
   font-family: var(--font-display);
-  font-size: var(--text-3xl);
-  letter-spacing: -0.045em;
+  font-size: var(--text-4xl);
+  font-weight: 700;
+  letter-spacing: -0.03em;
 }
 .search-heading > p:last-child {
-  margin: 12px 0 0;
+  margin: 14px 0 0;
+  max-width: 56ch;
   color: var(--text-secondary);
   font-size: var(--text-sm);
+  line-height: 1.8;
 }
 .search-form {
   display: flex;
-  gap: 9px;
-  padding: 8px;
+  gap: 8px;
+  padding: 7px;
   border: 1px solid var(--border-solid);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-full);
   background: var(--surface-solid);
   box-shadow: var(--shadow-sm);
+  transition:
+    border-color var(--transition-fast),
+    box-shadow var(--transition-fast);
 }
 .search-input-wrap {
   position: relative;
@@ -345,7 +351,7 @@ onMounted(() => {
 /* 联想下拉：挂在输入框正下方，宽度 = 输入框宽度；不传送门，z-index 与页面层级一致 */
 .suggest-list {
   position: absolute;
-  top: calc(100% + 6px);
+  top: calc(100% + 8px);
   left: 0;
   right: 0;
   z-index: var(--z-dropdown);
@@ -353,9 +359,9 @@ onMounted(() => {
   padding: 6px;
   list-style: none;
   border: 1px solid var(--border-light);
-  border-radius: var(--radius);
+  border-radius: var(--radius-lg);
   background: var(--surface-solid);
-  box-shadow: var(--shadow-sm);
+  box-shadow: var(--shadow-md);
 }
 .suggest-option {
   padding: 10px 12px;
@@ -375,41 +381,48 @@ onMounted(() => {
 }
 .search-form:focus-within {
   border-color: var(--primary);
-  box-shadow: 0 0 0 3px var(--primary-light);
+  box-shadow: 0 0 0 3px var(--accent-soft);
 }
 .search-form button {
-  min-width: 88px;
-  padding: 0 15px;
+  min-width: 92px;
+  padding: 0 18px;
   border: 0;
-  border-radius: var(--radius);
+  border-radius: var(--radius-full);
   background: var(--primary);
-  color: white;
+  /* 深色主题下强调色是提亮过的，白字对比度不足；--contrast-fg 自适应 */
+  color: var(--contrast-fg);
   cursor: pointer;
   font: inherit;
   font-size: var(--text-sm);
   font-weight: 600;
+  transition:
+    background var(--transition-fast),
+    transform var(--transition-fast);
 }
 .search-form button:hover:not(:disabled) {
   background: var(--primary-hover);
+  transform: translateY(-1px);
 }
 .search-form button:disabled {
   cursor: default;
   opacity: 0.55;
 }
 .search-results {
-  padding-top: 28px;
+  padding-top: 30px;
 }
 .results-heading {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
-  padding-bottom: 12px;
-  margin-bottom: 8px;
+  padding-bottom: 14px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid var(--border-light);
 }
 .results-heading h2 {
   margin: 0;
   font-family: var(--font-display);
   font-size: var(--text-lg);
+  font-weight: 650;
 }
 .results-heading > span {
   color: var(--text-muted);
@@ -419,7 +432,7 @@ onMounted(() => {
   margin-top: 20px;
   padding: 35px 20px;
   border: 1px dashed var(--border-solid);
-  border-radius: var(--radius);
+  border-radius: var(--radius-lg);
   color: var(--text-muted);
   text-align: center;
 }

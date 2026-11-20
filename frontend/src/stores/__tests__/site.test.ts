@@ -3,6 +3,7 @@ import { createPinia, setActivePinia } from 'pinia'
 import {
   APPEARANCE_STORAGE_KEY,
   applyFavicon,
+  applyThemeColor,
   buildBackgroundVars,
   effectiveSurfaceOpacities,
   isDarkCanvas,
@@ -34,6 +35,39 @@ describe('mimeForIcon', () => {
 
   it('ignores query strings when reading the extension', () => {
     expect(mimeForIcon('/uploads/a.svg?v=2')).toBe('image/svg+xml')
+  })
+})
+
+describe('applyThemeColor', () => {
+  const LIGHT = '<meta name="theme-color" content="#165DFF" media="(prefers-color-scheme: light)">'
+  const DARK = '<meta name="theme-color" content="#191919" media="(prefers-color-scheme: dark)">'
+
+  beforeEach(() => {
+    document.head.innerHTML = LIGHT + DARK
+  })
+
+  it('updates only the light-scheme meta so the dark chrome stays dark', () => {
+    applyThemeColor('#0f8a5f')
+    const metas = [...document.head.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]')]
+    // 读 attribute：jsdom 没有实现 HTMLMetaElement.media
+    expect(metas.find((m) => m.getAttribute('media')?.includes('light'))?.content).toBe('#0f8a5f')
+    expect(metas.find((m) => m.getAttribute('media')?.includes('dark'))?.content).toBe('#191919')
+  })
+
+  it('ignores an invalid colour instead of writing it into head', () => {
+    applyThemeColor('red; } body { display:none')
+    const light = document.head.querySelector<HTMLMetaElement>(
+      'meta[name="theme-color"][media*="light"]'
+    )
+    expect(light?.content).toBe('#165DFF')
+  })
+
+  it('adds the meta when the template did not declare one', () => {
+    document.head.innerHTML = ''
+    applyThemeColor('#123456')
+    expect(document.head.querySelector('meta[name="theme-color"]')?.getAttribute('content')).toBe(
+      '#123456'
+    )
   })
 })
 
@@ -380,10 +414,11 @@ describe('effectiveSurfaceOpacities', () => {
   })
 
   it('lets the paper tier turn translucent over a wallpaper', () => {
-    // 纸面从 100% 变成半透明，照片从底下透上来 —— 这就是玻璃感。
-    // 可读性由 buildBackgroundVars 的 30% 最小遮罩兜底（见该文件的用例）。
+    // 玻璃感：纸面之外的卡片 / 控件两档在半透明，照片从底下透上来。
+    // 纸面本身是「阅读面」，必须接近实心（见 WALLPAPER_PAPER_FLOOR 的说明）：
+    // 它是正文真正落在上面的那一层，掉到 60% 会让正文直接压在照片上。
     for (const dark of [false, true]) {
-      expect(effectiveSurfaceOpacities('60', dark, true).paper).toBe(60)
+      expect(effectiveSurfaceOpacities('60', dark, true).paper).toBe(dark ? 95 : 92)
     }
   })
 
@@ -391,6 +426,14 @@ describe('effectiveSurfaceOpacities', () => {
     // 浅色画布 88 / 深色画布 94：浅字压在半透明深色面上更容易掉到 2:1，所以深色要更厚。
     expect(effectiveSurfaceOpacities('60', false, true).raised).toBe(88)
     expect(effectiveSurfaceOpacities('60', true, true).raised).toBe(94)
+  })
+
+  it('keeps the wallpaper tiers readable as three distinct steps', () => {
+    // 纸面 92 → 卡片 88 → 控件 82：三档必须递减且互不相同，
+    // 否则壁纸上就退化成「一整块半透明白」（作者抱怨「一点半透明效果都没有」）。
+    const light = effectiveSurfaceOpacities('60', false, true)
+    expect(light.paper).toBeGreaterThan(light.raised)
+    expect(light.raised).toBeGreaterThan(light.control)
   })
 
   it('never lowers an author setting that already sits above the floor', () => {

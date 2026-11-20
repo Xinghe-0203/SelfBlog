@@ -399,6 +399,19 @@ const DARK_CANVAS_MIN_OVERLAY = 45
  */
 const WALLPAPER_RAISED_FLOOR_LIGHT = 88
 const WALLPAPER_RAISED_FLOOR_DARK = 94
+/**
+ * 壁纸模式下「纸面档」（整个页面框架）的不透明度下限。
+ *
+ * 纸面是正文真正落在上面的那一层：作者把 surfaceOpacity 调到 60 也没关系，
+ * 但纸面本身不能跟着降到 60 —— 否则正文直接压在照片上，字号再大也不可读，
+ * 整页看起来像「一张图上糊了几段字」。这里把纸面钉在 92%（深色画布 95%），
+ * 照片只从**页面边距**露出来（读者依然看得到自己选的壁纸），
+ * 而「玻璃感」仍然完整地体现在纸面之上的卡片（raised 88%）与控件（control 82%）两档上。
+ *
+ * 这个下限只作用于壁纸画布：纯色画布下三档照旧按作者设置分级（见下方分支）。
+ */
+const WALLPAPER_PAPER_FLOOR_LIGHT = 92
+const WALLPAPER_PAPER_FLOOR_DARK = 95
 /** control 档比 raised 再透明一档，形成「纸面 → 卡片 → 控件」的可见台阶。 */
 const SURFACE_TIER_STEP = 6
 
@@ -457,9 +470,12 @@ export function effectiveSurfaceOpacities(
       control: Math.max(60, raised - SURFACE_TIER_STEP)
     }
   }
+  // 壁纸画布：纸面是「阅读面」，必须接近实心（正文压在照片上不可读）；
+  // 卡片与控件两档保持通透，玻璃感依然读得出来。
+  const paper = Math.max(base, dark ? WALLPAPER_PAPER_FLOOR_DARK : WALLPAPER_PAPER_FLOOR_LIGHT)
   const raised = Math.max(base, dark ? WALLPAPER_RAISED_FLOOR_DARK : WALLPAPER_RAISED_FLOOR_LIGHT)
   const control = Math.min(raised, Math.max(60, raised - SURFACE_TIER_STEP))
-  return { paper: base, raised, control }
+  return { paper, raised, control }
 }
 
 /**
@@ -578,6 +594,38 @@ export function applyFavicon(url: string): void {
   document.head.appendChild(link)
 }
 
+/**
+ * 浏览器界面色（`<meta name="theme-color">`）跟随作者的主色。
+ *
+ * 移动端浏览器的地址栏 / 状态栏会取这枚颜色：站点主色是 #165DFF 时，
+ * 地址栏就应该是同一支蓝，而不是 index.html 里写死的默认值。
+ * 深色模式的 `media="(prefers-color-scheme: dark)"` 那一条保持深灰不变 ——
+ * 深色下的界面色需要的是「暗」，不是「品牌色」。
+ *
+ * 只改 `prefers-color-scheme: light` 的那条；没有该 meta 时补一条，
+ * 颜色非法（不是 #RRGGBB）时不动，避免把脏值写进 head。
+ */
+export function applyThemeColor(primary: string | undefined): void {
+  if (typeof document === 'undefined') return
+  const value = String(primary ?? '').trim()
+  if (!HEX_COLOR.test(value)) return
+
+  const metas = document.head.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]')
+  // 读 attribute 而不是 `meta.media`：后者在部分环境（含 jsdom）没有实现。
+  const lightMeta = [...metas].find((meta) => {
+    const media = meta.getAttribute('media') ?? ''
+    return !media || media.includes('prefers-color-scheme: light')
+  })
+  if (lightMeta) {
+    lightMeta.content = value
+    return
+  }
+  const meta = document.createElement('meta')
+  meta.name = 'theme-color'
+  meta.content = value
+  document.head.appendChild(meta)
+}
+
 export const useSiteStore = defineStore('site', () => {
   const settings = ref<SiteSettings>({ ...defaults })
   const adminPath = computed(() => settings.value.adminPath || 'admin')
@@ -657,6 +705,7 @@ export const useSiteStore = defineStore('site', () => {
     applyAppearance()
     document.title = settings.value.siteTitle || defaults.siteTitle
     applyFavicon(settings.value.faviconUrl || '')
+    applyThemeColor(settings.value.themePrimaryColor)
   }
 
   async function loadPublicSettings(): Promise<void> {

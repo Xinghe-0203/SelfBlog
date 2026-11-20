@@ -65,6 +65,83 @@ class ReadingPageServiceTest {
         assertEquals(404, reading.resolve("/post/999", null).status());
     }
 
+    @Test void tagsIndexListsTagsWithPublishedPostCounts() {
+        // 标签索引页：公开可读、可收录，条目是标签 + 已发布文章数。
+        var page = reading.resolve("/tags", null);
+        assertEquals(200, page.status());
+        assertEquals(SeoModels.Kind.TAGS, page.kind());
+        assertTrue(page.meta().indexable());
+        assertEquals("/tags", page.meta().path());
+        assertFalse(page.entries().isEmpty());
+        var entry = page.entries().stream().filter(item -> "技术".equals(item.title())).findFirst().orElseThrow();
+        assertEquals("/tag/660001", entry.url());
+        // 「技术」下只有一篇已发布文章（770002 是草稿，不计入）。
+        assertTrue(entry.summary().contains("1"));
+    }
+
+    /**
+     * 站点主色作为「页面未单独指定强调色」时的缺省值：服务端首屏的导航链接、
+     * 引用块竖线与行内代码都用它，写死 #165DFF 会让改过主色的站点先闪一下蓝色。
+     */
+    @Test void siteAccentFillsInWhenThePageHasNone() {
+        // 写入必须走 MyBatis mapper：JdbcTemplate 的写不会让 MyBatis 的本地会话缓存失效，
+        // 同一个事务里再读 mapper 仍会拿到旧行（真实存在的坑，见 docs/agents/backend.md）。
+        writePrimaryColor("#2d7c54");
+        clearSiteCache();
+        assertEquals("#2d7c54", siteAccent(), "站点主色应成为缺省强调色");
+
+        // 脏值不写进样式：非法颜色必须被丢弃（不会污染 --seo-accent）
+        writePrimaryColor("red");
+        clearSiteCache();
+        String dirty = siteAccent();
+        assertTrue(dirty == null || dirty.isBlank(), "非法颜色不应写进样式，实际=" + dirty);
+    }
+
+    /** 经 MyBatis 写 themePrimaryColor（存在则更新，否则插入）。 */
+    private void writePrimaryColor(String value) {
+        var row = settingMapper.selectById("themePrimaryColor");
+        var setting = row != null ? row : new com.selfblog.entity.SiteSetting();
+        setting.setSettingKey("themePrimaryColor");
+        setting.setSettingValue(value);
+        if (row != null) settingMapper.updateById(setting);
+        else settingMapper.insert(setting);
+    }
+
+    /** 首页配置里的强调色（style 可能为 null）。 */
+    private String siteAccent() {
+        var style = reading.resolve("/", null).config().style();
+        return style == null ? null : style.accent();
+    }
+
+    /**
+     * 空标签页保持可访问，但必须 noindex：只有标题的清单页是薄内容，
+     * 收录它只会稀释整站质量。挂上第一篇文章后自动恢复 index。
+     */
+    @Test void emptyTagPageStaysAccessibleButIsNotIndexable() {
+        jdbc.update("INSERT INTO blog_tag(id,name,is_deleted) VALUES(660003,'空标签页',0)");
+
+        var empty = reading.resolve("/tag/660003", null);
+        assertEquals(200, empty.status(), "空标签页仍然可访问（作者可能刚建好就分享链接）");
+        assertFalse(empty.meta().indexable(), "空标签页不应被收录");
+        assertTrue(empty.entries().isEmpty());
+
+        var filled = reading.resolve("/tag/660001", null);
+        assertTrue(filled.meta().indexable(), "有已发布文章的标签页必须可收录");
+    }
+
+    /**
+     * 0 篇已发布文章的标签不进公开索引：它们点进去是空白页（薄内容），
+     * 但仍留在后台「标签管理」里可管理。计数本身走同一条聚合查询。
+     */
+    @Test void tagsIndexSkipsTagsWithoutPublishedPosts() {
+        jdbc.update("INSERT INTO blog_tag(id,name,is_deleted) VALUES(660002,'空标签',0)");
+        var page = reading.resolve("/tags", null);
+        assertEquals(200, page.status());
+        assertTrue(page.entries().stream().anyMatch(item -> "技术".equals(item.title())));
+        assertFalse(page.entries().stream().anyMatch(item -> "空标签".equals(item.title())),
+                "0 篇已发布文章的标签不应出现在公开索引里");
+    }
+
     @Test void aboutUsesPublishedMarkdownAndCustomPageLifecycle() {
         pages.saveDraft("about", 0, null, config(Map.of("title", "关于我", "body", "## 独立介绍\n\n详情段落。")));
         pages.publish("about", 1);

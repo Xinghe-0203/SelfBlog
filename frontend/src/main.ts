@@ -3,6 +3,7 @@ import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import App from './App.vue'
 import router, { installAdminRoutes } from './router'
+import { installRoutePrefetch, prefetchPublicRoutes } from './router/prefetch'
 import { useLogger } from './utils/logger'
 import { useSiteStore } from './stores/site'
 import { useUserStore } from './stores/user'
@@ -43,6 +44,10 @@ async function bootstrap() {
   useUserStore(pinia).restoreFromStorage()
   app.use(router)
   app.mount('#app')
+  // 公开页面的 chunk 在空闲时预取：首屏渲染完成后再开始，不与首屏争抢带宽。
+  prefetchPublicRoutes()
+  // 悬停 / 聚焦站内链接时预取目标页面的 chunk（更早命中「第一次点击」）。
+  installRoutePrefetch()
   // Optional published configuration must not delay identity restoration or initial navigation.
   void usePagesStore(pinia).loadManifest()
   logger.info('Application initialized', { version: __APP_VERSION__, mode: import.meta.env.MODE })

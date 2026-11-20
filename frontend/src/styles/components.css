@@ -10,11 +10,15 @@
   font-weight: var(--font-medium);
   font-family: var(--font-sans);
   border: none;
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-full);
   cursor: pointer;
   transition:
     transform var(--transition-fast),
-    opacity var(--transition-fast);
+    opacity var(--transition-fast),
+    background var(--transition-fast),
+    border-color var(--transition-fast),
+    color var(--transition-fast),
+    box-shadow var(--transition-fast);
   white-space: nowrap;
   user-select: none;
   position: relative;
@@ -31,6 +35,23 @@
   background: var(--accent);
   color: var(--text-inverse);
   box-shadow: var(--shadow-sm);
+  position: relative;
+  overflow: hidden;
+}
+/* 斜向高光扫过：只在悬停时出现一次，不循环。 */
+.btn-primary::after {
+  position: absolute;
+  content: '';
+  top: -20%;
+  bottom: -20%;
+  left: 0;
+  width: 42%;
+  pointer-events: none;
+  background: linear-gradient(90deg, transparent, rgb(255 255 255 / 30%), transparent);
+  transform: translateX(-120%) skewX(-18deg);
+}
+.btn-primary:hover:not(:disabled)::after {
+  animation: sheen-sweep 900ms var(--ease-out);
 }
 .btn-primary:hover:not(:disabled) {
   background: var(--accent-dark);
@@ -44,10 +65,10 @@
 }
 /* Secondary — Flat surface */
 .btn-secondary {
-  background: var(--bg-secondary);
+  background: var(--surface-primary);
   color: var(--text-primary);
   border: 1px solid var(--border-light);
-  box-shadow: none;
+  box-shadow: var(--shadow-xs);
 }
 .btn-secondary:hover:not(:disabled) {
   background: var(--surface-secondary);
@@ -61,7 +82,7 @@
   color: var(--text-secondary);
 }
 .btn-ghost:hover:not(:disabled) {
-  background: var(--accent-light);
+  background: var(--accent-soft);
   color: var(--accent);
 }
 /* Accent */
@@ -111,10 +132,12 @@
   font-size: var(--text-sm);
   font-family: var(--font-sans);
   background: var(--surface-primary);
-  border: 1.5px solid var(--border-light);
-  border-radius: var(--radius-md);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius);
   color: var(--text-primary);
-  transition: all var(--transition);
+  transition:
+    border-color var(--transition-fast),
+    box-shadow var(--transition-fast);
   box-shadow: none;
   line-height: var(--leading-normal);
 }
@@ -124,7 +147,13 @@
 .form-input:focus {
   outline: none;
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-light);
+  /* 鼠标点击时的焦点提示：浅一档的强调色光环（键盘用户另有更明确的描边环）。 */
+  box-shadow: 0 0 0 3px var(--accent-ring);
+}
+/* 键盘焦点环：描边必须比组件自己的 `outline: none` 更明确。 */
+.form-input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
 }
 .form-input::placeholder {
   color: var(--text-muted);
@@ -157,9 +186,12 @@ textarea.form-input {
   background: var(--surface-primary);
   border: 1px solid var(--border-light);
   border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-sm);
+  box-shadow: var(--shadow-xs);
   overflow: hidden;
-  transition: all var(--transition-slow);
+  transition:
+    box-shadow var(--transition-slow),
+    transform var(--transition-slow),
+    border-color var(--transition-slow);
 }
 .card:hover {
   box-shadow: var(--shadow);
@@ -239,7 +271,13 @@ textarea.form-input {
   opacity: 0;
   visibility: hidden;
   transform: translateY(10px);
-  transition: all var(--transition-spring);
+  transition:
+    opacity var(--transition-spring),
+    visibility var(--transition-spring),
+    transform var(--transition-spring),
+    background var(--transition-fast),
+    color var(--transition-fast),
+    box-shadow var(--transition-fast);
   z-index: var(--z-sticky);
   box-shadow: var(--shadow);
 }
@@ -250,17 +288,12 @@ textarea.form-input {
 }
 .back-to-top:hover {
   background: var(--accent);
-  color: white;
+  color: var(--contrast-fg);
   border-color: var(--accent);
   transform: translateY(-4px);
   box-shadow: var(--shadow-lg);
 }
 /* ==================== Button Enhancements ==================== */
-.btn {
-  position: relative;
-  overflow: hidden;
-  transition: all var(--transition);
-}
 .btn:active {
   transform: scale(0.97);
 }

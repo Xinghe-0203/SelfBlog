@@ -13,7 +13,7 @@ import java.util.List;
 public final class SeoModels {
     private SeoModels() { }
 
-    public enum Kind { SHELL, POST, TAG, HOME, ARCHIVES, ABOUT, GALLERY, SEARCH, NOT_FOUND, CUSTOM }
+    public enum Kind { SHELL, POST, TAG, HOME, ARCHIVES, ABOUT, GALLERY, SEARCH, TAGS, NOT_FOUND, CUSTOM }
 
     /**
      * 首次响应里的 head 元数据（canonical/robots/OG/Twitter 由渲染层使用）。

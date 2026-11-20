@@ -5,10 +5,12 @@
   --bg-tertiary: #e5ecd9;
   --surface-primary: #fffefa;
   --surface-secondary: #f9faf5;
+  --surface-tertiary: #f0f4e9;
   --border-light: #dce4d2;
   --text-primary: #26372a;
   --text-secondary: #586b5a;
-  --text-muted: #687c66;
+  /* 对芯片面 #f0f4e9 ≥ 4.5:1（旧值 4.04 不达标）。 */
+  --text-muted: #60725e;
   --accent: #2d7c54;
   --accent-light: #e4f2e8;
   --accent-dark: #1d6541;
@@ -20,10 +22,12 @@
   --bg-tertiary: #e8e2f4;
   --surface-primary: #fff;
   --surface-secondary: #fbfaff;
+  --surface-tertiary: #f3effc;
   --border-light: #e4dff0;
   --text-primary: #302b3d;
   --text-secondary: #625b72;
-  --text-muted: #776d89;
+  /* 对芯片面 #f3effc ≥ 4.5:1（旧值 4.28 不达标）。 */
+  --text-muted: #716882;
   --accent: #7555b7;
   --accent-light: #eee8fa;
   --accent-dark: #5b3f98;
@@ -35,10 +39,12 @@
   --bg-tertiary: #efe2d6;
   --surface-primary: #fffdfa;
   --surface-secondary: #fff9f3;
+  --surface-tertiary: #fbf1e8;
   --border-light: #eadbd0;
   --text-primary: #3f3028;
   --text-secondary: #735d50;
-  --text-muted: #856c5b;
+  /* 对芯片面 #fbf1e8 ≥ 4.5:1（旧值 4.39 不达标）。 */
+  --text-muted: #816958;
   --accent: #c45b3e;
   --accent-light: #fbe9df;
   --accent-dark: #a8442d;
@@ -55,10 +61,12 @@
   --bg-tertiary: #dfe7e4;
   --surface-primary: #ffffff;
   --surface-secondary: #f7faf9;
+  --surface-tertiary: #eef3f1;
   --border-light: #d7e0dd;
   --text-primary: #1f2a28;
   --text-secondary: #56635f;
-  --text-muted: #64716d;
+  /* 对芯片面 #eef3f1 ≥ 4.5:1。 */
+  --text-muted: #63706c;
   --accent: #1f7a72;
   --accent-light: #e0f0ee;
   --accent-dark: #186059;
@@ -71,10 +79,12 @@
   --bg-tertiary: #e8dfd1;
   --surface-primary: #fffdfa;
   --surface-secondary: #faf6ef;
+  --surface-tertiary: #f3ece1;
   --border-light: #e5dbcb;
   --text-primary: #33291f;
   --text-secondary: #6b5b4a;
-  --text-muted: #7a6a58;
+  /* 对芯片面 #f3ece1 ≥ 4.5:1（旧值 4.44 不达标）。 */
+  --text-muted: #766755;
   --accent: #c2703f;
   --accent-light: #f7e8dc;
   --accent-dark: #a05a31;
@@ -95,10 +105,12 @@
   --bg-tertiary: #202f40;
   --surface-primary: #182535;
   --surface-secondary: #1d2c3c;
+  --surface-tertiary: #24354a;
   --border-light: #2d4053;
   --text-primary: #ecf2f8;
   --text-secondary: #b4c2d0;
-  --text-muted: #8094a9;
+  /* 对芯片面 #24354a ≥ 4.5:1（旧值 4.00 不达标）。 */
+  --text-muted: #8ea0b2;
   --accent: #69aef7;
   --accent-light: #213a54;
   --accent-dark: #8bc0fa;
@@ -126,10 +138,12 @@
   --bg-tertiary: #232040;
   --surface-primary: #1c1a2e;
   --surface-secondary: #232140;
+  --surface-tertiary: #2a2745;
   --border-light: #2f2c4a;
   --text-primary: #eceaf7;
   --text-secondary: #b3aecb;
-  --text-muted: #908aa8;
+  /* 对芯片面 #2a2745 ≥ 4.5:1（旧值 4.33 不达标）。 */
+  --text-muted: #9690ac;
   --accent: #9d8bf5;
   --accent-light: #2a2545;
   --accent-dark: #b3a4ff;

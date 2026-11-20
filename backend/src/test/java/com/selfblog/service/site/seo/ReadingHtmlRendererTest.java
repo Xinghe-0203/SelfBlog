@@ -74,6 +74,21 @@ class ReadingHtmlRendererTest {
         assertEquals(0, shell.select("link[rel=canonical]").size());
     }
 
+    /**
+     * 阅读页只有一个 h1（文章标题），正文标题已整体降级 —— 文档大纲不会被读成两个并列主题。
+     */
+    @Test void postPageKeepsASingleH1WhileBodyHeadingsAreDemoted() {
+        var post = new SeoModels.ReadingPage(200, SeoModels.Kind.POST, "post", PageConfig.empty(),
+                meta("真实标题", "/post/1", true), "真实标题",
+                new SafeMarkdown().render("# 一级\n\n## 二级"), List.of(), List.of(),
+                new SeoModels.SiteInfo("示例博客", "站点说明", "示例作者", "作者简介"));
+        Document rendered = Jsoup.parse(new ReadingContent().render(post).outerHtml());
+        assertEquals(1, rendered.select("h1").size(), "页面只能有一个 h1");
+        assertEquals("真实标题", rendered.selectFirst("h1").text());
+        assertEquals("一级", rendered.selectFirst("h2").text());
+        assertEquals("二级", rendered.selectFirst("h3").text());
+    }
+
     @Test void missingTemplateFailsClosedAs503WithSafeErrorDocument() {
         var missing = new ReadingHtmlRenderer(new ReadingTemplate("static/does-not-exist.html"));
         assertEquals(503, assertThrows(BusinessException.class, () -> missing.render(page(SeoModels.Kind.HOME, "首页", "/", "", true), base)).getCode());
@@ -101,6 +116,41 @@ class ReadingHtmlRendererTest {
         assertTrue(json.contains("\"potentialAction\""));
         assertTrue(json.contains("https://blog.example.com/search?q={search_term_string}"));
         assertTrue(json.contains("required name=search_term_string"));
+    }
+
+    /**
+     * 首页额外声明 ItemList：把「最新文章」这条列表结构化。
+     *
+     * <p>条目 URL 必须绝对化（与 canonical / 面包屑同源），且 position 从 1 连续递增。
+     * 归档页不声明 ItemList —— 它是「时间线」而不是「最新文章列表」，
+     * 语义不同，混在一起会让搜索引擎误判首页的内容新鲜度。</p>
+     */
+    @Test
+    void homePageAdvertisesItemListForLatestPosts() throws Exception {
+        var entries = List.of(
+                new SeoModels.Entry("/post/7", "最新一篇", "摘要一", "2026-10-16"),
+                new SeoModels.Entry("/post/3", "第二篇", "摘要二", "2026-10-15"));
+        var home = new SeoModels.ReadingPage(200, SeoModels.Kind.HOME, "home", PageConfig.empty(),
+                meta("首页", "/", true), "首页", "", entries, List.of(),
+                new SeoModels.SiteInfo("示例博客", "站点说明", "示例作者", "作者简介"));
+
+        Document doc = Jsoup.parse(renderer.render(home, base));
+        String json = doc.selectFirst("script[type=application/ld+json]").data();
+        var root = new com.fasterxml.jackson.databind.ObjectMapper().readTree(json);
+        var list = root.get("mainEntity");
+        assertNotNull(list);
+        assertEquals("ItemList", list.get("@type").asText());
+        var items = list.get("itemListElement");
+        assertEquals(2, items.size());
+        assertEquals(1, items.get(0).get("position").asInt());
+        assertEquals("https://blog.example.com/post/7", items.get(0).get("url").asText());
+        assertEquals("最新一篇", items.get(0).get("name").asText());
+        assertEquals(2, items.get(1).get("position").asInt());
+        assertEquals("https://blog.example.com/post/3", items.get(1).get("url").asText());
+
+        // 归档页不声明 ItemList：它的语义是时间线，不是「最新文章」。
+        Document archives = Jsoup.parse(renderer.render(page(SeoModels.Kind.ARCHIVES, "归档", "/archives", "", true), base));
+        assertTrue(archives.select("script[type=application/ld+json]").isEmpty());
     }
 
     /** 文章页 JSON-LD 携带面包屑：站点首页（站点名）→ 文章，URL 与 canonical 同源绝对地址。 */

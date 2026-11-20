@@ -287,6 +287,17 @@ api.interceptors.response.use(
     // 401错误处理（Token过期）
     // 没有 request config 就没有可重放的请求，刷新完也无从重放，直接落到兜底。
     if (originalRequest && error.response?.status === 401 && !originalRequest._retry) {
+      // **匿名请求**不当作登录态失效：访客访问公开接口时后端返回 401（例如某个
+      // 尚未开放的公开路由），如果照旧地清理会话并把他踢到后台登录页，体验是灾难性的
+      // —— 读者只是想看文章，却被弹到一个登录表单。判断依据是「这个请求带没带
+      // Authorization 头」：带了才说明它是登录态用户的请求，令牌才可能过期。
+      const sentAuth = Boolean(originalRequest.headers?.Authorization)
+      if (!sentAuth) {
+        logger.warn('Anonymous request rejected with 401', { url: originalRequest.url })
+        error.userMessage = error.response?.data?.message || '请求失败'
+        return Promise.reject(error)
+      }
+
       // 如果是刷新Token的请求失败，直接跳转登录
       if (originalRequest.url === '/user/refresh') {
         await handleAuthError()

@@ -567,7 +567,7 @@ select {
 }
 .llm-badge[data-llm-key='configured'] {
   background: var(--success-light);
-  color: var(--success);
+  color: var(--success-ink);
 }
 .llm-badge[data-llm-key='empty'] {
   background: var(--bg-tertiary);
@@ -583,11 +583,11 @@ select {
 }
 .llm-test[data-ok='true'] {
   background: var(--success-light);
-  color: var(--success);
+  color: var(--success-ink);
 }
 .llm-test[data-ok='false'] {
   background: var(--error-light);
-  color: var(--error);
+  color: var(--error-ink);
 }
 .llm-hint {
   background: var(--bg-secondary);

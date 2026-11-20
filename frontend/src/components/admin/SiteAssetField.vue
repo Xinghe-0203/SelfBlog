@@ -249,7 +249,7 @@ async function handleFileChange(event: Event): Promise<void> {
   border: 0;
   border-radius: var(--radius-sm);
   background: var(--primary);
-  color: white;
+  color: var(--contrast-fg);
   font-size: var(--text-xs);
   font-weight: 700;
   cursor: pointer;

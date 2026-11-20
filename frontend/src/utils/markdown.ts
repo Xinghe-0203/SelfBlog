@@ -147,6 +147,40 @@ export function isInternalMarkdownHref(href: string | null | undefined): boolean
   }
 }
 
+/**
+ * 正文标题统一降一级（`#`→`h2`、`##`→`h3`、`###`→`h4` …，`h6` 封顶）。
+ *
+ * <p>理由：每个页面已经有**一个** `h1`（文章标题 / 页面标题）。正文里的 `#` 若也渲染成
+ * `h1`，页面就出现两个一级标题，文档大纲（以及搜索结果里的结构）会被读成「并列的两个主题」。
+ * 降级后：`h1` 只有页面标题，正文从 `h2` 起，相对层级不变。</p>
+ *
+ * <p>必须与后端 {@code SafeMarkdown} 做同一件事：否则服务端 HTML（禁用 JS 的读者与
+ * 搜索引擎看到的那一份）会与浏览器里不一致。</p>
+ *
+ * <p>处理顺序从 `h5` 开始向下降到 `h1`：先动「源级别更深的」，新产生的 `h5` 不会再被
+ * `h5 → h6` 处理一次（避免连降两级）。</p>
+ */
+const HEADING_DEMOTION: Array<[string, string]> = [
+  ['h5', 'h6'],
+  ['h4', 'h5'],
+  ['h3', 'h4'],
+  ['h2', 'h3'],
+  ['h1', 'h2']
+]
+
+export function demoteMarkdownHeadings(doc: Document): void {
+  for (const [from, to] of HEADING_DEMOTION) {
+    for (const node of [...doc.querySelectorAll(from)]) {
+      const replacement = doc.createElement(to)
+      for (const attribute of [...node.attributes]) {
+        replacement.setAttribute(attribute.name, attribute.value)
+      }
+      while (node.firstChild) replacement.appendChild(node.firstChild)
+      node.replaceWith(replacement)
+    }
+  }
+}
+
 const SANITIZE_OPTIONS = {
   USE_PROFILES: { html: true },
   ADD_ATTR: ['target', 'rel', 'referrerpolicy', 'loading'],
@@ -164,6 +198,9 @@ export function sanitizeMarkdownHtml(rawHtml: string): string {
   const clean = DOMPurify.sanitize(rawHtml, SANITIZE_OPTIONS)
   if (!clean) return ''
   const doc = new DOMParser().parseFromString(clean, 'text/html')
+
+  // 先降级标题：下面遍历链接/图片时与标题无关，但顺序放在最前更直观。
+  demoteMarkdownHeadings(doc)
 
   doc.querySelectorAll('a[href]').forEach((anchor) => {
     const original = anchor.getAttribute('href') ?? ''

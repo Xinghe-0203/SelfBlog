@@ -30,10 +30,11 @@ const handleScroll = () => {
 }
 
 const scrollToTop = () => {
-  window.scrollTo({
-    top: 0,
-    behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth'
-  })
+  // matchMedia 可能被 mock 成返回 undefined，这里用可选链 + 布尔比较兜住。
+  const reduced =
+    typeof window.matchMedia === 'function' &&
+    window.matchMedia('(prefers-reduced-motion: reduce)')?.matches === true
+  window.scrollTo({ top: 0, behavior: reduced ? 'auto' : 'smooth' })
 }
 
 onMounted(() => {
@@ -56,19 +57,26 @@ onUnmounted(() => {
   position: fixed;
   bottom: 28px;
   right: 28px;
-  width: 44px;
-  height: 44px;
+  width: 46px;
+  height: 46px;
   display: flex;
   align-items: center;
   justify-content: center;
   border: 1px solid var(--border-solid);
-  border-radius: var(--radius);
+  border-radius: var(--radius-full);
   color: var(--text-secondary);
   cursor: pointer;
   opacity: 0;
   visibility: hidden;
   transform: translateY(8px) scale(0.9);
-  transition: all var(--transition-spring);
+  transition:
+    opacity var(--transition-spring),
+    visibility var(--transition-spring),
+    transform var(--transition-spring),
+    background var(--transition-fast),
+    color var(--transition-fast),
+    border-color var(--transition-fast),
+    box-shadow var(--transition-fast);
   z-index: var(--z-sticky);
   box-shadow: var(--shadow-md);
 }
@@ -92,11 +100,11 @@ onUnmounted(() => {
 }
 
 .back-to-top svg {
-  transition: transform var(--transition);
+  transition: transform var(--duration-slow) var(--ease-spring);
 }
 
 .back-to-top:hover svg {
-  transform: translateY(-2px);
+  transform: translateY(-3px);
 }
 
 @media (max-width: 768px) {

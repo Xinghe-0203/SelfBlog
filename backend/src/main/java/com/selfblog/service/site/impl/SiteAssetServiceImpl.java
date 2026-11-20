@@ -3,7 +3,9 @@ package com.selfblog.service.site.impl;
 import com.selfblog.common.enums.SiteAssetKind;
 import com.selfblog.common.exception.BusinessException;
 import com.selfblog.service.site.SiteAssetService;
+import com.selfblog.utils.ImageDimensionUtils;
 import com.selfblog.vo.site.SiteAssetVO;
+import net.coobird.thumbnailator.Thumbnails;
 import lombok.extern.slf4j.Slf4j;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Attribute;
@@ -15,6 +17,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -29,7 +32,13 @@ import java.util.UUID;
 /**
  * 站点品牌资产上传实现。
  *
- * 文件原样落盘（SVG 先净化），不做重新编码 —— 这正是它不能复用 MediaService 的原因。
+ * 文件原样落盘（SVG 先净化），**不重新编码** —— 这正是它不能复用 MediaService 的原因
+ * （MediaService 把所有图片压成 JPG，会毁掉 logo 的透明通道与 SVG）。
+ *
+ * <p>唯一的例外是**页面背景图**：它是整页铺满的装饰照片，动辄几百 KB 到数 MB，
+ * 而站点背景最多按 2560px 宽显示。因此 JPEG 背景在落盘前会做一次「超宽则等比缩到
+ * 2560px + 质量 0.82 重编码」；PNG/WebP 一律不动（可能带透明通道，重编码会改变观感），
+ * 优化失败也**保留原文件**，绝不让上传失败。</p>
  */
 @Slf4j
 @Service
@@ -84,6 +93,15 @@ public class SiteAssetServiceImpl implements SiteAssetService {
     private static final java.util.regex.Pattern URL_REFERENCE_PATTERN =
             java.util.regex.Pattern.compile("url\\(\\s*['\"]?([^)'\"]*)");
 
+    /** 页面背景图的最大显示宽度：超过它的部分在屏幕上永远看不到（整页铺满按视口算）。 */
+    private static final int BACKGROUND_MAX_WIDTH = 2560;
+    /** 背景图重编码质量：视觉上与 0.9 难以区分，体积通常只有一半。 */
+    private static final double BACKGROUND_QUALITY = 0.82;
+    /** 小于这个体积（700KB）的 JPEG 背景不值得重编码（会损失一点画质换不到多少体积）。 */
+    private static final long BACKGROUND_BYTES_TO_OPTIMIZE = 700L * 1024;
+    /** 尺寸已合规、但体积超过这个值（2MB）时仍然重编码一次。 */
+    private static final long BACKGROUND_BYTES_ALWAYS_KEEP = 2L * 1024 * 1024;
+
     private static final byte[] PNG_MAGIC = {(byte) 0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A};
     private static final byte[] JPEG_MAGIC = {(byte) 0xFF, (byte) 0xD8, (byte) 0xFF};
     private static final byte[] ICO_MAGIC = {0, 0, 1, 0};
@@ -134,6 +152,10 @@ public class SiteAssetServiceImpl implements SiteAssetService {
 
         if (".svg".equals(extension)) {
             bytes = sanitizeSvg(bytes);
+        }
+
+        if (assetKind == SiteAssetKind.BACKGROUND) {
+            bytes = optimizeBackground(bytes, extension);
         }
 
         String filename = UUID.randomUUID().toString().replace("-", "") + extension;
@@ -231,6 +253,51 @@ public class SiteAssetServiceImpl implements SiteAssetService {
      * 与 {@code <use href="data:image/svg+xml;base64,...">} 都会被拒绝。
      * 解析器对垃圾输入不会抛异常（已实测），因此用“有没有 svg 根元素”来拒绝非 SVG。</p>
      */
+    /**
+     * 页面背景图的按需瘦身：**只处理 JPEG**，超宽才缩，其余格式与失败一律原样返回。
+     *
+     * <p>为什么只处理 JPEG：PNG/WebP 可能带透明通道，重编码成 JPEG 会丢透明（还会改变观感）；
+     * SVG 是矢量。照片类背景绝大多数本来就是 JPEG，这是收益最大、风险最小的一档。</p>
+     *
+     * <p>三重保护：</p>
+     * <ol>
+     *   <li>解码前用 {@link ImageDimensionUtils#validatePixelCount} 拦「小文件声明超大尺寸」
+     *       的解压缩炸弹（与 MediaService 同一道闸）；</li>
+     *   <li>宽度未超限且体积已经不��（≤700KB）时直接返回原字节，不做无意义的重编码；</li>
+     *   <li>任何异常都 log 后返回原字节 —— 优化是锦上添花，不能让上传失败。</li>
+     * </ol>
+     */
+    private byte[] optimizeBackground(byte[] bytes, String extension) {
+        if (!(".jpg".equals(extension) || ".jpeg".equals(extension))) return bytes;
+        if (bytes.length <= BACKGROUND_BYTES_TO_OPTIMIZE) return bytes;
+        try {
+            ImageDimensionUtils.validatePixelCount(
+                    new ByteArrayInputStream(bytes), "background" + extension);
+            java.awt.image.BufferedImage image = javax.imageio.ImageIO.read(new ByteArrayInputStream(bytes));
+            if (image == null) return bytes;
+            if (image.getWidth() <= BACKGROUND_MAX_WIDTH) {
+                // 尺寸已经合规，只是体积偏大：仍然按同一档质量重编码，体积通常能降一半。
+                if (bytes.length <= BACKGROUND_BYTES_ALWAYS_KEEP) return bytes;
+            }
+            ByteArrayOutputStream output = new ByteArrayOutputStream();
+            Thumbnails.of(new ByteArrayInputStream(bytes))
+                    .width(BACKGROUND_MAX_WIDTH)
+                    .outputFormat("jpg")
+                    .outputQuality(BACKGROUND_QUALITY)
+                    .toOutputStream(output);
+            byte[] optimized = output.toByteArray();
+            // 重编码后反而更大（高质量小图）就没必要替换。
+            if (optimized.length >= bytes.length) return bytes;
+            log.info("[SiteAsset] 背景图优化：{}KB -> {}KB（宽 {} -> {}）",
+                    bytes.length / 1024, optimized.length / 1024, image.getWidth(),
+                    Math.min(image.getWidth(), BACKGROUND_MAX_WIDTH));
+            return optimized;
+        } catch (RuntimeException | IOException e) {
+            log.warn("[SiteAsset] 背景图优化失败，保留原文件: {}", e.getMessage());
+            return bytes;
+        }
+    }
+
     private byte[] sanitizeSvg(byte[] bytes) {
         String raw = new String(bytes, StandardCharsets.UTF_8);
         Document document = Jsoup.parse(raw, "", Parser.xmlParser());

@@ -805,11 +805,11 @@ onMounted(() => {
 }
 .alert {
   background: var(--error-light);
-  color: var(--error);
+  color: var(--error-ink);
 }
 .success {
   background: var(--success-light);
-  color: var(--success);
+  color: var(--success-ink);
 }
 .metrics {
   display: grid;
@@ -912,7 +912,7 @@ td {
   vertical-align: top;
 }
 th {
-  color: var(--text-muted);
+  color: var(--text-secondary);
   font-size: var(--text-xs);
   font-weight: 600;
   white-space: nowrap;
@@ -946,7 +946,7 @@ tbody tr:last-child td {
 }
 .status-badge[data-status='1'] {
   background: var(--success-light);
-  color: var(--success);
+  color: var(--success-ink);
 }
 .status-badge[data-status='0'] {
   background: var(--bg-tertiary);
@@ -962,7 +962,7 @@ tbody tr:last-child td {
 }
 .clean-badge {
   background: var(--success-light);
-  color: var(--success);
+  color: var(--success-ink);
 }
 .issue-chip {
   display: inline-block;
@@ -970,7 +970,7 @@ tbody tr:last-child td {
   padding: 2px 8px;
   border-radius: var(--radius-full);
   background: var(--warning-light);
-  color: var(--warning);
+  color: var(--warning-ink);
   font-size: var(--text-2xs);
   font-weight: 600;
   white-space: nowrap;
@@ -989,7 +989,8 @@ tbody tr:last-child td {
   padding: 4px 6px;
   border: 0;
   background: none;
-  color: var(--accent);
+  /* 压在半透明纸面上：accent 只有 4.47，用深一档的 accent-dark（浅色 #0e42d2 / 深色更亮）。 */
+  color: var(--accent-dark);
   font: inherit;
   font-size: var(--text-sm);
   cursor: pointer;
@@ -1002,7 +1003,8 @@ tbody tr:last-child td {
   cursor: not-allowed;
 }
 .link-button.danger {
-  color: var(--error);
+  /* 深色画布上 --error 对纸面只有 3.78；墨色档两边都 ≥ 5。 */
+  color: var(--error-ink);
 }
 .empty {
   padding: 24px 12px;
@@ -1105,7 +1107,7 @@ tbody tr:last-child td {
   padding: 10px 12px;
   border-radius: var(--radius);
   background: var(--warning-light);
-  color: var(--warning);
+  color: var(--warning-ink);
   font-size: var(--text-xs);
   line-height: 1.6;
 }
@@ -1155,11 +1157,11 @@ tbody tr:last-child td {
 }
 .issue-severity[data-severity='medium'] {
   background: var(--warning-light);
-  color: var(--warning);
+  color: var(--warning-ink);
 }
 .issue-severity[data-severity='high'] {
   background: var(--error-light);
-  color: var(--error);
+  color: var(--error-ink);
 }
 .issue-excerpt {
   margin: 0;

@@ -81,7 +81,12 @@ onMounted(fetchArchives)
     <div v-else-if="archiveGroups.length === 0" class="state-panel">还没有发布文章。</div>
 
     <div v-else class="archive-list">
-      <section v-for="group in archiveGroups" :key="group.key" class="archive-group">
+      <section
+        v-for="group in archiveGroups"
+        :key="group.key"
+        class="archive-group"
+        v-scroll-reveal="{ stagger: true }"
+      >
         <h2>
           {{ group.label }}<span v-if="showModule('count')">{{ group.posts.length }}</span>
         </h2>
@@ -109,31 +114,35 @@ onMounted(fetchArchives)
   color: var(--text-primary);
 }
 .page-heading {
-  padding-bottom: 24px;
+  padding-bottom: 26px;
 }
 .page-heading h1 {
   margin: 0;
   font-family: var(--font-display);
-  font-size: var(--text-3xl);
-  letter-spacing: -0.045em;
+  font-size: var(--text-4xl);
+  font-weight: 700;
+  letter-spacing: -0.03em;
 }
 .page-heading > p:last-child {
-  margin: 12px 0 0;
+  margin: 14px 0 0;
+  max-width: 56ch;
   color: var(--text-secondary);
   font-size: var(--text-sm);
+  line-height: 1.8;
 }
 .archive-list {
-  padding: 0 26px;
+  padding: 6px 28px;
   border: 1px solid var(--border-light);
   border-radius: var(--radius-xl);
   /* 浮起档：纯色画布别名回 --surface-primary，壁纸画布上是纸面之上的一档。 */
   background: var(--surface-raised);
+  box-shadow: var(--shadow-xs);
 }
 .archive-group {
   display: grid;
-  grid-template-columns: 145px minmax(0, 1fr);
+  grid-template-columns: 165px minmax(0, 1fr);
   gap: var(--page-section-gap, 24px);
-  padding: 27px 0;
+  padding: 30px 0;
   border-bottom: 1px solid var(--border-solid);
 }
 .archive-group:last-child {
@@ -146,15 +155,17 @@ onMounted(fetchArchives)
   margin: 4px 0 0;
   font-family: var(--font-display);
   font-size: var(--text-lg);
+  font-weight: 650;
+  letter-spacing: -0.01em;
 }
 .archive-group h2 span {
   color: var(--text-muted);
-  font: 500 0.75rem var(--font-sans);
+  font: 500 var(--text-2xs) var(--font-sans);
 }
 .archive-group ol {
   display: flex;
   flex-direction: column;
-  gap: 15px;
+  gap: 14px;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -169,12 +180,14 @@ onMounted(fetchArchives)
   color: var(--text-muted);
   font-size: var(--text-xs);
   white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 .archive-group a {
   color: var(--text-primary);
   font-size: var(--text-sm);
-  line-height: 1.55;
+  line-height: 1.6;
   text-decoration: none;
+  transition: color var(--transition-fast);
 }
 .archive-group a:hover {
   color: var(--primary);
@@ -187,7 +200,7 @@ onMounted(fetchArchives)
   margin-top: 28px;
   padding: 35px 20px;
   border: 1px dashed var(--border-solid);
-  border-radius: var(--radius);
+  border-radius: var(--radius-lg);
   color: var(--text-muted);
   text-align: center;
 }

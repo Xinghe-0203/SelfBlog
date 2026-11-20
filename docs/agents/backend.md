@@ -82,6 +82,66 @@ Java source root: `backend/src/main/java/com/selfblog/`.
 - `AiImageLoader` caps inline images at **4 MiB** and accepts only site-relative `/uploads/...` or absolute http(s) URLs; album photo paths must resolve inside `galleryDir`.
 - `album_photo.caption` had **no write path** before v2.0.28 (the column and `AlbumPhotoVO` existed, upload only wrote `file_path`/`mime_type`/`sort_order`). It is written by `PUT /api/admin/albums/{albumId}/photos/{photoId}` (`PhotoCaptionForm`, cap 500 matching `caption VARCHAR(500)`, `null`/blank clears). This must go through `update(null, LambdaUpdateWrapper.set(...))` — `updateById` cannot write NULL under the default `NOT_NULL` strategy.
 
+## Markdown 存储与渲染策略（2026-11-19 复查批次）
+
+- **正文原样保存，安全边界在渲染时。** `HtmlSanitizer.sanitizeMarkdown` 只做两件事：
+  去 UTF-8 BOM、统一换行符（CRLF/CR → LF）。**绝不整篇转义** —— 曾经的
+  `HtmlUtils.htmlEscape(markdown)` 会把 `>` 变成 `&gt;`（引用块消失）、把代码块里的
+  `>` 和 `'` 变成实体（读者在代码块里看到 `&gt;` / `&#39;`），这正是「正文里直接显示
+  `&nbsp;` 这类实体」的根因。两侧净化器都已覆盖：服务端 `SafeMarkdown` 的 Jsoup 白名单、
+  前端 `utils/markdown.ts` 的 DOMPurify。
+- **历史数据还原脚本**：`backend/src/main/resources/fix-markdown-escaping.sql`
+  （SQLite / MySQL 通用，只匹配 `&#39;` / `&quot;` / `&gt;` / `&lt;` 这几类 htmlEscape 产物，
+  反解顺序与转义顺序相反，可重复执行）。它不会自动跑 —— 升级既有站点时手动执行一次。
+- **`SafeMarkdown` 必须与前端 marked 逐字对齐的三点**（改任一处都要同时跑
+  `SafeMarkdownTest` 与 `markdownGfm.test.ts`）：
+  1. `escapeHtml(false)` —— 否则文本里的 `&nbsp;` 被二次转义成 `&amp;nbsp;`，
+     服务端显示字面量而浏览器显示空格；
+  2. `softbreak("<br />
+")` —— 否则「第一行
+第二行」在服务端被折叠成一行
+     （前端 `breaks: true` 渲染成两行）；
+  3. 安全只靠 Jsoup 白名单：关掉 `escapeHtml` 不等于允许原始 HTML 通过，
+     裸 `<script>` 会连内容一起被 Jsoup 清掉（与 DOMPurify 的 `FORBID_CONTENTS` 一致），
+     而**代码段/围栏里的同名字面量保留成转义文本**（作者讲安全时就是这么写的）。
+- **正文标题统一降一级**（`#`→`h2` … `h6` 封顶，`SafeMarkdown.demoteHeadings`）：
+  阅读页的 `h1` 只属于文章标题，否则服务端 HTML 里会有两个一级标题。
+  **必须与前端 `utils/markdown.ts::demoteMarkdownHeadings` 同步**：两侧大纲要一致
+  （`ReadingHtmlRendererTest` 与 `markdownGfm.test.ts` 各钉一条）。
+  降级后正文标题是 `h2..h6`，`seo-reading.css` 必须给出这五档的字阶，
+  否则 `##`/`###` 会落到浏览器默认字号。- **背景图按需瘦身**（`SiteAssetServiceImpl.optimizeBackground`）：**只处理 JPEG 背景**，
+  超过 700KB 时等比缩到 2560px + 质量 0.82 重编码；PNG/WebP/SVG 与 logo/头像/图标一律原样落盘，
+  解码前过 `ImageDimensionUtils.validatePixelCount`，**任何异常都保留原文件**（上传不能因优化失败而失败）。
+  这与「站点资产不重新编码」的既有边界并存：那条边界的理由是「不能毁掉透明通道与 SVG」，
+  JPEG 背景是唯一既无透明、又按视口铺满、且动辄数 MB 的类别。- **`seo-reading.css` 必须覆盖正文的基础元素**：`blockquote`（左竖线 + 淡底）、
+  行内 `code`（浅底强调色）、`pre code`（透明底继承深色块）、`ul/ol`、`hr`、`del`。
+  漏掉任何一个，服务端阅读页与浏览器里长得就不一样（禁用 JS 的读者与搜索引擎看到的是另一份）。
+
+## 公开标签索引与结构化数据 (2026-11-19, v2.0.30 第五批)
+
+- **公开标签索引**：`GET /api/tag/with-counts` → `List<TagWithCountVO>`（id / name / postCount）。
+  计数来自 `BlogTagMapper.selectTagsWithPostCounts()` 的**一条** `LEFT JOIN + GROUP BY` 聚合查询
+  （不是逐标签 N+1）。**只数 status=1 且 is_deleted=0 的文章**：草稿与已删除文章不公开，
+  计数里也不能出现（否则公开页面会泄露「有几篇草稿」）。关联表 `blog_post_tag.is_deleted=0` 同样要过滤。
+  排序：`postCount DESC, name ASC`。缓存在 `hotTagsCache` 的 `'tagsWithCounts'` 键，
+  与 `allTags` 同属一个缓存、同一批写方法整体失效。
+- **`/tags` 只列有已发布文章的标签**（`postCount > 0`），0 篇的标签不进公开索引；
+  **空标签页（`/tag/{id}` 无已发布文章）保持可访问但 `noindex,follow`** ——
+  只有标题的清单页是薄内容。有文章后无需手工操作，下次抓取自动恢复 `index,follow`。
+  两条判定与服务端同一份实现，前端（`TagsIndex.vue` / `TagDetail.vue` 的 `indexable`）保持一致。
+- **`--seo-accent` 缺省取后台「强调色」**（`ReadingPageService.withSiteAccent`）：页面级
+  `style.accent` 优先，其次是 `site_setting.themePrimaryColor`，非法值丢弃。返回**新** `PageConfig`，
+  不改 `pageCache` 里的缓存对象。写这条设置的测试必须经 MyBatis mapper（`JdbcTemplate` 的写不会
+  让本地会话缓存失效，同一个事务里再读仍是旧行）。
+- **`/tags` 公开页**：`SeoModels.Kind.TAGS` + `ReadingPageService.tags()` + `ReadingContent.tags()`。
+  服务端渲染（搜索引擎与禁用 JS 的读者都能读到），进入 `PageCatalog.BUILTINS`（后台「页面管理」可配置）
+  与 `sitemap-site.xml`。注意 `indexable(config, false)` 的第二个参数是「强制 noindex」，
+  传 `true` 会让这一页永远不被收录。
+- **首页 JSON-LD 增补 `ItemList`**：`ReadingHtmlRenderer.appendWebsiteJsonLd` 在首页额外声明
+  「最新文章」列表（URL 一律经 `SiteOrigin` 绝对化，position 从 1 连续递增）。
+  **归档页不声明** —— 它的语义是时间线，不是「最新文章」。
+- **`og:image:alt` / `twitter:image:alt`**：社交平台据此决定卡片版式与无图回退文案。
+
 ## Full-text feeds (2026-11-07, v2.0.30 batch 4)
 
 - `/feed.xml` + `/atom.xml` carry the full article body rendered through the **same `SafeMarkdown` entry point the reader HTML uses** — the GFM-parity contract now spans three surfaces (reader HTML, admin preview, feeds). RSS `content:encoded` is CDATA with `]]>` split (`cdata()` helper, defense-in-depth since SafeMarkdown escapes `>` anyway); Atom `content type="html"` reuses the existing `escape()`. The original `<description>` summary is unchanged.

@@ -302,7 +302,7 @@ table {
   text-align: left;
 }
 th {
-  color: var(--text-muted);
+  color: var(--text-secondary);
   font-size: var(--text-2xs);
   font-weight: 600;
 }

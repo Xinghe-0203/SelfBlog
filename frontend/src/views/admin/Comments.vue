@@ -372,7 +372,7 @@ select {
 }
 .status-1 {
   background: var(--success-light);
-  color: var(--success);
+  color: var(--success-ink);
 }
 .status-0 {
   background: var(--bg-secondary);
@@ -380,7 +380,7 @@ select {
 }
 .status-2 {
   background: var(--error-light);
-  color: var(--error);
+  color: var(--error-ink);
 }
 /* AI 审核建议：只是提示层，不替代上面的评论状态徽章 */
 .verdict-row {
@@ -398,15 +398,15 @@ select {
 }
 .verdict-badge[data-verdict='pass'] {
   background: var(--success-light);
-  color: var(--success);
+  color: var(--success-ink);
 }
 .verdict-badge[data-verdict='flag'] {
   background: var(--warning-light);
-  color: var(--warning);
+  color: var(--warning-ink);
 }
 .verdict-badge[data-verdict='block'] {
   background: var(--error-light);
-  color: var(--error);
+  color: var(--error-ink);
 }
 .verdict-reason {
   color: var(--text-muted);

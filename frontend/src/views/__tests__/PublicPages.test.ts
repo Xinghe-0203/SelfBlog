@@ -92,6 +92,16 @@ describe('public reading pages', () => {
     expect(wrapper.find('.article-list').exists()).toBe(true)
     expect(wrapper.get('a[href="/post/1"]').text()).toBe('一篇笔记')
   })
+  it('marks an empty tag page as noindex while keeping it readable', async () => {
+    // 空标签页可访问（作者可能刚建好标签就分享链接），但不该被搜索引擎收录。
+    vi.mocked(postApi.advancedSearch).mockResolvedValue(page([], 1))
+    await setup(TagDetail, '/tag/1')
+    await flushPromises()
+    expect(document.head.querySelector('meta[name="robots"]')?.getAttribute('content')).toBe(
+      'noindex,follow'
+    )
+  })
+
   it('retains every tag link in shared tag results and appends older articles', async () => {
     vi.mocked(postApi.advancedSearch)
       .mockResolvedValueOnce(page([post], 2))

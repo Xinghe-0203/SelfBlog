@@ -75,6 +75,7 @@ onBeforeUnmount(() => {
       :class="bannerClass"
       :style="bannerVars"
       :data-banner-tone="bannerTone"
+      v-scroll-reveal
     >
       <div v-if="banner" class="profile-banner" aria-hidden="true">
         <div class="profile-banner-media"></div>
@@ -149,21 +150,23 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: flex-start;
   gap: 28px;
-  padding: 34px;
+  padding: 36px;
   border: 1px solid var(--border-light);
-  border-radius: var(--radius-xl);
+  border-radius: var(--radius-2xl);
   /* 浮起档：原先这里写死 --surface-primary，于是壁纸模式下作者卡是唯一的
      不透明白块，和周围半透明的卡片「风格割裂」（用户截图 2 的原话）。
      改用档位变量后，纯色画布别名回 --surface-primary（逐像素不变），
      壁纸画布则与 .card/.sidebar-block 落在同一档。 */
   background: var(--surface-raised);
+  box-shadow: var(--shadow-xs);
 }
 .profile-avatar {
-  flex: 0 0 80px;
-  width: 80px;
-  height: 80px;
+  flex: 0 0 84px;
+  width: 84px;
+  height: 84px;
   border-radius: var(--radius-full);
   object-fit: cover;
+  box-shadow: var(--shadow-sm);
 }
 .profile-initial {
   display: grid;
@@ -171,25 +174,32 @@ onBeforeUnmount(() => {
   background: var(--accent-light);
   color: var(--accent);
   font-size: var(--text-3xl);
+  font-weight: 600;
 }
 .profile-copy {
   min-width: 0;
 }
 .profile-label {
-  font-size: var(--text-xs);
-  color: var(--text-muted);
-  margin-bottom: 7px;
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 8px;
 }
 .profile-copy h1 {
   font-size: var(--text-3xl);
+  font-weight: 700;
+  letter-spacing: -0.02em;
   overflow-wrap: anywhere;
 }
 .author-bio {
-  margin-top: 18px;
+  margin-top: 16px;
   white-space: pre-line;
   overflow-wrap: anywhere;
   font-size: var(--text-base);
   line-height: 1.9;
+  color: var(--text-secondary);
 }
 /* ---------------------------------------------------------------------------
    横幅背景（作者在「页面管理 → 关于」里设置）
@@ -261,33 +271,42 @@ onBeforeUnmount(() => {
   border-radius: var(--radius-lg);
 }
 .about-site {
-  margin: var(--page-section-gap, 32px) 34px 0;
+  margin: var(--page-section-gap, 32px) 0 0;
+  padding: 28px 32px;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-xl);
+  background: var(--surface-raised);
 }
 .about-site h2 {
   font-size: var(--text-lg);
+  font-weight: 650;
 }
 .about-site p {
   margin-block: 12px 20px;
   font-size: var(--text-sm);
+  line-height: 1.8;
 }
 .about-site nav {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: 10px;
 }
 .about-site a {
   display: flex;
   align-items: center;
   gap: 8px;
   min-height: 44px;
-  padding: 8px 12px;
+  padding: 8px 15px;
   border: 1px solid var(--border-light);
-  border-radius: var(--radius);
+  border-radius: var(--radius-full);
   /* 控件档：这三个芯片原先是不透明白块，和周围半透明表面「像另一套设计」。
      档位变量让它们与首页的芯片/按钮共用同一档底色。 */
   background: var(--surface-control);
   color: var(--text-secondary);
   font-size: var(--text-sm);
+  transition:
+    color var(--transition-fast),
+    border-color var(--transition-fast);
 }
 .about-site a:hover {
   color: var(--accent);

@@ -73,6 +73,82 @@ npm run build
 - **`linkStyle`** (`data-ap-link`, section 13 of customize.css): `dotted` = always-on underline goes dotted; `flat` = no rest-state underline, restored on hover, `.heading-anchor` excluded so heading `#` marks keep their no-underline design. App.vue watch array is 19 entries (`summaryCallout` deliberately absent — PostDetail v-if).
 - **4 new theme presets** (墨韵/杏暖/青苔/暮色) — presets panel shows 8 cards; each preset writes only existing keys. Appearance panel: **20 keys**.
 
+## 2026-11-19 全站 UI 重做 + 动效系统（v2.0.30 第五批）
+
+- **设计 token 重写**（`styles/variables.css`）：画布/纸面/控件三档表面、最小字号 12px、
+  圆角四档、阴影两段式。**`--surface-tertiary` 是新增的第三层表面**（芯片 / 输入区底色）——
+  深色模式与 7 套皮肤都必须补齐这一枚，否则浅色画布的 `#f3f5f8` 会在深色模式里变成刺眼白片
+  （`.dark-mode` 与 `[data-skin='midnight'|'dusk']` 各自定义，`skins.css` 里 7 套皮肤同理）。
+- **动效词汇表**（新 `styles/motion.css`）：`enter-*` 入场 / `ambient-*` 环境 / `press`·`lift`·`sheen` 反馈。
+  **只动 transform 与 opacity**；时长取 `--duration-*` token，因此后台「动效强度」档位仍然有效。
+  `motion.css` 必须排在 `animations.css` 之后（它覆盖同名 keyframes）。
+- **`useScrollReveal` 已重写**（不要再按旧用法写）：观察器**按 threshold/rootMargin 分桶共用**
+  （旧实现每个元素一个观察器）；初始态由 JS 加 `.reveal-ready`（脚本被拦时元素仍可见）；
+  环境无 IntersectionObserver 或用户开「减少动态效果」时直接判定为可见。
+  指令在 `src/test/setup.ts` 里已全局注册，测试里不必再手动 mount directive。
+- **`matchMedia` 必须可选链**：测试里 `vi.resetAllMocks()` 会把 `window.matchMedia` 的实现清掉，
+  直接读 `.matches` 会抛 `Cannot read properties of undefined`。
+  统一写法：`window.matchMedia('(prefers-reduced-motion: reduce)')?.matches === true`。
+- **新 `src/router/prefetch.ts`**：公开页面的 chunk 预取（空闲全量 + 悬停单页）。
+  **只预取公开路由**，后台 chunk 提前下载等于把后台代码发给未授权访客。
+- **新 `src/utils/apiCache.ts`**：公开只读接口的进程内缓存（列表 30s / 归档与标签 120s），并发同 key 去重。
+  写操作（`postApi.createPost` 等）用 `.finally()` 逐出 `post:` / `tag:` 前缀；
+  **`.finally()` 会丢掉调用点的上下文类型**，axios 的 `post<T, R>` 必须显式写 R：
+  `api.post<unknown, ApiResponse<Tag>>('/tag', data)`。
+- **匿名请求的 401 不再清会话**（`api/index.ts`）：只有**带 Authorization 头**的请求才走刷新/登出流程。
+- **壁纸画布的纸面下限**（`stores/site.ts` 的 `effectiveSurfaceOpacities`）：
+  壁纸模式下纸面档不透明度有下限（浅 92% / 深 95%），卡片与控件两档仍通透。
+  纯色画布下三档照旧按作者设置分级。
+- **公开标签索引页** `/tags`：后端 `GET /api/tag/with-counts` + `TagWithCountVO` +
+  `BlogTagMapper.selectTagsWithPostCounts()`（一条 LEFT JOIN + GROUP BY 聚合，不是 N+1）；
+  `SeoModels.Kind.TAGS` 走服务端渲染；进入 `PageCatalog.BUILTINS` 与 `sitemap-site.xml`。
+  前端对应 `pageCatalog.tags` 与 `views/TagsIndex.vue`。
+- **首页排序切换**：`?sort=latest|hot|essence`，脏值回落 `latest`，切换时回到第一页。
+
+## 2026-11-19 复查批次（Markdown 实体 / 焦点环 / 薄内容）
+
+- **正文里的 `&nbsp;` 之类实体以字面量显示**：根因在**后端保存时整篇转义**（已修，见
+  `docs/agents/backend.md` 的「Markdown 存储与渲染策略」）。前端这一侧本来是对的：
+  `marked` 保留实体、`DOMPurify` 只做净化。**不要在 `utils/markdown.ts` 里加任何
+  「反转义」逻辑**——那会把 `<`/`>` 从代码段里放出来。
+- **路由后焦点**：`guards.ts` 里 `shouldMoveFocusToMain`（纯函数，带 4 条用例）决定要不要把焦点
+  交给 `<main id="main-content" tabindex="-1">`：只看**路径级**导航，首次进入 / 仅 query 变化 /
+  带 hash 一律不抢。新增页面结构时别把 `<main>` 包进会被替换的容器。
+- **正文标题降一级**（`utils/markdown.ts::demoteMarkdownHeadings`）：页面只有 `h1`（页面标题），
+  正文从 `h2` 起。**`PostDetail` 的目录/观察器/锚点查询是 `h2, h3, h4`**（源文 `#`/`##`/`###`），
+  `useMarkdownEnhance` 的标题锚点查 `h2..h6`；改降级策略要同步这三处与后端 `SafeMarkdown`。
+- **`SafeMarkdown` 现在是 `escapeHtml(false)` + `softbreak("<br />")`**：后台预览/阅读页与
+  服务端 HTML 因此逐字对齐。`markdownGfm.test.ts` 钉住了实体与代码段两条契约，
+  `SafeMarkdownTest` 钉住对应的服务端行为，改记号渲染必须两边一起跑。
+- **键盘焦点环**：全局规则写成 `input:is(:focus-visible)`（特异性抬到 0,2,1），
+  否则组件里 `.comment-form input:focus { outline: none }` 会把它吃掉。
+  **任何新写 `outline: none` 的地方都必须配一条 `:focus-visible` 描边环**，
+  这是「键盘用户看得见焦点」的唯一保障（真机 Tab 一圈可验证）。
+- **图片默认可见**：不要再写「`img[loading=lazy]` 先 opacity:0、加载后加 `.loaded` 」——
+  没有任何代码会加那个类，而 `:not([src=''])` 又会抵消规则。`base.css` 只给 `img`
+  留 `transform` 过渡。
+- **公开标签索引过滤 0 篇标签**（`TagsIndex.vue` 的 `visibleTags`），
+  **空标签页 `noindex`**（`TagDetail.vue` 的 `indexable: totalPosts > 0`）——
+  与服务端同一判定，改一边必须改另一边。
+- **打印分支**（`styles/print.css`，**必须是 `main.css` 的最后一个 `@import`**）：
+  只在 `@media print` 内写规则；**不要在其中使用 Vue 的 `:deep()`** —— 普通 CSS 里它是无效
+  选择器，写进逗号列表会让整条规则被浏览器丢弃。导入顺序由
+  `scripts/__tests__/styles-order.test.mjs`（`npm run test:deployment`）钉住。
+- **文章 JSON-LD 必须由客户端补全**：Vue 挂载会用同一 id 重建 `#selfblog-article-jsonld`，
+  少写 `breadcrumb` 就等于把服务端刚写好的结构化数据降级掉。`applyArticleJsonLd` 现在的字段集
+  与 `ReadingHtmlRenderer` 对齐（breadcrumb / dateModified / keywords / articleSection / inLanguage）。
+- **对比度契约（2026-11-19 第二轮）**：`--text-muted` / `--text-secondary` 的取值是按
+  **半透明表面合成后**的颜色算的（玻璃感默认开启，表面比标称色更深），改这两枚 token
+  必须同时改 `appearance.css` 的壁纸模式覆盖值与 `skins.css` 各皮肤，
+  改完用 `.tmp-gate/contrast.mjs` 逐页量一遍。三条硬约定：
+  1. **压在强调色上的文字用 `--contrast-fg`**（浅色 #fff / 深色 #111），不要写 `color: white`；
+  2. **同色淡底（`--success-light` 等）上的文字用 `--success-ink` / `--warning-ink` /
+     `--error-ink` / `--info-ink`**，不要用色板色（`--success` 压淡绿底只有 2.7:1）；
+  3. 表头、计数这类「压在 `--bg-secondary` / `--surface-tertiary` 上」的小字用 `--text-secondary`。
+- **`applyThemeColor(primary)`**（`stores/site.ts`）：只同步 `media="(prefers-color-scheme: light)"`
+  的 `<meta name="theme-color">`；深色那一条保持深灰。读 `getAttribute('media')`
+  而不是 `meta.media`（jsdom 没有实现后者）。
+
 ## 2026-11-07 batch 4 (v2.0.30, borrowed from Hexo/Ghost)
 
 - **`highlight.js@11.12.0` is the repo's only new frontend dependency.** It lives in `useMarkdownEnhance` (`highlight.js/lib/common` — never the full build), gated on `hljs.getLanguage` (NO auto-detect), applied **before** collapse measurement, keyed off `textContent` for copy, and registered with no disposer (v-html replacement discards hljs classes). It ships in its own async chunk (~56 KB gzip; entry unchanged — verify with a build before/after touching the import graph). The github-dark theme provides token colors ONLY: `.markdown-body pre code.hljs` overrides the theme background to keep the `--code-bg/--code-text` always-dark surface (typography.css's `pre` meanwhile switched from the wrong `--bg-secondary` surface to the code tokens). Client-only enhancement: `utils/markdown.ts` and the SafeMarkdown parity fixture are untouched.

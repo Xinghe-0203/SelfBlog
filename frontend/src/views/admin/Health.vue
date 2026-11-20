@@ -217,12 +217,12 @@ async function runReport() {
 .alert {
   border: 1px solid var(--error);
   background: var(--error-light);
-  color: var(--error);
+  color: var(--error-ink);
 }
 .success {
   border: 1px solid var(--success);
   background: var(--success-light);
-  color: var(--success);
+  color: var(--success-ink);
 }
 .empty {
   padding: 34px;
@@ -349,11 +349,11 @@ async function runReport() {
 }
 .severity-badge[data-severity='medium'] {
   background: var(--warning-light);
-  color: var(--warning);
+  color: var(--warning-ink);
 }
 .severity-badge[data-severity='high'] {
   background: var(--error-light);
-  color: var(--error);
+  color: var(--error-ink);
 }
 .finding-count {
   color: var(--text-muted);
