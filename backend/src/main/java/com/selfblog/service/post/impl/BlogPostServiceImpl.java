@@ -229,6 +229,10 @@ public class BlogPostServiceImpl extends ServiceImpl<BlogPostMapper, BlogPost> i
             throw new BusinessException(403, "无权修改此文章");
         }
 
+        // 先留存旧值（下面会就地覆盖实体字段），供「清空列」判断使用
+        String oldTopicIdsJson = post.getTopicIds();
+        String oldCoverUrl = post.getCoverUrl();
+
         post.setTitle(sanitizedTitle);
         post.setSummary(sanitizedSummary);
         post.setContent(sanitizedContent);
@@ -238,7 +242,7 @@ public class BlogPostServiceImpl extends ServiceImpl<BlogPostMapper, BlogPost> i
         post.setCoverUrl(request.getCoverImage());
 
         // 计算话题变更并更新计数
-        Set<Long> oldTopicIds = parseTopicIds(post.getTopicIds());
+        Set<Long> oldTopicIds = parseTopicIds(oldTopicIdsJson);
         Set<Long> newTopicIds;
         if (request.getTopicIds() != null && !request.getTopicIds().isEmpty()) {
             post.setTopicIds(cn.hutool.json.JSONUtil.toJsonStr(request.getTopicIds()));
@@ -265,6 +269,30 @@ public class BlogPostServiceImpl extends ServiceImpl<BlogPostMapper, BlogPost> i
         }
 
         this.updateById(post);
+
+        // 「清空」路径（话题/封面）：updateById 的默认字段策略是 NOT_NULL，null 字段会被
+        // 从 SET 子句里整个剔除——旧实现 topic_ids 已在实体上置 null，计数也已经减掉了，
+        // 但落库时 topic_ids 列被剔除，旧话题数组仍挂在行上，计数与数据从此漂移。
+        // cover_url 同理：新封面为 null 时「清除封面」静默失效。
+        // 这里用 update(null, wrapper) 显式 .set(...) 把列真的写成 NULL（参考 SeoMetadataService.save）。
+        // update(null, wrapper) 没有实体可供 MetaObjectHandler 填充 updateTime，必须手动写。
+        // 非空更新仍走上面的 updateById：仅当确有列要清成 NULL 时才追加这条定向 UPDATE，
+        // 两语句同处一个事务，语义与非空路径完全等价。
+        boolean topicsCleared = newTopicIds.isEmpty()
+                && oldTopicIdsJson != null && !oldTopicIdsJson.isEmpty();
+        boolean coverCleared = request.getCoverImage() == null && oldCoverUrl != null;
+        if (topicsCleared || coverCleared) {
+            LambdaUpdateWrapper<BlogPost> clear = new LambdaUpdateWrapper<BlogPost>()
+                    .eq(BlogPost::getId, post.getId());
+            if (topicsCleared) {
+                clear.set(BlogPost::getTopicIds, null);
+            }
+            if (coverCleared) {
+                clear.set(BlogPost::getCoverUrl, null);
+            }
+            clear.set(BlogPost::getUpdateTime, LocalDateTime.now());
+            this.update(null, clear);
+        }
 
         if (tagPayloadPresent) {
             // 只有请求确实带了标签载荷才重建关联：null = 保持原标签不变，[] = 清空。
@@ -390,6 +418,8 @@ public class BlogPostServiceImpl extends ServiceImpl<BlogPostMapper, BlogPost> i
             if (!Objects.equals(userId, targetDraft.getUserId())) {
                 throw new BusinessException(403, "无权修改此草稿");
             }
+            boolean clearSummary = sanitizedSummary == null && targetDraft.getSummary() != null;
+            boolean clearCover = sanitizedCoverImage == null && targetDraft.getCoverImage() != null;
             targetDraft.setTitle(sanitizedTitle);
             targetDraft.setContent(sanitizedContent);
             targetDraft.setSummary(sanitizedSummary);
@@ -399,6 +429,7 @@ public class BlogPostServiceImpl extends ServiceImpl<BlogPostMapper, BlogPost> i
             targetDraft.setPostId(request.getPostId());
             targetDraft.setTopicId(request.getTopicId());
             blogDraftMapper.updateById(targetDraft);
+            clearDraftNullableColumns(targetDraft.getId(), clearSummary, clearCover);
             return targetDraft.getId();
         }
 
@@ -408,6 +439,8 @@ public class BlogPostServiceImpl extends ServiceImpl<BlogPostMapper, BlogPost> i
                     .eq(BlogDraft::getPostId, request.getPostId());
             BlogDraft existingByPost = blogDraftMapper.selectOne(postWrapper);
             if (existingByPost != null) {
+                boolean clearSummary = sanitizedSummary == null && existingByPost.getSummary() != null;
+                boolean clearCover = sanitizedCoverImage == null && existingByPost.getCoverImage() != null;
                 existingByPost.setTitle(sanitizedTitle);
                 existingByPost.setContent(sanitizedContent);
                 existingByPost.setSummary(sanitizedSummary);
@@ -417,6 +450,7 @@ public class BlogPostServiceImpl extends ServiceImpl<BlogPostMapper, BlogPost> i
                 existingByPost.setPostId(request.getPostId());
                 existingByPost.setTopicId(request.getTopicId());
                 blogDraftMapper.updateById(existingByPost);
+                clearDraftNullableColumns(existingByPost.getId(), clearSummary, clearCover);
                 return existingByPost.getId();
             }
         }
@@ -454,6 +488,35 @@ public class BlogPostServiceImpl extends ServiceImpl<BlogPostMapper, BlogPost> i
     public void deleteDraft(Long draftId, Long userId) {
         // 草稿不参与任何具名缓存，三参重载也没有 @CacheEvict，这里无需重复声明
         deleteDraft(draftId, userId, false);
+    }
+
+    /**
+     * 草稿的 summary / coverImage 允许被「清空」，但 {@code updateById(entity)} 的默认字段
+     * 策略是 NOT_NULL，null 字段会被从 SET 子句里剔除，「清空摘要/封面」会静默失效。
+     * 这里对确需清空的列用 {@code update(null, wrapper)} 显式 {@code .set(...)} 落 NULL
+     * （参考 {@code SeoMetadataService.save}）；{@code update(null, wrapper)} 没有实体可供
+     * MetaObjectHandler 填充 updateTime，必须手动写。
+     *
+     * <p><b>决策记录：只处理 summary / coverImage 两列。</b>草稿编辑器（PostEdit.vue）
+     * 保存时总是提交全部字段（清掉摘要/封面后发的是 {@code ""} 而不是缺省字段），因此
+     * 字段为 {@code null} 只会来自直接调 API 的客户端，按「本次就要清空」处理是安全的；
+     * title（有非空校验）、content、category、tagIds 维持既有「null 即不改」的语义不变，
+     * 避免局部更新被误伤。两条 update 分支（按 draftId / 按 postId）共用本方法。</p>
+     */
+    private void clearDraftNullableColumns(Long draftId, boolean clearSummary, boolean clearCover) {
+        if (!clearSummary && !clearCover) {
+            return;
+        }
+        LambdaUpdateWrapper<BlogDraft> clear = new LambdaUpdateWrapper<BlogDraft>()
+                .eq(BlogDraft::getId, draftId);
+        if (clearSummary) {
+            clear.set(BlogDraft::getSummary, null);
+        }
+        if (clearCover) {
+            clear.set(BlogDraft::getCoverImage, null);
+        }
+        clear.set(BlogDraft::getUpdateTime, LocalDateTime.now());
+        blogDraftMapper.update(null, clear);
     }
 
     // ==================== 管理员操作 ====================
@@ -698,15 +761,13 @@ public class BlogPostServiceImpl extends ServiceImpl<BlogPostMapper, BlogPost> i
 
     // ==================== 私有工具方法 ====================
 
+    /**
+     * 解析话题 ID：统一走 {@link BlogPost#parseTopicIds(String)}——它同时容忍现行规范
+     * 数组文本与旧版双重编码（{@code "[884002]"}）遗留行。否则 createPost 旧实现
+     * 写下的文章在编辑/删除时解析不出旧话题，post_count/trending_score 永不回减。
+     */
     private Set<Long> parseTopicIds(String topicIdsJson) {
-        if (topicIdsJson == null || topicIdsJson.isEmpty()) {
-            return java.util.Collections.emptySet();
-        }
-        try {
-            return new java.util.HashSet<>(cn.hutool.json.JSONUtil.toList(topicIdsJson, Long.class));
-        } catch (Exception e) {
-            return java.util.Collections.emptySet();
-        }
+        return new java.util.HashSet<>(BlogPost.parseTopicIds(topicIdsJson));
     }
 
     private void savePostTags(Long postId, List<Long> tagIds) {

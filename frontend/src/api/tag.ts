@@ -4,7 +4,7 @@
 
 import api from './index'
 import { cachedGet, invalidateApiCache } from '@/utils/apiCache'
-import type { ApiResponse, Tag, CreateTagRequest, UpdateTagRequest } from '@/types'
+import type { ApiResponse, Tag, TagWithCount, CreateTagRequest, UpdateTagRequest } from '@/types'
 
 export const tagApi = {
   /**
@@ -22,7 +22,7 @@ export const tagApi = {
    *
    * 计数只含已发布文章 —— 草稿不公开，也不该在公开计数里出现。
    */
-  getTagsWithCounts(): Promise<ApiResponse<Tag[]>> {
+  getTagsWithCounts(): Promise<ApiResponse<TagWithCount[]>> {
     return cachedGet('tag:with-counts', 120_000, () => api.get('/tag/with-counts'))
   },
 

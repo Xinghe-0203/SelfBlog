@@ -48,11 +48,12 @@
           <div v-if="form.newPassword" class="strength-bar">
             <div
               class="strength-fill"
-              :style="{ width: strengthPercent + '%', background: strengthColor }"
+              :class="`strength-${strengthLevel}`"
+              :style="{ width: strengthPercent + '%' }"
             ></div>
           </div>
           <span class="form-hint"
-            >至少8位字符，强度：<span :style="{ color: strengthColor, fontWeight: 600 }">{{
+            >至少8位字符，强度：<span class="strength-text" :class="`strength-${strengthLevel}`">{{
               strengthText
             }}</span></span
           >
@@ -107,7 +108,8 @@ import { useRouter } from 'vue-router'
 import { useUserStore } from '../../stores/user'
 import { useLogger } from '../../utils/logger'
 import { toast } from '../../utils/toast'
-import { checkPasswordStrength } from '../../utils'
+import { apiErrorMessage } from '../../utils/apiError'
+import { checkPasswordStrength, type PasswordStrength } from '../../utils'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -119,22 +121,32 @@ const form = reactive({
   newPassword: '',
   confirmPassword: ''
 })
-const strengthResult = ref<{ level: string; text: string; color: string }>({
-  level: 'weak',
-  text: '弱',
-  color: '#F44336'
-})
+/** 只持档位：颜色/文案映射分别放在本组件的 CSS 与 computed 里，不落在 JS 常量色上。 */
+const strengthResult = ref<PasswordStrength>({ level: 'empty' })
 const showPasswordError = ref(false)
 const passwordError = ref('')
 const showConfirmError = ref(false)
 const confirmError = ref('')
 
+const strengthLevel = computed(() => strengthResult.value.level)
 const strengthPercent = computed(() => {
-  const map: Record<string, number> = { weak: 33, medium: 66, strong: 100 }
-  return map[strengthResult.value.level] || 0
+  const map: Record<PasswordStrength['level'], number> = {
+    empty: 0,
+    weak: 33,
+    medium: 66,
+    strong: 100
+  }
+  return map[strengthResult.value.level] ?? 0
 })
-const strengthColor = computed(() => strengthResult.value.color)
-const strengthText = computed(() => strengthResult.value.text)
+const strengthText = computed(() => {
+  const map: Record<PasswordStrength['level'], string> = {
+    empty: '无',
+    weak: '弱',
+    medium: '中',
+    strong: '强'
+  }
+  return map[strengthResult.value.level]
+})
 
 function updateStrength() {
   strengthResult.value = checkPasswordStrength(form.newPassword)
@@ -202,9 +214,11 @@ async function handleSubmit() {
     } else {
       toast.error(result.message || '修改失败')
     }
-  } catch (error: any) {
-    logger.error('Failed to change password', { error: error.message })
-    toast.error(error.response?.data?.message || '修改密码失败')
+  } catch (error: unknown) {
+    logger.error('Failed to change password', {
+      error: error instanceof Error ? error.message : String(error)
+    })
+    toast.error(apiErrorMessage(error, '修改密码失败'))
   } finally {
     loading.value = false
   }
@@ -320,6 +334,36 @@ async function handleSubmit() {
   transition:
     width 0.3s ease,
     background 0.3s ease;
+}
+
+/* 强度档位 → 语义 token：进度条是实心块用色板色，文字用墨色（浅深两主题都过 AA）。 */
+.strength-fill.strength-empty {
+  background: var(--border);
+}
+.strength-fill.strength-weak {
+  background: var(--error);
+}
+.strength-fill.strength-medium {
+  background: var(--warning);
+}
+.strength-fill.strength-strong {
+  background: var(--success);
+}
+
+.strength-text {
+  font-weight: 600;
+}
+.strength-text.strength-empty {
+  color: var(--text-muted);
+}
+.strength-text.strength-weak {
+  color: var(--error-ink);
+}
+.strength-text.strength-medium {
+  color: var(--warning-ink);
+}
+.strength-text.strength-strong {
+  color: var(--success-ink);
 }
 
 .form-error {

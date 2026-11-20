@@ -144,7 +144,7 @@ public class PostQueryServiceImpl extends ServiceImpl<BlogPostMapper, BlogPost> 
 
         if (post.getTopicIds() != null && !post.getTopicIds().isEmpty()) {
             try {
-                List<Long> ids = cn.hutool.json.JSONUtil.toList(post.getTopicIds(), Long.class);
+                List<Long> ids = BlogPost.parseTopicIds(post.getTopicIds());
                 if (!ids.isEmpty()) {
                     response.setTopicId(ids.get(0));
                     Topic topic = topicService.getTopicById(ids.get(0));
@@ -636,12 +636,7 @@ public class PostQueryServiceImpl extends ServiceImpl<BlogPostMapper, BlogPost> 
         List<Long> allTopicIds = new ArrayList<>();
         for (BlogPost post : posts) {
             if (post.getTopicIds() != null && !post.getTopicIds().isEmpty()) {
-                try {
-                    List<Long> ids = cn.hutool.json.JSONUtil.toList(post.getTopicIds(), Long.class);
-                    allTopicIds.addAll(ids);
-                } catch (Exception e) {
-                    // ignore parse errors
-                }
+                allTopicIds.addAll(BlogPost.parseTopicIds(post.getTopicIds()));
             }
         }
         if (allTopicIds.isEmpty()) {
@@ -668,14 +663,8 @@ public class PostQueryServiceImpl extends ServiceImpl<BlogPostMapper, BlogPost> 
         response.setCreateTime(post.getCreateTime());
         response.setCoverImage(post.getCoverUrl());
         if (post.getTopicIds() != null && !post.getTopicIds().isEmpty()) {
-            try {
-                List<Long> ids = cn.hutool.json.JSONUtil.toList(post.getTopicIds(), Long.class);
-                if (!ids.isEmpty()) {
-                    response.setTopicId(ids.get(0));
-                }
-            } catch (Exception e) {
-                response.setTopicId(null);
-            }
+            List<Long> ids = BlogPost.parseTopicIds(post.getTopicIds());
+            response.setTopicId(ids.isEmpty() ? null : ids.get(0));
         }
         response.setTopicName(topicName);
 

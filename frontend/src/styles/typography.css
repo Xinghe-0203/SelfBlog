@@ -190,6 +190,16 @@ b {
 .markdown-body pre:hover .copy-btn {
   opacity: 1;
 }
+/* 窄屏上代码块靠横向滚动展示：滚到底时最后一个 token 会直接贴住右边框。
+   右侧多给一档内边距做缓冲（滚动容器的 trailing padding 计入可滚动区域），
+   同时在静止时暗示「右侧还有内容」。不用 mask 渐隐：mask 会把右上角的
+   复制按钮一起淡掉，短代码行（不需要滚动）的尾部也会被误伤。
+   复制按钮是 absolute 定位在 padding 盒上，不受这份内边距影响。 */
+@media (max-width: 600px) {
+  .markdown-body pre {
+    padding-right: var(--spacing-lg);
+  }
+}
 .markdown-body blockquote {
   padding: var(--spacing-sm) var(--spacing-md);
   margin: var(--spacing-md) 0;

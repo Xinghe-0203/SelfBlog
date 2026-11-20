@@ -43,8 +43,6 @@ const post: Post = {
   title: '真实文章标题',
   content: '## 正文\n\n内容',
   category: 'tech',
-  authorId: 1,
-  authorName: '作者',
   viewCount: 1,
   likeCount: 0,
   commentCount: 0,
@@ -65,11 +63,11 @@ const archiveItem: PostArchiveItem = {
 beforeEach(() => {
   vi.resetAllMocks()
   vi.mocked(postApi.getPostList).mockResolvedValue(
-    response({ records: [post], total: 1, pages: 1, pageNum: 1, pageSize: 10 })
+    response({ records: [post], total: 1, pages: 1, size: 10, current: 1 })
   )
   vi.mocked(postApi.getArchives).mockResolvedValue(response([archiveItem]))
   vi.mocked(postApi.advancedSearch).mockResolvedValue(
-    response({ records: [post], total: 1, pages: 1, pageNum: 1, pageSize: 10 })
+    response({ records: [post], total: 1, pages: 1, size: 10, current: 1 })
   )
   vi.mocked(postApi.getPostById).mockResolvedValue(response(post))
   vi.mocked(postApi.getAdjacentPosts).mockResolvedValue(

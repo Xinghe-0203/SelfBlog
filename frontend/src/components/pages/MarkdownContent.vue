@@ -23,7 +23,12 @@ onBeforeUnmount(() => {
   if (root.value) disposeMarkdownEnhance(root.value)
 })
 </script>
-<template><div ref="root" class="markdown-body page-markdown" v-html="html" /></template>
+<template>
+  <!-- 内容来自 renderMarkdown（DOMPurify 净化后的 GFM HTML），与文章详情共用同一条渲染链路 -->
+  <!-- eslint-disable vue/no-v-html -->
+  <div ref="root" class="markdown-body page-markdown" v-html="html" />
+  <!-- eslint-enable vue/no-v-html -->
+</template>
 <style scoped>
 .page-markdown {
   overflow-wrap: anywhere;

@@ -265,6 +265,49 @@ class RateLimitInterceptorTest {
                 "联想配额用尽不应牵连同 IP 的文章详情阅读");
     }
 
+    // ==================== 密码找回紧预算（真实路径）与配图读路径 ====================
+
+    @Test
+    void passwordRecoveryEndpointsKeepTheirTightBudgetsAtTheRealAuthPasswordPaths() throws Exception {
+        // 回归：写表旧登记 /api/user/send-code、/api/user/reset-password 指向不存在的端点，
+        // 发验证码/重置密码实际落在 /api/auth/ 的 20/min 上。现在按真实路径登记，预算不变。
+        for (int i = 0; i < 3; i++) {
+            assertTrue(call("/api/auth/password/send-code", "203.0.113.80", new MockHttpServletResponse()),
+                    "发验证码前 3 次应在 3/min 配额内");
+        }
+        assertFalse(call("/api/auth/password/send-code", "203.0.113.80", new MockHttpServletResponse()),
+                "第 4 次发验证码必须被紧预算拦下");
+
+        for (int i = 0; i < 5; i++) {
+            assertTrue(callWithMethod("PUT", "/api/auth/password/reset-password", "203.0.113.81",
+                    new MockHttpServletResponse()));
+        }
+        assertFalse(callWithMethod("PUT", "/api/auth/password/reset-password", "203.0.113.81",
+                new MockHttpServletResponse()), "第 6 次重置密码必须被 5/min 拦下");
+
+        // 两个端点是不同前缀、各自成桶：同一 IP 的发验证码打满不影响重置密码。
+        assertTrue(call("/api/auth/password/reset-password", "203.0.113.80", new MockHttpServletResponse()));
+    }
+
+    @Test
+    void readingPostMediaGetsSixtyPerMinuteWhileUploadsStayAtTen() throws Exception {
+        // 回归：GET /api/media/post/{postId}（文章配图列表）是纯只读浏览，
+        // 此前只能吃写表 /api/media/ 的 10/min。读表新增更长的 /api/media/post 前缀（60/min）。
+        for (int id = 1; id <= 60; id++) {
+            assertTrue(callWithMethod("GET", "/api/media/post/" + id, "203.0.113.82", new MockHttpServletResponse()),
+                    "第 " + id + " 篇文章的配图读取不应被 429");
+        }
+        assertFalse(callWithMethod("GET", "/api/media/post/61", "203.0.113.82", new MockHttpServletResponse()),
+                "配图读取自己的 60/min 仍然生效");
+
+        // 读放宽不得削弱写入防护：上传仍是 10/min。
+        for (int i = 0; i < 10; i++) {
+            assertTrue(call("/api/media/upload", "203.0.113.83", new MockHttpServletResponse()));
+        }
+        assertFalse(call("/api/media/upload", "203.0.113.83", new MockHttpServletResponse()),
+                "上传必须保持 mediaUpload=10/min");
+    }
+
     // ==================== 路径变量不得各自成桶 ====================
 
     @Test

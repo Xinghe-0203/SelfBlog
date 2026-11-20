@@ -290,6 +290,8 @@ describe('buildBackgroundVars', () => {
 
   it('keeps the image on a dark canvas but forces a readable overlay', () => {
     // 背景图是作者明确的视觉选择，保留；可读性靠加厚遮罩保证。
+    // 下限 = DARK_CANVAS_MIN_OVERLAY（60）：深色画布要让壁纸进一步退后，
+    // 不再是深色玻璃后最饱和的元素。
     for (const overlay of [undefined, '0', '10']) {
       const vars = buildBackgroundVars(
         { backgroundType: 'image', backgroundImageUrl: IMAGE, backgroundOverlay: overlay },
@@ -298,7 +300,7 @@ describe('buildBackgroundVars', () => {
       const image = vars['--ap-bg-image'] ?? ''
       expect(image).toContain(`url("${IMAGE}")`)
       const alpha = Number(image.match(/rgba\(0, 0, 0, ([\d.]+)\)/)?.[1])
-      expect(alpha).toBeGreaterThanOrEqual(0.45)
+      expect(alpha).toBeGreaterThanOrEqual(0.6)
       expect(alpha).toBeLessThanOrEqual(1)
     }
   })

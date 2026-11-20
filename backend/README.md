@@ -2,7 +2,7 @@
 
 Spring Boot 3 backend for a single-author personal blog. Public visitors can read and search published posts; author operations require an administrator account.
 
-**Version**: v2.0.29 | **Java**: 21 | **Spring Boot**: 3.3.13
+**Version**: v2.0.30 | **Java**: 21 | **Spring Boot**: 3.3.13
 
 ## Tech Stack
 
@@ -184,7 +184,9 @@ Covering high-frequency queries: user post lists, category filtering, hot/latest
 | `statsCache` | System stats | 15 min |
 | `statusCache` | Interaction status | 2 min |
 | `siteSettingsCache` | Site settings | 10 min |
+| `notificationListCache` | Notification lists | 2 min |
 | `pageCache` | Published pages, manifest, navigation | 5 min |
+| `feedCache` | Full-text RSS/Atom bodies (key includes resolved origin) | 5 min |
 | `visitorSummaryCache` | Visitor dashboard summary | 30 sec |
 
 - `@Cacheable` on 17+ query methods (public tag list, published pages/manifest/nav and
@@ -195,7 +197,7 @@ Covering high-frequency queries: user post lists, category filtering, hot/latest
 ## Testing
 
 ```bash
-mvn test "-Dskip.npm=true" "-Dskip.installnodenpm=true"                 # 559 tests, ~1 min
+mvn test "-Dskip.npm=true" "-Dskip.installnodenpm=true"                 # 1486 tests
 mvn test "-Dtest=AuthControllerTest" "-Dskip.npm=true" "-Dskip.installnodenpm=true"
 ```
 
@@ -454,16 +456,16 @@ environment (no Docker daemon); treat image execution as unverified.
 |-------|-----------|-------|-----------|
 | Auth | 5 | Follow | 5 |
 | User | 8 | Notification | 5 |
-| Post | 14 | Message | 5 |
+| Post | 17 | Message | 5 |
 | Comment | 6 | Circle | 8 |
 | Like | 4 | Topic | 5 |
 | Collect | 4 | Report | 4 |
-| Tag | 5 | Share | 3 |
+| Tag | 6 | Share | 3 |
 | Media | 4 | Statistics | 4 |
 | Trending | 3 | Admin SEO | 9 |
-| Admin AI | 9 | Admin | 16+ |
+| Admin AI | 11 | Admin | 16+ |
 
-Total: **120+ endpoints**. Authenticated endpoints require `Authorization: Bearer <access_token>`.
+Total: **200+ endpoints**. Authenticated endpoints require `Authorization: Bearer <access_token>`.
 
 ## LLM-assisted SEO (2026-10-22, extended 2026-10-22)
 
@@ -497,7 +499,7 @@ Notes that matter when changing this area:
 
 ## AI features beyond SEO (v2.0.28)
 
-Nine `POST /api/admin/ai/**` endpoints behind `hasRole('admin')`, all returning `Result<T>`. **None of them writes a business table** except comment moderation; generated text is always a suggestion the author must apply.
+Eleven `POST /api/admin/ai/**` endpoints behind `hasRole('admin')`, all returning `Result<T>`. **None of them writes a business table** except comment moderation; generated text is always a suggestion the author must apply.
 
 | Endpoint | Returns |
 |----------|---------|

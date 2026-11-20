@@ -24,8 +24,6 @@ const post: Post = {
   id: 1,
   title: '测试文章',
   content: '正文',
-  authorId: 1,
-  authorName: '作者',
   viewCount: 1,
   likeCount: 0,
   commentCount: 0,
@@ -39,7 +37,7 @@ const post: Post = {
 beforeEach(() => {
   vi.resetAllMocks()
   vi.mocked(postApi.getPostList).mockResolvedValue(
-    response({ records: [post], total: 1, pages: 1, pageNum: 1, pageSize: 9 })
+    response({ records: [post], total: 1, pages: 1, size: 9, current: 1 })
   )
   vi.mocked(tagApi.getTagList).mockResolvedValue(response([]))
   vi.mocked(pageApi.getPage).mockResolvedValue(response({ id: 'about', config: {} }))

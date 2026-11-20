@@ -29,12 +29,15 @@ export interface UploadProgress {
   percent: number
 }
 
-/** 上传响应 */
+/**
+ * 上传响应 —— 逐字对应后端 `MediaVO`（id/fileUrl/thumbUrl/fileSize/width/height）。
+ * 没有 url/fileName/fileType 字段：读地址一律走 `fileUrl`。
+ */
 export interface UploadResponse {
   id: number
-  url: string
   fileUrl: string
-  fileName: string
+  thumbUrl?: string
   fileSize: number
-  fileType: string
+  width?: number
+  height?: number
 }

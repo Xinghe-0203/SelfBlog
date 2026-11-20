@@ -15,6 +15,16 @@ export interface Tag {
   createdAt?: string
 }
 
+/**
+ * 标签 + 已发布文章数：逐字对应后端 `TagWithCountVO`
+ * （`GET /tag/with-counts`，公开标签索引页用）。可赋给 `Tag[]` 消费。
+ */
+export interface TagWithCount {
+  id: number
+  name: string
+  postCount: number
+}
+
 /** 创建标签请求 */
 export interface CreateTagRequest {
   name: string

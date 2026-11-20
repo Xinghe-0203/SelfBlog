@@ -135,14 +135,16 @@ import { ref, onMounted } from 'vue'
 import { adminApi } from '../../api/admin'
 import { useLogger } from '../../utils/logger'
 import { toast } from '../../utils/toast'
+import { apiErrorMessage } from '../../utils/apiError'
 import { useConfirm } from '../../composables/useConfirm'
 import Modal from '../../components/common/Modal.vue'
 import Icon from '../../components/common/Icon.vue'
+import type { Tag } from '../../types'
 
 const logger = useLogger('AdminTags')
 const { confirm, ConfirmDialog } = useConfirm()
 
-const tags = ref<any[]>([])
+const tags = ref<Tag[]>([])
 const currentPage = ref(1)
 const totalPages = ref(1)
 const loading = ref(true)
@@ -151,18 +153,17 @@ const newTagName = ref('')
 const creating = ref(false)
 const editDialog = ref(false)
 const editName = ref('')
-const editingTag = ref<any | null>(null)
+const editingTag = ref<Tag | null>(null)
 
 const fetchTags = async () => {
   loading.value = true
   error.value = ''
   try {
     const response = await adminApi.getTagList({ pageNum: currentPage.value, pageSize: 20 })
-    const data = response.data || {}
-    tags.value = data.records || []
-    totalPages.value = data.pages || 1
-  } catch (err: any) {
-    logger.error('Failed to fetch tags', { error: err.message })
+    tags.value = response.data?.records || []
+    totalPages.value = response.data?.pages || 1
+  } catch (err: unknown) {
+    logger.error('Failed to fetch tags', { error: apiErrorMessage(err, 'unknown') })
     error.value = '加载失败，请重试'
     tags.value = []
   } finally {
@@ -183,15 +184,15 @@ const createTag = async () => {
     toast.success('标签创建成功')
     newTagName.value = ''
     fetchTags()
-  } catch (err: any) {
-    logger.error('Failed to create tag', { error: err.message })
-    toast.error(err.userMessage || '创建失败，请重试')
+  } catch (err: unknown) {
+    logger.error('Failed to create tag', { error: apiErrorMessage(err, 'unknown') })
+    toast.error(apiErrorMessage(err, '创建失败，请重试'))
   } finally {
     creating.value = false
   }
 }
 
-const startEdit = (tag: any) => {
+const startEdit = (tag: Tag) => {
   editingTag.value = tag
   editName.value = tag.name
   editDialog.value = true
@@ -208,13 +209,13 @@ const submitEdit = async () => {
     toast.success('标签更新成功')
     editDialog.value = false
     editingTag.value.name = editName.value.trim()
-  } catch (err: any) {
-    logger.error('Failed to update tag', { error: err.message })
-    toast.error(err.userMessage || '更新失败，请重试')
+  } catch (err: unknown) {
+    logger.error('Failed to update tag', { error: apiErrorMessage(err, 'unknown') })
+    toast.error(apiErrorMessage(err, '更新失败，请重试'))
   }
 }
 
-const deleteTag = async (tag: any) => {
+const deleteTag = async (tag: Tag) => {
   const ok = await confirm(`确定删除标签「${tag.name}」吗？`, '删除标签')
   if (!ok) return
   try {
@@ -226,8 +227,8 @@ const deleteTag = async (tag: any) => {
       currentPage.value -= 1
     }
     await fetchTags()
-  } catch (err: any) {
-    logger.error('Failed to delete tag', { error: err.message })
+  } catch (err: unknown) {
+    logger.error('Failed to delete tag', { error: apiErrorMessage(err, 'unknown') })
     toast.error('删除失败')
   }
 }

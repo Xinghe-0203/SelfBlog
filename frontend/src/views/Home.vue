@@ -284,7 +284,7 @@ onMounted(() => {
           </div>
         </div>
         <div v-if="loading" class="state-panel" role="status">正在加载文章…</div>
-        <div v-else-if="error" class="state-panel" role="alert">
+        <div v-else-if="error" class="state-panel state-panel--error" role="alert">
           <p>{{ error }}</p>
           <button class="btn btn-secondary" type="button" @click="fetchPosts">重新加载</button>
         </div>
@@ -892,7 +892,7 @@ html[data-wallpaper] #selfblog .intro-shell::after {
     content: none;
   }
   /* 横幅：窄屏下左右分栏退化成上下堆叠；min-height 仍按作者选的高度档位，
-     上面那条 .intro-shell { min-height: 217px } 会盖掉横幅档位，这里补回来。 */
+     上面那条 .intro-shell { min-height: 224px } 会盖掉横幅档位，这里补回来。 */
   .intro-shell--banner {
     min-height: var(--banner-height, 250px);
   }

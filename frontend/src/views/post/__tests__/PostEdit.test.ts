@@ -58,8 +58,6 @@ beforeEach(() => {
       id: 9,
       title: '要发布的文章',
       content: '正文内容',
-      authorId: 1,
-      authorName: '作者',
       viewCount: 0,
       likeCount: 0,
       commentCount: 0,
@@ -74,8 +72,6 @@ beforeEach(() => {
       id: 9,
       title: '已发布文章',
       content: '正文',
-      authorId: 1,
-      authorName: '作者',
       viewCount: 0,
       likeCount: 0,
       commentCount: 0,
@@ -92,8 +88,6 @@ beforeEach(() => {
       title: '已发布文章',
       content: '正文',
       category: 'tech',
-      authorId: 1,
-      authorName: '作者',
       viewCount: 1,
       likeCount: 0,
       commentCount: 0,
@@ -475,6 +469,54 @@ describe('author editor smoke coverage', () => {
     await flushPromises()
     expect(mediaApi.uploadFile).toHaveBeenCalledWith(file, 'cover')
     expect(wrapper.find('.cover-preview img').attributes('src')).toBe('/uploads/cover.jpg')
+  })
+
+  /** MediaVO 只有 fileUrl；以前这里读 url/fileName，永远是 undefined → 图片永远插不进正文。 */
+  it('inserts the uploaded content image at the cursor using the MediaVO fileUrl', async () => {
+    vi.mocked(mediaApi.uploadFile).mockResolvedValue(
+      response({ id: 1, fileUrl: '/uploads/content.jpg', fileSize: 32 } as never)
+    )
+    const { wrapper } = await setup()
+    const inputs = wrapper.findAll<HTMLInputElement>('input[type="file"]')
+    const imageInput = inputs[0]
+    if (!imageInput) throw new Error('missing content image input')
+    const file = new File([new Uint8Array(32)], 'shot.jpg', { type: 'image/jpeg' })
+    Object.defineProperty(imageInput.element, 'files', { value: [file] })
+
+    await wrapper.get('.content-input').setValue('前图后文')
+    const textarea = wrapper.get<HTMLTextAreaElement>('.content-input').element
+    textarea.setSelectionRange(2, 2)
+
+    await imageInput.trigger('change')
+    await flushPromises()
+
+    expect(mediaApi.uploadFile).toHaveBeenCalledWith(file, 'article')
+    expect((wrapper.get('.content-input').element as HTMLTextAreaElement).value).toBe(
+      '前图\n![图片](/uploads/content.jpg)\n后文'
+    )
+    expect(vi.mocked(toast.success)).toHaveBeenCalledWith('图片已插入')
+  })
+
+  it('does not claim the image was inserted when the response has no fileUrl', async () => {
+    vi.mocked(mediaApi.uploadFile).mockResolvedValue(
+      response({ id: 1, fileUrl: '', fileSize: 32 } as never)
+    )
+    const { wrapper } = await setup()
+    const inputs = wrapper.findAll<HTMLInputElement>('input[type="file"]')
+    const imageInput = inputs[0]
+    if (!imageInput) throw new Error('missing content image input')
+    const file = new File([new Uint8Array(32)], 'shot.jpg', { type: 'image/jpeg' })
+    Object.defineProperty(imageInput.element, 'files', { value: [file] })
+
+    await wrapper.get('.content-input').setValue('正文未被改动')
+    await imageInput.trigger('change')
+    await flushPromises()
+
+    expect((wrapper.get('.content-input').element as HTMLTextAreaElement).value).toBe(
+      '正文未被改动'
+    )
+    expect(vi.mocked(toast.error)).toHaveBeenCalledWith('上传成功，但未取得图片地址')
+    expect(vi.mocked(toast.success)).not.toHaveBeenCalled()
   })
 
   it('only offers the SEO panel for a saved post and loads its stored metadata', async () => {

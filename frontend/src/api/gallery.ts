@@ -1,6 +1,5 @@
 import api from './index'
 import type { ApiResponse } from '@/types'
-import type { PageResult } from './site'
 
 export interface AlbumPhoto {
   id: number
@@ -74,11 +73,5 @@ export const galleryApi = {
     caption: string | null
   ): Promise<ApiResponse> {
     return api.put(`/admin/albums/${albumId}/photos/${photoId}`, { caption })
-  },
-  getCommentPage<T>(params: {
-    pageNum?: number
-    pageSize?: number
-  }): Promise<ApiResponse<PageResult<T>>> {
-    return api.get('/admin/guest-comments', { params })
   }
 }

@@ -402,16 +402,11 @@ public class ReportServiceImpl extends ServiceImpl<BlogReportMapper, BlogReport>
     }
 
     /**
-     * 解析话题ID数组字符串
+     * 解析话题ID数组字符串：统一走 {@link BlogPost#parseTopicIds(String)}，
+     * 兼容旧版双重编码（{@code "[884002]"}）遗留行，否则被举报的旧文章在核实删除时
+     * 话题计数不会回减。
      */
     private List<Long> parseTopicIds(String topicIdsJson) {
-        if (topicIdsJson == null || topicIdsJson.isEmpty()) {
-            return Collections.emptyList();
-        }
-        try {
-            return cn.hutool.json.JSONUtil.toList(topicIdsJson, Long.class);
-        } catch (Exception e) {
-            return Collections.emptyList();
-        }
+        return BlogPost.parseTopicIds(topicIdsJson);
     }
 }

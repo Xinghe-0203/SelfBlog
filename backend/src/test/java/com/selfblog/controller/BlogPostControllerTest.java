@@ -335,4 +335,26 @@ class BlogPostControllerTest {
                 .andExpect(jsonPath("$.code").value(200))
                 .andExpect(jsonPath("$.data").value(200L));
     }
+
+    @Test
+    @DisplayName("saveDraft_分类或封面超宽_Returns400（对齐 blog_draft 列宽）")
+    void saveDraft_OversizeCategoryOrCover_Returns400() throws Exception {
+        // 回归：SaveDraftRequest 此前缺 @Size 上限，51 字符分类 / 501 字符封面会
+        // 一路走到数据库再抛 500。上限与 PostCreateRequest 一致（50/500）。
+        setUpSecurityContext(1L, false);
+
+        String longCategory = "分".repeat(51);
+        mockMvc.perform(post("/post/draft")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"Draft\",\"content\":\"C\",\"category\":\"" + longCategory + "\"}"))
+                .andExpect(status().is(400))
+                .andExpect(jsonPath("$.message").value("文章分类不能超过50字符"));
+
+        String longCover = "/uploads/" + "a".repeat(492); // 共 501 字符
+        mockMvc.perform(post("/post/draft")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"Draft\",\"content\":\"C\",\"coverImage\":\"" + longCover + "\"}"))
+                .andExpect(status().is(400))
+                .andExpect(jsonPath("$.message").value("封面图片地址不能超过500字符"));
+    }
 }

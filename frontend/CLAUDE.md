@@ -1,8 +1,8 @@
-# CLAUDE.md - 个人博客 Vue 3 前端 (v2.0.29)
+# CLAUDE.md - 个人博客 Vue 3 前端 (v2.0.30)
 
 ## 项目概述
 
-这是单人作者个人博客的前端项目，基于 Vue 3 + Vite 构建。访客只读、搜索，作者通过管理员后台写作管理。当前版本 v2.0.29。
+这是单人作者个人博客的前端项目，基于 Vue 3 + Vite 构建。访客只读、搜索，作者通过管理员后台写作管理。当前版本 v2.0.30。
 
 ## 常用命令
 
@@ -13,8 +13,8 @@ npm run build          # 构建生产版本（先 vue-tsc --noEmit，再 Vite）
 npm run preview        # 预览生产版本
 npm run lint:check     # 只读 ESLint 检查（npm run lint 会改写文件）
 npm run type-check     # vue-tsc --noEmit（必过闸门）
-npm run test:run       # Vitest 单次运行（当前 56 文件 / 558 tests；原始基线 210）
-npm run test:deployment # node:test：Vercel 代理生成器 + Docker/Compose 源契约（27 项）
+npm run test:run       # Vitest 单次运行（当前 64 文件 / 667 tests；原始基线 210）
+npm run test:deployment # node:test：Vercel 代理生成器 + Docker/Compose 源契约（29 项）
 ```
 
 > 本机直接把 `npm run <script>` 跑在系统 PATH 上会失败（PATH 里有一条不配对的引号，
@@ -31,6 +31,7 @@ npm run test:deployment # node:test：Vercel 代理生成器 + Docker/Compose �
 - Axios 1.20.0
 - Marked 12.0.2 (Markdown)
 - DOMPurify 3.4.17 (XSS 防护)
+- highlight.js 11.12.0（代码语法高亮，客户端渐进增强；仓库唯一新增前端依赖）
 - TypeScript 6.0.3 + Vitest 4.1.11（单元测试，jsdom + @vue/test-utils）
 
 以上按 package-lock.json 锁定版本核对，不把 package.json 范围下界当作实际版本。
@@ -39,10 +40,11 @@ npm run test:deployment # node:test：Vercel 代理生成器 + Docker/Compose �
 
 ```
 src/
-├── api/            # API 接口（admin/gallery/index/media/message/notification/pages/post/public-interactions/seo/site/tag/user）
+├── api/            # API 接口（admin/gallery/index/llm/media/message/notification/pages/post/public-interactions/seo/site/tag/user）
 ├── components/     # Vue 组件
 │   ├── common/     # 通用组件
 │   │   ├── BackToTop.vue     # 返回顶部
+│   │   ├── CountUp.vue       # 数字滚动（easeOutCubic + 等宽数字）
 │   │   ├── Icon.vue          # 内置 SVG 图标（icons.ts 注册表）
 │   │   ├── ImagePreview.vue  # 图片预览灯箱
 │   │   ├── Modal.vue         # 通用模态框
@@ -57,7 +59,7 @@ src/
 ├── stores/         # Pinia 状态管理 (site / theme / user / music / pages)
 ├── styles/         # 样式文件（入口 main.css，customize.css 必须最后导入）
 ├── types/          # TypeScript 类型定义（含 seo.ts 与 axios-augment.d.ts）
-├── utils/          # 工具函数 (crypto / logger / toast / visitor / reading / navigationFit / pageCatalog)
+├── utils/          # 工具函数 (crypto / logger / toast / visitor / reading / navigationFit / pageCatalog / apiCache / apiError / clipboard / markdown / searchShortcut / index)
 └── views/          # 页面组件（Home/About/Archives、post、pages、admin(+pages)、gallery、search、tag、user、auth、common）
 ```
 
@@ -75,10 +77,10 @@ src/
 
 ## 设计系统
 
-- 入口 `src/styles/main.css`，按顺序 `@import` **15** 个模块（2026-11-19 新增 `motion.css` 动效词汇表，排在 `animations.css` 之后）；设计 token 在 `variables.css`，深色模式覆盖在 `dark-mode.css`，皮肤在 `skins.css`。**`appearance.css` 与 `customize.css` 必须排在最后且 `customize.css` 更后**（作者配置的背景/不透明度/排版要压过皮肤与深色模式里同优先级的声明）
+- 入口 `src/styles/main.css`，按顺序 `@import` **16** 个模块（2026-11-19 新增 `motion.css` 动效词汇表，排在 `animations.css` 之后；同日复查批次新增 `print.css`，**必须是最后一个**）；设计 token 在 `variables.css`，深色模式覆盖在 `dark-mode.css`，皮肤在 `skins.css`。**`appearance.css` 与 `customize.css` 必须排在 `print.css` 之前且 `customize.css` 更后**（作者配置的背景/不透明度/排版要压过皮肤与深色模式里同优先级的声明）
 - 深色模式通过 `.dark-mode` 类生效（`stores/theme.ts` 加在 `<html>`，`App.vue` 同时绑在 `#selfblog` 上）
 - 皮肤通过 `#selfblog[data-skin='...']` 生效：`ocean`(默认)/`forest`/`lavender`/`sunset`/`midnight`/`ink`/`sand`/`dusk`（`midnight` 与 `dusk` 是自带深色画布的皮肤，各自声明 `color-scheme: dark`）
-- 动画工具类: `.fade-in`, `.slide-up`, `.pulse`
+- 动效词汇表（`styles/motion.css`，2026-11-19 起）：入场 `enter-up` / `enter-fade` / `enter-scale` / `enter-left` / `enter-right`，环境 `ambient-drift`（极慢背景漂移）/ `pulse-ring`（呼吸圈），反馈 `press` / `lift` / `sheen`（主按钮高光扫过）。旧的 `.fade-in` / `.slide-up` / `.pulse` 工具类已删除，不要再引用
 
 ### Token 使用约定（重要）
 
@@ -181,7 +183,7 @@ src/
 VITE_APP_TITLE=个人博客                     # 应用标题（代码实际消费）
 VITE_API_TARGET=http://localhost:8825       # 开发环境代理目标（vite.config.ts 消费）
 VITE_API_BASE_URL=/api                      # 保留位：axios 在 src/api/index.ts 硬编码 /api，未被消费
-VITE_APP_VERSION=2.0.29                     # 保留位：当前未被代码消费；真实版本号由 vite.config.ts 从 package.json 注入 __APP_VERSION__
+VITE_APP_VERSION=2.0.30                     # 保留位：当前未被代码消费；真实版本号由 vite.config.ts 从 package.json 注入 __APP_VERSION__
 ```
 
 如需本地覆盖，创建 `.env.local`（不提交 git）。

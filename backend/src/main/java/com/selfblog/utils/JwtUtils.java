@@ -85,8 +85,15 @@ public class JwtUtils {
     private final Map<String, Long> tokenBlacklist = new ConcurrentHashMap<>();
 
     /**
-     * 用户设备会话映射: userId -> deviceTokens (CopyOnWriteArraySet for concurrent iteration)
-     * 用于支持选择性登出特定设备
+     * 用户设备会话映射: userId -> deviceTokens。
+     * 用于支持选择性登出特定设备。
+     *
+     * <p>值为<b>插入有序</b>的线程安全 Set（{@code synchronizedSet(LinkedHashSet)}）：
+     * 旧实现用无序的 ConcurrentHashMap.newKeySet()，「驱逐最旧设备」实际是随机驱逐。
+     * LinkedHashSet 的迭代顺序 = 注册顺序，第 11 台设备登录时被驱逐的才是真正最早的令牌。
+     * 所有单次操作经 Collections.synchronizedSet 自带锁；**复合操作（迭代 + 增删）**
+     * 必须在调用方用 {@code synchronized (devices)} 包住（见各方法），这是
+     * synchronizedSet 的标准契约。</p>
      */
     private final Map<Long, Set<String>> userDeviceTokens = new ConcurrentHashMap<>();
 
@@ -147,10 +154,11 @@ public class JwtUtils {
         if (userId == null || token == null) {
             return;
         }
-        Set<String> devices = userDeviceTokens.computeIfAbsent(userId, k -> ConcurrentHashMap.newKeySet());
+        Set<String> devices = userDeviceTokens.computeIfAbsent(userId, k -> newDeviceTokenSet());
         synchronized (devices) {
             devices.add(token);
             while (devices.size() > MAX_DEVICES_PER_USER) {
+                // LinkedHashSet 迭代顺序 = 注册顺序：iterator().next() 是真正最早注册的令牌
                 String oldestToken = devices.iterator().next();
                 devices.remove(oldestToken);
                 // 旧设备Token加入黑名单（记录过期时间用于自动清理）
@@ -159,15 +167,26 @@ public class JwtUtils {
         }
     }
 
+    /** 插入有序 + 线程安全的设备令牌集合（迭代需调用方对返回值加 synchronized）。 */
+    private static Set<String> newDeviceTokenSet() {
+        return java.util.Collections.synchronizedSet(new java.util.LinkedHashSet<>());
+    }
+
     /**
      * 获取Token的过期时间戳（毫秒）
+     *
+     * <p>解析失败（签名不对、格式损坏、已过期到无法读取等）时<b>不能</b>返回
+     * {@code Long.MAX_VALUE}：黑名单清理按「过期时间早于当前时间」剔除条目，
+     * {@code Long.MAX_VALUE} 会让无法解析的令牌在黑名单里永久免疫（既永不清理，
+     * 又实际等于永久撤销期）。夹紧到「当前时间 + 刷新令牌有效期」——与最长会话边界
+     * 对齐的有限撤销期，之后黑名单条目自然过期清理。</p>
      */
     private Long getExpirationFromToken(String token) {
         try {
             Claims claims = parseToken(token);
             return claims.getExpiration().getTime();
         } catch (Exception e) {
-            return Long.MAX_VALUE;
+            return System.currentTimeMillis() + refreshExpiration;
         }
     }
 
@@ -200,14 +219,17 @@ public class JwtUtils {
         }
         Set<String> devices = userDeviceTokens.get(userId);
         if (devices != null) {
-            for (String deviceToken : devices) {
-                if (!deviceToken.equals(excludeToken)) {
-                    tokenBlacklist.put(deviceToken, getExpirationFromToken(deviceToken));
+            // 迭代 + clear + add 是复合操作：必须对集合本身加锁（synchronizedSet 契约）
+            synchronized (devices) {
+                for (String deviceToken : devices) {
+                    if (!deviceToken.equals(excludeToken)) {
+                        tokenBlacklist.put(deviceToken, getExpirationFromToken(deviceToken));
+                    }
                 }
-            }
-            devices.clear();
-            if (excludeToken != null) {
-                devices.add(excludeToken);
+                devices.clear();
+                if (excludeToken != null) {
+                    devices.add(excludeToken);
+                }
             }
         }
         log.info("其他设备已登出: userId={}", userId);
@@ -346,10 +368,13 @@ public class JwtUtils {
         }
         Set<String> devices = userDeviceTokens.get(userId);
         if (devices != null) {
-            for (String deviceToken : devices) {
-                tokenBlacklist.put(deviceToken, getExpirationFromToken(deviceToken));
+            // 迭代 + clear 是复合操作：必须对集合本身加锁（synchronizedSet 契约）
+            synchronized (devices) {
+                for (String deviceToken : devices) {
+                    tokenBlacklist.put(deviceToken, getExpirationFromToken(deviceToken));
+                }
+                devices.clear();
             }
-            devices.clear();
         }
         log.info("已撤销用户所有Token: userId={}", userId);
     }

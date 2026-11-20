@@ -4,7 +4,85 @@
 
 ---
 
-## 未发布 — 全站 UI 重做 + 动效系统 + 性能与 SEO 优化 + 标签索引（v2.0.30 第五批）
+## v2.0.30 (2026-10-23 → 2026-11-21)
+
+本版本收编 2026-10-23 → 2026-11-19 之间的**八个开发批次**（页面横幅 + 玻璃感默认开启 + 后台信息架构重排、文章链接跳转修复 + Markdown 渲染链路统一、编辑器「链接」按钮方向修正、AI 写作助手扩展 + 读写路径提速 + 外观呈现五维、相关阅读 + 归档轻量端点 + AI 翻译 + 侧栏/目录自定义、摘要卡 + 搜索联想 + 面包屑 SEO + 链接样式、语法高亮 + 全文订阅 + 版权行、全站 UI 重做 + 动效系统 + 性能与 SEO 优化 + 标签索引），以及 2026-11-21 的**全仓深度审计修复批**。全部改动经 CI 四个 job 真实执行验证（后端 H2 全量、前端全部门禁、**真实 MySQL 8** 全量、Docker 构建健康检查）；**数据库 schema 全程零变动**（新增能力全部走既有 `site_setting` KV 表、独立表或聚合查询，无新列）。
+
+### 未发布收编说明
+
+以下 `###` 小节为原「未发布」条目的**原样收编**（标题与正文未改写，仅标题降级一级），按时间倒序排列；「六」为 2026-11-21 审计批（沿用第四批（全文订阅）→ 第五批（UI 重做）的批次编号）。
+
+### 六（2026-11-21）— 全仓深度审计修复 + UI 打磨 + 版本发布整理
+
+### 说明
+
+四份并行审计报告（后端正确性 / 前端正确性 / UI 真机 Playwright / 工程与版本）驱动的收口批次：修真缺陷、删死代码、打磨 UI 细节，并把散落在八个「未发布」条目里的版本故事统一为 **2.0.30**。数据库 schema 零变动。
+
+### 修复（后端 — 深度审计）
+
+- **遗留缺陷：`blog_post.topic_ids` 挂 `JacksonTypeHandler` 但无 `autoResultMap`** —— 写入时把「已是 JSON 的字符串」**再编码一次**（库里落成 `"[884002]"` 带引号的 JSON 字符串而非数组），读取时又不过 handler，`parseTopicIds` 对应用自己写入的行**永远解析失败** → 话题计数器从不递减、`JSON_CONTAINS`/`json_each` 过滤全部失效。修复：移除 typeHandler（String 字段原样落库与读出）+ 容错解析器 `BlogPost.parseTopicIds`（同时容忍存量双编码行，**无需数据迁移**）；读 MyBatis-Plus 3.5.8 源码后**否决了给该列开 `autoResultMap` 的方案**——它会让单编码的历史行在读库 `readValue` 时直接抛异常。
+- **`updateById` 写不了 NULL（默认 NOT_NULL 策略）导致计数漂移**：话题/封面「清除」改为 `LambdaUpdateWrapper` 显式 `set`，草稿 `summary`/`coverImage` 同修——此前清空动作匹配 1 行、报成功，但旧值还在库里。
+- `SaveDraftRequest` 补 `@Size`（category 50 / summary 500）对齐列宽，超长输入返回 400 而不是数据库层 500。
+- `GlobalExceptionHandler` 补 **503 分支**：阅读页模板缺失抛的 `BusinessException(503)` 此前落 default 被降级成 400，客户端把「站点临时故障」误判成参数错误。
+- **限流前缀修正**：`/api/user/send-code` → **`/api/auth/password/send-code`**（3/min）、`/api/user/reset-password` → **`/api/auth/password/reset-password`**（5/min）——旧前缀指向不存在的路径，等于发邮件/改密码两个重操作完全不限流；新增 `/api/media/post` 读预算 **60/min**（文章配图列表此前吃 `/api/media` 的 10/min 上传写桶，翻第 11 篇带图文章即 429）。
+- `BaseErrorCode` **43 个死枚举删除**；`LogUtils`/`SqlLikeUtils` 死导出删除。
+- **设备驱逐改为插入序**（`synchronizedSet(LinkedHashSet)`）——旧无序 Set 的「驱逐最旧设备」实际是随机驱逐；黑名单过期上限钳制：解析失败的令牌不再记 `Long.MAX_VALUE`（永久免疫清理 + 实际永久撤销期），夹紧到「当前时间 + 刷新令牌有效期」。
+- `GuestCommentServiceImpl` 补 **13 个服务测试**（此前该服务零直测）。
+
+### 修复（前端）
+
+- **正文图片上传静默失败**：前端 `UploadResponse` 与后端 `MediaVO` 不匹配（前端读 `url`/`fileName`，后端给 `fileUrl`），插入永不执行却弹成功提示——类型镜像对齐 + 失败改 `toast.error` 而非 success。
+- **约 40 个死 API 方法 / store 动作 / 死类型删除**：`statsApi`、`adminApi` 13 个方法、`user.ts` 11 个方法、`stores/user.ts` 死动作、`types/trending.ts` 整文件等。
+- **类型契约对齐**：`PaginatedData` 改 `records/total/size/current/pages`（对齐后端分页信封）、`Post` 死别名清理、新增 `TagWithCount`。
+- `crypto` 弃用 `escape`/`unescape` → `TextEncoder`。
+- `toggleLike`/`uploadFile` 补 `_noRetry`（非幂等请求禁自动重试，避免一次超时放大成三次写入）。
+- **39 条 eslint 警告清零**：新增 `utils/apiError.ts` 的 `apiErrorMessage(err, fallback)` 统一错误取值，新 catch 一律 `unknown`。
+
+### 修复（UI 打磨 — Playwright 真机审计）
+
+- ①skip-link 阴影泄漏进左上角 → `transform` 停靠；②移动端菜单文字透出 → `functional-glass` 提到 **98%** 并移出 `paper-tier` 接管清单；③禁用搜索按钮改灰阶；④暗色画布遮罩下限 45→**60**；⑤登录复选框 `accent-color` + 18px；⑥移动端代码块右缘留白；⑦双搜索框单向同步；⑧联想下拉与空态互斥；⑨细主题滚动条；⑩Home 错误态补 `state-panel--error`。
+
+### 工程
+
+- CI actions 升级：`actions/checkout` v7、`actions/setup-java` v6、`crazy-max/ghaction-setup-buildx` v4（`setup-node`/`build-push-action` 上游暂无 Node 24 版本，暂不动）。
+- **版本统一 2.0.30**：`pom.xml` / `package.json` / `.env.example` / 各 README 与 CLAUDE 徽标对齐；本文件八个「未发布」条目收编进本节（见上）。
+
+### 影响文件
+
+| 文件 | 改动类型 |
+|------|----------|
+| `backend/.../entity/BlogPost.java` | 修改（移除 `topicIds` 的 JacksonTypeHandler + 容错 `parseTopicIds`，注释钉死禁令） |
+| `backend/.../service/post/impl/BlogPostServiceImpl.java` | 修改（话题/封面/草稿 summary/coverImage 清除改 wrapper 显式 set） |
+| `backend/.../service/post/impl/PostQueryServiceImpl.java` | 修改（topicIds 容错解析） |
+| `backend/.../service/social/impl/ReportServiceImpl.java` | 修改（举报核实的话题计数回减统一走容错解析） |
+| `backend/.../dto/post/SaveDraftRequest.java` | 修改（+`@Size` 50/500） |
+| `backend/.../common/enums/BaseErrorCode.java` | 修改（43 死枚举删除） |
+| `backend/.../common/exception/GlobalExceptionHandler.java` | 修改（+503 分支） |
+| `backend/.../config/web/RateLimitProperties.java` | 修改（密码找回两前缀修正 + `/api/media/post` 读预算 60/min） |
+| `backend/.../utils/JwtUtils.java` | 修改（设备驱逐插入序 + 黑名单过期钳制） |
+| `backend/.../utils/LogUtils.java` / `SqlLikeUtils.java` | 修改（死导出删除） |
+| `backend/src/test/.../service/post/BlogPostServiceNullClearTest.java`、`BlogPostTopicIdsRoundTripTest.java` | 新增（NULL 清除语义 / topic_ids 双编码往返） |
+| `backend/src/test/.../service/site/impl/GuestCommentServiceImplTest.java` | 新增（13 个服务测试） |
+| `backend/src/test/.../GlobalExceptionHandlerTest.java` / `RateLimitInterceptorTest.java` / `RateLimitPropertiesTest.java` / `BlogPostControllerTest.java` / `JwtUtilsTest.java` | 修改（503 / 限流前缀与媒体读预算 / topicIds / 设备驱逐与黑名单） |
+| `frontend/src/api/`（admin / gallery / media / public-interactions / site / tag / user） | 修改（死方法删除、`UploadResponse` 对齐 MediaVO、`_noRetry`） |
+| `frontend/src/utils/apiError.ts` + `__tests__/apiError.test.ts` | 新增（`apiErrorMessage` 统一错误取值） |
+| `frontend/src/stores/user.ts` / `site.ts`、`frontend/src/types/`（admin / common / index / media / post / tag，删 `trending.ts`） | 修改（死动作/死类型删除、`PaginatedData`/`TagWithCount` 对齐） |
+| `frontend/src/utils/`（crypto / index / logger） | 修改（`escape`/`unescape` → `TextEncoder`、死导出删除） |
+| `frontend/src/styles/`（animations / appearance / base / typography / variables） | 修改（UI 打磨十项 + 死 CSS 清理） |
+| `frontend/src/views/`（Home / Login / PostDetail / PostEdit / Search / PasswordChange / admin/Posts / admin/TagsManagement）、`components/`（Icon / icons.ts / MarkdownContent / ArticleList）、`App.vue`、`constants/index.ts` | 修改 |
+| 前端测试 13 个文件（ArticleList / site / user / crypto / index / Home / PageBanner / PageConfiguration / PublicPages / TagsManagement / PostDetail / PostEdit / Search） | 修改 |
+| `.github/workflows/ci.yml` | 修改（actions 升级） |
+| 版本与文档：`backend/pom.xml`、`frontend/package.json`、`frontend/.env.example`、README/CLAUDE/AGENTS/`docs/agents/*`、本文件 | 修改（版本统一 2.0.30 + 基线与结构清单更新） |
+| `docs/reviews/2026-11-21-deep-audit-verification.md` | 新增（四审计方法、P1 对照表、验证证据与遗留清单） |
+
+### 验证
+
+- 后端全量：**1486 tests / 0 failures**（filesystem 与 reversealphabetical 两种测试顺序均验证通过）。
+- 前端全量：**64 files / 667 tests** 全通过；`eslint` **0 error / 0 warning**；`vue-tsc` 0 错误；`test:deployment` **29/29**；`vite build` 通过。
+
+---
+
+### 未发布 — 全站 UI 重做 + 动效系统 + 性能与 SEO 优化 + 标签索引（v2.0.30 第五批）
 
 ### 说明
 
@@ -230,7 +308,7 @@
 
 ---
 
-## 未发布 — 语法高亮 + 全文订阅 + 版权行（借鉴成熟博客）(2026-11-07)
+### 未发布 — 语法高亮 + 全文订阅 + 版权行（借鉴成熟博客）(2026-11-07)
 
 ### 说明
 
@@ -281,7 +359,7 @@ v2.0.30 开发批次第四批，主题是**借鉴 Hexo / Halo / Ghost 等成熟�
 
 ---
 
-## 未发布 — 摘要卡 + 搜索联想 + 面包屑 SEO + 链接样式 (2026-11-07)
+### 未发布 — 摘要卡 + 搜索联想 + 面包屑 SEO + 链接样式 (2026-11-07)
 
 ### 说明
 
@@ -328,7 +406,7 @@ v2.0.30 开发批次第三批（同日第三波）：让 AI 产出可见（摘�
 
 ---
 
-## 未发布 — 相关阅读 + 归档轻量端点 + AI 翻译 + 侧栏/目录自定义 (2026-11-07)
+### 未发布 — 相关阅读 + 归档轻量端点 + AI 翻译 + 侧栏/目录自定义 (2026-11-07)
 
 ### 说明
 
@@ -380,7 +458,7 @@ v2.0.30 开发批次第二批（同日第二波迭代）：补齐「读路径的
 
 ---
 
-## 未发布 — AI 写作助手扩展 + 读写路径提速 + 外观呈现五维 (2026-11-07)
+### 未发布 — AI 写作助手扩展 + 读写路径提速 + 外观呈现五维 (2026-11-07)
 
 ### 说明
 
@@ -468,7 +546,7 @@ v2.0.30 开发批次（版本号随下一次发版统一 bump），三个方向�
 
 ---
 
-## 未发布 — 编辑器「链接」按钮方向修正 (2026-10-24)
+### 未发布 — 编辑器「链接」按钮方向修正 (2026-10-24)
 
 ### 说明
 
@@ -502,7 +580,7 @@ v2.0.30 开发批次（版本号随下一次发版统一 bump），三个方向�
 
 ---
 
-## 未发布 — 文章链接跳转修复 + Markdown 渲染链路统一 (2026-10-24)
+### 未发布 — 文章链接跳转修复 + Markdown 渲染链路统一 (2026-10-24)
 
 ### 说明
 
@@ -562,7 +640,7 @@ v2.0.30 开发批次（版本号随下一次发版统一 bump），三个方向�
 
 ---
 
-## 未发布 — 页面横幅自定义 + 玻璃感默认开启 + 后台信息架构重排 (2026-10-23)
+### 未发布 — 页面横幅自定义 + 玻璃感默认开启 + 后台信息架构重排 (2026-10-23)
 
 ### 说明
 

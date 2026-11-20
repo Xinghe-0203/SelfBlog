@@ -1,12 +1,12 @@
 package com.selfblog.entity;
 
 import com.baomidou.mybatisplus.annotation.*;
-import com.baomidou.mybatisplus.extension.handlers.JacksonTypeHandler;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
 import java.io.Serializable;
 import java.time.LocalDateTime;
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -35,8 +35,18 @@ public class BlogPost implements Serializable {
     @Schema(description = "文章内容")
     private String content;
 
+    /**
+     * 话题 ID 数组，落库为 JSON 数组文本（如 {@code [884002]}）。
+     *
+     * <p><b>不要</b>给这个 String 字段挂 {@code JacksonTypeHandler}：写入时会把「已是 JSON
+     * 的字符串」再编码一次，库里变成 {@code "[884002]"}（带引号的 JSON 字符串而非数组），
+     * 导致 {@code JSON_CONTAINS} / {@code json_each} / {@code TopicMapper.recalculate*}
+     * 全部失配——这正是 schema-fresh-install.sql「v2.0.16 topic_ids 格式修复」迁移注释
+     * 所指的双重编码问题。String 字段不挂 typeHandler 即可按原文落库与读出（也无需
+     * autoResultMap）；JSON 的生成由写入侧 hutool 完成，解析统一走
+     * {@link #parseTopicIds(String)}（同时容忍上述遗留双重编码形态）。</p>
+     */
     @Schema(description = "话题ID数组")
-    @TableField(typeHandler = JacksonTypeHandler.class)
     private String topicIds;
 
     @Schema(description = "文章分类")
@@ -89,14 +99,33 @@ public class BlogPost implements Serializable {
      * 兼容方法：返回第一个话题ID
      */
     public Long getTopicId() {
-        if (topicIds == null || topicIds.isEmpty()) {
-            return null;
+        List<Long> ids = parseTopicIds(topicIds);
+        return ids.isEmpty() ? null : ids.get(0);
+    }
+
+    /**
+     * 解析 topic_ids 列文本为话题 ID 列表。
+     *
+     * <p>兼容两种历史存储形态：规范 JSON 数组文本（{@code [884002]}，现行写入形态）
+     * 与遗留双重编码形态（{@code "[884002]"}——旧版实体挂 {@code JacksonTypeHandler} 后
+     * createPost/updatePost 落库的带引号 JSON 字符串，见 schema-fresh-install.sql
+     * 「v2.0.16 topic_ids 格式修复」迁移注释）。解析失败一律返回空列表，绝不抛异常：
+     * 调用方是话题计数（编辑/删除/举报核实后的 decrement）与列表/详情展示路径。</p>
+     */
+    public static List<Long> parseTopicIds(String topicIdsJson) {
+        if (topicIdsJson == null || topicIdsJson.isEmpty()) {
+            return Collections.emptyList();
+        }
+        String text = topicIdsJson.trim();
+        if (text.length() >= 2 && text.charAt(0) == '"' && text.charAt(text.length() - 1) == '"') {
+            // 遗留双重编码形态：最外层是一对 JSON 引号，解掉一层得到规范数组文本
+            text = text.substring(1, text.length() - 1);
         }
         try {
-            List<Long> ids = cn.hutool.json.JSONUtil.toList(topicIds, Long.class);
-            return ids.isEmpty() ? null : ids.get(0);
+            List<Long> ids = cn.hutool.json.JSONUtil.toList(text, Long.class);
+            return ids == null ? Collections.emptyList() : ids;
         } catch (Exception e) {
-            return null;
+            return Collections.emptyList();
         }
     }
 }

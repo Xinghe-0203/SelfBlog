@@ -20,8 +20,6 @@ const post: Post = {
   id: 1,
   title: '测试文章',
   content: '正文',
-  authorId: 1,
-  authorName: '作者',
   viewCount: 1,
   likeCount: 0,
   commentCount: 0,
@@ -33,7 +31,7 @@ const post: Post = {
 const page = (posts: Post[]) => ({
   code: 200,
   message: 'ok',
-  data: { records: posts, total: 2, pages: 2, pageNum: 1, pageSize: 9 }
+  data: { records: posts, total: 2, pages: 2, size: 9, current: 1 }
 })
 beforeEach(() => {
   vi.resetAllMocks()
@@ -111,6 +109,15 @@ describe('home spatial introduction and article list', () => {
     await wrapper.get('[role="alert"] button').trigger('click')
     await flushPromises()
     expect(wrapper.get('.intro-visual img').attributes('src')).toBe('/uploads/retry.jpg')
+  })
+
+  it('marks the error panel with the shared state-panel--error modifier', async () => {
+    // 与其他页面的错误面板保持同一视觉语义（其余页面均带该修饰类）
+    vi.mocked(postApi.getPostList).mockRejectedValue(new Error('offline'))
+    const { wrapper } = await setup()
+    const alert = wrapper.get('[role="alert"]')
+    expect(alert.classes()).toContain('state-panel')
+    expect(alert.classes()).toContain('state-panel--error')
   })
 })
 

@@ -1,7 +1,7 @@
 # SelfBlog — 个人博客
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Version](https://img.shields.io/badge/version-v2.0.29-blue)](https://github.com/Xinghe-0203)
+[![Version](https://img.shields.io/badge/version-v2.0.30-blue)](https://github.com/Xinghe-0203)
 [![Java](https://img.shields.io/badge/Java-21-orange)](https://www.oracle.com/java/)
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.3.13-green)](https://spring.io/projects/spring-boot)
 [![Vue](https://img.shields.io/badge/Vue-3.5.44-brightgreen)](https://vuejs.org/)
@@ -44,6 +44,7 @@
 | **Jsoup** | 1.18.3 | XSS 防护（HTML 净化） |
 | **Hutool** | 5.8.40 | Java 工具库 |
 | **Lombok** | 1.18.42 | 代码简化 |
+| **CommonMark** | 0.24.0 | 服务端 Markdown 渲染（可抓取阅读 HTML） |
 | **Maven** | 3.8+ | 构建工具 |
 
 ### 前端
@@ -58,6 +59,7 @@
 | **Axios** | 1.20.0 | HTTP 客户端 |
 | **Marked** | 12.0.2 | Markdown 渲染 |
 | **DOMPurify** | 3.4.17 | XSS 防护 |
+| **highlight.js** | 11.12.0 | 代码语法高亮（客户端渐进增强） |
 | **Vitest** | 4.1.11 | 单元测试 |
 | **npm** | 11.x | 包管理工具（构建时自动安装） |
 
@@ -225,10 +227,10 @@ SelfBlog/
 │   ├── vite.config.ts              # Vite 构建配置
 │   ├── tsconfig.json               # TypeScript 配置
 │   └── src/
-│       ├── api/                    # API 模块（20 个）
-│       ├── views/                  # 页面组件（45 个）
+│       ├── api/                    # API 模块（14 个）
+│       ├── views/                  # 页面组件（29 个）
 │       ├── components/             # 通用组件、导航、文章行与后台控件
-│       ├── stores/                 # Pinia：site / theme / user / music
+│       ├── stores/                 # Pinia：site / theme / user / music / pages
 │       ├── router/                 # 路由配置（模块化）
 │       ├── composables/            # 组合式函数
 │       ├── styles/                 # 全局 token、实底内容与功能玻璃控件
@@ -267,8 +269,9 @@ cp /path/to/repo/backend/.env.example .env   # 然后填写 JWT_SECRET 与 ADMIN
 java -jar selfblog-2.0.29.jar
 ```
 
-校验与重建方式见 [`release/README.md`](release/README.md)。该 JAR 与提交时的源码一一对应，
-源码变更后不会自动更新。
+校验与重建方式见 [`release/README.md`](release/README.md)。注意 `release/selfblog-2.0.29.jar`
+构建于 2026-10-23 以来的八个开发批次与 2026-11-21 审计批合入**之前**（源码版本已升 2.0.30），
+发布时应按 `release/README.md` 的命令重新构建；该 JAR 不会随源码变更自动更新。
 
 ### 推荐：构建并运行单 JAR
 
@@ -431,55 +434,10 @@ Controller（控制器）→ Service（服务）→ Mapper（数据访问）→ 
 
 ## 更新日志
 
-### 未发布（2026-11-07）— 语法高亮 + 全文订阅 + 版权行（借鉴成熟博客）
+### v2.0.30 (2026-10-23 → 2026-11-21)
 
-- **代码语法高亮**（新增唯一前端依赖 highlight.js）：~35 常用语言、已知语言才高亮（不做散文自动探测）、客户端渐进增强（SafeMarkdown 奇偶性不受影响）；hljs 落独立异步 chunk（55.85KB gzip）**入口零增长**；主题 token 色配 house code token，代码块两种模式恒暗（顺带统一了内容页 pre 原先误用亮面的老问题）
-- **RSS/Atom 全文订阅**：`content:encoded` / `content type="html"` 经 SafeMarkdown 渲染与读者 HTML 同源；CDATA `]]>` 分段、XML 转义、合法 XML 解析测试钉死；新增 `feedCache`（5min，键含 origin）+ 9 个文章写方法全逐出
-- **版权声明行**（`postLicense` 默认空 = 不渲染）：正文末尾渲染声明 + 自链接 permalink；**字数统计** `· 约 N 字`；**Ctrl/Cmd+K 或 `/`** 全局跳转搜索页（输入框聚焦时忽略）+ 搜索页挂载自动聚焦
-- 门禁：后端 **1427 测试**（+7），前端 **58 文件 / 609 测试**（+1 文件/+20）+ lint(0 error)/format/type/build/部署契约 27/27
-
-### 未发布（2026-11-07）— 摘要卡 + 搜索联想 + 面包屑 SEO + 链接样式
-
-- **阅读页摘要卡**（`summaryCallout` 默认关）：开启且有摘要时在正文前渲染「摘要」卡——配合 AI 摘要一键生成，**AI 产出首次直接呈现给访客**；纯文本插值不 v-html
-- **搜索联想 typeahead**：接通沉睡的后端 `GET /api/post/search/suggest`（此前前端零消费）——300ms 防抖、combobox ARIA、↓/↑/Enter 键盘导航；**顺带修掉 suggest 与高级搜索共享 60/min 读桶、连续打字 ~18 秒即 429 的问题**（新增 `/api/post/search` 专属读预算 120/min，写预算未动）
-- **面包屑 SEO**：阅读页 JSON-LD BlogPosting 节点新增 `breadcrumb`（首页 → 文章，URL 走 SiteOrigin 规范 origin，缺 origin 整体不输出，SPA 切换随块清理不残留）
-- **外观 20 键**：`linkStyle`（正文链接 默认/点状/悬浮下划线，flat 排除标题锚点）+ 4 套新成品主题（墨韵/杏暖/青苔/暮色）
-- 门禁：后端 **1420 测试**（+27），前端 **57 文件 / 589 测试**（+1 文件/+12）+ lint(0 error)/format/type/build/部署契约 27/27
-
-### 未发布（2026-11-07）— 相关阅读 + 归档轻量端点 + AI 翻译 + 侧栏/目录自定义
-
-- **相关阅读**：阅读页文末新增「相关阅读」区块——后端 `GET /api/post/{id}/related` 按共享标签数排序取 5 篇已发布文章（草稿/删除行先过滤再排名、不足按时间补齐），非空才渲染、预览不拉取、失败静默
-- **归档轻量化**：新增 `GET /api/post/archives` 单查询 6 列投影（绝不拉正文），前端归档页从 5 次分页爬取完整 VO 改为一次请求，视觉零变化；`/post/archives` 字面路径优先于 `{id}` 变量（测试钉死），SecurityConfig 为两个新 GET 显式放行（限流走既有 `/api/post` 读预算 60/min，写预算未动）
-- **AI 翻译**：编辑器选区写作新增 translate 动作——中↔英自动判断，与润色/精简同走「替换选区」流程（选区快照守卫、超长拦截、单飞）
-- **外观 18 键**：`homeSidebarOrder`（首页侧栏三模块 6 种排列，默认 = 现有顺序 DOM 逐字不变）+ `tocStyle`（隐藏目录时连移动端抽屉/悬浮按钮一起收起，栅格收敛复用既有 modifier，零新 CSS）；两键均为模板/逻辑驱动，不进 CSS 钩子三件套
-- 门禁：后端 **1393 测试**（+31），前端 **56 文件 / 577 测试**（+12）+ lint(0 error)/format/type/build/部署契约 27/27
-
-### 未发布（2026-11-07）— AI 写作助手扩展 + 读写路径提速 + 外观呈现五维
-
-- **编辑器 AI 选区写作**（`POST /api/admin/ai/writing/inline`）：选中正文片段即可 润色 / 续写 / 精简（≤3000 字符），**不要求文章先保存**；选区在点击瞬间同步捕获，请求期间作者改动会拒绝拼接而不是错位覆盖
-- **AI 内链建议**（`POST /api/admin/ai/writing/links`）：模型只拿最近 40 篇其他已发布文章的标题+摘要清单，返回 3–5 条「锚文本 + 目标文章 + 理由」；不在候选集的 postId 与空锚文本直接丢弃，`targetTitle` 永远由服务端回填（不信任模型输出），点「插入」把 `[锚文本](/post/{id})` 写进光标处
-- **外观呈现五维**（外观深度自定义 11 键 → 16 键，`site_setting` KV 零迁移）：`readingProgress`（阅读进度条开关）、`blockquoteStyle`（引用块 accent/minimal/card）、`postRowStyle`（文章行 compact/card）、`contentImageStyle`（正文图片 framed/flat）、`tableStyle`（表格 striped/minimal）。默认档仍逐像素等于改造前，导航栏与后台照旧碰不到
-- **前端提速**：`marked.setOptions` 迁出 `main.ts` → markdown 渲染链路（marked+DOMPurify，66KB）不再出现在 `dist/index.html` 的 modulepreload 里，首页/搜索/归档/标签页首屏不再解析它；Navbar resize 改 rAF 合帧；文章列表阅读时长一次 `computed` 记忆化；`visitorTrackingEnabled=false` 时前端跳过记录 POST
-- **后端读路径提速**（全部 SELECT-only，无 DDL）：相册列表每相册一次的照片查询合并为单查询分组；公开标签列表挂 `hotTagsCache`（标签写入同时逐出 `categoryCache`，修掉改名后 30 分钟陈旧的老问题）；站点页面四读挂新 `pageCache`（5min，六个写方法全逐出）；访客仪表盘 28 次串行计数合并为 2 次 GROUP BY + 总阅读量改 `SUM()`；gzip 增加 `image/svg+xml`
-- 门禁：后端 **1362 测试**（+71），前端 **56 文件 / 565 测试**（+7）+ lint(0 error)/format/type/build/部署契约 27/27；新 AI 端点测试全部走回环桩服务器不出网
-
-### 未发布 (2026-10-23)
-
-- **页面横幅**：首页介绍区与关于页作者卡可在后台「页面管理 → 样式」配置背景图（上传或外链）、适配、焦点、高度（190/250/330px）、遮罩（0–80）、文字明暗与排布（左右分栏/居中/上下堆叠）。`PageStyle.banner` 新增契约，后端仅 `home`/`about` 接受，背景图复用既有 `imageUrl()` 白名单；服务端可抓取 HTML 同步输出横幅样式；编辑器「预览」直接挂载真实组件，所见即所得
-- **玻璃感默认开启**：修复「一点半透明效果没有」的根因 —— `appearance.css` 里 `html:not([data-wallpaper])` 那条规则把三档表面强制拉平，于是纯色/渐变画布下卡片必然实心。现在三档在任何画布下都分档；默认 `surfaceOpacity` 100→88、`surfaceBlur` 0→12、画布 `solid`→`gradient`（`#f4f7fc → #e9eef7`）；新增 `glassMode` 总开关（关闭即全实心），不透明度上限 92%（100% 与实心无差别），用背景图时遮罩下限 30% 保证文字对比度
-- **4 套成品主题**：纸间 / 墨青 / 暖砂 / 暮紫，一点即换（只写 10 个已有设置键，后端零迁移）；新增 `ink`/`sand`/`dusk` 三套皮肤，`dusk` 为深色画布；中文标题不再收负字距（`:lang(zh) h1/h2/h3`）
-- **后台信息架构重排**：网站设置 7 段平铺 → 4 个分组 tab（站点资料 / 外观 / 内容与互动 / 系统与安全），仍是同一表单一次保存；模型连接表单从设置页迁到「SEO 管理」页顶部（`LlmConnectionPanel`，只提交 11 个 `llm*` 键）；工作台去掉「SEO 管理」卡换成「页面管理」卡；页面编辑器去掉 SEO 档（已存页面 SEO 配置继续生效，只是不再提供编辑 UI）
-- 修复新增用例暴露的两处测试自身缺陷（`List.of(...).toList()` 在 JDK 21 不合法；连续 `saveDraft` 未递进 revision 触发 409）
-- 门禁：后端 **1288 测试**（+34），前端 **55 文件 / 534 测试**（+4 文件/+30）+ lint(0 error)/format/type/build/部署契约 27/27；真机 Playwright 验证默认玻璃感三档台阶、深色模式、壁纸模式、横幅三种排布、后台 4 tab/主题预设/编辑器 3 档，验证后已还原作者原配置
-
-### 未发布（2026-10-24）— 文章链接跳转修复 + Markdown 渲染链路统一
-
-- **修复「文章里的 URL 点击后跳到本站 404」**：根因是 marked 只在 GFM autolink（裸 `https://…` 或裸 `www.…`）时补协议，而 `[文字](example.com)` 这种链接语法的 href 会原样输出成相对路径，浏览器解析成 `https://本站/example.com`，被 SPA 兜底路由 `/:pathMatch(.*)*` 接走变成 404 页
-- 新增唯一渲染入口 `frontend/src/utils/markdown.ts`：`normalizeMarkdownHref`（危险协议 `javascript:`/`data:` 等清空；邮箱补 `mailto:`；裸域名补 `https://`，并用文件扩展名白名单避免把 `a.md`、`photo.png` 误判成域名）、`isInternalMarkdownHref`、`sanitizeMarkdownHtml`（DOMPurify 之后用 `DOMParser` 遍历 `a[href]`/`img` 改属性，取代原先会误命中 `<area>`/`<abbr>` 的正则）、`renderMarkdown`。文章详情、编辑器预览、页面正文三处共用同一条链路
-- 外链补 `target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer"`，站内链接不再被强行新开标签；详情页 `onContentClick` 接管站内链接（`#` 锚点平滑滚动、其余走 `router.push`），编辑器预览里点站内链接只提示不跳转（避免丢未保存内容）
-- 编辑器「链接」按钮插入 `[文字](https://)` 并自动全选 URL 占位，不再留裸 `url`；后端 `SafeMarkdown` 同步补协议（此前 Jsoup 白名单会把无协议 href 直接剥掉）；清理 `typography.css` 两处误写成 CSS 的 `referrerpolicy` 声明
-- 编辑器「链接」按钮此前方向是反的：选中一段已有 URL 再点它，会产出 `[URL](url)`（URL 被当成链接文字、href 留裸占位符）。现在按选中内容形态分流——选中的像地址就生成 `[链接文字](选中地址)` 并全选「链接文字」等作者改写，选中的像文字就生成 `[选中文字](https://)` 并全选 URL 占位；判定复用 `looksLikeLinkTarget`（排除 `/`、`#`、`?` 开头的站内路径与危险协议）
-- 门禁：后端 **1291 测试**，前端 **56 文件 / 558 测试**（+1 文件/+24）+ `vue-tsc` 0 错、`eslint` 0 error、`prettier` 通过
+八个开发批次（页面横幅 + 玻璃感默认开启 + 后台信息架构重排、文章链接跳转修复 + Markdown 渲染链路统一、编辑器「链接」按钮方向修正、AI 写作助手扩展 + 读写路径提速 + 外观呈现五维、相关阅读 + 归档轻量端点 + AI 翻译、摘要卡 + 搜索联想 + 面包屑 SEO + 链接样式、语法高亮 + 全文订阅 + 版权行、全站 UI 重做 + 动效系统 + 公开标签索引页），加一个 2026-11-21 深度审计修复批（`topic_ids` 双编码遗留缺陷、NULL 清除语义、限流前缀修正、前端死代码清理与 UI 打磨）。
+完整分批记录见 [CHANGELOG.md 的 v2.0.30 小节](CHANGELOG.md)。
 
 ### v2.0.29 (2026-10-22)
 

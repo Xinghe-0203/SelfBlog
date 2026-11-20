@@ -48,15 +48,11 @@ export const icons = {
   external:
     '<path d="M14 4.5h5.5V10M19 5l-8 8"/><path d="M18 13.5V19a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5.5"/>',
   clock: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>',
-  link: '<path d="M10.5 13.5a4 4 0 0 0 5.7 0l2.6-2.6a4 4 0 0 0-5.7-5.7l-1.3 1.3"/><path d="M13.5 10.5a4 4 0 0 0-5.7 0l-2.6 2.6a4 4 0 0 0 5.7 5.7l1.3-1.3"/>',
   share:
     '<circle cx="17.5" cy="6" r="2.5"/><circle cx="6.5" cy="12" r="2.5"/><circle cx="17.5" cy="18" r="2.5"/><path d="m8.8 10.7 6.4-3.4M8.8 13.3l6.4 3.4"/>',
-  copy: '<rect x="8.5" y="8.5" width="11" height="11" rx="2.5"/><path d="M15.5 5.5h-9a2 2 0 0 0-2 2v9"/>',
   rss: '<path d="M5 19a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z"/><path d="M4.5 11a8.5 8.5 0 0 1 8.5 8.5M4.5 5.5A14 14 0 0 1 18.5 19.5"/>',
   calendar:
     '<rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 9.5h17M8 3v4M16 3v4"/>',
-  hash: '<path d="M5 9h14M5 15h14M10 4l-2 16M16 4l-2 16"/>',
-  pen: '<path d="M4 20h4L20 8l-4-4L4 16z"/><path d="m14.5 5.5 4 4"/>',
   layers:
     '<path d="m12 3.5 8.5 4.7-8.5 4.7-8.5-4.7z"/><path d="m4 12.7 8 4.4 8-4.4M4 16.9l8 4.4 8-4.4"/>'
 } as const

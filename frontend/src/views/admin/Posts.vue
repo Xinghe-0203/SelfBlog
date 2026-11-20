@@ -152,7 +152,7 @@ onMounted(fetchPosts)
                 statusLabel(post.status)
               }}</span>
             </td>
-            <td class="muted">{{ formatDate(post.createTime || post.createdAt, 'YYYY-MM-DD') }}</td>
+            <td class="muted">{{ formatDate(post.createTime, 'YYYY-MM-DD') }}</td>
             <td class="muted">{{ post.viewCount || 0 }}</td>
             <td>
               <div class="row-actions">

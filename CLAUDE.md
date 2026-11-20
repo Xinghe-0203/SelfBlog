@@ -2,7 +2,7 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-**版本**: v2.0.29 | **仓库**: https://github.com/Xinghe-0203/SelfBlog
+**版本**: v2.0.30 | **仓库**: https://github.com/Xinghe-0203/SelfBlog
 
 ---
 
@@ -58,7 +58,7 @@ export JAVA_HOME='C:\Program Files\Java\jdk-21'
 ```
 
 - **跑后端测试必须带 `-Dskip.npm=true -Dskip.installnodenpm=true`**。`pom.xml` 里的 `frontend-maven-plugin` 在 `initialize`/`generate-resources` 阶段会在 `../frontend` 执行 `npm ci` + `npm run build`：不带这两个开关，一次测试会先把整个前端重建一遍，并且**会改写前端构建产物**。带上后全套测试约 1 分钟。
-- 基线：**1291 tests, 0 failures**（2026-10-24 实测；CI 还会用真实 MySQL 8 再跑一遍）。日志里大量 `[PERF] ... error:` 是 `PerformanceMonitoringAspect` 记录的正常负例断言，不是失败。
+- 基线：**1486 tests, 0 failures**（2026-11-21 实测；CI 还会用真实 MySQL 8 再跑一遍）。日志里大量 `[PERF] ... error:` 是 `PerformanceMonitoringAspect` 记录的正常负例断言，不是失败。
 - 单测：`"$MVN" test -Dtest=AuthControllerTest -Dskip.npm=true -Dskip.installnodenpm=true`，加 `#方法名` 可只跑一条。
 - 打包：`"$MVN" clean package -DskipTests` → `target/selfblog.jar`（`finalName=selfblog`）。
 - 本地起服务：先把 `backend/.env.example` 复制为 `backend/.env`，填 `JWT_SECRET`（≥32 位）与 `ADMIN_PASSWORD`（≥12 位）。
@@ -76,8 +76,8 @@ cd frontend
 ```
 
 - **本机 `npm run <script>` 全部失败**（`'"node"' 不是内部或外部命令`），`dev` / `build` / `test:run` 都不例外；`npm ci`、`npm install` 正常。原因不在仓库：系统 PATH 中 `C:\Program Files\Java\jdk-25\bin"` 这一项带了一个**不配对的引号**，`cmd.exe` 解析 PATH 时把它当成未闭合引号的开头，其后所有条目失效——`node` 无法被 `cmd` 解析（`where node` 仍能找到，走的是 App Paths），而 `node_modules/.bin/*.cmd` 垫片结尾正是调用裸 `node`。bash 不受影响。**因此一律直接调用 `./node_modules/.bin/<tool>`**（POSIX 垫片，可用；上面五条均已实测通过）。根治办法是删掉那条 PATH 里多余的引号；临时办法是在 PowerShell 里把 `backend/target/frontend/node` 前置到 `PATH`（该目录由 Maven 插件生成，`target/` 被清理后需重新构建才有）。
-- 测试基线：**56 个文件 / 558 tests 全通过**（2026-10-24 实测）。
-- 闸门：`lint:check`、`format:check`、`type-check`、`test:run`、`build` 全绿；部署适配另跑 `npm run test:deployment`（Vercel 代理生成器 + Docker/Compose 契约，27 项）。`format:check` 自 2026-10-17 起是真实可用的仓库级闸门（`.prettierrc` 改为 `endOfLine: "auto"` 并重写了一次历史漂移）。
+- 测试基线：**64 个文件 / 667 tests 全通过**（2026-11-21 实测）。
+- 闸门：`lint:check`、`format:check`、`type-check`、`test:run`、`build` 全绿；部署适配另跑 `npm run test:deployment`（Vercel 代理生成器 + Docker/Compose 契约，29 项）。`format:check` 自 2026-10-17 起是真实可用的仓库级闸门（`.prettierrc` 改为 `endOfLine: "auto"` 并重写了一次历史漂移）。
 - `tsconfig.json` 开启 `strict` + **`noUncheckedIndexedAccess`**：索引访问返回 `T | undefined`，`arr[0].foo` 过不了 `type-check`。用 `arr[0]?.foo`，或改用 `replace` 而非 `split()[0]` 这类写法。
 - 开发端口 3000，`/api` 与 `/uploads` 代理到 `VITE_API_TARGET`（默认 `http://localhost:8825`）。SPA 在没有后端时也能靠 `stores/site.ts` 的默认值正常渲染（`loadPublicSettings` 的 `fetch` 失败被静默吞掉），所以**只跑 `./node_modules/.bin/vite` 就能验收布局与样式**。
 
@@ -119,13 +119,13 @@ Post 与 Circle 采用同一套拆分，**新增功能要放对位置，不要�
 
 Mapper XML 支持 `databaseId="mysql"` / `"sqlite"` 双语句（`MybatisPlusConfig` 注册 `VendorDatabaseIdProvider`）；**H2 没有映射 id，只会走无 databaseId 的兜底语句**，所以不要把 MySQL 专有 SQL 写进共享语句。
 
-表分两组：历史社区表（`sys_user`、`blog_post`、`blog_comment`、`blog_tag`、`blog_post_tag`、`blog_like`、`blog_collect`、`blog_share`、`blog_follow`、`blog_notification`、`blog_trending`、`blog_draft`、`blog_draft_tag`、`blog_report`、`blog_circle_*`、`blog_media`、`blog_post_media`、`blog_topic`、`blog_message`）与个人博客新增表（`site_setting`、`visitor_event`、`anonymous_post_like`、`guest_comment`、`photo_album`、`album_photo`）。
+表分两组：历史社区表（`sys_user`、`blog_post`、`blog_comment`、`blog_tag`、`blog_post_tag`、`blog_like`、`blog_collect`、`blog_share`、`blog_follow`、`blog_notification`、`blog_trending`、`blog_draft`、`blog_draft_tag`、`blog_report`、`blog_circle_*`、`blog_media`、`blog_post_media`、`blog_topic`、`blog_message`）与个人博客新增表（`site_setting`、`visitor_event`、`anonymous_post_like`、`guest_comment`、`photo_album`、`album_photo`、`post_seo`）。
 
 > `site_setting` 是 **KV 表**（`setting_key` 主键 + `setting_value`）。新增站点设置键**零 schema 迁移**，只需在 `SiteSettingsServiceImpl` 登记并做校验。
 
 ### 缓存
 
-`config/cache/CaffeineCacheConfig.java` 用 `SimpleCacheManager` 注册 9 个具名缓存，各自独立 TTL：`hotTagsCache`(10m)、`categoryCache`(30m)、`userCache`(10m)、`trendingCache`(5m)、`statsCache`(15m)、`statusCache`(2m)、`siteSettingsCache`(10m)、`visitorSummaryCache`(30s)、`notificationListCache`(2m)。测试 profile 关闭缓存。
+`config/cache/CaffeineCacheConfig.java` 用 `SimpleCacheManager` 注册 11 个具名缓存，各自独立 TTL：`hotTagsCache`(10m)、`categoryCache`(30m)、`userCache`(10m)、`trendingCache`(5m)、`statsCache`(15m)、`statusCache`(2m)、`siteSettingsCache`(10m)、`visitorSummaryCache`(30s)、`notificationListCache`(2m)、`pageCache`(5m)、`feedCache`(5m，键含解析后 origin)。测试 profile 关闭缓存。
 
 ### 路由前缀、SPA 与可抓取 HTML
 
@@ -196,7 +196,7 @@ Mapper XML 支持 `databaseId="mysql"` / `"sqlite"` 双语句（`MybatisPlusConf
 
 ## 已知问题（改动前先看）
 
-- **Docker 镜像未在本机验证**：`backend/Dockerfile` 与两个 compose 文件已改为“仓库根上下文 + 真实 `selfblog.jar` + 数据/上传/相册卷”，但本机没有 Docker 守护进程，**镜像构建与运行仍未验证**；部署前请自行 `docker compose -f backend/docker-compose.yml up -d --build` 验证。
+- **Docker**：本机未验证（没有 Docker 守护进程）；**CI 的 `docker` job 已真实构建 `backend/Dockerfile`（仓库根上下文）、启动容器并通过 `/actuator/health` 与首页 HTML 检查**。需要本机手动验证时自行 `docker compose -f backend/docker-compose.yml up -d --build`。
 - **真实 Vercel 部署未验证**：`frontend/vercel.json` 只做统一反向代理（`framework: null` + `scripts/build-vercel-proxy.mjs`），需要 `SELFBLOG_BACKEND_ORIGIN` 与 `SITE_BASE_URL` 两个环境变量；没有账号/域名时无法真机验证。
 - **MySQL 运行时只在 CI 验证**：本机没有 MySQL/Docker 守护进程，全量套件只能在 H2 上跑；真实 MySQL 8 由 CI 的 `mysql` job 覆盖（从 `schema-fresh-install.sql` 初始化后跑全量）。**H2 会假绿**：跨连接的锁问题（如 `REQUIRES_NEW` 自增等待调用方未提交的行锁）在 H2 上不报错、在真实 MySQL 上等满 `innodb_lock_wait_timeout` 后抛 `CannotAcquireLockException`——改事务边界后必须等 MySQL job 的结论，别只看 H2 绿。
 - `views/user/*` 等历史社区页仍在仓库中（路由仍注册），但已无公开入口；`views/auth/Register.vue`、`views/circle/*`、`components/circle/*` 等死代码已于 2026-10-17 删除（见 CHANGELOG）。后端对应的社区/话题接口与数据表保留。

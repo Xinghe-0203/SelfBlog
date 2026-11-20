@@ -279,4 +279,49 @@ class JwtUtilsTest {
         try { Thread.sleep(10); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
         assertThrows(ExpiredJwtException.class, () -> jwtUtils.getUserIdFromToken(token));
     }
+
+    @Test
+    @DisplayName("registerDeviceToken - 第11次登录驱逐的是最早注册的那台设备")
+    void registerDeviceToken_shouldEvictTheGenuinelyOldestDevice() {
+        // 旧实现用无序 Set，"驱逐最旧"实际是随机驱逐；换成插入有序结构后，
+        // 迭代顺序 = 注册顺序，第 11 次登录必须把第 1 台设备的令牌送进黑名单。
+        String[] tokens = new String[11];
+        for (int i = 0; i <= 10; i++) {
+            // 用不同 subject 保证 11 个令牌互不相同（同毫秒生成的同参数令牌可能逐字节相同）
+            tokens[i] = jwtUtils.generateToken(TEST_USER_ID, "device-" + i, TEST_ROLE);
+        }
+        for (int i = 0; i <= 10; i++) {
+            jwtUtils.registerDeviceToken(TEST_USER_ID, tokens[i]);
+        }
+
+        Map<String, Long> blacklist = (Map<String, Long>) ReflectionTestUtils.getField(jwtUtils, "tokenBlacklist");
+        assertEquals(10, jwtUtils.getUserDeviceCount(TEST_USER_ID), "设备数封顶 10");
+        assertTrue(blacklist.containsKey(tokens[0]), "第 1 台设备的令牌必须被驱逐");
+        for (int i = 1; i <= 10; i++) {
+            assertFalse(blacklist.containsKey(tokens[i]), "第 " + (i + 1) + " 台设备的令牌不得被误驱逐");
+        }
+        // 被驱逐令牌的黑名单条目带真实过期时间（不是永久免疫的哨兵值）
+        assertTrue(blacklist.get(tokens[0]) < Long.MAX_VALUE, "驱逐条目的过期时间必须有限");
+    }
+
+    @Test
+    @DisplayName("无法解析的令牌进黑名单时过期时间被夹紧，不再永久免疫清理")
+    void unparseableTokenBlacklistEntryIsClampedInsteadOfMaxValue() {
+        // 旧实现对解析失败的令牌返回 Long.MAX_VALUE，黑名单清理（按过期时间剔除）
+        // 永远删不掉它。现在夹紧到「当前时间 + 刷新令牌有效期」。
+        String garbage = "not-a-parseable-token";
+        jwtUtils.logoutDevice(TEST_USER_ID, garbage);
+
+        Map<String, Long> blacklist = (Map<String, Long>) ReflectionTestUtils.getField(jwtUtils, "tokenBlacklist");
+        Long clamped = blacklist.get(garbage);
+        assertNotNull(clamped, "设备登出应把令牌送进黑名单");
+        assertTrue(clamped < Long.MAX_VALUE, "不得再返回 Long.MAX_VALUE");
+        long upperBound = System.currentTimeMillis() + TEST_REFRESH_EXPIRATION;
+        assertTrue(clamped <= upperBound, "夹紧值不得超过「现在 + 刷新令牌有效期」");
+        assertTrue(clamped > System.currentTimeMillis(), "夹紧值仍须在将来，撤销窗口非零");
+
+        // 随后立即执行一次清理：条目仍在（未到期），且不会因为哨兵值而破坏清理逻辑
+        jwtUtils.cleanExpiredTokens();
+        assertTrue(jwtUtils.isTokenRevoked(garbage), "撤销窗口内的令牌仍视为已撤销");
+    }
 }

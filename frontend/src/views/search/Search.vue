@@ -18,6 +18,9 @@ usePageSeo('search', () => ({
 
 const route = useRoute()
 const router = useRouter()
+// 关键词与路由是**单向**同步：挂载时从 route.query.q 初始化、路由变化时跟随（见下方 watch），
+// 输入框只在显式提交时写回路由。导航条的搜索框有它自己的本地状态，这里不回写，
+// 否则会形成两个输入框互相追赶的循环。
 const query = ref(String(route.query.q || ''))
 /** 搜索输入框：挂载后把光标放进这里，快捷键直达搜索页时可以直接开打。 */
 const searchInput = ref<HTMLInputElement | null>(null)
@@ -283,7 +286,9 @@ onMounted(() => {
         </button>
       </nav>
     </section>
-    <section v-else class="search-prompt">
+    <!-- 联想下拉展开时暂时收起这块装饰性空态：下拉是绝对定位，
+         会直接压在放大镜图标上（两块视觉互相穿插）。 -->
+    <section v-else-if="!suggestOpen" class="search-prompt">
       <Icon name="search" :size="28" />
       <p>输入关键词，开始阅读。</p>
     </section>
@@ -403,9 +408,14 @@ onMounted(() => {
   background: var(--primary-hover);
   transform: translateY(-1px);
 }
+/* 禁用态用「降级为中性面」而不是压暗强调色：opacity 叠在强调底色上
+   读起来像渲染坏了，换实心灰面 + 弱化文字才像一枚真正不可用的按钮。 */
 .search-form button:disabled {
-  cursor: default;
-  opacity: 0.55;
+  cursor: not-allowed;
+  background: var(--surface-tertiary);
+  border: 1px solid var(--border-light);
+  color: var(--text-muted);
+  opacity: 1;
 }
 .search-results {
   padding-top: 30px;

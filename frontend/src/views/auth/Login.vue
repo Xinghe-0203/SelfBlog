@@ -64,7 +64,6 @@
         <div class="form-row">
           <label class="check-label">
             <input v-model="form.remember" type="checkbox" class="check-input" />
-            <span class="check-box" aria-hidden="true"><Icon name="check" :size="12" /></span>
             <span class="check-text">记住我</span>
           </label>
           <span class="link-subtle">忘记密码请联系站点作者</span>
@@ -326,42 +325,26 @@ const handleLogin = async () => {
   gap: 12px;
 }
 
+/* 原生 checkbox：accent-color 直接上色，不再自绘 16px 的小盒子。
+   18px 的盒 + label 的 3px 内边距凑出 ≥24px 的点击目标；
+   负外边距把多出来的内边距抵消掉，行高观感不变。 */
 .check-label {
   display: flex;
   align-items: center;
   gap: 8px;
+  padding: 3px;
+  margin: -3px;
   cursor: pointer;
   user-select: none;
 }
 
 .check-input {
-  position: absolute;
-  width: 0;
-  height: 0;
-  opacity: 0;
-  pointer-events: none;
-}
-
-.check-box {
-  display: grid;
-  place-items: center;
-  width: 16px;
-  height: 16px;
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-xs);
-  background: var(--surface-primary);
-  color: transparent;
-}
-
-.check-input:checked + .check-box {
-  border-color: var(--accent);
-  background: var(--accent);
-  color: var(--text-inverse);
-}
-
-.check-input:focus-visible + .check-box {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
 }
 
 .check-text {

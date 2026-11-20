@@ -16,7 +16,7 @@ Applies to `frontend/` (Vue 3.5 + Vite 6 + Pinia + Vitest). `AGENTS.md` is the e
   If that directory is missing (fresh `target/` cleanup), run a Maven build once to re-provision it, or call `node_modules/.bin/<tool>` directly.
 - On this machine a bare `npm run <script>` fails on the default PATH (verified 2026-10-16): the system PATH contains an unmatched quote (`C:\Program Files\Java\jdk-25\bin"`), which derails `cmd.exe`'s PATH parsing so the `.bin` shims cannot resolve bare `node`. Prefix the provisioned Node directory as above (what all verified commands do), or call the shims directly.
 - `node_modules` was reinstalled on Windows with the provisioned Node (`npm ci`), so the `.bin/*.cmd` shims and win32 native packages (`@rollup/rollup-win32-x64-msvc`, `@esbuild/win32-x64`) are present.
-- Test baseline as of 2026-11-07: `npx vitest run` = **58 files / 609 tests**, all passing (~25s). `lint:check` (0 errors / 42 warnings), `format:check`, `type-check`, `test:deployment` (27/27) and `build` are all green at the same commit; never leave any of them below that.
+- Test baseline as of 2026-11-21: `npx vitest run` = **64 files / 667 tests**, all passing. `lint:check` (**0 errors / 0 warnings** — the zero-warning bar is new as of the 2026-11-21 audit batch), `format:check`, `type-check`, `test:deployment` (**29/29**) and `build` are all green at the same commit; never leave any of them below that.
 - **jsdom/sandbox trap on this machine**: vitest and `npm run test:deployment` (node:test) `mkdtemp`/`mkdir` under the OS temp dir can fail with `EPERM` when run from a sandboxed shell. Point `TMP`/`TEMP`/`TMPDIR` at a workspace-local directory (e.g. `frontend/.tmp-vitest`, removed afterwards) and re-run — it is environmental, not a test failure.
 
 ```sh
@@ -161,3 +161,16 @@ npm run build
 - Deleted the never-routed frontend circle/topic trees and other unreferenced files (**22 files**): `router/modules/circle.ts`, `views/circle/*`, `components/circle/*`, `views/admin/{CircleManagement,TopicsManagement}.vue`, `views/{topic/TopicDetail,trending/TrendingPage,auth/PasswordReset,auth/Register}.vue`, `components/home/*`, `components/common/Card.vue`, `composables/usePagination.ts`, `types/vo.ts`, `api/topic.ts`, `types/topic.ts`, plus the now-dead circle/topic API helpers and types in `api/admin.ts`/`types/index.ts`. Backend community endpoints and tables are intentionally retained (admin-only API surface).
 - Deleted the second, legacy community UI set (**25 files**): `api/{circle,collect,comment,follow,like,report}.ts`, `types/{circle,follow}.ts`, `components/common/{CollectButton,FollowButton,LikeButton}.vue`, `views/admin/{Reports,Statistics,Users}.vue`, `views/common/Report.vue`, the ten `views/user/*` pages except `PasswordChange.vue` (which is kept and linked from the admin settings page). `api/user.ts`, `stores/user.ts` and `types/comment.ts` stay.
 - Both deletion waves are frontend-only; no runtime route or API changed. Root `CLAUDE.md`'s "known issues" line about the unregistered circle route is obsolete but the file carries user-owned edits and was left untouched (except the necessary `schema.sql` rename).
+
+## 2026-11-21 深度审计批
+
+- **`UploadResponse` 必须镜像后端 `MediaVO`**：后端给的是 `fileUrl`（不是 `url`/`fileName`）。
+  类型对不上时正文图片上传会**静默失败**——插入永不执行却弹成功提示。规则：插入失败必须
+  `toast.error` 而非 success；success 提示只能在真正插入之后发。
+- **`apiErrorMessage(err, fallback)`**（`utils/apiError.ts`）统一错误取值：新写的 catch 一律
+  `unknown`，不要把 `err` 直接当 `Error` 或 axios 错误解构；用户文案取不到时落 fallback。
+- **eslint 0 警告是新的基线**（此前 42 条）：确需豁免的规则（如 `v-html` 的四处使用）用
+  **块级 disable + 理由注释**，不留文件级或全局放宽。
+- **UI 打磨的两个决策**：移动端菜单的 `.functional-glass` 提到 **98%** 并移出 `paper-tier`
+  接管清单（菜单下文字不再透出）；暗色画布（背景图）遮罩下限 `DARK_CANVAS_MIN_OVERLAY`
+  45 → **60**（浅字压照片的可读下限，作者设置高于下限时按作者的来）。

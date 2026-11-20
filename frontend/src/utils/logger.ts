@@ -102,6 +102,7 @@ function log(level: LogLevel, module: string, message: string, data?: unknown): 
   // 控制台输出（开发环境）
   if (import.meta.env.DEV) {
     const style = getConsoleStyle(level)
+    // eslint-disable-next-line no-console -- DEV 控制台输出就是这个模块的产品
     console.log(
       `%c[${level}]%c ${module}%c ${message}`,
       style,
@@ -160,29 +161,6 @@ export function useLogger(module: string): Logger {
   return createLogger(module)
 }
 
-/**
- * 性能日志
- */
-export function logPerformance(name: string, duration: number): void {
-  const level: LogLevel = duration > 3000 ? 'WARN' : duration > 1000 ? 'INFO' : 'DEBUG'
-  log(level, 'Performance', `${name}: ${duration}ms`)
-}
-
-/**
- * 用户行为日志
- */
-export function logUserAction(action: string, data?: unknown): void {
-  log('INFO', 'UserAction', action, data)
-}
-
-/**
- * API调用日志
- */
-export function logApiCall(method: string, url: string, status: number, duration: number): void {
-  const level: LogLevel = status >= 400 ? 'ERROR' : 'INFO'
-  log(level, 'API', `${method} ${url} - ${status}`, { duration })
-}
-
 function handleBeforeUnload(): void {
   if (logQueue.length > 0) {
     const logsToSend = [...logQueue]
@@ -228,14 +206,6 @@ export function destroyLogger(): void {
   isDestroyed = true
 }
 
-/**
- * 重新初始化日志系统（用于 HMR 热更新后恢复）
- */
-export function reinitLogger(): void {
-  isDestroyed = false
-  initLogger()
-}
-
 // 自动初始化
 if (typeof window !== 'undefined') {
   initLogger()
@@ -244,9 +214,6 @@ if (typeof window !== 'undefined') {
 export default {
   createLogger,
   useLogger,
-  logPerformance,
-  logUserAction,
-  logApiCall,
   initLogger,
   destroyLogger
 }

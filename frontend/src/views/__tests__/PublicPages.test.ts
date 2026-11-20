@@ -22,8 +22,6 @@ const post: Post = {
   id: 1,
   title: '一篇笔记',
   content: '正文',
-  authorId: 1,
-  authorName: '作者',
   viewCount: 1,
   likeCount: 0,
   commentCount: 0,
@@ -45,7 +43,7 @@ const archiveItem = (overrides: Partial<PostArchiveItem> = {}): PostArchiveItem 
 const page = (records: Post[], pages = 1) => ({
   code: 200,
   message: 'ok',
-  data: { records, pages, total: records.length, pageNum: 1, pageSize: 12 }
+  data: { records, pages, total: records.length, size: 12, current: 1 }
 })
 beforeEach(() => {
   vi.resetAllMocks()

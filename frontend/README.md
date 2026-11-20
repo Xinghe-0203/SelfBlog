@@ -2,7 +2,7 @@
 
 Vue 3 frontend for a single-author personal blog. Public pages focus on reading, search, archives, about, and tags; writing and content management are protected by administrator-only routes.
 
-**Version**: v2.0.29 | **Vue**: 3.5.44 | **Vite**: 6.4.4
+**Version**: v2.0.30 | **Vue**: 3.5.44 | **Vite**: 6.4.4
 
 ## Tech Stack
 
@@ -15,6 +15,7 @@ Vue 3 frontend for a single-author personal blog. Public pages focus on reading,
 | Axios | 1.20.0 | HTTP client |
 | Marked | 12.0.2 | Markdown rendering |
 | DOMPurify | 3.4.17 | XSS protection |
+| highlight.js | 11.12.0 | Syntax highlighting (client-side progressive enhancement) |
 | TypeScript | 6.0 | Type safety |
 | Vitest | 4.1.11 | Unit tests (jsdom + @vue/test-utils) |
 
@@ -40,18 +41,18 @@ For production, Maven builds the Vue assets and embeds them into `backend/target
 src/
 ├── api/                # Axios modules + interceptors (index, site, admin, post, media, pages, gallery, seo, llm, …)
 ├── components/
-│   ├── common/         # Reusable UI: Button, Input, Icon, Modal, Toast, ImagePreview, BackToTop, …
+│   ├── common/         # Reusable UI: Icon, Modal, Toast, ImagePreview, BackToTop, CountUp, …
 │   ├── layout/         # Navbar, Footer, headless MusicPlayer, NavbarMusicControl
 │   ├── post/           # ArticleList + MobileTocSheet (shared rows and reading extras)
 │   ├── pages/          # PageFrame, MarkdownContent, ContentPageView (page config + safe body)
 │   └── admin/          # SiteAssetField (brand asset uploads)
-├── composables/        # useDialog, useConfirm, useScrollState, useMarkdownEnhance, useSeoMeta, usePageConfig, usePageSeo, useScrollReveal
+├── composables/        # useDialog, useConfirm, useLatestRequest, useScrollState, useMarkdownEnhance, useSeoMeta, usePageConfig, usePageSeo, useScrollReveal
 ├── router/             # Entry, guards, lazy helpers, per-domain modules
 ├── stores/             # Pinia: site, theme, user, music, pages
 ├── styles/             # Tokens + base + components + dark mode + a11y (entry: main.css)
 ├── types/              # TypeScript type definitions
-├── utils/              # crypto, logger, toast, visitor, reading
-├── views/              # Home / About / Archives + admin(+pages), auth, post, pages, user, gallery, search, tag, common
+├── utils/              # crypto, logger, toast, visitor, reading, apiCache, apiError, clipboard, markdown, searchShortcut, navigationFit, pageCatalog, index
+├── views/              # Home / About / Archives / TagsIndex + admin(+pages), auth, post, pages, user, gallery, search, tag, common
 ├── App.vue
 └── main.ts
 ```
@@ -60,7 +61,7 @@ src/
 
 | Module | Routes |
 |--------|--------|
-| Public | `/`, `/archives`, `/about`, `/gallery`, `/search`, `/tag/:id`, `/post/:id` |
+| Public | `/`, `/archives`, `/about`, `/gallery`, `/search`, `/tags`, `/tag/:id`, `/post/:id` |
 | Author | `/{adminPath}` (login), `/{adminPath}/write`, `/{adminPath}/edit/:id` |
 | Admin | `/{adminPath}/dashboard`, `/{adminPath}/posts`, `/{adminPath}/tags`, plus visitors/comments/albums/settings |
 
@@ -281,7 +282,7 @@ Eleven more author settings, in four dimensions — typography (`fontFamily`, `b
   avatars/buttons must stay truly round.
 - The eleven keys stay **out of `PREPAINT_APPEARANCE_VARS`**: they depend on the `#selfblog`
   scope, and pre-painting them onto `<html>` would bypass the scope and alter the navbar.
-- `App.vue`'s appearance `watch` dependency array must list all eleven keys (14 entries today),
+- `App.vue`'s appearance `watch` dependency array must list all CSS-hook keys (19 entries today),
   or changing a setting will not re-apply it.
 - The admin panel is the 7th section of `views/admin/Settings.vue`; its "restore defaults"
   button only edits the form and does **not** save, so a mis-click cannot change the live site.
@@ -302,8 +303,8 @@ Eleven more author settings, in four dimensions — typography (`fontFamily`, `b
   `blockquoteStyle` / `postRowStyle` / `contentImageStyle` / `tableStyle` — all four are pure CSS
   in `customize.css` sections 9–12 under the same hard scope
   (`#selfblog[data-ap-*] .app-main:not(.app-main--admin)`), with **no rule for the default tier**
-  and none of the five in `PREPAINT_APPEARANCE_VARS`. `App.vue`'s watch array is now 18 entries;
-  the admin panel exposes 16 keys.
+  and none of the five in `PREPAINT_APPEARANCE_VARS`. `App.vue`'s watch array was 18 entries and
+  the admin panel exposed 16 keys **as of batch 1** (later batches raised both to 19 entries / 20 keys).
 - `utils/markdown.ts` now owns `marked.setOptions({ gfm: true, breaks: true })` at module
   top-level; `main.ts` no longer imports `marked`, so the 66 KB markdown chunk is no longer
   modulepreloaded on first paint (Home/Search/Archives/Tag never fetch it — verified in

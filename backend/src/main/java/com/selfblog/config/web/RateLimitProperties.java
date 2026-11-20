@@ -100,6 +100,17 @@ public class RateLimitProperties {
     private int postSearchRead = 120;
 
     /**
+     * 文章**图片列表**只读 GET 接口限流（次/分钟）。
+     *
+     * 为什么单列：`GET /api/media/post/{postId}`（读取一篇文章的全部配图）此前只能落到
+     * 写表 `/api/media/` 的 10/min（mediaUpload/mediaGeneral 都是按「上传重操作」定的），
+     * 而它是纯只读浏览——读者翻看第 11 篇带图文章就会被 429。登记在**读表**里
+     * 60/min（对齐同样面向匿名访客的 postRead/postList），写路径
+     * （`POST /api/media/upload` 的 10/min）不受任何影响。
+     */
+    private int mediaPostRead = 60;
+
+    /**
      * 访客评论**列表**读取限流（次/分钟）。
      *
      * 为什么单列：`/api/guest-comments/` 的 5/min 是给「发表评论」定的，
@@ -284,6 +295,9 @@ public class RateLimitProperties {
         limits.put("/api/post/search", postSearchRead);
         // 公开评论列表：比写前缀 /api/guest-comments 更长，靠最长前缀直接胜出。
         limits.put("/api/guest-comments/post", guestCommentRead);
+        // 文章配图列表：比写前缀 /api/media 更长，靠最长前缀直接胜出，
+        // GET /api/media/post/** 不再吃 /api/media 的 10/min 上传写桶。
+        limits.put("/api/media/post", mediaPostRead);
         return Collections.unmodifiableMap(limits);
     }
 
@@ -291,8 +305,11 @@ public class RateLimitProperties {
         Map<String, Integer> limits = new HashMap<>();
         limits.put("/api/user/login", login);
         limits.put("/api/user/register", register);
-        limits.put("/api/user/send-code", sendCode);
-        limits.put("/api/user/reset-password", resetPassword);
+        // 密码找回的两个端点真实位于 /api/auth/password/**（PasswordController），
+        // 此前按 /api/user/send-code、/api/user/reset-password 登记，指向了不存在的路径，
+        // 等于这两个重操作（发邮件/改密码）完全不限流。预算不变（3/min、5/min）。
+        limits.put("/api/auth/password/send-code", sendCode);
+        limits.put("/api/auth/password/reset-password", resetPassword);
         limits.put("/api/user/search", userSearch);
         limits.put("/api/media/upload", mediaUpload);
         limits.put("/api/circle/post", circlePost);

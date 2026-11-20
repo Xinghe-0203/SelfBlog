@@ -108,6 +108,12 @@ public class GlobalExceptionHandlerTest {
             throw new BusinessException(500, "服务器内部错误");
         }
 
+        // BusinessException(503)：阅读页模板缺失等「服务暂不可用」场景
+        @GetMapping("/test/business/503")
+        public Result<String> testBusiness503() {
+            throw new BusinessException(503, "服务暂时不可用");
+        }
+
         // 参数校验测试（@RequestParam）
         @GetMapping("/test/validation")
         public Result<String> testValidation(@RequestParam @NotBlank @Size(min = 3) String param) {
@@ -269,6 +275,17 @@ public class GlobalExceptionHandlerTest {
                 .andExpect(status().is(500))
                 .andExpect(jsonPath("$.code").value(500))
                 .andExpect(jsonPath("$.message").value("服务器内部错误"));
+    }
+
+    @Test
+    @DisplayName("处理业务异常 - 503错误按原状态返回，不再降级为400")
+    void testHandleBusinessException_503() throws Exception {
+        // 回归：BusinessException(503)（阅读页模板缺失）此前落到 switch 的 default 分支，
+        // HTTP 状态被降级成 400，客户端会把「站点临时故障」误判为参数错误。
+        mockMvc.perform(get("/test/business/503"))
+                .andExpect(status().is(503))
+                .andExpect(jsonPath("$.code").value(503))
+                .andExpect(jsonPath("$.message").value("服务暂时不可用"));
     }
 
     // ==================== 参数校验异常测试 ====================

@@ -380,36 +380,6 @@ public class LogUtils {
     }
 
     /**
-     * 记录API调用日志
-     *
-     * @param module   模块名称
-     * @param action   操作名称
-     * @param detail   详细信息
-     */
-    public static void logApiCall(String module, String action, String detail) {
-        log.info("[API] [{}] {} - {}",
-                sanitizeLogValue(module, 64),
-                sanitizeLogValue(action, 128),
-                sanitizeLogValue(detail, 512));
-    }
-
-    /**
-     * 记录用户操作日志
-     *
-     * @param userId   用户ID
-     * @param username 用户名
-     * @param action   操作
-     * @param detail   详细信息
-     */
-    public static void logUserAction(Long userId, String username, String action, String detail) {
-        log.info("[USER_ACTION] userId={}, username={}, action={}, detail={}",
-                userId,
-                sanitizeLogValue(username, 64),
-                sanitizeLogValue(action, 128),
-                sanitizeLogValue(detail, 512));
-    }
-
-    /**
      * 记录安全事件日志
      *
      * @param event    事件类型
@@ -442,62 +412,6 @@ public class LogUtils {
     }
 
     /**
-     * 记录数据库操作日志
-     *
-     * @param operation 操作类型（SELECT/INSERT/UPDATE/DELETE）
-     * @param table     表名
-     * @param detail    详细信息
-     * @param duration  执行时间（毫秒）
-     */
-    public static void logDbOperation(String operation, String table, String detail, long duration) {
-        String safeOperation = sanitizeLogValue(operation, 32);
-        String safeTable = sanitizeLogValue(table, 64);
-        String safeDetail = sanitizeLogValue(detail, 512);
-        if (duration > 1000) {
-            log.warn("[DB] SLOW {} on {} - {} ({}ms)", safeOperation, safeTable, safeDetail, duration);
-        } else {
-            log.debug("[DB] {} on {} - {} ({}ms)", safeOperation, safeTable, safeDetail, duration);
-        }
-    }
-
-    /**
-     * 记录缓存操作日志
-     *
-     * @param operation 操作类型（GET/PUT/DELETE）
-     * @param key       缓存键
-     * @param hit       是否命中
-     */
-    public static void logCacheOperation(String operation, String key, boolean hit) {
-        log.debug("[CACHE] {} key={}, hit={}",
-                sanitizeLogValue(operation, 32), sanitizeLogValue(key, 256), hit);
-    }
-
-    /**
-     * 记录通知发送日志
-     *
-     * @param userId  接收用户ID
-     * @param type    通知类型
-     * @param detail  详细信息
-     */
-    public static void logNotification(Long userId, String type, String detail) {
-        log.info("[NOTIFICATION] userId={}, type={}, detail={}",
-                userId, sanitizeLogValue(type, 64), sanitizeLogValue(detail, 512));
-    }
-
-    /**
-     * 记录文件上传日志
-     *
-     * @param userId   用户ID
-     * @param filename 文件名
-     * @param size     文件大小（字节）
-     * @param success  是否成功
-     */
-    public static void logFileUpload(Long userId, String filename, long size, boolean success) {
-        log.info("[FILE_UPLOAD] userId={}, filename={}, size={}, success={}",
-                userId, sanitizeLogValue(filename, 255), size, success);
-    }
-
-    /**
      * 记录登录日志
      *
      * @param username 用户名
@@ -514,17 +428,5 @@ public class LogUtils {
             log.warn("[LOGIN] username={}, clientIp={}, success=false, reason={}",
                     safeUsername, safeClientIp, sanitizeLogValue(reason, 256));
         }
-    }
-
-    /**
-     * 记录注册日志
-     *
-     * @param username 用户名
-     * @param clientIp 客户端IP
-     * @param success  是否成功
-     */
-    public static void logRegister(String username, String clientIp, boolean success) {
-        log.info("[REGISTER] username={}, clientIp={}, success={}",
-                sanitizeLogValue(username, 64), sanitizeLogValue(clientIp, 64), success);
     }
 }

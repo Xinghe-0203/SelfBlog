@@ -8,13 +8,7 @@ import { userApi } from '@/api/user'
 import { useLogger } from '@/utils/logger'
 import { encodeData, decodeData } from '@/utils/crypto'
 import { STORAGE_KEY_PREFIX } from '@/constants'
-import type {
-  User,
-  LoginRequest,
-  RegisterRequest,
-  ChangePasswordRequest,
-  UpdateProfileRequest
-} from '@/types'
+import type { User, LoginRequest, ChangePasswordRequest } from '@/types'
 
 const logger = useLogger('UserStore')
 
@@ -155,9 +149,10 @@ export const useAuthStore = defineStore('auth', () => {
     loading.value = true
     try {
       const response = await userApi.login(credentials)
-      const loginData = (response as { data?: unknown }).data || response
+      // 拦截器已经解过一层信封：`response` 就是 ApiResponse，`data` 即登录载荷（LoginResponse）。
+      const loginData = response.data
 
-      let {
+      const {
         token: newToken,
         refreshToken: newRefreshToken,
         id,
@@ -166,28 +161,7 @@ export const useAuthStore = defineStore('auth', () => {
         avatar: loginAvatar,
         email,
         role
-      } = loginData as {
-        token: string
-        refreshToken: string
-        id: number
-        username: string
-        nickname: string
-        avatar: string
-        email: string
-        role: 'user' | 'admin'
-      }
-
-      if (!id && (loginData as { data?: unknown }).data) {
-        const nestedData = (loginData as { data: Record<string, unknown> }).data
-        newToken = nestedData.token as string
-        newRefreshToken = nestedData.refreshToken as string
-        id = nestedData.id as number
-        loginUsername = nestedData.username as string
-        loginNickname = nestedData.nickname as string
-        loginAvatar = nestedData.avatar as string
-        email = nestedData.email as string
-        role = nestedData.role as 'user' | 'admin'
-      }
+      } = loginData
 
       if (!newToken || !id) {
         logger.error('Invalid login response structure', { loginData })
@@ -198,32 +172,11 @@ export const useAuthStore = defineStore('auth', () => {
       refreshToken.value = newRefreshToken
       user.value = {
         id,
-        username:
-          loginUsername ||
-          ((loginData as Record<string, unknown>).username as string) ||
-          (((loginData as Record<string, unknown>).data as Record<string, unknown>)
-            ?.username as string),
-        nickname:
-          loginNickname ||
-          ((loginData as Record<string, unknown>).nickname as string) ||
-          (((loginData as Record<string, unknown>).data as Record<string, unknown>)
-            ?.nickname as string),
-        avatar:
-          loginAvatar ||
-          ((loginData as Record<string, unknown>).avatar as string) ||
-          (((loginData as Record<string, unknown>).data as Record<string, unknown>)
-            ?.avatar as string),
-        email:
-          email ||
-          ((loginData as Record<string, unknown>).email as string) ||
-          (((loginData as Record<string, unknown>).data as Record<string, unknown>)
-            ?.email as string),
-        role:
-          role ||
-          ((loginData as Record<string, unknown>).role as 'user' | 'admin') ||
-          (((loginData as Record<string, unknown>).data as Record<string, unknown>)?.role as
-            | 'user'
-            | 'admin')
+        username: loginUsername,
+        nickname: loginNickname,
+        avatar: loginAvatar,
+        email,
+        role
       }
 
       if (credentials.remember) {
@@ -259,26 +212,6 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  // 用户注册
-  async function register(data: RegisterRequest): Promise<{ success: boolean; message?: string }> {
-    loading.value = true
-    try {
-      await userApi.register(data)
-      logger.info('Registration successful', { username: data.username })
-      return { success: true }
-    } catch (error) {
-      logger.error('Registration failed', { error: (error as Error).message })
-      return {
-        success: false,
-        message:
-          (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
-          '注册失败'
-      }
-    } finally {
-      loading.value = false
-    }
-  }
-
   // 用户登出
   async function logout(): Promise<void> {
     const userId = user.value?.id
@@ -296,78 +229,6 @@ export const useAuthStore = defineStore('auth', () => {
     token.value = newToken
     refreshToken.value = newRefreshToken
     saveToStorage()
-  }
-
-  // 更新用户信息
-  function updateUserInfo(userData: Partial<User>): void {
-    const allowedFields: (keyof User)[] = [
-      'id',
-      'username',
-      'nickname',
-      'avatar',
-      'email',
-      'role',
-      'coverImage',
-      'bio',
-      'gender',
-      'birthday',
-      'phone',
-      'school',
-      'major',
-      'grade',
-      'signature',
-      'status',
-      'createdAt'
-    ]
-    const filteredData = {} as Partial<User>
-    for (const key of allowedFields) {
-      if (key in userData) {
-        ;(filteredData as Record<string, unknown>)[key] = userData[key]
-      }
-    }
-    user.value = { ...user.value!, ...filteredData }
-    saveToStorage()
-    logger.info('User info updated', { userId: user.value?.id })
-  }
-
-  // 更新用户头像
-  function updateAvatar(avatarUrl: string): void {
-    if (user.value) {
-      user.value.avatar = avatarUrl
-      saveToStorage()
-    }
-  }
-
-  // 更新用户封面图
-  function updateCoverImage(coverImageUrl: string): void {
-    if (user.value) {
-      user.value.coverImage = coverImageUrl
-      saveToStorage()
-    }
-  }
-
-  /**
-   * 更新个人资料
-   */
-  async function updateProfile(
-    profileData: UpdateProfileRequest
-  ): Promise<{ success: boolean; message?: string }> {
-    loading.value = true
-    try {
-      await userApi.updateProfile(profileData)
-      updateUserInfo(profileData as Partial<User>)
-      return { success: true }
-    } catch (error) {
-      logger.error('Failed to update profile', { error: (error as Error).message })
-      return {
-        success: false,
-        message:
-          (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
-          '更新失败'
-      }
-    } finally {
-      loading.value = false
-    }
   }
 
   /**
@@ -413,13 +274,8 @@ export const useAuthStore = defineStore('auth', () => {
     resetState,
     validateToken,
     login,
-    register,
     logout,
     updateTokens,
-    updateUserInfo,
-    updateAvatar,
-    updateCoverImage,
-    updateProfile,
     changePassword
   }
 })

@@ -52,7 +52,9 @@ public class GlobalExceptionHandler {
         LogUtils.logSecurityEvent("BUSINESS_EXCEPTION", e.getMessage(), clientIp);
         int httpStatus;
         switch (e.getCode()) {
-            case 400: case 401: case 403: case 404: case 409: case 429: case 500: case 502:
+            // 503：服务暂不可用（如阅读页模板缺失，ReadingTemplate 抛 BusinessException(503)）。
+            // 此前落到 default 会被降级成 400，客户端把「站点临时故障」误判为参数错误。
+            case 400: case 401: case 403: case 404: case 409: case 429: case 500: case 502: case 503:
                 httpStatus = e.getCode();
                 break;
             default:

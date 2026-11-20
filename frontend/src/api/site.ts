@@ -1,5 +1,5 @@
 import api from './index'
-import type { ApiResponse } from '@/types'
+import type { ApiResponse, PaginatedData } from '@/types'
 import type { SiteSettings } from '@/stores/site'
 import { getVisitorId } from '@/utils/visitor'
 import type { AxiosProgressEvent } from 'axios'
@@ -24,13 +24,8 @@ export interface VisitorRecord {
   time: string
 }
 
-export interface PageResult<T> {
-  records: T[]
-  total: number
-  current: number
-  size: number
-  pages: number
-}
+/** 与 `PaginatedData`（types/common.ts）同一形状：后端分页统一是 { records, total, size, current, pages }。 */
+export type PageResult<T> = PaginatedData<T>
 
 export type SiteAssetKind = 'logo' | 'favicon' | 'avatar' | 'music' | 'background'
 

@@ -199,10 +199,12 @@ html[data-wallpaper] #selfblog .toc-card {
 
 /* 纸面档 —— 页面级大面（整页框架、空态、首屏 Hero、浮层、页脚、登录卡）。
    刻意**不含**输入框、表格行、徽章、按钮：它们面积小、边界细，
-   半透明后与背景糊在一起反而降低可读性。 */
+   半透明后与背景糊在一起反而降低可读性。
+   也**不含** .functional-glass：导航条 / 菜单面板是压在正文上方的功能层，
+   走 variables.css 的 --functional-glass-bg（98%，比纸面档更高一档），
+   否则面板后的文字会透过玻璃「重影」（见 glassmorphism.css）。 */
 #selfblog[data-surface-translucent] .page-frame[data-page-background='auto'],
 #selfblog[data-surface-translucent] .page-frame[data-page-background='plain'],
-#selfblog[data-surface-translucent] .functional-glass,
 #selfblog[data-surface-translucent] .intro-shell,
 #selfblog[data-surface-translucent] .state-panel,
 #selfblog[data-surface-translucent] .modal-content,

@@ -191,8 +191,12 @@
   --glass-shadow-wet: var(--shadow-md);
   --glass-wet-glow: none;
 
-  /* Explicit opt-in: never turn legacy content cards into glass. */
-  --functional-glass-bg: color-mix(in srgb, var(--surface-primary) 88%, transparent);
+  /* Explicit opt-in: never turn legacy content cards into glass.
+     98%（而非 88%）：导航条 / 移动端菜单面板是压在正文上方的功能层，
+     backdrop-filter 在部分渲染路径下不生效，alpha 必须独立兜底 ——
+     实测 88%~95% 时面板后的大号标题仍可辨认（透射差 ~19/255），
+     98% 才降到不可察觉（~4/255，与 reduced-transparency 的实心回落同观感档）。 */
+  --functional-glass-bg: color-mix(in srgb, var(--surface-primary) 98%, transparent);
   --functional-glass-edge: color-mix(in srgb, var(--surface-primary) 90%, transparent);
   --functional-glass-blur: 16px;
   --functional-glass-shadow: 0 9px 30px rgb(20 32 51 / 9%);

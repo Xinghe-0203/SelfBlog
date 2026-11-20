@@ -51,7 +51,7 @@ export type {
 export type { Comment, CreateCommentRequest, CommentListParams } from './comment'
 
 // 标签类型
-export type { Tag, CreateTagRequest, UpdateTagRequest, TagSearchParams } from './tag'
+export type { Tag, TagWithCount, CreateTagRequest, UpdateTagRequest, TagSearchParams } from './tag'
 
 // 消息/通知类型
 export type {
@@ -66,20 +66,10 @@ export type {
 } from './message'
 
 // 管理后台类型
-export type {
-  CommunityStats,
-  AdminStatistics,
-  AdminUserListParams,
-  AdminPostListParams,
-  HandleReportRequest,
-  HandleUserStatusRequest
-} from './admin'
+export type { AdminPostListParams } from './admin'
 
 // 媒体类型
 export type { MediaType, UploadType, Media, UploadProgress, UploadResponse } from './media'
-
-// 热搜类型
-export type { TrendingContentType, TrendingContent, TrendingParams } from './trending'
 
 // SEO 自动化类型
 export type {

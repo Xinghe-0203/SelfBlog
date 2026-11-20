@@ -42,12 +42,12 @@ usePageSeo('post', () => ({
   title: post.value?.title || '文章详情',
   description:
     post.value?.summary || post.value?.content.replace(/[#*`>_~-]/g, '').slice(0, 140) || '',
-  image: post.value?.coverUrl || post.value?.coverImage,
+  image: post.value?.coverImage,
   url: `/post/${post.value?.id || route.params.id}`,
   type: post.value ? 'article' : 'website',
-  publishedTime: post.value?.createTime || post.value?.createdAt,
+  publishedTime: post.value?.createTime,
   modifiedTime: post.value?.updateTime,
-  author: post.value?.nickname || post.value?.authorName,
+  author: post.value?.nickname,
   tags: post.value?.tags?.map((tag) => tag.name),
   section: post.value?.category,
   indexable: !!post.value
@@ -113,7 +113,7 @@ const UPDATE_NOTICE_THRESHOLD_MS = 7 * 24 * 60 * 60 * 1000
  */
 const lastUpdated = computed(() => {
   const updated = post.value?.updateTime
-  const created = post.value?.createTime || post.value?.createdAt
+  const created = post.value?.createTime
   if (!updated || !created) return ''
   const updatedAt = new Date(updated).getTime()
   const createdAt = new Date(created).getTime()
@@ -404,7 +404,8 @@ const scrollToHeading = (item: TocItem) => {
   const heading = contentRef.value?.querySelector(`#${item.id}`)
   if (!heading) return
   heading.scrollIntoView({
-    behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+    behavior:
+      window.matchMedia('(prefers-reduced-motion: reduce)')?.matches === true ? 'auto' : 'smooth',
     block: 'start'
   })
   activeHeading.value = item.id
@@ -541,9 +542,9 @@ onUnmounted(() => {
           </p>
           <p v-if="post.summary" class="article-summary">{{ post.summary }}</p>
           <div v-if="showModule('meta')" class="article-meta">
-            <time :datetime="post.createTime || post.createdAt">
+            <time :datetime="post.createTime">
               <Icon name="calendar" :size="14" />
-              {{ formatDate(post.createTime || post.createdAt, 'YYYY年MM月DD日') }}
+              {{ formatDate(post.createTime, 'YYYY年MM月DD日') }}
             </time>
             <span class="meta-item"
               ><Icon name="clock" :size="14" />约 {{ estimatedReadMinutes }} 分钟阅读</span
@@ -565,9 +566,9 @@ onUnmounted(() => {
         </header>
 
         <img
-          v-if="showModule('cover') && (post.coverImage || post.coverUrl)"
+          v-if="showModule('cover') && post.coverImage"
           class="article-cover"
-          :src="getSafeImageUrl(post.coverImage || post.coverUrl)"
+          :src="getSafeImageUrl(post.coverImage)"
           alt=""
         />
 
@@ -577,12 +578,15 @@ onUnmounted(() => {
           <p class="summary-callout-text">{{ post.summary }}</p>
         </aside>
 
+        <!-- 正文 HTML 来自 renderMarkdown（DOMPurify 净化 + 站内/外链加工），不是原始用户输入 -->
+        <!-- eslint-disable vue/no-v-html -->
         <div
           ref="contentRef"
           class="markdown-body"
           v-html="renderedContent"
           @click="onContentClick"
         ></div>
+        <!-- eslint-enable vue/no-v-html -->
 
         <!-- 版权声明：正文之后、相关阅读之前；留空设置下整块不渲染 -->
         <footer v-if="licenseVisible" class="post-license">

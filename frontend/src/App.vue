@@ -190,9 +190,12 @@ onUnmounted(() => {
 }
 
 /* ==================== Skip Link ==================== */
+/* 收起态用 transform 上移出屏，而不是 top: -48px：top 会把布局盒留在 -48px，
+   但 --shadow-md 的弥散阴影仍画在原地，渗进视口左上角（/login 没有导航条遮挡，
+   最明显）。阴影跟着 transform 走，元素整个（含阴影）都离开了可视区。 */
 .skip-link {
   position: absolute;
-  top: -48px;
+  top: 0;
   left: var(--spacing-md);
   background: linear-gradient(135deg, var(--primary-start), var(--primary-end));
   /* 强调色在深色主题下会提亮（62% 主色 + 38% 白），白字会掉到 2.7:1；
@@ -203,13 +206,14 @@ onUnmounted(() => {
   font-weight: 500;
   border-radius: 0 0 var(--radius) var(--radius);
   z-index: 10000;
-  transition: top 0.25s var(--ease-spring);
+  transition: transform 0.25s var(--ease-spring);
   text-decoration: none;
+  transform: translateY(calc(-100% - var(--spacing-md)));
   box-shadow: var(--shadow-md);
 }
 
 .skip-link:focus {
-  top: 0;
+  transform: none;
   outline: 2px solid var(--primary);
   outline-offset: 2px;
 }

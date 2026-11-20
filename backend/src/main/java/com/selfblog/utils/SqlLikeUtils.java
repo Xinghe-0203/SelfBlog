@@ -75,18 +75,4 @@ public final class SqlLikeUtils {
     public static String containsPattern(String keyword) {
         return "%" + escape(keyword) + "%";
     }
-
-    /**
-     * 构造“以关键词开头”的 LIKE 模式（右侧 `%` 通配）。
-     */
-    public static String prefixPattern(String keyword) {
-        return escape(keyword) + "%";
-    }
-
-    /**
-     * 构造“以关键词结尾”的 LIKE 模式（左侧 `%` 通配）。
-     */
-    public static String suffixPattern(String keyword) {
-        return "%" + escape(keyword);
-    }
 }

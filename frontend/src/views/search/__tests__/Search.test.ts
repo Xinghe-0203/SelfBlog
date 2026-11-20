@@ -42,7 +42,7 @@ beforeEach(() => {
   vi.resetAllMocks()
   vi.mocked(postApi.getSearchSuggestions).mockResolvedValue(response(SUGGESTIONS))
   vi.mocked(postApi.advancedSearch).mockResolvedValue(
-    response({ records: [], total: 0, pageNum: 1, pageSize: 12, pages: 1 })
+    response({ records: [], total: 0, size: 12, current: 1, pages: 1 })
   )
 })
 
@@ -183,6 +183,25 @@ describe('search typeahead suggestions', () => {
     expect(input.attributes('aria-expanded')).toBe('false')
   })
 
+  it('hides the empty-state prompt while the dropdown is open and restores it after close', async () => {
+    // 联想下拉是绝对定位，会压在空态的装饰放大镜上：下拉展开期间整块收起
+    useDebounceFakeTimers()
+    const { wrapper } = await setupSearch()
+    const prompt = () => wrapper.find('.search-prompt')
+    expect(prompt().exists()).toBe(true)
+    const input = wrapper.get('#article-search')
+    await input.setValue('vue')
+    await vi.advanceTimersByTimeAsync(300)
+    await flushPromises()
+    await nextTick()
+    expect(wrapper.find('#article-search-suggestions').exists()).toBe(true)
+    expect(prompt().exists()).toBe(false)
+
+    await input.trigger('keydown', { key: 'Escape' })
+    expect(wrapper.find('#article-search-suggestions').exists()).toBe(false)
+    expect(prompt().exists()).toBe(true)
+  })
+
   it('keeps the plain submit flow when Enter is pressed without an active suggestion', async () => {
     const { wrapper } = await setupSearch()
     const input = wrapper.get('#article-search')
@@ -204,5 +223,38 @@ describe('search input focus', () => {
     // 全局 Ctrl/Cmd+K 或 `/` 直达搜索页后，光标应该已经在输入框里
     expect(document.activeElement).toBe(wrapper.get('#article-search').element)
     wrapper.unmount()
+  })
+})
+
+describe('page query sync with the route (and the navbar search)', () => {
+  it('initializes the page input from route.query.q at mount', async () => {
+    const { wrapper } = await setupSearch('hello')
+    expect((wrapper.get('#article-search').element as HTMLInputElement).value).toBe('hello')
+    expect(postApi.advancedSearch).toHaveBeenCalledWith({
+      keyword: 'hello',
+      pageNum: 1,
+      pageSize: 12
+    })
+  })
+
+  it('keeps the sync one-way: local typing never writes back to the route', async () => {
+    const { wrapper, router } = await setupSearch('hello')
+    const input = wrapper.get('#article-search')
+    await input.setValue('hello2')
+    await flushPromises()
+    expect(router.currentRoute.value.query.q).toBe('hello')
+    expect(router.currentRoute.value.fullPath).not.toContain('hello2')
+  })
+
+  it('follows a route change made outside the page (navbar submit) without a loop', async () => {
+    const { wrapper, router } = await setupSearch('hello')
+    await router.push({ path: '/search', query: { q: 'navbar word' } })
+    await flushPromises()
+    expect((wrapper.get('#article-search').element as HTMLInputElement).value).toBe('navbar word')
+    expect(postApi.advancedSearch).toHaveBeenLastCalledWith({
+      keyword: 'navbar word',
+      pageNum: 1,
+      pageSize: 12
+    })
   })
 })

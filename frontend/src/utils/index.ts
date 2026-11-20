@@ -3,38 +3,6 @@
  */
 
 /**
- * 格式化日期为相对时间
- */
-export function formatRelativeTime(date: string | Date | null | undefined): string {
-  if (!date) return ''
-  const target = new Date(date)
-  if (isNaN(target.getTime())) return ''
-  const now = new Date()
-  const diff = now.getTime() - target.getTime()
-  if (diff < 0) {
-    return formatDate(target)
-  }
-
-  const seconds = Math.floor(diff / 1000)
-  const minutes = Math.floor(seconds / 60)
-  const hours = Math.floor(minutes / 60)
-  const days = Math.floor(hours / 24)
-
-  if (seconds < 60) return '刚刚'
-  if (minutes < 60) return `${minutes}分钟前`
-  if (hours < 24) return `${hours}小时前`
-  if (days < 30) return `${days}天前`
-
-  // 30 天近似会把「还差几天满一年」的日期提前说成「1年前」；改用真实日历月差。
-  let months =
-    (now.getFullYear() - target.getFullYear()) * 12 + (now.getMonth() - target.getMonth())
-  if (now.getDate() < target.getDate()) months -= 1
-  if (months < 1) return `${days}天前`
-  if (months < 12) return `${months}个月前`
-  return `${Math.floor(months / 12)}年前`
-}
-
-/**
  * 格式化日期
  */
 export function formatDate(
@@ -96,15 +64,18 @@ export function getSafeImageUrl(
 
 /**
  * 验证密码强度
+ *
+ * 只判**档位**，不产出颜色/文案：颜色映射放在 PasswordChange.vue 的 CSS 里
+ * （语义 token 会随主题/皮肤切换，JS 里写死的 hex 做不到）。
  */
+export type PasswordStrengthLevel = 'empty' | 'weak' | 'medium' | 'strong'
+
 export interface PasswordStrength {
-  level: 'none' | 'weak' | 'medium' | 'strong'
-  text: string
-  color: string
+  level: PasswordStrengthLevel
 }
 
 export function checkPasswordStrength(password: string | null | undefined): PasswordStrength {
-  if (!password) return { level: 'none', text: '无', color: '#999' }
+  if (!password) return { level: 'empty' }
   let strength = 0
 
   if (password.length >= 8) strength++
@@ -113,7 +84,7 @@ export function checkPasswordStrength(password: string | null | undefined): Pass
   if (/\d/.test(password)) strength++
   if (/[^a-zA-Z0-9]/.test(password)) strength++
 
-  if (strength <= 2) return { level: 'weak', text: '弱', color: '#F44336' }
-  if (strength <= 3) return { level: 'medium', text: '中', color: '#FF9800' }
-  return { level: 'strong', text: '强', color: '#4CAF50' }
+  if (strength <= 2) return { level: 'weak' }
+  if (strength <= 3) return { level: 'medium' }
+  return { level: 'strong' }
 }

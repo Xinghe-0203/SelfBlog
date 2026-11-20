@@ -521,12 +521,15 @@
               maxlength="300000"
             ></textarea>
             <div v-else class="editor-preview">
+              <!-- 预览正文来自 renderMarkdown（DOMPurify 净化）与站内渲染链路，不是原始用户 HTML -->
+              <!-- eslint-disable vue/no-v-html -->
               <div
                 v-if="form.content"
                 class="markdown-body"
                 v-html="renderedContent"
                 @click="onPreviewClick"
               ></div>
+              <!-- eslint-enable vue/no-v-html -->
               <div v-else class="empty-preview">
                 <svg
                   width="48"
@@ -1033,6 +1036,7 @@ import { seoApi } from '../../api/seo'
 import { llmApi } from '../../api/llm'
 import { useLogger } from '../../utils/logger'
 import { toast } from '../../utils/toast'
+import { apiErrorMessage } from '../../utils/apiError'
 import { useConfirm } from '../../composables/useConfirm'
 import { formatDate } from '../../utils'
 import { estimateReadMinutes } from '../../utils/reading'
@@ -1051,9 +1055,11 @@ const saving = ref(false)
 const publishing = ref(false)
 const confirmingPublication = ref(false)
 const tagInput = ref('')
-const selectedTags = ref<any[]>([])
-const allTags = ref<any[]>([])
-const filteredTags = ref<any[]>([])
+/** 编辑器里的标签轻量形状：可能只有名字（新建未落库），也可能带 id */
+type TagLike = { id?: number; name: string }
+const selectedTags = ref<TagLike[]>([])
+const allTags = ref<TagLike[]>([])
+const filteredTags = ref<TagLike[]>([])
 const currentDraftId = ref<number | null>(null)
 const contentTextarea = ref<HTMLTextAreaElement | null>(null)
 const imageInput = ref<HTMLInputElement | null>(null)
@@ -1065,7 +1071,7 @@ const isLoading = ref(false)
 function postData() {
   return {
     ...form,
-    tagIds: selectedTags.value.filter((tag) => tag.id).map((tag) => tag.id),
+    tagIds: selectedTags.value.flatMap((tag) => (tag.id === undefined ? [] : [tag.id])),
     tagNames: selectedTags.value.map((tag) => tag.name)
   }
 }
@@ -1290,7 +1296,8 @@ async function uploadContentImage(e: Event) {
   uploadingImage.value = true
   try {
     const res = await mediaApi.uploadFile(file, 'article')
-    const url = res.data?.url || res.data?.fileName
+    // MediaVO 只带 fileUrl；拿不到地址就不能谎报「已插入」。
+    const url = res.data?.fileUrl
     if (url) {
       const ta = contentTextarea.value
       const start = ta?.selectionStart ?? form.content.length
@@ -1298,11 +1305,13 @@ async function uploadContentImage(e: Event) {
       saveHistory()
       form.content =
         form.content.substring(0, start) + md + form.content.substring(ta?.selectionEnd ?? start)
+      toast.success('图片已插入')
+    } else {
+      toast.error('上传成功，但未取得图片地址')
     }
-    toast.success('图片已插入')
-  } catch (err: any) {
-    logger.error('upload content image error', { error: err.message })
-    toast.error(err.response?.data?.message || '图片上传失败')
+  } catch (err: unknown) {
+    logger.error('upload content image error', { error: apiErrorMessage(err, 'unknown') })
+    toast.error(apiErrorMessage(err, '图片上传失败'))
   } finally {
     uploadingImage.value = false
     target.value = ''
@@ -1315,8 +1324,8 @@ const fetchTags = async () => {
   try {
     const response = await tagApi.getTagList()
     allTags.value = response.data || []
-  } catch (err: any) {
-    logger.error('Failed to fetch tags', { error: err.message })
+  } catch (err: unknown) {
+    logger.error('Failed to fetch tags', { error: apiErrorMessage(err, 'unknown') })
   }
 }
 
@@ -1346,13 +1355,13 @@ function addTag() {
   filteredTags.value = []
 }
 
-function addSuggestedTag(tag: any) {
+function addSuggestedTag(tag: TagLike) {
   if (!selectedTags.value.find((s) => s.id === tag.id)) selectedTags.value.push(tag)
   tagInput.value = ''
   filteredTags.value = []
 }
 
-function removeTag(tag: any) {
+function removeTag(tag: TagLike) {
   selectedTags.value = selectedTags.value.filter((s) =>
     tag.id ? s.id !== tag.id : s.name !== tag.name
   )
@@ -1370,9 +1379,9 @@ async function createTagAndAdd() {
     await fetchTags()
     tagInput.value = ''
     toast.success('标签已创建')
-  } catch (err: any) {
-    logger.error('create tag error', { error: err.message })
-    toast.error(err.response?.data?.message || '创建标签失败')
+  } catch (err: unknown) {
+    logger.error('create tag error', { error: apiErrorMessage(err, 'unknown') })
+    toast.error(apiErrorMessage(err, '创建标签失败'))
   }
 }
 
@@ -1384,11 +1393,11 @@ async function handleCoverUpload(e: Event) {
   if (!file) return
   try {
     const res = await mediaApi.uploadFile(file, 'cover')
-    form.coverImage = (res.data as any)?.fileUrl || (res.data as any)?.url || ''
+    form.coverImage = res.data?.fileUrl || ''
     toast.success('封面图上传成功')
-  } catch (err: any) {
-    logger.error('cover upload error', { error: err.message })
-    toast.error(err.response?.data?.message || '上传封面图失败')
+  } catch (err: unknown) {
+    logger.error('cover upload error', { error: apiErrorMessage(err, 'unknown') })
+    toast.error(apiErrorMessage(err, '上传封面图失败'))
   }
   if (coverInput.value) coverInput.value.value = ''
 }
@@ -1418,10 +1427,10 @@ async function loadSeo() {
     seoForm.seoDescription = data?.seoDescription || ''
     seoForm.seoKeywords = data?.seoKeywords || ''
     seoForm.ogImageUrl = data?.ogImageUrl || ''
-  } catch (err: any) {
+  } catch (err: unknown) {
     // 没有 SEO 记录时后端返回 404，等同于「尚未填写」，不是错误。
-    if (err?.response?.status !== 404) {
-      seoInfo.error = err.userMessage || 'SEO 元数据加载失败'
+    if ((err as { response?: { status?: number } }).response?.status !== 404) {
+      seoInfo.error = apiErrorMessage(err, 'SEO 元数据加载失败')
     }
   } finally {
     seoInfo.loading = false
@@ -1448,8 +1457,8 @@ async function saveSeo() {
   try {
     await seoApi.update(Number(postId), seoPayload())
     seoInfo.notice = 'SEO 元数据已保存'
-  } catch (err: any) {
-    seoInfo.error = err.userMessage || 'SEO 保存失败'
+  } catch (err: unknown) {
+    seoInfo.error = apiErrorMessage(err, 'SEO 保存失败')
   } finally {
     seoInfo.busy = false
   }
@@ -1471,8 +1480,8 @@ async function generateSeo() {
       seoForm.ogImageUrl = data.ogImageUrl || ''
     }
     seoInfo.notice = '已由模型生成并保存'
-  } catch (err: any) {
-    seoInfo.error = err.userMessage || '模型生成失败'
+  } catch (err: unknown) {
+    seoInfo.error = apiErrorMessage(err, '模型生成失败')
   } finally {
     seoInfo.busy = false
   }
@@ -1547,13 +1556,8 @@ async function runWriting(kind: 'summary' | 'tags' | 'titles' | 'links') {
         ? '已生成内链建议，点「插入」写进正文'
         : '模型没有给出可用的内链建议'
     }
-  } catch (err) {
-    const detail = err as {
-      userMessage?: string
-      response?: { data?: { message?: string } }
-    }
-    writing.error =
-      detail.userMessage || detail.response?.data?.message || '模型生成失败，请稍后重试'
+  } catch (err: unknown) {
+    writing.error = apiErrorMessage(err, '模型生成失败，请稍后重试')
   } finally {
     writing.busy = ''
   }
@@ -1639,13 +1643,8 @@ async function runInlineWriting(action: InlineWritingAction) {
             ? '翻译完成，已替换选区'
             : '精简完成，已替换选区'
     }
-  } catch (err) {
-    const detail = err as {
-      userMessage?: string
-      response?: { data?: { message?: string } }
-    }
-    writing.error =
-      detail.userMessage || detail.response?.data?.message || '模型生成失败，请稍后重试'
+  } catch (err: unknown) {
+    writing.error = apiErrorMessage(err, '模型生成失败，请稍后重试')
   } finally {
     writing.busy = ''
   }
@@ -1741,9 +1740,9 @@ const fetchPost = async () => {
     postInfo.createTime = post.createTime || ''
     postInfo.viewCount = post.viewCount || 0
     postInfo.likeCount = post.likeCount || 0
-  } catch (err: any) {
-    logger.error('fetch post error', { error: err.message })
-    toast.error(err.response?.data?.message || '加载文章失败')
+  } catch (err: unknown) {
+    logger.error('fetch post error', { error: apiErrorMessage(err, 'unknown') })
+    toast.error(apiErrorMessage(err, '加载文章失败'))
   }
 }
 
@@ -1760,9 +1759,9 @@ const fetchDraftById = async (draftId: string) => {
       selectedTags.value = res.data.tags || []
       form.coverImage = res.data.coverImage || ''
     }
-  } catch (err: any) {
-    logger.error('fetch draft by id error', { error: err.message })
-    toast.error(err.response?.data?.message || '加载草稿失败')
+  } catch (err: unknown) {
+    logger.error('fetch draft by id error', { error: apiErrorMessage(err, 'unknown') })
+    toast.error(apiErrorMessage(err, '加载草稿失败'))
   }
 }
 
@@ -1790,10 +1789,10 @@ const saveDraft = async (silent = false) => {
         ? res.data
         : res.data?.draftId || res.data?.id || currentDraftId.value
     acceptSavedSnapshot(snapshot)
-  } catch (err: any) {
-    logger.error('save draft error', { error: err.message })
+  } catch (err: unknown) {
+    logger.error('save draft error', { error: apiErrorMessage(err, 'unknown') })
     saveStatus.value = ''
-    if (!silent) toast.error(err.userMessage || err.response?.data?.message || '保存草稿失败')
+    if (!silent) toast.error(apiErrorMessage(err, '保存草稿失败'))
   } finally {
     saving.value = false
   }
@@ -1854,9 +1853,9 @@ const publishPost = async () => {
       return
     }
     await router.push('/')
-  } catch (err: any) {
-    logger.error('publish error', { error: err.message })
-    toast.error(err.response?.data?.message || '发布失败')
+  } catch (err: unknown) {
+    logger.error('publish error', { error: apiErrorMessage(err, 'unknown') })
+    toast.error(apiErrorMessage(err, '发布失败'))
   } finally {
     publishing.value = false
     confirmingPublication.value = false
@@ -2567,7 +2566,7 @@ onBeforeRouteLeave((_to, _from) => {
   width: 36px;
   height: 36px;
   background: var(--preview-scrim);
-  color: #fff;
+  color: var(--contrast-fg);
   border: none;
   border-radius: var(--radius);
   cursor: pointer;

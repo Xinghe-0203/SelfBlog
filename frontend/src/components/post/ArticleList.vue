@@ -10,7 +10,7 @@ const props = withDefaults(
   { heading: 'h3' }
 )
 const failed = ref(new Set<string>())
-const cover = (post: Post) => getSafeImageUrl(post.coverImage || post.coverUrl, '')
+const cover = (post: Post) => getSafeImageUrl(post.coverImage, '')
 // 阅读时长按 post.id 记忆成 Map：estimateReadMinutes 要对全文跑多趟正则，
 // 模板里每次渲染逐条重算太贵。Post.id 必填，Map 与同一数组同源，get 不会落空。
 const readMinutes = computed(
@@ -31,8 +31,8 @@ const readMinutes = computed(
     >
       <div class="article-row-main">
         <div class="article-meta">
-          <time :datetime="post.createTime || post.createdAt">{{
-            formatDate(post.createTime || post.createdAt, 'YYYY年MM月DD日')
+          <time :datetime="post.createTime">{{
+            formatDate(post.createTime, 'YYYY年MM月DD日')
           }}</time>
           <span v-if="post.category" class="article-category">{{ post.category }}</span>
         </div>

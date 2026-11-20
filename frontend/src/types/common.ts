@@ -15,12 +15,15 @@ export interface PaginationParams {
   pageSize?: number
 }
 
-/** 分页响应数据 */
+/**
+ * 分页响应数据 —— 与后端 MyBatis-Plus `Page` 的序列化逐字对应：
+ * `{ records, total, size, current, pages }`（没有 pageNum/pageSize 字段）。
+ */
 export interface PaginatedData<T> {
   records: T[]
   total: number
-  pageNum: number
-  pageSize: number
+  size: number
+  current: number
   pages: number
 }
 

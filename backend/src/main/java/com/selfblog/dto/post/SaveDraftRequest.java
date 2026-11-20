@@ -29,12 +29,14 @@ public class SaveDraftRequest {
     private String content;
 
     @Schema(description = "文章分类")
+    @Size(max = 50, message = "文章分类不能超过50字符")
     private String category;
 
     @Schema(description = "标签ID列表")
     private List<Long> tagIds;
 
     @Schema(description = "封面图片URL")
+    @Size(max = 500, message = "封面图片地址不能超过500字符")
     private String coverImage;
 
     @Schema(description = "标签名称列表")

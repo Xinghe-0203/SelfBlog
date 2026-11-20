@@ -68,10 +68,22 @@ select:is(:focus-visible),
   outline-offset: 2px;
 }
 
-/* ==================== Scrollbar — Minimal ==================== */
+/* ==================== Scrollbar — Themed & Thin ==================== */
+/*
+  标准属性（Firefox / Chrome 121+）与 ::-webkit-scrollbar（Safari 及旧内核）双轨：
+  支持 scrollbar-color 的引擎会忽略 webkit 伪元素样式，所以两份都要写。
+  颜色全部走 token —— --border-light / --text-muted 在深色模式与各皮肤里
+  都有定义，滚动条因此自动跟随主题，不再需要 .dark-mode 单独覆写。
+  thin 宽度对代码块 pre 的横向滚动同样适用，只收窄不干扰。
+*/
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-light) transparent;
+}
+
 ::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
+  width: 8px;
+  height: 8px;
 }
 
 ::-webkit-scrollbar-track {
@@ -79,25 +91,14 @@ select:is(:focus-visible),
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--gray-300);
-  border: 3px solid transparent;
+  background: var(--border-light);
+  border: 2px solid transparent;
   border-radius: var(--radius-full);
   background-clip: content-box;
-  transition: background var(--transition);
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--gray-400);
-  background-clip: content-box;
-}
-
-.dark-mode ::-webkit-scrollbar-thumb {
-  background: var(--gray-600);
-  background-clip: content-box;
-}
-
-.dark-mode ::-webkit-scrollbar-thumb:hover {
-  background: var(--gray-500);
+  background: var(--text-muted);
   background-clip: content-box;
 }
 

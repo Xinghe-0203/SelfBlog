@@ -14,7 +14,7 @@ beforeEach(() => {
   vi.mocked(adminApi.getTagList).mockResolvedValue({
     code: 200,
     message: 'ok',
-    data: { records: [{ id: 1, name: '技术' }], pages: 1, total: 1, pageNum: 1, pageSize: 20 }
+    data: { records: [{ id: 1, name: '技术' }], pages: 1, total: 1, size: 20, current: 1 }
   })
 })
 async function setup() {

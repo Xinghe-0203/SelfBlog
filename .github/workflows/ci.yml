@@ -30,8 +30,8 @@ jobs:
     name: Backend tests (H2)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: '21'
@@ -48,7 +48,7 @@ jobs:
       run:
         working-directory: frontend
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v4
         with:
           # engine-strict 要求 ^22.22.2 || ^24.15.0 || >=26（来自缩略依赖树）
@@ -90,8 +90,8 @@ jobs:
       # test/resources/schema.sql 是 H2 专用的，MySQL 库由下面的脚本初始化
       SPRING_SQL_INIT_MODE: never
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: '21'
@@ -106,8 +106,8 @@ jobs:
     name: Docker image smoke test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: docker/setup-buildx-action@v3
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
       - name: Build image (repository-root context, like Compose uses)
         uses: docker/build-push-action@v6
         with:

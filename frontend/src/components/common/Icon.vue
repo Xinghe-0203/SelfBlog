@@ -14,6 +14,8 @@ const fragment = computed(() => icons[props.name] ?? icons.logo)
 </script>
 
 <template>
+  <!-- 片段来自本仓库 icons.ts 的静态注册表（纯 SVG path，无用户输入），因此 v-html 是安全的 -->
+  <!-- eslint-disable vue/no-v-html -->
   <svg
     class="icon"
     :width="size"
@@ -28,6 +30,7 @@ const fragment = computed(() => icons[props.name] ?? icons.logo)
     focusable="false"
     v-html="fragment"
   />
+  <!-- eslint-enable vue/no-v-html -->
 </template>
 
 <style scoped>

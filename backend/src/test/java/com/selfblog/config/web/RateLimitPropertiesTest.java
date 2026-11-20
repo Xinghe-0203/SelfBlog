@@ -81,12 +81,45 @@ class RateLimitPropertiesTest {
 
         assertEquals(10, limits.get("/api/user/login"));
         assertEquals(5, limits.get("/api/user/register"));
-        assertEquals(3, limits.get("/api/user/send-code"));
         assertEquals(20, limits.get("/api/user/search"));
         assertEquals(30, limits.get("/api/user/"));
         assertEquals(60, limits.get("/api/visitor/"));
         assertEquals(5, limits.get("/api/guest-comments/"));
         assertEquals(120, limits.get("/api/site/pages"));
+    }
+
+    @Test
+    @DisplayName("密码找回端点按真实路径 /api/auth/password/** 登记，预算 3/min 与 5/min 不变")
+    void passwordRecoveryBudgetsPointAtTheRealAuthPasswordPaths() {
+        RateLimitProperties properties = new RateLimitProperties();
+        Map<String, Integer> limits = properties.getAllLimits();
+
+        // 回归：旧登记 /api/user/send-code、/api/user/reset-password 指向不存在的端点，
+        // 发验证码/重置密码两个重操作实际完全不限流。
+        assertFalse(limits.containsKey("/api/user/send-code"), "旧前缀必须移除");
+        assertFalse(limits.containsKey("/api/user/reset-password"), "旧前缀必须移除");
+        assertEquals(3, limits.get("/api/auth/password/send-code"), "发验证码预算保持 3/min");
+        assertEquals(5, limits.get("/api/auth/password/reset-password"), "重置密码预算保持 5/min");
+        // 新前缀比 /api/auth/（20/min）更长：最长前缀匹配下紧预算必须能胜出。
+        assertTrue("/api/auth/password/send-code".startsWith("/api/auth/"),
+                "新前缀必须落在 /api/auth/ 命名空间内，靠更长前缀压过它的 20/min");
+    }
+
+    @Test
+    @DisplayName("文章配图列表读阈值 60/min 登记在读表，写前缀 /api/media/ 的 10/min 不变")
+    void mediaPostReadPathHasItsOwnLooseThreshold() {
+        RateLimitProperties properties = new RateLimitProperties();
+        Map<String, Integer> write = properties.getAllLimits();
+        Map<String, Integer> read = properties.getReadLimits();
+
+        assertEquals(60, read.get("/api/media/post"),
+                "GET /api/media/post/** 是纯只读浏览，不得吃 10/min 的上传写桶");
+        assertTrue("/api/media/post".length() > "/api/media".length(),
+                "读前缀必须比写前缀 /api/media 更长，最长前缀匹配才能在 GET /api/media/post/** 上胜出");
+        assertFalse(write.containsKey("/api/media/post"),
+                "写表不得新增该前缀：/api/media 下的写路径仍由 10/min 保护");
+        assertEquals(10, write.get("/api/media/"), "写路径保持 10/min 不变");
+        assertEquals(10, write.get("/api/media/upload"), "上传路径保持 10/min 不变");
     }
 
     // ==================== 只读路径专用阈值表 ====================

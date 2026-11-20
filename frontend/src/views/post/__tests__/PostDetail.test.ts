@@ -28,8 +28,6 @@ const post: Post = {
   id: 1,
   title: '阅读测试',
   content: '## 第一节\n\n正文\n\n```ts\nconst a = 1\n```\n\n<script>alert(1)</script>',
-  authorId: 1,
-  authorName: '作者',
   viewCount: 1,
   likeCount: 0,
   commentCount: 0,

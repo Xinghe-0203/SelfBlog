@@ -10,15 +10,13 @@ const post: Post = {
   title: '一篇真实的笔记',
   content: '正文'.repeat(300),
   summary: '文章摘要',
-  authorId: 1,
-  authorName: '作者',
   viewCount: 1,
   likeCount: 0,
   commentCount: 0,
   collectCount: 0,
   shareCount: 0,
   status: 1,
-  createdAt: '2026-10-16T10:00:00',
+  createTime: '2026-10-16T10:00:00',
   tags: [{ id: 2, name: '技术' }]
 }
 async function setup(posts = [post]) {
@@ -51,10 +49,8 @@ describe('shared article rows', () => {
     expect(wrapper.find('.row-cover').exists()).toBe(false)
   })
 
-  it('supports legacy coverUrl and rejects unsafe images without default artwork', async () => {
-    const wrapper = await setup([{ ...post, coverUrl: '/uploads/old.jpg' }])
-    expect(wrapper.get('img').attributes('src')).toBe('/uploads/old.jpg')
-    await wrapper.setProps({ posts: [{ ...post, coverImage: 'javascript:alert(1)' }] })
+  it('rejects unsafe images without default artwork', async () => {
+    const wrapper = await setup([{ ...post, coverImage: 'javascript:alert(1)' }])
     expect(wrapper.find('img').exists()).toBe(false)
   })
 
