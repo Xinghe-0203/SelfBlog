@@ -74,6 +74,7 @@
 | `.github/workflows/ci.yml` | 修改（actions 升级） |
 | 版本与文档：`backend/pom.xml`、`frontend/package.json`、`frontend/.env.example`、README/CLAUDE/AGENTS/`docs/agents/*`、本文件 | 修改（版本统一 2.0.30 + 基线与结构清单更新） |
 | `docs/reviews/2026-11-21-deep-audit-verification.md` | 新增（四审计方法、P1 对照表、验证证据与遗留清单） |
+| `release/selfblog-2.0.30.jar`（替换 2.0.29 制品）+ `release/README.md` | 新增（对应当前源码的发布 JAR，内嵌最新前端，SHA-256 见 README） |
 
 ### 验证
 

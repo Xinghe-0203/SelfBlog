@@ -4,10 +4,11 @@
 
 | 文件 | 版本 | 大小 | SHA-256 |
 |---|---|---|---|
-| `selfblog-2.0.29.jar` | 2.0.29 | 67,729,037 B | `9835BBB6FC5304AEB6DE92EB649E17408B4838AE83BE51DAD11857EC1736DF48` |
+| `selfblog-2.0.30.jar` | 2.0.30 | 67,851,640 B | `6C8FF4A78ECA6AB02228830AC1497896DF6140F100B55243466F9D685F88B2C0` |
 
-> **版本提示（2026-11-21）**：源码版本已统一升至 **2.0.30**；本目录提交的 `selfblog-2.0.29.jar`
-> 是这些批次合入**之前**构建的产物，发布时应按下方命令重新构建一份 2.0.30 的 JAR 并替换。
+> **版本提示（2026-11-21）**：本 JAR 对应当前源码版本 **2.0.30**（提交 `4925379`，
+> 含 v2.0.30 全部六个批次：AI 写作助手、深度审计修复、UI 重做与打磨、全文订阅、
+> 语法高亮等），与提交的源码一一对应。
 
 ## 这个 JAR 是什么
 
@@ -20,7 +21,7 @@ JAR 与配置好的 `.env` 放在**同一运行目录**，并从该目录启动�
 都依赖工作目录）：
 
 ```bash
-java -jar selfblog-2.0.29.jar
+java -jar selfblog-2.0.30.jar
 ```
 
 默认端口 8825：博客 `http://localhost:8825/`，后台 `http://localhost:8825/admin`，
@@ -46,13 +47,14 @@ rm -rf target/classes/static
 所以发布用的副本放在本目录并显式提交。校验：
 
 ```bash
-sha256sum selfblog-2.0.29.jar
-# 9835bbb6fc5304aeb6de92eb649e17408b4838ae83be51dad11857ec1736df48
+sha256sum selfblog-2.0.30.jar
+# 6c8ff4a78eca6ab02228830ac1497896df6140f100b55243466f9d685f88b2c0
 ```
 
 ## 注意
 
-- 本 JAR 与当前提交的源码**不再一一对应**（源码已进入 2.0.30，见上方版本提示）；发布前需要重新构建并替换。
+- 打包时若本机有正在运行的旧后端（`java -jar target/selfblog.jar`），Windows 会锁死该
+  文件导致 repackage 报 `Unable to rename ... .original`——先停掉旧进程再打包。
 - 生产部署请以 `prod` profile 运行（`SPRING_PROFILES_ACTIVE=prod`），否则 Swagger 与
   management 端点会按默认配置对外暴露。
 - 数据库、上传目录与相册媒体不在 JAR 内，需要持久化到容器/主机卷。
